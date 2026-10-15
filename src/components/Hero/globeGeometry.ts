@@ -1,6 +1,3 @@
-import type { Destination } from '../../data/destinations'
-import { projectToGlobe } from '../../lib/globe'
-
 export interface Point {
   x: number
   y: number
@@ -11,18 +8,6 @@ export interface Route {
   from: Point
   control: Point
   to: Point
-}
-
-export interface Marker {
-  destination: Destination
-  point: Point
-}
-
-export function globeMarkers(list: Destination[]): Marker[] {
-  return list.flatMap((destination) => {
-    const p = projectToGlobe(destination.lat, destination.lon)
-    return p.visible ? [{ destination, point: { x: p.x, y: p.y } }] : []
-  })
 }
 
 /** Quadratic arc between two points, bowed away from the globe centre like a flight path. */

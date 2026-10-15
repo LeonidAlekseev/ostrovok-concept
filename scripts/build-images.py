@@ -5,12 +5,12 @@ Usage:
 
 Expected files in <sources-dir> (see public/images/CREDITS.md for origins):
     bm.jpg        Blue Marble Next Generation + topography + bathymetry (3600x1800)
-    prague.jpg    Týn Church, Prague
     florence.jpg  Florence panorama with the Duomo
     eiffel.jpg    Eiffel Tower at sunset
     sea.jpg       Navagio bay, Zakynthos
 
-The globe centre must stay in sync with GLOBE_CENTER in src/lib/globe.ts.
+The globe centre must stay in sync with GLOBE_CENTER in src/lib/globe.ts,
+TEXTURE_LAT_MIN with the shader in src/components/Hero/globeRenderer.ts.
 """
 
 import sys
@@ -20,6 +20,8 @@ import numpy as np
 from PIL import Image, ImageEnhance
 
 LAT0, LON0 = 10.0, 15.0
+# The hero only ever shows the northern cap: the rotating texture is cropped at this latitude.
+TEXTURE_LAT_MIN = -20.0
 OUT = Path(__file__).resolve().parent.parent / "public" / "images"
 
 
@@ -55,11 +57,7 @@ def render_globe(texture: Image.Image, size: int) -> Image.Image:
         + tex[y0 + 1, x1] * fx * fy
     )
 
-    # Lift the dark Blue Marble ocean towards a vivid travel-poster blue.
-    lum = c.mean(axis=-1, keepdims=True)
-    blueness = np.clip((c[..., 2:3] - c[..., 0:1]) * 3.0, 0, 1)
-    ocean = blueness * np.clip(1.2 - lum * 2.0, 0, 1)
-    c = c * (1 + 0.45 * ocean) + ocean * np.array([0.0, 0.05, 0.2])
+    c = boost_ocean(c)
 
     # Soft daylight from the upper right, plus atmospheric haze at the limb.
     light = np.array([0.45, 0.55, 0.70])
@@ -75,6 +73,22 @@ def render_globe(texture: Image.Image, size: int) -> Image.Image:
     img = img.resize((size, size), Image.LANCZOS)
     img = ImageEnhance.Color(img).enhance(1.25)
     return ImageEnhance.Contrast(img).enhance(1.08)
+
+
+def boost_ocean(c: np.ndarray) -> np.ndarray:
+    """Lifts the dark Blue Marble ocean towards a vivid travel-poster blue."""
+    lum = c.mean(axis=-1, keepdims=True)
+    blueness = np.clip((c[..., 2:3] - c[..., 0:1]) * 3.0, 0, 1)
+    ocean = blueness * np.clip(1.2 - lum * 2.0, 0, 1)
+    return c * (1 + 0.45 * ocean) + ocean * np.array([0.0, 0.05, 0.2])
+
+
+def globe_texture(texture: Image.Image) -> Image.Image:
+    """Equirectangular texture for the rotating WebGL globe (lighting is applied in the shader)."""
+    tex = np.asarray(texture.convert("RGB"), dtype=np.float32) / 255.0
+    rows = round(tex.shape[0] * (90 - TEXTURE_LAT_MIN) / 180)
+    c = boost_ocean(tex[:rows])
+    return Image.fromarray((np.clip(c, 0, 1) * 255).astype(np.uint8), "RGB")
 
 
 def crop_to(img: Image.Image, ratio: float, cx: float, cy: float, zoom: float = 1.0) -> Image.Image:
@@ -100,8 +114,11 @@ def main(src: Path) -> None:
     save(globe, "earth-europe-2000.webp", 2000, 82)
     save(globe, "earth-europe-1200.webp", 1200, 82)
 
+    texture = globe_texture(Image.open(src / "bm.jpg"))
+    save(texture, "earth-texture-3600.webp", 3600, 80)
+    save(texture, "earth-texture-2048.webp", 2048, 80)
+
     photos = {
-        "prague.jpg": ("prague-tyn.webp", 1.0, 0.55, 0.45, 1.3, 320),
         "sea.jpg": ("sea-navagio.webp", 1.15, 0.6, 0.6, 1.0, 900),
         "florence.jpg": ("florence-duomo.webp", 1.15, 0.64, 0.3, 2.2, 900),
         "eiffel.jpg": ("paris-eiffel.webp", 1.15, 0.585, 0.42, 1.9, 900),

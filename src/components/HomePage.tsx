@@ -2,6 +2,7 @@
 
 import { useCallback, useRef } from 'react'
 import { destinations, FEATURED_DESTINATION_ID, scenarios, type Destination } from '../data/destinations'
+import { newHotels } from '../data/hotels'
 import { useHotelSearch } from '../hooks/useHotelSearch'
 import { resolveTarget } from '../lib/search'
 import { DestinationCard } from './DestinationCard/DestinationCard'
@@ -40,8 +41,8 @@ export function HomePage() {
       <main className={styles.main}>
         <Hero
           markers={globeDestinations}
+          hotels={newHotels}
           featured={featured}
-          featuredImage="/images/prague-tyn.webp"
           selectedId={selectedDestinationId}
           onSelect={(d: Destination) => applyToSearch(d.name)}
         />
