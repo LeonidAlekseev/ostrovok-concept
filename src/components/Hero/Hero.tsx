@@ -404,7 +404,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
 }
 
 /**
- * Globe coordinates are percent of the globe box; CSS turns them into container units.
+ * Globe coordinates are percent of the globe box; CSS turns them into pixels.
  * Rounded so the server and the browser, whose trigonometry differs in the last digit, render the same markup.
  */
 const positionStyle = (p: { x: number; y: number }) =>

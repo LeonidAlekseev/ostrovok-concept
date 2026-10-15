@@ -72,8 +72,10 @@
   left: calc(var(--globe-x) - var(--globe-size) / 2);
   width: var(--globe-size);
   aspect-ratio: 1;
-  /* Markers are placed in container units: --x/--y are percent of the globe box. */
-  container-type: inline-size;
+  /* Markers are placed by --x/--y, percent of the globe box: --unit is 1% of it. No container query
+     units: Safari turns a query container into its own stacking layer, trapping the hotel card
+     under the hint. */
+  --unit: calc(var(--globe-size) / 100);
 }
 
 .atmosphere {
@@ -156,7 +158,7 @@
   aspect-ratio: 1.3;
   background: radial-gradient(ellipse, rgba(255, 255, 255, 0.7) 0%, rgba(240, 255, 225, 0.3) 35%, transparent 70%);
   opacity: var(--o, 1);
-  transform: translate(calc(var(--x) * 1cqw - 50%), calc(var(--y) * 1cqw - 50%));
+  transform: translate(calc(var(--x) * var(--unit) - 50%), calc(var(--y) * var(--unit) - 50%));
   mix-blend-mode: screen;
   pointer-events: none;
 }
@@ -214,7 +216,7 @@
   border: 0;
   border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
   opacity: var(--o, 1);
-  transform: translate(calc(var(--x) * 1cqw - 50%), calc(var(--y) * 1cqw - 100%)) scale(var(--pin-scale));
+  transform: translate(calc(var(--x) * var(--unit) - 50%), calc(var(--y) * var(--unit) - 100%)) scale(var(--pin-scale));
   will-change: transform;
   /* Like the globe's disc: a swipe that starts on a pin must not pull the page to refresh. */
   touch-action: none;
@@ -327,8 +329,8 @@
   box-shadow: 0 14px 34px rgba(30, 80, 20, 0.25);
   opacity: var(--o, 1);
   transform: translate(
-    calc(var(--x) * 1cqw + var(--card-dx)),
-    calc(var(--y) * 1cqw + var(--card-dy) - var(--card-lift))
+    calc(var(--x) * var(--unit) + var(--card-dx)),
+    calc(var(--y) * var(--unit) + var(--card-dy) - var(--card-lift))
   );
   will-change: transform;
   touch-action: none;
