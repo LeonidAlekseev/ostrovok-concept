@@ -201,6 +201,13 @@
 
 /* ---------- Pins ---------- */
 
+/* Registered so it can transition: the pin's transform is rewritten every frame, the scale eases on its own. */
+@property --pin-scale {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 1;
+}
+
 .pin {
   --pin-scale: 1;
 
@@ -221,9 +228,10 @@
   /* Like the globe's disc: a swipe that starts on a pin must not pull the page to refresh. */
   touch-action: none;
   transition:
-    width 0.5s ease,
-    height 0.5s ease,
-    color 0.3s ease;
+    --pin-scale 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.4s ease;
 }
 
 .pin[data-hidden] {
@@ -347,7 +355,7 @@
   display: flex;
   align-items: center;
   gap: clamp(7px, 2vw, 12px);
-  animation: cardIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: cardIn 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .placeIcon {
@@ -452,7 +460,7 @@
 @keyframes cardIn {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(8px) scale(0.97);
   }
 }
 

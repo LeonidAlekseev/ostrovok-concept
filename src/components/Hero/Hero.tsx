@@ -29,8 +29,11 @@ const SETTLE_RATE = 1.5
 const MAX_DRAG_SPEED = 400
 /** A vertical drag tilts the globe up to this latitude either way; the tilt stays after release. */
 const MAX_TILT = 85
-/** How quickly the globe turns a selected pin into view (per second). */
+/** How quickly the globe turns a selected pin into place (per second). */
 const CENTER_RATE = 3
+/** Share of the hero's height covered by the search form, and the gap kept above it, px. */
+const FORM_OVERLAP = 0.24
+const SELECTED_GAP = 16
 /** Seconds each new hotel stays in the spotlight. */
 const SPOTLIGHT_SECONDS = 5
 const REDUCED_MOTION_SPOTLIGHT_SECONDS = 8
@@ -40,6 +43,11 @@ const SCROLL_PAUSE_MS = 150
 const MIN_FRAME_MS = 10
 /** Below this speed (degrees per second) the globe is considered standing, so it is not redrawn. */
 const MIN_SPEED = 0.001
+/** Entrance of a new spotlight: the card fades in, then the routes to its city. */
+const SPOTLIGHT_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
+const CARD_FADE_MS = 700
+const ROUTE_FADE_MS = 1000
+const ROUTE_DELAY_MS = 200
 /** Routes to the first spotlight, matching the reference composition. */
 const initialSourceIds = ['london', 'lisbon', 'tbilisi']
 
@@ -94,8 +102,20 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
 
   // A new spotlight is painted before the browser shows it, so the card never flashes at a stale spot.
   useLayoutEffect(() => {
+    const changed = spotlightRef.current !== spotlight
     spotlightRef.current = spotlight
     paint(sceneAt(markers, spotlight, viewRef.current))
+    // The card and its routes fade in at the new city instead of jumping there (not on the first render:
+    // the server-rendered card is already in place). Animations override the per-frame depth opacity
+    // only while they run.
+    if (!changed || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    cardRef.current?.animate({ opacity: [0, 1] }, { duration: CARD_FADE_MS, easing: SPOTLIGHT_EASE })
+    for (const group of routeRefs.current)
+      for (const path of group?.children ?? [])
+        path.animate(
+          { opacity: [0, 1] },
+          { duration: ROUTE_FADE_MS, delay: ROUTE_DELAY_MS, easing: SPOTLIGHT_EASE, fill: 'backwards' },
+        )
   }, [markers, spotlight, paint])
 
   useEffect(() => {
@@ -267,7 +287,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
     }
   }, [markers, feed, paint])
 
-  // A selected pin stops the spin and is brought to the middle of the visible part of the globe.
+  // A selected pin stops the spin and is brought to the middle of the screen, just above the search form.
   useEffect(() => {
     const selected = markers.find((d) => d.id === selectedId)
     pausedRef.current.selected = selected !== undefined
@@ -278,9 +298,14 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
     const g = globeRef.current!.getBoundingClientRect()
     const h = heroRef.current!.getBoundingClientRect()
     const radius = g.width / 2
-    // Middle of the disc's visible part: the hero clips its sides and its faded bottom third.
-    const x = (Math.max(g.left, h.left) + Math.min(g.right, h.right)) / 2
-    const y = (Math.max(g.top, h.top) + Math.min(g.bottom, h.bottom - h.height * 0.3)) / 2
+    // The card keeps its place relative to the pin (below it on phones, beside it on wide screens);
+    // the pair must end just above the form, which overlaps the bottom quarter of the hero.
+    const card = cardRef.current!.getBoundingClientRect()
+    const hub = sceneAt(markers, spotlightRef.current, viewRef.current).hub
+    const hubY = g.top + (hub.y / 100) * g.height
+    const formTop = h.bottom - h.height * FORM_OVERLAP
+    const x = h.left + h.width / 2
+    const y = formTop - Math.max(card.bottom - hubY, 0) - SELECTED_GAP
     const u = (x - g.left - radius) / radius
     const v = (g.top + radius - y) / radius
     // Far north a city cannot reach every spot of the disc: move the spot towards the centre until it can.
