@@ -22,10 +22,9 @@ export interface FrameWindow {
   draws: number
 }
 
-/** Few cores, little memory or the data saver on: start cheap and skip the large texture. */
-export function isLowEndDevice() {
-  const nav = navigator as Navigator & { deviceMemory?: number; connection?: { saveData?: boolean } }
-  return nav.hardwareConcurrency <= 4 || (nav.deviceMemory ?? 8) <= 4 || nav.connection?.saveData === true
+/** The visitor asked to save traffic: the globe gets the small texture. */
+export function prefersSavingData() {
+  return (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true
 }
 
 /** Sums frames into half-second windows and reports each finished one. */
@@ -60,20 +59,17 @@ export function createFrameMeter(onWindow: (frames: FrameWindow) => void) {
  * Adapts the globe's render resolution to the frame rate the device actually holds.
  * A level that once proved too slow is not tried again, so the quality does not oscillate.
  */
-export function createGlobeQuality(devicePixelRatio: number, lowEnd: boolean) {
+export function createGlobeQuality(devicePixelRatio: number) {
   const ratios = [...new Set(PIXEL_RATIOS.map((r) => Math.min(r, devicePixelRatio)))]
   const cheapest = ratios.length - 1
-  let level = lowEnd ? ratios.findIndex((r) => r <= 1) : 0
+  // Every device starts sharp; a slow one steps down within a second or two.
+  let level = 0
   let best = 0
   let slow = 0
   let smooth = 0
   return {
     get pixelRatio() {
       return ratios[level]
-    },
-    /** At the cheapest level decorative effects are dropped too. */
-    get lite() {
-      return level === cheapest && cheapest > 0
     },
     get level() {
       return `${level + 1}/${ratios.length}`

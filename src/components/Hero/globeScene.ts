@@ -1,13 +1,13 @@
 import type { Destination } from '../../data/destinations'
 import type { NewHotel } from '../../data/hotels'
 import { projectToGlobe, type GlobePoint } from '../../lib/globe'
-import { arc, pointOnRoute, routePath, type Point } from './globeGeometry'
+import { arc, routePath } from './globeGeometry'
 
 /** A recently added hotel highlighted on the globe, with flight routes arriving at its city. */
 export interface Spotlight {
   destination: Destination
   hotel: NewHotel
-  /** Cities the routes start from; the plane flies along the first one. */
+  /** Cities the routes start from. */
   sources: Destination[]
 }
 
@@ -15,7 +15,6 @@ export interface Scene {
   points: Map<string, GlobePoint>
   hub: GlobePoint
   routes: { id: string; d: string; opacity: number }[]
-  plane: Point & { angle: number; opacity: number }
 }
 
 const routeLift = [0.3, 0.2, 0.25]
@@ -23,23 +22,20 @@ const routeLift = [0.3, 0.2, 0.25]
 /** Fades a marker out as it approaches the limb (depth 0) and hides it behind. */
 export const depthOpacity = (depth: number) => Math.min(Math.max((depth - 0.05) / 0.2, 0), 1)
 
-/** Positions of everything on the globe when it is turned to `centerLon`; `flight` is the plane progress, 0…1. */
-export function sceneAt(markers: Destination[], spotlight: Spotlight, centerLon: number, flight: number): Scene {
+/** Positions of everything on the globe when it is turned to `centerLon`. */
+export function sceneAt(markers: Destination[], spotlight: Spotlight, centerLon: number): Scene {
   const points = new Map(markers.map((d) => [d.id, projectToGlobe(d.lat, d.lon, centerLon)]))
   const project = (d: Destination) => points.get(d.id) ?? projectToGlobe(d.lat, d.lon, centerLon)
   const hub = project(spotlight.destination)
-  const arcs = spotlight.sources.map((source, i) => {
+  const routes = spotlight.sources.map((source, i) => {
     const from = project(source)
     return {
-      route: arc(source.id, from, hub, routeLift[i % routeLift.length]),
+      id: source.id,
+      d: routePath(arc(source.id, from, hub, routeLift[i % routeLift.length])),
       opacity: depthOpacity(Math.min(from.depth, hub.depth)),
     }
   })
-  const routes = arcs.map(({ route, opacity }) => ({ id: route.id, d: routePath(route), opacity }))
-  const plane = arcs[0]
-    ? { ...pointOnRoute(arcs[0].route, flight), opacity: arcs[0].opacity }
-    : { x: hub.x, y: hub.y, angle: 0, opacity: 0 }
-  return { points, hub, routes, plane }
+  return { points, hub, routes }
 }
 
 /** Cycles through each city's hotels so consecutive visits show different ones. */

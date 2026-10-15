@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
-import { BedDouble, ChevronRight, Plane, Star } from 'lucide-react'
+import { BedDouble, ChevronRight, Star } from 'lucide-react'
 import type { Destination } from '../../data/destinations'
 import type { NewHotel } from '../../data/hotels'
 import { GLOBE_CENTER } from '../../lib/globe'
 import { appEnv, isProduction } from '../../lib/env'
 import { formatPrice } from '../../lib/format'
-import { createFrameMeter, createGlobeQuality, isLowEndDevice, type FrameWindow } from './globePerformance'
+import { createFrameMeter, createGlobeQuality, prefersSavingData, type FrameWindow } from './globePerformance'
 import { createGlobeRenderer, type GlobeRenderer } from './globeRenderer'
 import { createHotelFeed, depthOpacity, pickSpotlightCity, sceneAt, type Scene, type Spotlight } from './globeScene'
 import { StatsPanel, type StatsPanelHandle } from './StatsPanel'
@@ -45,7 +45,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
     sources: initialSourceIds.flatMap((id) => markers.find((d) => d.id === id) ?? []),
   }))
   // The initial layout is rendered once; afterwards the animation loop owns all positions.
-  const [initialScene] = useState(() => sceneAt(markers, spotlight, GLOBE_CENTER.lon, 0.42))
+  const [initialScene] = useState(() => sceneAt(markers, spotlight, GLOBE_CENTER.lon))
   const [spinning, setSpinning] = useState(false)
 
   const heroRef = useRef<HTMLElement>(null)
@@ -54,13 +54,12 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const pinRefs = useRef(new Map<string, HTMLButtonElement>())
   const routeRefs = useRef<(SVGGElement | null)[]>([])
-  const planeRef = useRef<SVGSVGElement>(null)
   const glowRef = useRef<HTMLDivElement>(null)
   const cardRef = useRef<HTMLButtonElement>(null)
   const statsRef = useRef<StatsPanelHandle>(null)
   const spotlightRef = useRef(spotlight)
   const pausedRef = useRef({ hover: false, focus: false })
-  const sceneRef = useRef({ centerLon: GLOBE_CENTER.lon, flight: 0.42 })
+  const sceneRef = useRef({ centerLon: GLOBE_CENTER.lon })
 
   /** Writes the current scene straight to the DOM, bypassing React on every frame. */
   const paint = useCallback((scene: Scene) => {
@@ -82,19 +81,12 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
       if (route) for (const path of g.children) path.setAttribute('d', route.d)
       g.style.opacity = String(route?.opacity ?? 0)
     })
-    const plane = planeRef.current
-    if (plane) {
-      setPosition(plane, scene.plane.x, scene.plane.y)
-      plane.style.setProperty('--angle', `${scene.plane.angle + 45}deg`)
-      plane.style.setProperty('--o', String(scene.plane.opacity))
-    }
   }, [])
 
   // A new spotlight is painted before the browser shows it, so the card never flashes at a stale spot.
   useLayoutEffect(() => {
     spotlightRef.current = spotlight
-    const { centerLon, flight } = sceneRef.current
-    paint(sceneAt(markers, spotlight, centerLon, flight))
+    paint(sceneAt(markers, spotlight, sceneRef.current.centerLon))
   }, [markers, spotlight, paint])
 
   useEffect(() => {
@@ -102,18 +94,18 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
     const globe = globeRef.current!
     const hero = heroRef.current!
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const lowEnd = isLowEndDevice()
-    const quality = createGlobeQuality(window.devicePixelRatio || 1, lowEnd)
+    const saveData = prefersSavingData()
+    const quality = createGlobeQuality(window.devicePixelRatio || 1)
     const renderer = createGlobeRenderer(canvas, {
       small: '/images/earth-texture-2048.webp',
-      large: '/images/earth-texture-3600.webp',
-      useLarge: !lowEnd && globe.clientWidth * quality.pixelRatio > 1400,
+      large: '/images/earth-texture-4096.webp',
+      useLarge: !saveData,
     })
     if (!renderer) statsRef.current?.show('no WebGL 2', 'WebGL 2 unavailable: static poster')
     const meter = createFrameMeter((frames) => {
-      if (quality.update(frames.fps)) globe.toggleAttribute('data-lite', quality.lite)
+      quality.update(frames.fps)
       if (renderer)
-        statsRef.current?.show(`${Math.round(frames.fps)} fps`, describeStats(frames, quality, renderer, lowEnd))
+        statsRef.current?.show(`${Math.round(frames.fps)} fps`, describeStats(frames, quality, renderer, saveData))
     })
     let glReady = false
     let shown = false
@@ -181,8 +173,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
       state.centerLon -= speed * dt
       const period = reducedMotion.matches ? REDUCED_MOTION_SPOTLIGHT_SECONDS : SPOTLIGHT_SECONDS
       if (!paused) elapsed += dt
-      state.flight = reducedMotion.matches ? 0.42 : easeInOut(Math.min(elapsed / (period * 0.8), 1))
-      const scene = sceneAt(markers, spotlightRef.current, state.centerLon, state.flight)
+      const scene = sceneAt(markers, spotlightRef.current, state.centerLon)
 
       let drew = false
       if (glReady) {
@@ -203,7 +194,6 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
       paint(scene)
       if (elapsed >= period) {
         elapsed = 0
-        state.flight = 0
         nextSpotlight(scene.points)
       }
       if (glReady) meter.frame(now, performance.now() - started, drew)
@@ -284,7 +274,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
           className={`${styles.earth} ${spinning ? styles.replaced : ''}`}
           src="/images/earth-europe-1200.webp"
           srcSet="/images/earth-europe-1200.webp 1200w, /images/earth-europe-2000.webp 2000w"
-          sizes="(min-width: 768px) 1100px, 175vw"
+          sizes="(min-width: 768px) 960px, 140vw"
           alt="Земля из космоса"
           width={1200}
           height={1200}
@@ -315,25 +305,10 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
               {/* Two wide translucent strokes fake the glow: a blur filter would re-run on every frame. */}
               <path className={styles.routeHalo} d={route.d} />
               <path className={styles.routeGlow} d={route.d} />
-              <path className={styles.route} d={route.d} pathLength={100} />
+              <path className={styles.route} d={route.d} />
             </g>
           ))}
         </svg>
-
-        <Plane
-          ref={planeRef}
-          className={styles.plane}
-          style={
-            {
-              ...positionStyle(initialScene.plane),
-              '--angle': `${initialScene.plane.angle + 45}deg`,
-            } as CSSProperties
-          }
-          size={26}
-          fill="currentColor"
-          strokeWidth={1}
-          aria-hidden
-        />
 
         {markers.map((d) => {
           const isHub = d.id === destination.id
@@ -410,21 +385,19 @@ function describeStats(
   frames: FrameWindow,
   quality: ReturnType<typeof createGlobeQuality>,
   renderer: GlobeRenderer,
-  lowEnd: boolean,
+  saveData: boolean,
 ) {
   const { gpu, texture, canvas } = renderer.describe()
   const nav = navigator as Navigator & { deviceMemory?: number }
   return [
     `${Math.round(frames.fps)} fps · worst ${frames.worstMs.toFixed(1)} ms · js ${frames.cpuMs.toFixed(2)} ms`,
-    `globe ${Math.round(frames.draws)} draws/s · ${canvas} @${quality.pixelRatio}x · level ${quality.level}${quality.lite ? ' lite' : ''}`,
+    `globe ${Math.round(frames.draws)} draws/s · ${canvas} @${quality.pixelRatio}x · level ${quality.level}`,
     `texture ${texture}`,
     `gpu ${gpu}`,
-    `dpr ${window.devicePixelRatio} · ${nav.hardwareConcurrency} cores · ${nav.deviceMemory ?? '?'} GB${lowEnd ? ' · low-end' : ''}`,
+    `dpr ${window.devicePixelRatio} · ${nav.hardwareConcurrency} cores · ${nav.deviceMemory ?? '?'} GB${saveData ? ' · save-data' : ''}`,
     `env ${appEnv}`,
   ].join('\n')
 }
-
-const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2)
 
 function PinIcon() {
   return (

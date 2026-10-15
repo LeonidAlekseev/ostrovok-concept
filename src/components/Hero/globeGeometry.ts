@@ -29,13 +29,3 @@ export function arc(id: string, from: Point, to: Point, lift = 0.22): Route {
 export function routePath({ from, control, to }: Route): string {
   return `M ${from.x} ${from.y} Q ${control.x} ${control.y} ${to.x} ${to.y}`
 }
-
-/** Point and heading (degrees, 0 = pointing right) on a route at parameter t. */
-export function pointOnRoute({ from, control, to }: Route, t: number): Point & { angle: number } {
-  const u = 1 - t
-  const x = u * u * from.x + 2 * u * t * control.x + t * t * to.x
-  const y = u * u * from.y + 2 * u * t * control.y + t * t * to.y
-  const tx = 2 * u * (control.x - from.x) + 2 * t * (to.x - control.x)
-  const ty = 2 * u * (control.y - from.y) + 2 * t * (to.y - control.y)
-  return { x, y, angle: (Math.atan2(ty, tx) * 180) / Math.PI }
-}

@@ -1,7 +1,7 @@
 .hero {
   /* The sphere is much larger than the viewport: only its northern cap is visible. */
-  --globe-size: clamp(560px, 173vw, 840px);
-  --globe-top: clamp(92px, 25vw, 116px);
+  --globe-size: clamp(460px, 140vw, 680px);
+  --globe-top: clamp(112px, 31vw, 140px);
   --globe-x: 52%;
 
   position: relative;
@@ -243,8 +243,6 @@
 .route {
   stroke: rgba(235, 245, 255, 0.8);
   stroke-width: 1.1;
-  stroke-dasharray: 60 6;
-  animation: flow 9s linear infinite;
 }
 
 .routeGlow {
@@ -255,25 +253,6 @@
 .routeHalo {
   stroke: rgba(120, 190, 255, 0.12);
   stroke-width: 10;
-}
-
-.plane {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 2;
-  opacity: var(--o, 1);
-  transform: translate(calc(var(--x) * 1cqw - 50%), calc(var(--y) * 1cqw - 50%)) rotate(var(--angle));
-  /* Moved every frame: an own compositor layer is shifted instead of repainted. */
-  will-change: transform;
-  color: #fff;
-  filter: drop-shadow(0 0 6px rgba(140, 200, 255, 0.9));
-  pointer-events: none;
-}
-
-/* Cheapest quality level: no shadow filter on the moving plane. */
-.globe[data-lite] .plane {
-  filter: none;
 }
 
 /* ---------- Pins ---------- */
@@ -517,12 +496,6 @@
   text-overflow: ellipsis;
 }
 
-@keyframes flow {
-  to {
-    stroke-dashoffset: -132;
-  }
-}
-
 @keyframes cardIn {
   from {
     opacity: 0;
@@ -562,7 +535,7 @@
 
 @media (min-width: 768px) {
   .hero {
-    --globe-size: clamp(1000px, 100vw, 1180px);
+    --globe-size: clamp(820px, 80vw, 960px);
     --globe-top: 180px;
     --globe-x: 52%;
 

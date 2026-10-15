@@ -4,7 +4,7 @@ Usage:
     uv run --with pillow --with numpy python scripts/build-images.py <sources-dir>
 
 Expected files in <sources-dir> (see public/images/CREDITS.md for origins):
-    earth.jpg     equirectangular Earth texture, 2:1 (4052x2026)
+    earth.jpg     Blue Marble Next Generation, topography + bathymetry, July (5400x2700)
     florence.jpg  Florence panorama with the Duomo
     eiffel.jpg    Eiffel Tower at sunset
     sea.jpg       Navagio bay, Zakynthos
@@ -104,8 +104,8 @@ def main(src: Path) -> None:
     save(globe, "earth-europe-1200.webp", 1200, 82)
 
     texture = globe_texture(Image.open(src / "earth.jpg"))
-    save(texture, "earth-texture-3600.webp", 3600, 80)
-    save(texture, "earth-texture-2048.webp", 2048, 80)
+    save(texture, "earth-texture-4096.webp", 4096, 85)
+    save(texture, "earth-texture-2048.webp", 2048, 85)
 
     photos = {
         "sea.jpg": ("sea-navagio.webp", 1.15, 0.6, 0.6, 1.0, 900),
