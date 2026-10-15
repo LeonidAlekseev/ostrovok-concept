@@ -44,7 +44,7 @@ Vercel определяет проект как Next.js без дополнит�
 ## Изображения
 
 Готовые файлы лежат в `public/images` (источники и лицензии — `public/images/CREDITS.md`).
-Глобус отрендерен из текстуры NASA Blue Marble скриптом:
+Глобус отрендерен из равнопромежуточной текстуры Земли (`earth.jpg`, 2:1) скриптом:
 
 ```bash
 uv run --with pillow --with numpy python scripts/build-images.py <папка-с-исходниками>
