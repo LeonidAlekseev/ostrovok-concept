@@ -1,7 +1,6 @@
 /**
- * Orthographic projection of the hero globe. GLOBE_CENTER is the view of the
- * pre-rendered poster image (keep in sync with LAT0/LON0 in scripts/build-images.py);
- * the live globe keeps the latitude and rotates the longitude.
+ * Orthographic projection of the hero globe. GLOBE_CENTER is the initial view;
+ * the globe keeps the latitude and rotates the longitude.
  */
 export const GLOBE_CENTER = { lat: 10, lon: 15 }
 

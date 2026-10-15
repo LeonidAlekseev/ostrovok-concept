@@ -1,209 +1,189 @@
-import { GLOBE_CENTER, type GlobePoint } from '../../lib/globe'
+import { GLOBE_CENTER } from '../../lib/globe'
 
-/** Southern edge of the cropped texture (keep in sync with TEXTURE_LAT_MIN in scripts/build-images.py). */
-const TEXTURE_LAT_MIN = -20
-
-const vertexSource = `#version 300 es
-in vec2 aPos;
-out vec2 vUv;
-void main() {
-  vUv = aPos;
-  gl_Position = vec4(aPos, 0.0, 1.0);
-}`
-
-// Same orthographic projection and shading as render_globe() in scripts/build-images.py,
-// so the live globe matches the poster image it replaces.
-const fragmentSource = `#version 300 es
-precision highp float;
-in vec2 vUv;
-out vec4 outColor;
-uniform sampler2D uTex;
-// sin and cos of the view latitude.
-uniform vec2 uLat0;
-uniform float uLon0;
-uniform float uLatMin;
-uniform float uPixel;
-// View-space position of the spotlighted city (xyz) and its glow strength (w).
-uniform vec4 uCity;
-const float PI = 3.14159265;
-const vec3 LIGHT = normalize(vec3(0.45, 0.55, 0.70));
-// 1 - cos of the glow's angular radius, 0.16 rad: as wide as the CSS glow it replaced.
-const float GLOW_RADIUS = 0.0128;
-const vec3 GLOW_CORE = vec3(1.0, 0.925, 0.55) * 0.55;
-const vec3 GLOW_EDGE = vec3(0.63, 1.0, 0.47) * 0.25;
-
-void main() {
-  float u = vUv.x, v = vUv.y;
-  float rho = length(vUv);
-  float alpha = 1.0 - smoothstep(1.0 - uPixel, 1.0 + uPixel, rho);
-  if (alpha <= 0.0) discard;
-  float z = sqrt(max(1.0 - rho * rho, 0.0));
-
-  float lat = asin(clamp(z * uLat0.x + v * uLat0.y, -1.0, 1.0));
-  float lon = uLon0 + atan(u, z * uLat0.y - v * uLat0.x);
-  float s = lon / (2.0 * PI) + 0.5;
-  float t = (PI / 2.0 - lat) / (PI / 2.0 - uLatMin);
-
-  // Take derivatives from whichever wrap of s is continuous here to avoid a mip seam at the date line.
-  float s1 = fract(s), s2 = fract(s + 0.5) - 0.5;
-  vec2 g1 = vec2(dFdx(s1), dFdy(s1)), g2 = vec2(dFdx(s2), dFdy(s2));
-  vec2 gs = dot(g1, g1) < dot(g2, g2) ? g1 : g2;
-  vec3 c = textureGrad(uTex, vec2(s1, t), vec2(gs.x, dFdx(t)), vec2(gs.y, dFdy(t))).rgb;
-
-  float diffuse = clamp(dot(vec3(u, v, z), LIGHT), 0.0, 1.0);
-  c *= 0.55 + 0.75 * diffuse;
-  float haze = pow(1.0 - z, 2.2);
-  c = c * (1.0 - 0.65 * haze) + vec3(0.38, 0.66, 1.0) * 0.75 * haze;
-  c = clamp(c, 0.0, 1.0);
-
-  float gray = dot(c, vec3(0.299, 0.587, 0.114));
-  c = clamp(mix(vec3(gray), c, 1.25), 0.0, 1.0);
-  c = clamp(mix(vec3(0.4), c, 1.08), 0.0, 1.0);
-
-  // Pool of light around the spotlighted city, screen-blended; it follows the sphere's curvature.
-  float r = sqrt(max(1.0 - dot(vec3(u, v, z), uCity.xyz), 0.0) / GLOW_RADIUS);
-  vec3 glow = r < 0.5 ? mix(GLOW_CORE, GLOW_EDGE, r * 2.0) : mix(GLOW_EDGE, vec3(0.0), min(r * 2.0 - 1.0, 1.0));
-  c += glow * uCity.w * (1.0 - c);
-
-  // Interleaved gradient noise of one 8-bit step hides banding in the haze and the terminator.
-  c += (fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5) / 255.0;
-  outColor = vec4(c * alpha, alpha);
-}`
+/** Southern edge of the drawn globe (keep in sync with LAT_MIN in scripts/build-globe.py). */
+const LAT_MIN = -20
+/** Spacing of the latitude/longitude grid and the step its lines are sampled with, degrees. */
+const GRID_STEP = 15
+const GRID_SAMPLE = 2
+/** Side of a land dot, CSS pixels. */
+const DOT_SIZE = 1.8
+/** Dots are batched into a few opacity levels by how squarely they face the viewer. */
+const DOT_LEVELS = [
+  { depth: 0.05, alpha: 0.3 },
+  { depth: 0.25, alpha: 0.6 },
+  { depth: 0.5, alpha: 0.95 },
+]
+const GRID_STYLE = 'rgba(255, 255, 255, 0.22)'
+const COAST_STYLE = 'rgba(255, 255, 255, 0.7)'
 
 export interface GlobeFrame {
   centerLon: number
   /** Canvas size, CSS pixels. */
   size: number
-  /** Top fraction of the canvas that is on screen; only it is rasterised. */
+  /** Top fraction of the canvas that is on screen; only it is drawn. */
   visibleFraction: number
   /** Canvas pixels per CSS pixel. */
   pixelRatio: number
-  /** Spotlighted city and the strength of the light pool around it, 0…1. */
-  city: GlobePoint
-  cityGlow: number
 }
 
 export interface GlobeRenderer {
-  /** Resolves once the texture is uploaded and frames can be drawn. */
+  /** Resolves once the geometry is loaded and frames can be drawn. */
   ready: Promise<void>
   /** Draws a frame; returns false when nothing changed since the previous one and drawing was skipped. */
   draw(frame: GlobeFrame): boolean
-  /** GPU name and texture details for the technical overlay. */
-  describe(): { gpu: string; texture: string; canvas: string }
+  /** Geometry and canvas details for the technical overlay. */
+  describe(): { geometry: string; canvas: string }
   dispose(): void
 }
 
-/** WebGL 2 globe renderer, or null when WebGL 2 is unavailable (the static poster stays then). */
-export function createGlobeRenderer(
-  canvas: HTMLCanvasElement,
-  texture: { small: string; large: string; useLarge: boolean },
-) {
-  // A full-screen shader pass gains nothing from the discrete GPU on dual-GPU laptops; spare the battery.
-  const gl = canvas.getContext('webgl2', {
-    alpha: true,
-    antialias: false,
-    premultipliedAlpha: true,
-    powerPreference: 'low-power',
-  })
-  if (!gl) return null
+/**
+ * Points on the unit sphere as (cosφ·cosλ, cosφ·sinλ, sinφ) triples: turning the globe then needs
+ * no trigonometry per point, only the sine and cosine of the view longitude.
+ */
+interface Polylines {
+  points: Float32Array
+  /** Index of each polyline's first point, plus the total count at the end. */
+  starts: number[]
+}
 
-  const program = linkProgram(gl)
-  if (!program) return null
-  gl.useProgram(program)
+/** Dotted wireframe globe drawn with Canvas 2D: land dots, coastlines and a latitude/longitude grid. */
+export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): GlobeRenderer | null {
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
 
-  const buffer = gl.createBuffer()
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
-  const aPos = gl.getAttribLocation(program, 'aPos')
-  gl.enableVertexAttribArray(aPos)
-  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0)
-
-  const uniform = (name: string) => gl.getUniformLocation(program, name)
-  const uLon0 = uniform('uLon0')
-  const uPixel = uniform('uPixel')
-  const uCity = uniform('uCity')
-  const lat0 = (GLOBE_CENTER.lat * Math.PI) / 180
-  gl.uniform2f(uniform('uLat0'), Math.sin(lat0), Math.cos(lat0))
-  gl.uniform1f(uniform('uLatMin'), (TEXTURE_LAT_MIN * Math.PI) / 180)
-  gl.uniform1i(uniform('uTex'), 0)
-
-  const glTexture = gl.createTexture()
-  let textureSize = ''
+  const grid = polylines(graticule())
+  let dots: Float32Array = new Float32Array()
+  let coast: Polylines = { points: new Float32Array(), starts: [0] }
   let drawn = ''
-  let disposed = false
+  const controller = new AbortController()
 
   const ready = (async () => {
-    const image = new Image()
-    image.decoding = 'async'
-    image.src = texture.useLarge && gl.getParameter(gl.MAX_TEXTURE_SIZE) >= 4096 ? texture.large : texture.small
-    await image.decode()
-    if (disposed) return
-    textureSize = `${image.naturalWidth}×${image.naturalHeight}`
-    gl.bindTexture(gl.TEXTURE_2D, glTexture)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image)
-    gl.generateMipmap(gl.TEXTURE_2D)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    const response = await fetch(url, { signal: controller.signal }).catch((error: unknown) => {
+      // Disposed before the geometry arrived: nothing will be drawn, so this is not an error.
+      if (controller.signal.aborted) return null
+      throw error
+    })
+    if (!response) return
+    if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`)
+    const data: { dots: number[]; lines: number[][] } = await response.json()
+    dots = toSphere(data.dots)
+    coast = polylines(data.lines)
   })()
+
+  const lat0 = (GLOBE_CENTER.lat * Math.PI) / 180
+  const sin0 = Math.sin(lat0)
+  const cos0 = Math.cos(lat0)
 
   return {
     ready,
-    draw({ centerLon, size, visibleFraction, pixelRatio, city, cityGlow }) {
+    draw({ centerLon, size, visibleFraction, pixelRatio }) {
       const px = Math.round(size * pixelRatio)
       const visible = Math.ceil(px * Math.min(Math.max(visibleFraction, 0), 1))
-      // A standing globe (hover, reduced motion) costs no GPU time at all.
-      const key = `${centerLon}/${px}/${visible}/${city.x}/${city.y}/${cityGlow}`
+      // A standing globe (hover, reduced motion) costs nothing at all.
+      const key = `${centerLon}/${px}/${visible}`
       if (key === drawn && canvas.width === px) return false
       drawn = key
       if (canvas.width !== px || canvas.height !== px) {
         canvas.width = px
         canvas.height = px
       }
-      gl.viewport(0, 0, px, px)
-      gl.enable(gl.SCISSOR_TEST)
-      gl.scissor(0, px - visible, px, visible)
-      gl.clearColor(0, 0, 0, 0)
-      gl.clear(gl.COLOR_BUFFER_BIT)
-      gl.uniform1f(uLon0, (centerLon * Math.PI) / 180)
-      gl.uniform1f(uPixel, 1.5 / px)
-      gl.uniform4f(uCity, city.x / 50 - 1, 1 - city.y / 50, city.depth, cityGlow)
-      gl.drawArrays(gl.TRIANGLES, 0, 3)
+      ctx.clearRect(0, 0, px, px)
+
+      const c = (centerLon * Math.PI) / 180
+      const cc = Math.cos(c)
+      const sc = Math.sin(c)
+      const r = px / 2
+      // Orthographic projection, the same as projectToGlobe() in src/lib/globe.ts.
+      const project = (p: Float32Array, i: number, out: { x: number; y: number; depth: number }) => {
+        const a = p[i]
+        const b = p[i + 1]
+        const s = p[i + 2]
+        const cosLon = a * cc + b * sc
+        out.x = r + (b * cc - a * sc) * r
+        out.y = r - (cos0 * s - sin0 * cosLon) * r
+        out.depth = sin0 * s + cos0 * cosLon
+      }
+      const q = { x: 0, y: 0, depth: 0 }
+
+      ctx.lineWidth = pixelRatio
+      ctx.lineJoin = 'round'
+      for (const [lines, style] of [
+        [grid, GRID_STYLE],
+        [coast, COAST_STYLE],
+      ] as const) {
+        ctx.beginPath()
+        for (let l = 0; l + 1 < lines.starts.length; l++) {
+          let pen = false
+          for (let i = lines.starts[l]; i < lines.starts[l + 1]; i++) {
+            project(lines.points, i * 3, q)
+            // Lines break where they pass behind the limb.
+            if (q.depth < 0 || q.y > visible + r * 0.05) pen = false
+            else if (pen) ctx.lineTo(q.x, q.y)
+            else {
+              ctx.moveTo(q.x, q.y)
+              pen = true
+            }
+          }
+        }
+        ctx.strokeStyle = style
+        ctx.stroke()
+      }
+
+      const side = DOT_SIZE * pixelRatio
+      ctx.fillStyle = '#fff'
+      DOT_LEVELS.forEach(({ depth, alpha }, level) => {
+        const until = DOT_LEVELS[level + 1]?.depth ?? Infinity
+        ctx.beginPath()
+        for (let i = 0; i < dots.length; i += 3) {
+          project(dots, i, q)
+          if (q.depth >= depth && q.depth < until && q.y < visible + side) ctx.rect(q.x - side / 2, q.y - side / 2, side, side)
+        }
+        ctx.globalAlpha = alpha
+        ctx.fill()
+      })
+      ctx.globalAlpha = 1
       return true
     },
     describe() {
-      const debug = gl.getExtension('WEBGL_debug_renderer_info')
+      const vertices = coast.starts.at(-1)! + grid.starts.at(-1)!
       return {
-        gpu: String(gl.getParameter(debug ? debug.UNMASKED_RENDERER_WEBGL : gl.RENDERER)),
-        texture: textureSize || 'loading',
+        geometry: `${dots.length / 3} dots · ${vertices} line vertices`,
         canvas: `${canvas.width}×${canvas.height}`,
       }
     },
     dispose() {
-      disposed = true
-      gl.deleteTexture(glTexture)
-      gl.deleteBuffer(buffer)
-      gl.deleteProgram(program)
+      controller.abort()
     },
   } satisfies GlobeRenderer
 }
 
-function linkProgram(gl: WebGL2RenderingContext): WebGLProgram | null {
-  const program = gl.createProgram()
-  for (const [type, source] of [
-    [gl.VERTEX_SHADER, vertexSource],
-    [gl.FRAGMENT_SHADER, fragmentSource],
-  ] as const) {
-    const shader = gl.createShader(type)!
-    gl.shaderSource(shader, source)
-    gl.compileShader(shader)
-    gl.attachShader(program, shader)
-    gl.deleteShader(shader)
+/** Converts flat [lon, lat, …] pairs in tenths of a degree to unit-sphere triples. */
+function toSphere(coords: number[]): Float32Array {
+  const out = new Float32Array((coords.length / 2) * 3)
+  for (let i = 0, j = 0; i < coords.length; i += 2, j += 3) {
+    const lon = (coords[i] / 10) * (Math.PI / 180)
+    const lat = (coords[i + 1] / 10) * (Math.PI / 180)
+    out[j] = Math.cos(lat) * Math.cos(lon)
+    out[j + 1] = Math.cos(lat) * Math.sin(lon)
+    out[j + 2] = Math.sin(lat)
   }
-  gl.linkProgram(program)
-  if (gl.getProgramParameter(program, gl.LINK_STATUS)) return program
-  console.error('Globe shader failed to link:', gl.getProgramInfoLog(program))
-  gl.deleteProgram(program)
-  return null
+  return out
+}
+
+function polylines(lines: number[][]): Polylines {
+  const starts = [0]
+  for (const line of lines) starts.push(starts.at(-1)! + line.length / 2)
+  return { points: toSphere(lines.flat()), starts }
+}
+
+/** Meridians and parallels over the drawn part of the globe, in the same tenths-of-a-degree format. */
+function graticule(): number[][] {
+  const lines: number[][] = []
+  const range = (from: number, to: number, step: number) =>
+    Array.from({ length: Math.floor((to - from) / step) + 1 }, (_, i) => from + i * step)
+  for (const lon of range(-180, 180 - GRID_STEP, GRID_STEP))
+    lines.push(range(LAT_MIN, 90, GRID_SAMPLE).flatMap((lat) => [lon * 10, lat * 10]))
+  for (const lat of range(-15, 90 - GRID_STEP, GRID_STEP))
+    lines.push(range(-180, 180, GRID_SAMPLE).flatMap((lon) => [lon * 10, lat * 10]))
+  return lines
 }

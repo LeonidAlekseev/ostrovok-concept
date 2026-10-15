@@ -5,7 +5,7 @@ import type { NewHotel } from '../../data/hotels'
 import { GLOBE_CENTER } from '../../lib/globe'
 import { appEnv, isProduction } from '../../lib/env'
 import { formatPrice } from '../../lib/format'
-import { createFrameMeter, createGlobeQuality, prefersSavingData, type FrameWindow } from './globePerformance'
+import { createFrameMeter, createGlobeQuality, type FrameWindow } from './globePerformance'
 import { createGlobeRenderer, type GlobeRenderer } from './globeRenderer'
 import { createHotelFeed, depthOpacity, pickSpotlightCity, sceneAt, type Scene, type Spotlight } from './globeScene'
 import { StatsPanel, type StatsPanelHandle } from './StatsPanel'
@@ -94,26 +94,20 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
     const globe = globeRef.current!
     const hero = heroRef.current!
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const saveData = prefersSavingData()
     const quality = createGlobeQuality(window.devicePixelRatio || 1)
-    const renderer = createGlobeRenderer(canvas, {
-      small: '/images/earth-texture-2048.webp',
-      large: '/images/earth-texture-4096.webp',
-      useLarge: !saveData,
-    })
-    if (!renderer) statsRef.current?.show('no WebGL 2', 'WebGL 2 unavailable: static poster')
+    const renderer = createGlobeRenderer(canvas, '/data/globe.json')
+    if (!renderer) statsRef.current?.show('no canvas', 'Canvas 2D unavailable: bare sphere')
     const meter = createFrameMeter((frames) => {
       quality.update(frames.fps)
-      if (renderer)
-        statsRef.current?.show(`${Math.round(frames.fps)} fps`, describeStats(frames, quality, renderer, saveData))
+      if (renderer) statsRef.current?.show(`${Math.round(frames.fps)} fps`, describeStats(frames, quality, renderer))
     })
-    let glReady = false
+    let ready = false
     let shown = false
     renderer?.ready.then(
       () => {
-        glReady = true
+        ready = true
       },
-      (error: unknown) => console.error('Globe texture failed to load:', error),
+      (error: unknown) => console.error('Globe geometry failed to load:', error),
     )
 
     const recent: string[] = [spotlightRef.current.destination.id]
@@ -154,7 +148,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
       const dt = Math.min((now - last) / 1000, 0.1)
       last = now
       const paused = pausedRef.current.hover || pausedRef.current.focus
-      const canSpin = glReady && !reducedMotion.matches
+      const canSpin = ready && !reducedMotion.matches
 
       // Ease in and out of rotation instead of starting or stopping abruptly. A drag pulls the spin
       // towards the pointer's speed; once released, the globe coasts back to its own pace.
@@ -176,15 +170,13 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
       const scene = sceneAt(markers, spotlightRef.current, state.centerLon)
 
       let drew = false
-      if (glReady) {
+      if (ready) {
         const globeRect = globe.getBoundingClientRect()
         drew = renderer!.draw({
           centerLon: state.centerLon,
           size: globeRect.width,
           visibleFraction: (hero.getBoundingClientRect().bottom - globeRect.top) / globeRect.height,
           pixelRatio: quality.pixelRatio,
-          city: scene.hub,
-          cityGlow: depthOpacity(scene.hub.depth),
         })
         if (!shown) {
           shown = true
@@ -196,11 +188,11 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
         elapsed = 0
         nextSpotlight(scene.points)
       }
-      if (glReady) meter.frame(now, performance.now() - started, drew)
+      if (ready) meter.frame(now, performance.now() - started, drew)
     }
 
     const onPointerDown = (e: PointerEvent) => {
-      if (!glReady || drag || e.button !== 0) return
+      if (!ready || drag || e.button !== 0) return
       drag = { pointerId: e.pointerId, lastX: e.clientX, dx: 0 }
       canvas.setPointerCapture(e.pointerId)
       canvas.toggleAttribute('data-dragging', true)
@@ -270,27 +262,11 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
 
       <div ref={globeRef} className={styles.globe}>
         <div className={styles.atmosphere} aria-hidden />
-        <img
-          className={`${styles.earth} ${spinning ? styles.replaced : ''}`}
-          src="/images/earth-europe-1200.webp"
-          srcSet="/images/earth-europe-1200.webp 1200w, /images/earth-europe-2000.webp 2000w"
-          sizes="(min-width: 768px) 960px, 140vw"
-          alt="Земля из космоса"
-          width={1200}
-          height={1200}
-          fetchPriority="high"
-          onError={(e) => e.currentTarget.classList.add(styles.earthFailed)}
-        />
+        <div className={styles.earth} aria-hidden />
         <canvas ref={canvasRef} className={`${styles.canvas} ${spinning ? styles.canvasShown : ''}`} aria-hidden />
         <div className={styles.rim} aria-hidden />
         <div className={styles.sun} aria-hidden />
-        {/* The live globe draws this glow itself; the element stays for the static poster. */}
-        <div
-          ref={glowRef}
-          className={`${styles.cityGlow} ${spinning ? styles.replaced : ''}`}
-          style={positionStyle(initialScene.hub)}
-          aria-hidden
-        />
+        <div ref={glowRef} className={styles.cityGlow} style={positionStyle(initialScene.hub)} aria-hidden />
 
         <svg className={styles.routes} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
           {initialScene.routes.map((route, i) => (
@@ -385,16 +361,14 @@ function describeStats(
   frames: FrameWindow,
   quality: ReturnType<typeof createGlobeQuality>,
   renderer: GlobeRenderer,
-  saveData: boolean,
 ) {
-  const { gpu, texture, canvas } = renderer.describe()
+  const { geometry, canvas } = renderer.describe()
   const nav = navigator as Navigator & { deviceMemory?: number }
   return [
     `${Math.round(frames.fps)} fps · worst ${frames.worstMs.toFixed(1)} ms · js ${frames.cpuMs.toFixed(2)} ms`,
     `globe ${Math.round(frames.draws)} draws/s · ${canvas} @${quality.pixelRatio}x · level ${quality.level}`,
-    `texture ${texture}`,
-    `gpu ${gpu}`,
-    `dpr ${window.devicePixelRatio} · ${nav.hardwareConcurrency} cores · ${nav.deviceMemory ?? '?'} GB${saveData ? ' · save-data' : ''}`,
+    geometry,
+    `dpr ${window.devicePixelRatio} · ${nav.hardwareConcurrency} cores · ${nav.deviceMemory ?? '?'} GB`,
     `env ${appEnv}`,
   ].join('\n')
 }

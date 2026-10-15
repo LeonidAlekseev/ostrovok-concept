@@ -1,8 +1,8 @@
 /**
- * Canvas pixels per CSS pixel, from sharpest to cheapest. Even at 1.5 the earth texture is
- * already magnified, so higher ratios would only cost fragments without adding detail.
+ * Canvas pixels per CSS pixel, from sharpest to cheapest. Thin lines and dots stay crisp up to 2;
+ * beyond that the fill cost grows with no visible gain.
  */
-const PIXEL_RATIOS = [1.5, 1.25, 1, 0.75]
+const PIXEL_RATIOS = [2, 1.5, 1, 0.75]
 const WINDOW_MS = 500
 /** A gap this long between frames means the loop was paused (tab hidden, hero off screen), not slow. */
 const PAUSE_MS = 1000
@@ -20,11 +20,6 @@ export interface FrameWindow {
   cpuMs: number
   /** Globe redraws per second; 0 while it stands still. */
   draws: number
-}
-
-/** The visitor asked to save traffic: the globe gets the small texture. */
-export function prefersSavingData() {
-  return (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true
 }
 
 /** Sums frames into half-second windows and reports each finished one. */
