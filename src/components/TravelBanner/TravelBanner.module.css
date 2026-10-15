@@ -19,6 +19,7 @@
   color: var(--navy);
   background: var(--green-soft);
   border-radius: 50%;
+  corner-shape: round;
 }
 
 .text {

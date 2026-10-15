@@ -1,4 +1,5 @@
 import type { GlobeView } from '../../lib/globe'
+import { advance, ahead, createPlanes, reroute, type Vec3 } from './globePlanes'
 
 /** Spacing of the latitude/longitude grid and the step its lines are sampled with, degrees. */
 const GRID_STEP = 15
@@ -13,6 +14,14 @@ const DOT_LEVELS = [
 ]
 const GRID_STYLE = 'rgba(255, 255, 255, 0.4)'
 const COAST_STYLE = 'rgba(255, 255, 255, 0.85)'
+const PLANE_COUNT = 9
+/** Plane length and its contrail length, CSS pixels and radians of arc. */
+const PLANE_SIZE = 17
+const TRAIL_ANGLE = 0.12
+const PLANE_COLOR = '#0645e8'
+/** Minimal top view of an airliner on a 24×24 grid, nose up. */
+const PLANE_PATH =
+  'M12 1.5c.9 0 1.4.9 1.4 2v5.7l7.6 4.6v2l-7.6-2.4v5l2.6 1.9v1.6L12 21l-4 .9v-1.6l2.6-1.9v-5L3 15.8v-2l7.6-4.6V3.5c0-1.1.5-2 1.4-2Z'
 
 export interface GlobeFrame {
   view: GlobeView
@@ -22,6 +31,8 @@ export interface GlobeFrame {
   visibleFraction: number
   /** Canvas pixels per CSS pixel. */
   pixelRatio: number
+  /** Seconds the planes fly since the previous frame; 0 holds them still. */
+  dt: number
 }
 
 export interface GlobeRenderer {
@@ -53,6 +64,8 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
   let dots: Float32Array = new Float32Array()
   let coast: Polylines = { points: new Float32Array(), starts: [0] }
   let drawn = ''
+  const planes = createPlanes(PLANE_COUNT)
+  const planePath = new Path2D(PLANE_PATH)
   const controller = new AbortController()
 
   const ready = (async () => {
@@ -70,12 +83,13 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
 
   return {
     ready,
-    draw({ view, size, visibleFraction, pixelRatio }) {
+    draw({ view, size, visibleFraction, pixelRatio, dt }) {
       const px = Math.round(size * pixelRatio)
       const visible = Math.ceil(px * Math.min(Math.max(visibleFraction, 0), 1))
-      // A standing globe (hover, reduced motion) costs nothing at all.
+      // A standing globe with standing planes (reduced motion) costs nothing at all.
       const key = `${view.lon}/${view.lat}/${px}/${visible}`
-      if (key === drawn && canvas.width === px) return false
+      if (dt === 0 && key === drawn && canvas.width === px) return false
+      advance(planes, dt)
       drawn = key
       if (canvas.width !== px || canvas.height !== px) {
         canvas.width = px
@@ -91,15 +105,15 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
       const cos0 = Math.cos(lat0)
       const r = px / 2
       // Orthographic projection, the same as projectToGlobe() in src/lib/globe.ts.
-      const project = (p: Float32Array, i: number, out: { x: number; y: number; depth: number }) => {
-        const a = p[i]
-        const b = p[i + 1]
-        const s = p[i + 2]
+      const projectPoint = (a: number, b: number, s: number, out: { x: number; y: number; depth: number }) => {
         const cosLon = a * cc + b * sc
         out.x = r + (b * cc - a * sc) * r
         out.y = r - (cos0 * s - sin0 * cosLon) * r
         out.depth = sin0 * s + cos0 * cosLon
       }
+      const project = (p: Float32Array, i: number, out: { x: number; y: number; depth: number }) =>
+        projectPoint(p[i], p[i + 1], p[i + 2], out)
+      const projectVec = (v: Vec3, out: { x: number; y: number; depth: number }) => projectPoint(v[0], v[1], v[2], out)
       const q = { x: 0, y: 0, depth: 0 }
 
       ctx.lineWidth = pixelRatio
@@ -138,6 +152,44 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
         ctx.globalAlpha = alpha
         ctx.fill()
       })
+
+      const head = { x: 0, y: 0, depth: 0 }
+      const tail = { x: 0, y: 0, depth: 0 }
+      const scale = (PLANE_SIZE * pixelRatio) / 24
+      ctx.lineCap = 'round'
+      ctx.lineWidth = 1.5 * pixelRatio
+      for (const plane of planes) {
+        projectVec(plane.pos, q)
+        // Behind the globe each plane picks a new random course, so the flights never repeat.
+        if (q.depth < -0.3 && !plane.rerouted) {
+          reroute(plane)
+          plane.rerouted = true
+        } else if (q.depth > 0) plane.rerouted = false
+        if (q.depth < 0.05 || q.y > visible + PLANE_SIZE * pixelRatio) continue
+        ctx.globalAlpha = Math.min((q.depth - 0.05) / 0.2, 1)
+
+        projectVec(ahead(plane, -TRAIL_ANGLE), tail)
+        const trail = ctx.createLinearGradient(q.x, q.y, tail.x, tail.y)
+        trail.addColorStop(0, 'rgba(255, 255, 255, 0.9)')
+        trail.addColorStop(1, 'rgba(255, 255, 255, 0)')
+        ctx.beginPath()
+        ctx.moveTo(q.x, q.y)
+        for (let k = 1; k <= 6; k++) {
+          projectVec(ahead(plane, (-TRAIL_ANGLE * k) / 6), tail)
+          ctx.lineTo(tail.x, tail.y)
+        }
+        ctx.strokeStyle = trail
+        ctx.stroke()
+
+        projectVec(ahead(plane, 0.01), head)
+        const angle = Math.atan2(head.y - q.y, head.x - q.x) + Math.PI / 2
+        ctx.setTransform(scale, 0, 0, scale, q.x, q.y)
+        ctx.rotate(angle)
+        ctx.translate(-12, -12)
+        ctx.fillStyle = PLANE_COLOR
+        ctx.fill(planePath)
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
+      }
       ctx.globalAlpha = 1
       return true
     },

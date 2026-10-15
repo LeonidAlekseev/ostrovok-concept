@@ -182,6 +182,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
           visibleFraction: (hero.getBoundingClientRect().bottom - globeRect.top) / globeRect.height,
           // Full device resolution keeps the thin lines and dots crisp.
           pixelRatio: window.devicePixelRatio || 1,
+          dt: reducedMotion.matches ? 0 : dt,
         })
         if (!shown) {
           shown = true
@@ -255,17 +256,12 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
     <section ref={heroRef} className={styles.hero} aria-labelledby="hero-title">
       <div ref={copyRef} className={styles.copy}>
         <h1 id="hero-title" className={styles.title}>
-          Мир ближе, <span className={styles.titleAccent}>чем кажется</span>
+          Найди свой <span className={styles.titleAccent}>уголок!</span>
         </h1>
-        <p className={styles.subtitle}>Найдите место для следующего путешествия</p>
       </div>
 
       <p ref={hintRef} className={styles.hint} aria-hidden>
-        Вращайте глобус и&nbsp;выбирайте направление
-        <svg className={styles.hintArrow} viewBox="0 0 64 34" fill="none">
-          <path d="M3 22C14 6 38 2 52 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          <path d="M44 18.5 53 19l1-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        Вращай глобус — воплощай мечту
       </p>
 
       <div ref={globeRef} className={styles.globe}>

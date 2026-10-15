@@ -46,14 +46,6 @@
   color: var(--blue);
 }
 
-.subtitle {
-  max-width: 10.5em;
-  margin: clamp(8px, 2.4vw, 20px) 0 0;
-  font-size: clamp(15px, 4vw, 22px);
-  font-weight: 450;
-  line-height: 1.25;
-}
-
 .hint {
   position: relative;
   z-index: 4;
@@ -67,14 +59,6 @@
   transform: rotate(-10deg);
   transform-origin: left top;
   pointer-events: none;
-}
-
-.hintArrow {
-  position: absolute;
-  top: -0.6em;
-  left: 100%;
-  width: 2.8em;
-  transform: rotate(12deg);
 }
 
 /* ---------- Globe ---------- */
@@ -95,6 +79,7 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
+  corner-shape: round;
   box-shadow:
     0 0 0 1.5px rgba(255, 255, 255, 0.6),
     0 0 24px 6px rgba(240, 255, 225, 0.7),
@@ -106,6 +91,7 @@
   width: 100%;
   height: 100%;
   border-radius: 50%;
+  corner-shape: round;
   /* Translucent glassy sphere: the dots and lines on top carry the geography. */
   background:
     radial-gradient(circle at 65% 15%, rgba(255, 255, 255, 0.45), transparent 40%),
@@ -138,6 +124,7 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
+  corner-shape: round;
   box-shadow: inset 0 0 30px 6px rgba(245, 255, 235, 0.55);
   pointer-events: none;
 }
@@ -225,6 +212,7 @@
   background: none;
   border: 0;
   border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
+  corner-shape: round;
   opacity: var(--o, 1);
   transform: translate(calc(var(--x) * 1cqw - 50%), calc(var(--y) * 1cqw - 100%)) scale(var(--pin-scale));
   will-change: transform;
@@ -313,13 +301,19 @@
   --card-dx: 22px;
   --card-dy: calc(-100% - 12px);
   --card-lift: 0px;
+  /* Inset of the picture, the same on every side; its size equals the text block's height. */
+  --card-pad: clamp(5px, 1.4vw, 7px);
+  --badge-size: clamp(9px, 2.5vw, 12px);
+  --name-size: clamp(13px, 3.5vw, 17px);
+  --meta-size: clamp(10px, 2.75vw, 13px);
+  --text-gap: 2px;
 
   position: absolute;
   top: 0;
   left: 0;
   z-index: 4;
   width: max-content;
-  padding: 4px 6px 4px 4px;
+  padding: var(--card-pad) calc(var(--card-pad) + 4px) var(--card-pad) var(--card-pad);
   color: var(--text);
   text-align: left;
   background: var(--white);
@@ -348,21 +342,16 @@
   animation: cardIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.placeCard:focus-visible {
-  box-shadow:
-    0 14px 34px rgba(30, 80, 20, 0.25),
-    var(--focus);
-}
-
 .placeIcon {
   display: grid;
   flex: none;
   place-items: center;
-  width: clamp(40px, 11vw, 64px);
+  width: calc(1.25 * (var(--badge-size) + var(--name-size) + var(--meta-size)) + 2 * var(--text-gap));
   aspect-ratio: 1;
   color: var(--white);
   background: linear-gradient(135deg, #3d8bff, #0b3aa8);
-  border-radius: clamp(7px, 2vw, 10px);
+  /* Concentric with the card's corner. */
+  border-radius: calc(clamp(10px, 3vw, 14px) - var(--card-pad) + 2px);
 }
 
 .placeIcon svg {
@@ -373,20 +362,21 @@
 .placeText {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--text-gap);
   min-width: 0;
+  line-height: 1.25;
 }
 
 .placeBadge {
   color: #1f9d55;
-  font-size: clamp(9px, 2.5vw, 12px);
+  font-size: var(--badge-size);
   font-weight: 650;
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
 .placeName {
-  font-size: clamp(13px, 3.5vw, 17px);
+  font-size: var(--name-size);
   font-weight: 650;
 }
 
@@ -394,6 +384,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  height: calc(1.25 * var(--meta-size));
 }
 
 .placeStars {
@@ -408,7 +399,7 @@
 
 .placePrice {
   color: var(--text-2);
-  font-size: clamp(10px, 2.75vw, 13px);
+  font-size: var(--meta-size);
   white-space: nowrap;
 }
 
@@ -492,10 +483,6 @@
   .copy {
     margin-left: max(0px, (100% - var(--page-max)) / 2);
     padding-top: clamp(56px, 8vw, 96px);
-  }
-
-  .subtitle {
-    max-width: 12em;
   }
 
   .hint {

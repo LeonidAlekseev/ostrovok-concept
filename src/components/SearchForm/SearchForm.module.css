@@ -67,11 +67,8 @@
   border-color: #c3ccda;
 }
 
-.field:focus-within,
-.fieldButton:focus-visible,
 .fieldButton[aria-expanded='true'] {
   border-color: var(--blue);
-  box-shadow: var(--focus);
 }
 
 .fieldInvalid,
@@ -123,6 +120,7 @@
   background: none;
   border: 0;
   border-radius: 50%;
+  corner-shape: round;
   transform: translateY(-50%);
 }
 
@@ -186,12 +184,6 @@
 
 .submit:active {
   transform: translateY(1px);
-}
-
-.submit:focus-visible {
-  box-shadow:
-    0 0 0 3px var(--white),
-    0 0 0 6px rgba(6, 69, 232, 0.45);
 }
 
 .spin {
@@ -326,6 +318,7 @@
   background: none;
   border: 0;
   border-radius: 50%;
+  corner-shape: round;
   pointer-events: auto;
 }
 
@@ -438,6 +431,7 @@
   background: var(--white);
   border: 1px solid var(--line);
   border-radius: 50%;
+  corner-shape: round;
 }
 
 .stepperButton:hover:not(:disabled) {
