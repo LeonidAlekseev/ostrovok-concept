@@ -216,6 +216,8 @@
   opacity: var(--o, 1);
   transform: translate(calc(var(--x) * 1cqw - 50%), calc(var(--y) * 1cqw - 100%)) scale(var(--pin-scale));
   will-change: transform;
+  /* Like the globe's disc: a swipe that starts on a pin must not pull the page to refresh. */
+  touch-action: none;
   transition:
     width 0.5s ease,
     height 0.5s ease,
@@ -329,6 +331,7 @@
     calc(var(--y) * 1cqw + var(--card-dy) - var(--card-lift))
   );
   will-change: transform;
+  touch-action: none;
   transition: box-shadow 0.2s ease;
 }
 

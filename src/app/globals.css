@@ -53,13 +53,10 @@
    scrolls and repaints badly (a blank strip at the bottom while its toolbar collapses). */
 html {
   overflow-x: clip;
-  /* No pull-to-refresh: a downward drag that starts on a pin or the hotel card would reload the page. */
-  overscroll-behavior-y: none;
 }
 
 body {
   margin: 0;
-  overscroll-behavior-y: none;
   min-width: 320px;
   overflow-x: clip;
 }
