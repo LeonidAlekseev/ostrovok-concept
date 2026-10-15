@@ -1,0 +1,588 @@
+.card {
+  position: relative;
+  z-index: 10;
+  padding: clamp(14px, 3.6vw, 18px);
+  background: var(--white);
+  border-radius: clamp(20px, 5vw, 26px);
+  box-shadow:
+    0 20px 50px rgba(7, 22, 47, 0.14),
+    0 2px 6px rgba(7, 22, 47, 0.04);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.42fr) minmax(0, 1fr);
+  grid-template-areas:
+    'destination destination'
+    'dates guests'
+    'submit submit';
+  gap: clamp(8px, 2.4vw, 12px);
+}
+
+.areaDestination {
+  grid-area: destination;
+}
+
+.areaDates {
+  grid-area: dates;
+}
+
+.areaGuests {
+  grid-area: guests;
+}
+
+.areaSubmit {
+  grid-area: submit;
+}
+
+/* ---------- Fields ---------- */
+
+.fieldWrap {
+  position: relative;
+  min-width: 0;
+}
+
+.fieldRow {
+  position: relative;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 2.3vw, 16px);
+  width: 100%;
+  height: clamp(48px, 12.4vw, 56px);
+  padding: 0 clamp(10px, 3vw, 18px);
+  color: var(--text);
+  text-align: left;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.field:hover {
+  border-color: #c3ccda;
+}
+
+.field:focus-within,
+.fieldButton:focus-visible,
+.fieldButton[aria-expanded='true'] {
+  border-color: var(--blue);
+  box-shadow: var(--focus);
+}
+
+.fieldInvalid,
+.fieldInvalid:hover {
+  border-color: var(--danger);
+}
+
+.fieldIcon {
+  flex: none;
+  color: var(--navy);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  /* Room for the divider and clear button laid over the field. */
+  padding: 0 56px 0 0;
+  font-size: clamp(16px, 4.1vw, 18px);
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+
+.input::placeholder {
+  color: #475467;
+  opacity: 1;
+}
+
+.divider {
+  position: absolute;
+  top: 22%;
+  right: clamp(48px, 13vw, 58px);
+  bottom: 22%;
+  width: 1px;
+  background: var(--line);
+}
+
+.clear {
+  position: absolute;
+  top: 50%;
+  right: clamp(6px, 2vw, 10px);
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  color: var(--text-2);
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  transform: translateY(-50%);
+}
+
+.clear:hover {
+  color: var(--text);
+  background: var(--gray-bg);
+}
+
+.value {
+  overflow: hidden;
+  font-size: clamp(13px, 3.55vw, 18px);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chevron {
+  flex: none;
+  /* The glyph has built-in side bearings; pull it towards the edge. */
+  margin: 0 -4px 0 auto;
+  color: var(--navy);
+  transition: transform 0.2s;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.error {
+  margin: 6px 4px 0;
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+/* ---------- Submit ---------- */
+
+.submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: clamp(50px, 12.8vw, 56px);
+  padding: 0 28px;
+  color: var(--white);
+  font-size: clamp(17px, 4.6vw, 19px);
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--blue);
+  border: 0;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 20px rgba(6, 69, 232, 0.25);
+  transition:
+    background-color 0.2s,
+    transform 0.1s,
+    box-shadow 0.2s;
+}
+
+.submit:hover {
+  background: var(--blue-hover);
+}
+
+.submit:active {
+  transform: translateY(1px);
+}
+
+.submit:focus-visible {
+  box-shadow:
+    0 0 0 3px var(--white),
+    0 0 0 6px rgba(6, 69, 232, 0.45);
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+/* ---------- Popovers ---------- */
+
+.popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  margin: 0;
+  padding: 8px;
+  background: var(--white);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  animation: pop 0.16s ease-out;
+}
+
+.suggestions {
+  right: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.option[aria-selected='true'] {
+  background: var(--gray-bg);
+}
+
+.optionIcon {
+  flex: none;
+  color: var(--blue);
+}
+
+.optionLabel {
+  display: block;
+  font-weight: 600;
+}
+
+.optionHint {
+  display: block;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.popoverHint {
+  margin: 4px 8px 0;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.popoverFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 8px 4px;
+  border-top: 1px solid var(--line);
+}
+
+.popoverSummary {
+  font-size: 14px;
+  font-weight: 550;
+}
+
+.popoverDone {
+  height: 38px;
+  padding: 0 16px;
+  color: var(--white);
+  font-weight: 600;
+  background: var(--blue);
+  border: 0;
+  border-radius: 10px;
+}
+
+.popoverDone:hover {
+  background: var(--blue-hover);
+}
+
+.popoverDoneWide {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.datesPopover {
+  width: min(330px, calc(100vw - 2 * var(--page-x) - 8px));
+}
+
+.guestsPopover {
+  right: 0;
+  left: auto;
+  width: min(310px, calc(100vw - 2 * var(--page-x) - 8px));
+  padding: 12px;
+}
+
+/* ---------- Calendar ---------- */
+
+.calendar {
+  position: relative;
+}
+
+.calendarNav {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  left: 0;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.calendarArrow {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--navy);
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  pointer-events: auto;
+}
+
+.calendarArrow:hover:not(:disabled) {
+  background: var(--gray-bg);
+}
+
+.calendarArrow:disabled {
+  opacity: 0.3;
+}
+
+.months {
+  display: grid;
+  gap: 20px;
+}
+
+.monthSecond {
+  display: none;
+}
+
+.monthTitle {
+  margin: 0;
+  padding: 10px 0 8px;
+  font-size: 15px;
+  font-weight: 650;
+  text-align: center;
+}
+
+.monthTitle::first-letter {
+  text-transform: uppercase;
+}
+
+.weekdays,
+.days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.weekdays span {
+  padding: 4px 0;
+  color: var(--text-2);
+  font-size: 12px;
+  text-align: center;
+}
+
+.day {
+  height: 40px;
+  padding: 0;
+  font-size: 14px;
+  background: none;
+  border: 0;
+  border-radius: 10px;
+}
+
+.day:hover:not(:disabled) {
+  background: var(--blue-soft);
+}
+
+.day:disabled {
+  color: #c0c7d2;
+}
+
+.dayInRange {
+  background: var(--blue-soft);
+  border-radius: 0;
+}
+
+.dayEdge,
+.dayEdge:hover:not(:disabled) {
+  color: var(--white);
+  font-weight: 600;
+  background: var(--blue);
+}
+
+/* ---------- Guests ---------- */
+
+.stepperRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 4px;
+}
+
+.stepperTitle {
+  display: block;
+  font-weight: 600;
+}
+
+.stepperHint {
+  display: block;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.stepper {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.stepperButton {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--blue);
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+}
+
+.stepperButton:hover:not(:disabled) {
+  border-color: var(--blue);
+}
+
+.stepperButton:disabled {
+  color: #c0c7d2;
+}
+
+.stepperValue {
+  min-width: 24px;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ---------- Results ---------- */
+
+.results:empty {
+  display: none;
+}
+
+.results {
+  margin-top: 14px;
+  padding: 14px 4px 2px;
+  border-top: 1px solid var(--line);
+}
+
+.resultsLoading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-2);
+}
+
+.resultsTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.resultsMeta {
+  margin: 2px 0 10px;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.resultsList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resultsItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--gray-bg);
+  border-radius: 12px;
+}
+
+.resultsPrice {
+  font-weight: 650;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.demoNote {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 0;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.demoNote svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.demoNote code {
+  word-break: break-all;
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Narrow phones: stack dates and guests ---------- */
+
+@media (max-width: 374px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'destination' 'dates' 'guests' 'submit';
+  }
+
+  .value {
+    font-size: 15px;
+  }
+}
+
+/* ---------- Tablet & desktop ---------- */
+
+@media (min-width: 768px) {
+  .datesPopover {
+    width: 620px;
+  }
+
+  .months {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .monthSecond {
+    display: block;
+  }
+}
+
+@media (min-width: 980px) {
+  .card {
+    padding: 14px;
+  }
+
+  .grid {
+    grid-template-columns: minmax(0, 1.55fr) minmax(0, 1.2fr) minmax(0, 0.95fr) auto;
+    grid-template-areas: 'destination dates guests submit';
+  }
+
+  .field,
+  .submit {
+    height: 60px;
+  }
+}

@@ -1,0 +1,442 @@
+.hero {
+  /* The sphere is much larger than the viewport: only its northern cap is visible. */
+  --globe-size: clamp(560px, 173vw, 840px);
+  --globe-top: clamp(92px, 25vw, 116px);
+  --globe-x: 52%;
+
+  position: relative;
+  isolation: isolate;
+  height: calc(var(--globe-top) + var(--globe-size) * 0.6);
+  overflow: hidden;
+  color: var(--white);
+  background:
+    radial-gradient(ellipse 70% 45% at 18% 4%, rgba(46, 104, 230, 0.42), transparent 70%),
+    radial-gradient(ellipse 60% 40% at 88% 30%, rgba(40, 92, 210, 0.35), transparent 70%),
+    linear-gradient(180deg, #050f2a 0%, #071d4f 55%, #0a3bb0 100%);
+  border-radius: 50% 50% 0 0 / 36px 36px 0 0;
+}
+
+/* Fade the bottom of the scene into the white page behind the search form. */
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 3;
+  height: 26%;
+  background: linear-gradient(180deg, rgba(150, 196, 255, 0) 0%, rgba(176, 212, 255, 0.82) 55%, #ffffff 100%);
+  pointer-events: none;
+}
+
+.sky {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    radial-gradient(1.4px 1.4px at 8% 22%, #fff 50%, transparent 52%),
+    radial-gradient(1.2px 1.2px at 23% 8%, #fff 50%, transparent 52%),
+    radial-gradient(1px 1px at 37% 30%, rgba(255, 255, 255, 0.9) 50%, transparent 52%),
+    radial-gradient(1.6px 1.6px at 56% 6%, #fff 50%, transparent 52%),
+    radial-gradient(1px 1px at 69% 24%, #fff 50%, transparent 52%),
+    radial-gradient(1.3px 1.3px at 78% 14%, #fff 50%, transparent 52%),
+    radial-gradient(1.1px 1.1px at 96% 26%, #fff 50%, transparent 52%),
+    radial-gradient(1px 1px at 3% 46%, rgba(255, 255, 255, 0.8) 50%, transparent 52%),
+    radial-gradient(1.2px 1.2px at 91% 44%, #fff 50%, transparent 52%),
+    radial-gradient(0.9px 0.9px at 45px 30px, rgba(255, 255, 255, 0.75) 50%, transparent 52%),
+    radial-gradient(0.8px 0.8px at 110px 95px, rgba(255, 255, 255, 0.55) 50%, transparent 52%),
+    radial-gradient(0.8px 0.8px at 160px 20px, rgba(255, 255, 255, 0.6) 50%, transparent 52%),
+    radial-gradient(0.7px 0.7px at 20px 130px, rgba(255, 255, 255, 0.5) 50%, transparent 52%);
+  background-size:
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    190px 170px,
+    190px 170px,
+    230px 150px,
+    170px 210px;
+}
+
+.sparkle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background:
+    radial-gradient(circle, #fff 0 1.4px, transparent 2.4px),
+    linear-gradient(90deg, transparent 45%, rgba(255, 255, 255, 0.85) 50%, transparent 55%),
+    linear-gradient(0deg, transparent 45%, rgba(255, 255, 255, 0.85) 50%, transparent 55%);
+  border-radius: 50%;
+  filter: drop-shadow(0 0 3px rgba(170, 210, 255, 0.9));
+  animation: twinkle 4s ease-in-out infinite;
+}
+
+.sparkle:nth-child(2) {
+  animation-delay: -1.3s;
+}
+
+.sparkle:nth-child(3) {
+  animation-delay: -2.6s;
+}
+
+.sparkleSmall {
+  width: 9px;
+  height: 9px;
+}
+
+.copy {
+  position: relative;
+  z-index: 4;
+  padding: clamp(26px, 8vw, 56px) var(--page-x) 0;
+  text-align: center;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(22px, 7vw, 60px);
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  line-height: 1.08;
+  text-shadow: 0 2px 18px rgba(3, 12, 40, 0.55);
+  text-wrap: balance;
+}
+
+.subtitle {
+  max-width: 19em;
+  margin: clamp(6px, 1.6vw, 14px) auto 0;
+  color: rgba(232, 240, 255, 0.92);
+  font-size: clamp(14px, 4vw, 21px);
+  font-weight: 450;
+  line-height: 1.3;
+  text-shadow: 0 1px 12px rgba(3, 12, 40, 0.6);
+}
+
+/* ---------- Globe ---------- */
+
+.globe {
+  position: absolute;
+  top: var(--globe-top);
+  left: var(--globe-x);
+  z-index: 1;
+  width: var(--globe-size);
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+}
+
+.atmosphere {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1.5px rgba(170, 220, 255, 0.7),
+    0 0 22px 6px rgba(110, 185, 255, 0.85),
+    0 0 70px 26px rgba(40, 120, 255, 0.55),
+    0 0 160px 60px rgba(20, 80, 230, 0.35);
+}
+
+.earth {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+.earthFailed {
+  background: radial-gradient(circle at 60% 30%, #3d8bff, #0b3aa8 60%, #061f63);
+  color: transparent;
+}
+
+.rim {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, transparent 62%, rgba(120, 190, 255, 0.28) 68%, transparent 71%);
+  box-shadow: inset 0 0 26px 4px rgba(150, 210, 255, 0.55);
+  pointer-events: none;
+}
+
+.sun {
+  position: absolute;
+  top: 11%;
+  left: 82%;
+  width: 26%;
+  aspect-ratio: 1;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.95) 0 3%,
+    rgba(210, 232, 255, 0.55) 9%,
+    rgba(120, 180, 255, 0.18) 30%,
+    transparent 62%
+  );
+  transform: translate(-50%, -50%);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.cityGlow {
+  position: absolute;
+  width: 16%;
+  aspect-ratio: 1.3;
+  background: radial-gradient(ellipse, rgba(255, 236, 140, 0.55) 0%, rgba(160, 255, 120, 0.25) 35%, transparent 70%);
+  transform: translate(-50%, -50%);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.routes {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.route,
+.routeGlow {
+  fill: none;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.route {
+  stroke: rgba(235, 245, 255, 0.8);
+  stroke-width: 1.1;
+  stroke-dasharray: 60 6;
+  animation: flow 9s linear infinite;
+}
+
+.routeGlow {
+  stroke: rgba(120, 190, 255, 0.7);
+  stroke-width: 3;
+}
+
+.plane {
+  position: absolute;
+  z-index: 2;
+  color: #fff;
+  filter: drop-shadow(0 0 6px rgba(140, 200, 255, 0.9));
+  pointer-events: none;
+}
+
+/* ---------- Pins ---------- */
+
+.pin {
+  position: absolute;
+  z-index: 2;
+  width: 18px;
+  height: 24px;
+  padding: 0;
+  color: var(--blue);
+  background: none;
+  border: 0;
+  border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
+  transform: translate(-50%, -100%);
+  transition: transform 0.2s ease;
+}
+
+.pin::before {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  width: 16px;
+  height: 7px;
+  background: radial-gradient(ellipse, rgba(140, 200, 255, 0.95), transparent 70%);
+  transform: translateX(-50%);
+}
+
+.pin:hover,
+.pin:focus-visible,
+.pin[aria-pressed='true'] {
+  transform: translate(-50%, -100%) scale(1.15);
+}
+
+.pin[aria-pressed='true'] {
+  color: #00a2ff;
+}
+
+.pinHub {
+  z-index: 3;
+  width: 30px;
+  height: 40px;
+}
+
+.pinHub::before {
+  width: 42px;
+  height: 16px;
+  bottom: -8px;
+  background: radial-gradient(ellipse, rgba(200, 255, 170, 0.95), rgba(120, 220, 120, 0.4) 45%, transparent 72%);
+}
+
+.pinIcon {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 4px 6px rgba(3, 20, 70, 0.45));
+}
+
+.pinTooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  padding: 4px 8px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--white);
+  border-radius: 8px;
+  box-shadow: var(--shadow-soft);
+  opacity: 0;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
+  pointer-events: none;
+}
+
+.pin:not(.pinHub):hover .pinTooltip,
+.pin:not(.pinHub):focus-visible .pinTooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* ---------- Featured place card ---------- */
+
+.placeCard {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: clamp(7px, 2vw, 12px);
+  width: max-content;
+  padding: 4px 6px 4px 4px;
+  color: var(--text);
+  text-align: left;
+  background: var(--white);
+  border: 0;
+  border-radius: clamp(10px, 3vw, 14px);
+  box-shadow: 0 14px 34px rgba(3, 14, 45, 0.35);
+  transform: translate(8px, calc(-100% - 8px));
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.placeCard:hover {
+  transform: translate(8px, calc(-100% - 12px));
+  box-shadow: 0 18px 40px rgba(3, 14, 45, 0.42);
+}
+
+.placeCard:focus-visible {
+  box-shadow:
+    0 14px 34px rgba(3, 14, 45, 0.35),
+    var(--focus);
+}
+
+.placeImage {
+  flex: none;
+  width: clamp(40px, 11vw, 72px);
+  height: auto;
+  aspect-ratio: 1.15;
+  object-fit: cover;
+  border-radius: clamp(7px, 2vw, 10px);
+}
+
+.placeText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.placeName {
+  font-size: clamp(13px, 3.5vw, 17px);
+  font-weight: 650;
+}
+
+.placePrice {
+  color: var(--text-2);
+  font-size: clamp(10px, 2.75vw, 13px);
+  white-space: nowrap;
+}
+
+.placeChevron {
+  flex: none;
+  width: clamp(14px, 3.8vw, 18px);
+  margin-left: clamp(0px, 1vw, 14px);
+  color: var(--text-2);
+}
+
+@keyframes flow {
+  to {
+    stroke-dashoffset: -132;
+  }
+}
+
+@keyframes twinkle {
+  50% {
+    opacity: 0.45;
+    transform: scale(0.8);
+  }
+}
+
+/* Not enough room to the right of the pin: lift the card above it. */
+@media (max-width: 374px) {
+  .placeCard,
+  .placeCard:hover {
+    transform: translate(-42%, calc(-100% - 52px));
+  }
+}
+
+/* ---------- Tablet & desktop ---------- */
+
+@media (min-width: 768px) {
+  .hero {
+    --globe-size: clamp(1000px, 100vw, 1180px);
+    --globe-top: 180px;
+    --globe-x: 52%;
+
+    height: calc(var(--globe-top) + var(--globe-size) * 0.47);
+    width: calc(100% - 2 * var(--page-x));
+    max-width: calc(var(--page-max) - 2 * var(--page-x));
+    margin: 0 auto;
+    border-radius: 50% 50% 0 0 / 56px 56px 0 0;
+  }
+
+  .copy {
+    padding-top: 56px;
+  }
+
+  .title {
+    font-size: clamp(40px, 5.6vw, 68px);
+  }
+
+  .subtitle {
+    max-width: 30em;
+  }
+
+  .placeCard,
+  .placeCard:hover {
+    transform: translate(22px, calc(-100% - 12px));
+  }
+
+  .hero::after {
+    height: 30%;
+  }
+
+  .pin {
+    width: 26px;
+    height: 35px;
+  }
+
+  .pinHub {
+    width: 44px;
+    height: 58px;
+  }
+}

@@ -1,3 +1,43 @@
 # ostrovok-concept
 
 Островок! - концепт агрегатора в сфере онлайн-бронирования жилья
+
+Главная страница сервиса бронирования отелей (Next.js 16 App Router + React 19 + TypeScript).
+Визуальный референс — `references/homepage.jpg`.
+
+## Запуск
+
+```bash
+npm install
+npm run dev        # http://localhost:3000
+npm run build      # production-сборка (страница пререндерится статически)
+npm run start      # запуск собранной версии
+npm run lint
+npm run typecheck
+```
+
+## Деплой на Vercel
+
+Vercel определяет проект как Next.js без дополнительной настройки:
+импортируйте репозиторий (Framework Preset — Next.js, команды по умолчанию)
+или выполните `npx vercel --prod` из корня. Нужен Node.js ≥ 20.9.
+Переменные окружения не требуются.
+
+## Демо-режим
+
+Бэкенда нет: поиск валидирует форму, формирует параметры запроса
+(`?destination=…&checkin=…&checkout=…&adults=…&rooms=…`, они же пишутся в адресную строку)
+и показывает ориентировочные цены из локального каталога `src/data/destinations.ts`.
+Бронирование, вход в профиль и избранное не реализованы.
+
+## Изображения
+
+Готовые файлы лежат в `public/images` (источники и лицензии — `public/images/CREDITS.md`).
+Глобус отрендерен из текстуры NASA Blue Marble скриптом:
+
+```bash
+uv run --with pillow --with numpy python scripts/build-images.py <папка-с-исходниками>
+```
+
+Центр проекции в скрипте должен совпадать с `GLOBE_CENTER` в `src/lib/globe.ts` —
+по нему на глобусе расставляются маркеры городов.

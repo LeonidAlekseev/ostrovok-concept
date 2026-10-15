@@ -1,0 +1,6 @@
+.fallback {
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.7);
+  background: linear-gradient(135deg, #2b5cd9 0%, #0b2a6b 100%);
+}
