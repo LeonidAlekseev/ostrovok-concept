@@ -8,6 +8,7 @@ import { formatPrice } from '../../lib/format'
 import { createFrameMeter, createGlobeQuality, isLowEndDevice, type FrameWindow } from './globePerformance'
 import { createGlobeRenderer, type GlobeRenderer } from './globeRenderer'
 import { createHotelFeed, depthOpacity, pickSpotlightCity, sceneAt, type Scene, type Spotlight } from './globeScene'
+import { StatsPanel, type StatsPanelHandle } from './StatsPanel'
 import styles from './Hero.module.css'
 
 interface Props {
@@ -56,7 +57,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
   const planeRef = useRef<SVGSVGElement>(null)
   const glowRef = useRef<HTMLDivElement>(null)
   const cardRef = useRef<HTMLButtonElement>(null)
-  const statsRef = useRef<HTMLPreElement>(null)
+  const statsRef = useRef<StatsPanelHandle>(null)
   const spotlightRef = useRef(spotlight)
   const pausedRef = useRef({ hover: false, focus: false })
   const sceneRef = useRef({ centerLon: GLOBE_CENTER.lon, flight: 0.42 })
@@ -108,11 +109,11 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
       large: '/images/earth-texture-3600.webp',
       useLarge: !lowEnd && globe.clientWidth * quality.pixelRatio > 1400,
     })
-    const stats = statsRef.current
-    if (stats && !renderer) stats.textContent = 'WebGL 2 unavailable: static poster'
+    if (!renderer) statsRef.current?.show('no WebGL 2', 'WebGL 2 unavailable: static poster')
     const meter = createFrameMeter((frames) => {
       if (quality.update(frames.fps)) globe.toggleAttribute('data-lite', quality.lite)
-      if (stats && renderer) stats.textContent = describeStats(frames, quality, renderer, lowEnd)
+      if (renderer)
+        statsRef.current?.show(`${Math.round(frames.fps)} fps`, describeStats(frames, quality, renderer, lowEnd))
     })
     let glReady = false
     let shown = false
@@ -392,7 +393,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
         </button>
       </div>
 
-      {!isProduction && <pre ref={statsRef} className={styles.stats} aria-hidden />}
+      {!isProduction && <StatsPanel ref={statsRef} />}
     </section>
   )
 }
