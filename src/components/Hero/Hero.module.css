@@ -168,8 +168,8 @@
   cursor: grabbing;
 }
 
-/* Hidden only after the live globe has faded in on top of it. */
-.earthHidden {
+/* Poster parts the live globe renders itself: hidden only after it has faded in. */
+.replaced {
   visibility: hidden;
   transition: visibility 0s 0.6s;
 }
@@ -233,7 +233,8 @@
 }
 
 .route,
-.routeGlow {
+.routeGlow,
+.routeHalo {
   fill: none;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
@@ -247,8 +248,13 @@
 }
 
 .routeGlow {
-  stroke: rgba(120, 190, 255, 0.7);
-  stroke-width: 3;
+  stroke: rgba(120, 190, 255, 0.32);
+  stroke-width: 4;
+}
+
+.routeHalo {
+  stroke: rgba(120, 190, 255, 0.12);
+  stroke-width: 10;
 }
 
 .plane {
@@ -258,17 +264,14 @@
   z-index: 2;
   opacity: var(--o, 1);
   transform: translate(calc(var(--x) * 1cqw - 50%), calc(var(--y) * 1cqw - 50%)) rotate(var(--angle));
+  /* Moved every frame: an own compositor layer is shifted instead of repainted. */
+  will-change: transform;
   color: #fff;
   filter: drop-shadow(0 0 6px rgba(140, 200, 255, 0.9));
   pointer-events: none;
 }
 
-/* Cheapest quality level: no per-frame blur of the moving routes and plane. */
-.globe[data-lite] .routeGlow {
-  filter: none;
-  opacity: 0.5;
-}
-
+/* Cheapest quality level: no shadow filter on the moving plane. */
 .globe[data-lite] .plane {
   filter: none;
 }
@@ -291,6 +294,7 @@
   border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
   opacity: var(--o, 1);
   transform: translate(calc(var(--x) * 1cqw - 50%), calc(var(--y) * 1cqw - 100%)) scale(var(--pin-scale));
+  will-change: transform;
   transition:
     width 0.5s ease,
     height 0.5s ease,
@@ -394,6 +398,7 @@
     calc(var(--x) * 1cqw + var(--card-dx)),
     calc(var(--y) * 1cqw + var(--card-dy) - var(--card-lift))
   );
+  will-change: transform;
   transition: box-shadow 0.2s ease;
 }
 

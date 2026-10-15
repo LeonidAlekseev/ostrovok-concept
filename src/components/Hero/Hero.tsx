@@ -178,21 +178,27 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
       }
       const state = sceneRef.current
       state.centerLon -= speed * dt
+      const period = reducedMotion.matches ? REDUCED_MOTION_SPOTLIGHT_SECONDS : SPOTLIGHT_SECONDS
+      if (!paused) elapsed += dt
+      state.flight = reducedMotion.matches ? 0.42 : easeInOut(Math.min(elapsed / (period * 0.8), 1))
+      const scene = sceneAt(markers, spotlightRef.current, state.centerLon, state.flight)
+
       let drew = false
       if (glReady) {
         const globeRect = globe.getBoundingClientRect()
-        const visible = (hero.getBoundingClientRect().bottom - globeRect.top) / globeRect.height
-        drew = renderer!.draw(state.centerLon, globeRect.width, visible, quality.pixelRatio)
+        drew = renderer!.draw({
+          centerLon: state.centerLon,
+          size: globeRect.width,
+          visibleFraction: (hero.getBoundingClientRect().bottom - globeRect.top) / globeRect.height,
+          pixelRatio: quality.pixelRatio,
+          city: scene.hub,
+          cityGlow: depthOpacity(scene.hub.depth),
+        })
         if (!shown) {
           shown = true
           setSpinning(true)
         }
       }
-
-      const period = reducedMotion.matches ? REDUCED_MOTION_SPOTLIGHT_SECONDS : SPOTLIGHT_SECONDS
-      if (!paused) elapsed += dt
-      state.flight = reducedMotion.matches ? 0.42 : easeInOut(Math.min(elapsed / (period * 0.8), 1))
-      const scene = sceneAt(markers, spotlightRef.current, state.centerLon, state.flight)
       paint(scene)
       if (elapsed >= period) {
         elapsed = 0
@@ -274,7 +280,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
       <div ref={globeRef} className={styles.globe}>
         <div className={styles.atmosphere} aria-hidden />
         <img
-          className={`${styles.earth} ${spinning ? styles.earthHidden : ''}`}
+          className={`${styles.earth} ${spinning ? styles.replaced : ''}`}
           src="/images/earth-europe-1200.webp"
           srcSet="/images/earth-europe-1200.webp 1200w, /images/earth-europe-2000.webp 2000w"
           sizes="(min-width: 768px) 1100px, 175vw"
@@ -287,14 +293,15 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
         <canvas ref={canvasRef} className={`${styles.canvas} ${spinning ? styles.canvasShown : ''}`} aria-hidden />
         <div className={styles.rim} aria-hidden />
         <div className={styles.sun} aria-hidden />
-        <div ref={glowRef} className={styles.cityGlow} style={positionStyle(initialScene.hub)} aria-hidden />
+        {/* The live globe draws this glow itself; the element stays for the static poster. */}
+        <div
+          ref={glowRef}
+          className={`${styles.cityGlow} ${spinning ? styles.replaced : ''}`}
+          style={positionStyle(initialScene.hub)}
+          aria-hidden
+        />
 
         <svg className={styles.routes} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
-          <defs>
-            <filter id="route-glow" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="0.6" />
-            </filter>
-          </defs>
           {initialScene.routes.map((route, i) => (
             <g
               key={i}
@@ -304,7 +311,9 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
               className={styles.routeGroup}
               style={{ opacity: route.opacity }}
             >
-              <path className={styles.routeGlow} d={route.d} filter="url(#route-glow)" />
+              {/* Two wide translucent strokes fake the glow: a blur filter would re-run on every frame. */}
+              <path className={styles.routeHalo} d={route.d} />
+              <path className={styles.routeGlow} d={route.d} />
               <path className={styles.route} d={route.d} pathLength={100} />
             </g>
           ))}
