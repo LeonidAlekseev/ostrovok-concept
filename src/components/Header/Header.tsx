@@ -49,7 +49,11 @@ export function Header({ onStartSearch }: Props) {
             aria-label={open === 'menu' ? 'Закрыть меню' : 'Открыть меню'}
             {...buttonProps('menu')}
           >
-            {open === 'menu' ? <X size={30} aria-hidden /> : <Menu size={30} strokeWidth={1.8} aria-hidden />}
+            {open === 'menu' ? (
+              <X size={28} strokeWidth={2.8} aria-hidden />
+            ) : (
+              <Menu size={28} strokeWidth={2.8} aria-hidden />
+            )}
           </button>
 
           {open && (

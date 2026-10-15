@@ -131,9 +131,12 @@
 }
 
 .sun {
+  /* The glare sits exactly on the limb, at this angle from the globe's centre (clockwise from 3 o'clock). */
+  --sun-angle: -50deg;
+
   position: absolute;
-  top: 11%;
-  left: 82%;
+  top: calc(50% + 50% * sin(var(--sun-angle)));
+  left: calc(50% + 50% * cos(var(--sun-angle)));
   width: 26%;
   aspect-ratio: 1;
   background: radial-gradient(
@@ -465,8 +468,7 @@
 
   /* The globe overflows the screen sideways: keep the glare on the visible part of the limb. */
   .sun {
-    top: 8%;
-    left: 30%;
+    --sun-angle: -112deg;
   }
 }
 
