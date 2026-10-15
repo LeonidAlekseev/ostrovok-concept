@@ -3,7 +3,9 @@
   z-index: 10;
   padding: clamp(14px, 3.6vw, 18px);
   background: var(--white);
-  border-radius: clamp(30px, 7.5vw, 39px);
+  border-radius: calc(clamp(30px, 7.5vw, 39px) * var(--corner-scale, 1));
+  corner-shape: squircle;
+  --corner-shape: squircle;
   box-shadow:
     0 20px 50px rgba(7, 22, 47, 0.14),
     0 2px 6px rgba(7, 22, 47, 0.04);
@@ -57,7 +59,9 @@
   text-align: left;
   background: var(--white);
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: calc(var(--radius-sm) * var(--corner-scale, 1));
+  corner-shape: squircle;
+  --corner-shape: squircle;
   transition:
     border-color 0.2s,
     box-shadow 0.2s;
@@ -120,7 +124,6 @@
   background: none;
   border: 0;
   border-radius: 50%;
-  corner-shape: round;
   transform: translateY(-50%);
 }
 
@@ -170,10 +173,12 @@
   white-space: nowrap;
   background: var(--blue);
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: calc(var(--radius-sm) * var(--corner-scale, 1));
+  corner-shape: squircle;
+  --corner-shape: squircle;
   box-shadow: 0 8px 20px rgba(6, 69, 232, 0.25);
+  /* No background-color transition: the squircle fallback bakes the fill into an SVG layer. */
   transition:
-    background-color 0.2s,
     transform 0.1s,
     box-shadow 0.2s;
 }
@@ -200,7 +205,9 @@
   margin: 0;
   padding: 8px;
   background: var(--white);
-  border-radius: var(--radius-md);
+  border-radius: calc(var(--radius-md) * var(--corner-scale, 1));
+  corner-shape: squircle;
+  --corner-shape: squircle;
   box-shadow: var(--shadow-card);
   animation: pop 0.16s ease-out;
 }
@@ -217,7 +224,9 @@
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
-  border-radius: 15px;
+  border-radius: calc(15px * var(--corner-scale, 1));
+  corner-shape: squircle;
+  --corner-shape: squircle;
   cursor: pointer;
 }
 
@@ -269,7 +278,9 @@
   font-weight: 600;
   background: var(--blue);
   border: 0;
-  border-radius: 15px;
+  border-radius: calc(15px * var(--corner-scale, 1));
+  corner-shape: squircle;
+  --corner-shape: squircle;
 }
 
 .popoverDone:hover {
@@ -318,7 +329,6 @@
   background: none;
   border: 0;
   border-radius: 50%;
-  corner-shape: round;
   pointer-events: auto;
 }
 
@@ -370,7 +380,9 @@
   font-size: 14px;
   background: none;
   border: 0;
-  border-radius: 15px;
+  border-radius: calc(15px * var(--corner-scale, 1));
+  corner-shape: squircle;
+  --corner-shape: squircle;
 }
 
 .day:hover:not(:disabled) {
@@ -431,7 +443,6 @@
   background: var(--white);
   border: 1px solid var(--line);
   border-radius: 50%;
-  corner-shape: round;
 }
 
 .stepperButton:hover:not(:disabled) {
@@ -496,7 +507,9 @@
   gap: 12px;
   padding: 10px 12px;
   background: var(--gray-bg);
-  border-radius: 18px;
+  border-radius: calc(18px * var(--corner-scale, 1));
+  corner-shape: squircle;
+  --corner-shape: squircle;
 }
 
 .resultsPrice {

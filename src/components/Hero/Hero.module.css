@@ -80,7 +80,6 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  corner-shape: round;
   box-shadow:
     0 0 0 1.5px rgba(255, 255, 255, 0.6),
     0 0 24px 6px rgba(240, 255, 225, 0.7),
@@ -92,7 +91,6 @@
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  corner-shape: round;
   /* Translucent glassy sphere: the dots and lines on top carry the geography. */
   background:
     radial-gradient(circle at 65% 15%, rgba(255, 255, 255, 0.45), transparent 40%),
@@ -125,7 +123,6 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  corner-shape: round;
   box-shadow: inset 0 0 30px 6px rgba(245, 255, 235, 0.55);
   pointer-events: none;
 }
@@ -216,7 +213,6 @@
   background: none;
   border: 0;
   border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
-  corner-shape: round;
   opacity: var(--o, 1);
   transform: translate(calc(var(--x) * 1cqw - 50%), calc(var(--y) * 1cqw - 100%)) scale(var(--pin-scale));
   will-change: transform;
@@ -286,7 +282,9 @@
   font-weight: 600;
   white-space: nowrap;
   background: var(--white);
-  border-radius: 12px;
+  border-radius: calc(12px * var(--corner-scale, 1));
+  corner-shape: squircle;
+  --corner-shape: squircle;
   box-shadow: var(--shadow-soft);
   opacity: 0;
   transform: translate(-50%, 4px);
@@ -325,7 +323,9 @@
   text-align: left;
   background: var(--white);
   border: 0;
-  border-radius: clamp(15px, 4.5vw, 21px);
+  border-radius: calc(clamp(15px, 4.5vw, 21px) * var(--corner-scale, 1));
+  corner-shape: squircle;
+  --corner-shape: squircle;
   box-shadow: 0 14px 34px rgba(30, 80, 20, 0.25);
   opacity: var(--o, 1);
   transform: translate(
@@ -358,7 +358,9 @@
   color: var(--white);
   background: linear-gradient(135deg, #3d8bff, #0b3aa8);
   /* Concentric with the card's corner. */
-  border-radius: calc(clamp(15px, 4.5vw, 21px) - var(--card-pad) + 3px);
+  border-radius: calc(calc(clamp(15px, 4.5vw, 21px) - var(--card-pad) + 3px) * var(--corner-scale, 1));
+  corner-shape: squircle;
+  --corner-shape: squircle;
 }
 
 .placeIcon svg {
@@ -432,7 +434,9 @@
     Menlo,
     monospace;
   background: rgba(0, 0, 0, 0.78);
-  border-radius: 9px;
+  border-radius: calc(9px * var(--corner-scale, 1));
+  corner-shape: squircle;
+  --corner-shape: squircle;
 }
 
 .stats summary {

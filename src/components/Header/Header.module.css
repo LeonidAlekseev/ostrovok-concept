@@ -22,7 +22,9 @@
   letter-spacing: -0.035em;
   line-height: 1;
   text-decoration: none;
-  border-radius: 12px;
+  border-radius: calc(12px * var(--corner-scale, 1));
+  corner-shape: squircle;
+  --corner-shape: squircle;
 }
 
 .actions {
@@ -42,7 +44,6 @@
   background: transparent;
   border: 0;
   border-radius: 50%;
-  corner-shape: round;
   transition:
     background-color 0.2s,
     color 0.2s,
@@ -62,7 +63,9 @@
   width: min(300px, calc(100vw - 2 * var(--page-x)));
   padding: 18px;
   background: var(--white);
-  border-radius: var(--radius-md);
+  border-radius: calc(var(--radius-md) * var(--corner-scale, 1));
+  corner-shape: squircle;
+  --corner-shape: squircle;
   box-shadow: var(--shadow-card);
   animation: pop 0.18s ease-out;
 }
@@ -87,7 +90,9 @@
   font-weight: 600;
   background: var(--blue);
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: calc(var(--radius-sm) * var(--corner-scale, 1));
+  corner-shape: squircle;
+  --corner-shape: squircle;
 }
 
 .panelAction:hover {
@@ -106,7 +111,9 @@
   color: var(--text);
   font-weight: 550;
   text-decoration: none;
-  border-radius: 15px;
+  border-radius: calc(15px * var(--corner-scale, 1));
+  corner-shape: squircle;
+  --corner-shape: squircle;
 }
 
 .menuLink:hover {

@@ -7,9 +7,12 @@
   overflow: hidden;
   color: var(--white);
   text-align: left;
-  background: var(--navy);
+  /* No fill of its own: in the squircle fallback it would show as a dark fringe around the picture. */
+  background: none;
   border: 0;
-  border-radius: clamp(21px, 5.4vw, 33px);
+  border-radius: calc(clamp(21px, 5.4vw, 33px) * var(--corner-scale, 1));
+  corner-shape: squircle;
+  --corner-shape: squircle;
   box-shadow: 0 6px 18px rgba(7, 22, 47, 0.12);
   scroll-snap-align: start;
   transition:
@@ -23,7 +26,17 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  /* Placeholder while the photo loads. */
+  background: var(--navy);
   transition: transform 0.5s ease;
+}
+
+/* The card's shadow puts the Safari/Firefox fallback in layer mode, which does not clip children: shape them too. */
+.image,
+.shade {
+  border-radius: inherit;
+  corner-shape: squircle;
+  --corner-shape: squircle;
 }
 
 .shade {
@@ -67,7 +80,6 @@
   color: var(--navy);
   background: var(--white);
   border-radius: 50%;
-  corner-shape: round;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
   transition:
     transform 0.25s ease,

@@ -7,7 +7,9 @@
   padding: clamp(12px, 3.4vw, 26px) clamp(16px, 4.6vw, 36px);
   overflow: hidden;
   background: var(--gray-bg);
-  border-radius: clamp(27px, 6.9vw, 39px);
+  border-radius: calc(clamp(27px, 6.9vw, 39px) * var(--corner-scale, 1));
+  corner-shape: squircle;
+  --corner-shape: squircle;
 }
 
 .badge {
@@ -19,7 +21,6 @@
   color: var(--navy);
   background: var(--green-soft);
   border-radius: 50%;
-  corner-shape: round;
 }
 
 .text {

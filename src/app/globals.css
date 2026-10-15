@@ -1,3 +1,6 @@
+/* Before the polyfill starts, browsers without corner-shape soften the radii (see --radius-sm). */
+@import "hyperellipse/css";
+
 :root {
   --blue: #0645e8;
   --blue-hover: #0538c4;
@@ -16,6 +19,12 @@
   --lime: #a5e87b;
   --danger: #d92d20;
 
+  /*
+   * Corners are Apple-style squircles: `corner-shape` natively, the hyperellipse polyfill in Safari and
+   * Firefox. Each rounded element sets `corner-shape` and `--corner-shape` and writes its radius as
+   * calc(R * var(--corner-scale, 1)); a squircle looks as round as a circular corner about 1.5 times
+   * smaller, hence the large radii (and the 0.6 scale before the polyfill starts).
+   */
   --radius-sm: 18px;
   --radius-md: 24px;
   --radius-lg: 36px;
@@ -45,9 +54,6 @@
 *::before,
 *::after {
   box-sizing: border-box;
-  /* Apple-style continuous corners where supported; other browsers keep ordinary rounded ones.
-     A squircle looks as round as a circular corner about 1.5 times smaller, hence the larger radii. */
-  corner-shape: squircle;
 }
 
 html {
