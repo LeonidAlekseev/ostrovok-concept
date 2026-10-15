@@ -25,7 +25,7 @@ const BALLOON_SIZE = 0.036
 const TRAIL_ANGLE = 0.12
 const FLYER_COLOR = '#fff'
 /** Planes and balloons are slightly see-through, so they never outshine the globe and the pins. */
-const FLYER_ALPHA = 0.75
+const FLYER_ALPHA = 0.9
 /** Planes and balloons fade out smoothly between these depths as they near the horizon. */
 const FADE_FROM = 0.02
 const FADE_TO = 0.35
@@ -215,14 +215,18 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
         // The contrail goes without a shadow, as a faint streak.
         ctx.shadowColor = 'transparent'
 
+        // The contrail starts behind the tail: overlapping the body, two translucent whites would add up
+        // to an opaque plane that never fades. Half the plane's length, in radians of arc.
+        const tailStart = -PLANE_SIZE
+        projectVec(ahead(plane, tailStart), head)
         projectVec(ahead(plane, -TRAIL_ANGLE), tail)
-        const trail = ctx.createLinearGradient(q.x, q.y, tail.x, tail.y)
-        trail.addColorStop(0, 'rgba(255, 255, 255, 0.9)')
+        const trail = ctx.createLinearGradient(head.x, head.y, tail.x, tail.y)
+        trail.addColorStop(0, 'rgba(255, 255, 255, 0.6)')
         trail.addColorStop(1, 'rgba(255, 255, 255, 0)')
         ctx.beginPath()
-        ctx.moveTo(q.x, q.y)
+        ctx.moveTo(head.x, head.y)
         for (let k = 1; k <= 6; k++) {
-          projectVec(ahead(plane, (-TRAIL_ANGLE * k) / 6), tail)
+          projectVec(ahead(plane, tailStart + ((tailStart + TRAIL_ANGLE) * -k) / 6), tail)
           // Past the horizon the contrail would fold back onto the visible disc.
           if (tail.depth < FADE_FROM) break
           ctx.lineTo(tail.x, tail.y)

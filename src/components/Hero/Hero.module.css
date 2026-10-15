@@ -51,7 +51,7 @@
   position: relative;
   z-index: 4;
   width: 7em;
-  margin: clamp(16px, 5vw, 40px) 0 0 calc(var(--page-x) + 4px);
+  margin: clamp(32px, 9vw, 64px) 0 0 calc(var(--page-x) + 4px);
   color: var(--blue);
   font-family: Caveat, cursive;
   font-size: clamp(17px, 4.6vw, 22px);
