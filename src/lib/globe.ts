@@ -2,7 +2,7 @@
  * Orthographic projection of the hero globe. GLOBE_CENTER is the initial view;
  * the globe keeps the latitude and rotates the longitude.
  */
-export const GLOBE_CENTER = { lat: 10, lon: 15 }
+export const GLOBE_CENTER = { lat: 25, lon: 50 }
 
 const rad = Math.PI / 180
 

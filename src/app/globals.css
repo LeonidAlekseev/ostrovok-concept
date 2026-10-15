@@ -10,6 +10,8 @@
   --text-2: #667085;
   --green: #4cc13a;
   --green-soft: #dcf7c4;
+  /* Background of the header and the hero. */
+  --lime: #a5e87b;
   --danger: #d92d20;
 
   --radius-sm: 12px;

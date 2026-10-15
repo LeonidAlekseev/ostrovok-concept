@@ -13,8 +13,8 @@ const DOT_LEVELS = [
   { depth: 0.25, alpha: 0.6 },
   { depth: 0.5, alpha: 0.95 },
 ]
-const GRID_STYLE = 'rgba(255, 255, 255, 0.22)'
-const COAST_STYLE = 'rgba(255, 255, 255, 0.7)'
+const GRID_STYLE = 'rgba(255, 255, 255, 0.4)'
+const COAST_STYLE = 'rgba(255, 255, 255, 0.85)'
 
 export interface GlobeFrame {
   centerLon: number

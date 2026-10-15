@@ -1,7 +1,7 @@
 .header {
   position: relative;
   z-index: 20;
-  background: var(--white);
+  background: var(--lime);
 }
 
 .inner {
@@ -29,16 +29,16 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: clamp(10px, 4vw, 22px);
+  gap: clamp(0px, 1vw, 14px);
 }
 
 .iconButton {
   display: grid;
   place-items: center;
-  width: 44px;
+  width: 40px;
   height: 44px;
   padding: 0;
-  color: var(--navy);
+  color: var(--blue);
   background: transparent;
   border: 0;
   border-radius: 50%;
@@ -48,17 +48,23 @@
     transform 0.2s;
 }
 
-.iconButton:hover {
-  color: var(--blue);
+.iconButton:hover,
+.iconButton[aria-expanded='true'] {
+  color: var(--blue-hover);
+  background: rgba(255, 255, 255, 0.35);
 }
 
-.iconButton[aria-expanded='true'] {
-  color: var(--blue);
+/* Two more icons do not fit next to the logo on the narrowest phones. */
+@media (max-width: 359px) {
+  .help {
+    display: none;
+  }
 }
 
 .profile {
   width: 42px;
   height: 42px;
+  margin: 0 4px;
   color: var(--blue);
   background: var(--blue-soft);
   box-shadow:

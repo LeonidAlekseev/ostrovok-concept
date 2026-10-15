@@ -62,7 +62,7 @@ export interface Viewport {
   /** Bottom edge of the title block, px. */
   titleBottom: number
   /** Edges of the place card relative to its pin, px (the CSS decides where the card sits). */
-  card: { left: number; right: number; top: number }
+  card: { left: number; right: number; top: number; bottom: number }
 }
 
 const shuffle = <T>(list: T[]) => list.toSorted(() => Math.random() - 0.5)
@@ -90,7 +90,8 @@ export function pickSpotlightCity(
       x + view.card.right + 32 < view.hero.right &&
       x < view.hero.left + view.hero.width * 0.65 &&
       y + view.card.top > view.titleBottom + 8 &&
-      y < view.hero.bottom - view.hero.height * 0.32
+      y < view.hero.bottom - view.hero.height * 0.32 &&
+      y + view.card.bottom < view.hero.bottom - view.hero.height * 0.28
     )
   })
   const fresh = fits.filter((d) => !recent.includes(d.id))

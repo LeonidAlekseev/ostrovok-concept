@@ -1,19 +1,17 @@
 .hero {
-  /* The sphere is much larger than the viewport: only its northern cap is visible. */
-  --globe-size: clamp(460px, 140vw, 680px);
-  --globe-top: clamp(112px, 31vw, 140px);
-  --globe-x: 52%;
+  /* The sphere is much larger than the viewport: it rises from the lower right behind the title. */
+  --globe-size: clamp(540px, 144vw, 640px);
+  --globe-top: clamp(24px, 8vw, 40px);
+  --globe-x: 88%;
 
   position: relative;
   isolation: isolate;
-  height: calc(var(--globe-top) + var(--globe-size) * 0.6);
+  height: calc(var(--globe-top) + var(--globe-size) * 0.76);
   overflow: hidden;
-  color: var(--white);
+  color: var(--navy);
   background:
-    radial-gradient(ellipse 70% 45% at 18% 4%, rgba(46, 104, 230, 0.42), transparent 70%),
-    radial-gradient(ellipse 60% 40% at 88% 30%, rgba(40, 92, 210, 0.35), transparent 70%),
-    linear-gradient(180deg, #050f2a 0%, #071d4f 55%, #0a3bb0 100%);
-  border-radius: 50% 50% 0 0 / 36px 36px 0 0;
+    radial-gradient(ellipse 60% 45% at 85% 30%, rgba(214, 255, 176, 0.75), transparent 70%),
+    var(--lime);
 }
 
 /* Fade the bottom of the scene into the white page behind the search form. */
@@ -22,96 +20,61 @@
   position: absolute;
   inset: auto 0 0;
   z-index: 3;
-  height: 26%;
-  background: linear-gradient(180deg, rgba(150, 196, 255, 0) 0%, rgba(176, 212, 255, 0.82) 55%, #ffffff 100%);
+  height: 30%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(240, 252, 232, 0.8) 60%, #ffffff 100%);
   pointer-events: none;
-}
-
-.sky {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background-image:
-    radial-gradient(1.4px 1.4px at 8% 22%, #fff 50%, transparent 52%),
-    radial-gradient(1.2px 1.2px at 23% 8%, #fff 50%, transparent 52%),
-    radial-gradient(1px 1px at 37% 30%, rgba(255, 255, 255, 0.9) 50%, transparent 52%),
-    radial-gradient(1.6px 1.6px at 56% 6%, #fff 50%, transparent 52%),
-    radial-gradient(1px 1px at 69% 24%, #fff 50%, transparent 52%),
-    radial-gradient(1.3px 1.3px at 78% 14%, #fff 50%, transparent 52%),
-    radial-gradient(1.1px 1.1px at 96% 26%, #fff 50%, transparent 52%),
-    radial-gradient(1px 1px at 3% 46%, rgba(255, 255, 255, 0.8) 50%, transparent 52%),
-    radial-gradient(1.2px 1.2px at 91% 44%, #fff 50%, transparent 52%),
-    radial-gradient(0.9px 0.9px at 45px 30px, rgba(255, 255, 255, 0.75) 50%, transparent 52%),
-    radial-gradient(0.8px 0.8px at 110px 95px, rgba(255, 255, 255, 0.55) 50%, transparent 52%),
-    radial-gradient(0.8px 0.8px at 160px 20px, rgba(255, 255, 255, 0.6) 50%, transparent 52%),
-    radial-gradient(0.7px 0.7px at 20px 130px, rgba(255, 255, 255, 0.5) 50%, transparent 52%);
-  background-size:
-    100% 100%,
-    100% 100%,
-    100% 100%,
-    100% 100%,
-    100% 100%,
-    100% 100%,
-    100% 100%,
-    100% 100%,
-    100% 100%,
-    190px 170px,
-    190px 170px,
-    230px 150px,
-    170px 210px;
-}
-
-.sparkle {
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  background:
-    radial-gradient(circle, #fff 0 1.4px, transparent 2.4px),
-    linear-gradient(90deg, transparent 45%, rgba(255, 255, 255, 0.85) 50%, transparent 55%),
-    linear-gradient(0deg, transparent 45%, rgba(255, 255, 255, 0.85) 50%, transparent 55%);
-  border-radius: 50%;
-  filter: drop-shadow(0 0 3px rgba(170, 210, 255, 0.9));
-  animation: twinkle 4s ease-in-out infinite;
-}
-
-.sparkle:nth-child(2) {
-  animation-delay: -1.3s;
-}
-
-.sparkle:nth-child(3) {
-  animation-delay: -2.6s;
-}
-
-.sparkleSmall {
-  width: 9px;
-  height: 9px;
 }
 
 .copy {
   position: relative;
   z-index: 4;
-  padding: clamp(26px, 8vw, 56px) var(--page-x) 0;
-  text-align: center;
+  width: fit-content;
+  padding: clamp(18px, 5vw, 48px) var(--page-x) 0 calc(var(--page-x) + 8px);
+  pointer-events: none;
 }
 
 .title {
   margin: 0;
-  font-size: clamp(22px, 7vw, 60px);
-  font-weight: 750;
-  letter-spacing: -0.03em;
-  line-height: 1.08;
-  text-shadow: 0 2px 18px rgba(3, 12, 40, 0.55);
-  text-wrap: balance;
+  font-size: clamp(32px, 9vw, 72px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+}
+
+.titleAccent {
+  display: block;
+  color: var(--blue);
 }
 
 .subtitle {
-  max-width: 19em;
-  margin: clamp(6px, 1.6vw, 14px) auto 0;
-  color: rgba(232, 240, 255, 0.92);
-  font-size: clamp(14px, 4vw, 21px);
+  max-width: 10.5em;
+  margin: clamp(8px, 2.4vw, 20px) 0 0;
+  font-size: clamp(15px, 4vw, 22px);
   font-weight: 450;
-  line-height: 1.3;
-  text-shadow: 0 1px 12px rgba(3, 12, 40, 0.6);
+  line-height: 1.25;
+}
+
+.hint {
+  position: relative;
+  z-index: 4;
+  width: 7em;
+  margin: clamp(16px, 5vw, 40px) 0 0 calc(var(--page-x) + 4px);
+  color: var(--blue);
+  font-family: Caveat, cursive;
+  font-size: clamp(17px, 4.6vw, 22px);
+  font-weight: 600;
+  line-height: 1.05;
+  transform: rotate(-10deg);
+  transform-origin: left top;
+  pointer-events: none;
+}
+
+.hintArrow {
+  position: absolute;
+  top: -0.6em;
+  left: 100%;
+  width: 2.8em;
+  transform: rotate(12deg);
 }
 
 /* ---------- Globe ---------- */
@@ -133,10 +96,9 @@
   inset: 0;
   border-radius: 50%;
   box-shadow:
-    0 0 0 1.5px rgba(170, 220, 255, 0.7),
-    0 0 22px 6px rgba(110, 185, 255, 0.85),
-    0 0 70px 26px rgba(40, 120, 255, 0.55),
-    0 0 160px 60px rgba(20, 80, 230, 0.35);
+    0 0 0 1.5px rgba(255, 255, 255, 0.6),
+    0 0 24px 6px rgba(240, 255, 225, 0.7),
+    0 0 80px 24px rgba(214, 255, 176, 0.55);
 }
 
 .earth {
@@ -146,8 +108,8 @@
   border-radius: 50%;
   /* Translucent glassy sphere: the dots and lines on top carry the geography. */
   background:
-    radial-gradient(circle at 70% 18%, rgba(160, 210, 255, 0.35), transparent 45%),
-    radial-gradient(circle at 50% 50%, rgba(30, 90, 220, 0.25) 55%, rgba(90, 160, 255, 0.45) 100%);
+    radial-gradient(circle at 65% 15%, rgba(255, 255, 255, 0.45), transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.12) 50%, rgba(255, 255, 255, 0.5) 100%);
 }
 
 .canvas {
@@ -176,8 +138,7 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 50%, transparent 62%, rgba(120, 190, 255, 0.28) 68%, transparent 71%);
-  box-shadow: inset 0 0 26px 4px rgba(150, 210, 255, 0.55);
+  box-shadow: inset 0 0 30px 6px rgba(245, 255, 235, 0.55);
   pointer-events: none;
 }
 
@@ -190,8 +151,8 @@
   background: radial-gradient(
     circle,
     rgba(255, 255, 255, 0.95) 0 3%,
-    rgba(210, 232, 255, 0.55) 9%,
-    rgba(120, 180, 255, 0.18) 30%,
+    rgba(240, 255, 225, 0.6) 9%,
+    rgba(214, 255, 176, 0.2) 30%,
     transparent 62%
   );
   transform: translate(-50%, -50%);
@@ -205,7 +166,7 @@
   left: 0;
   width: 16%;
   aspect-ratio: 1.3;
-  background: radial-gradient(ellipse, rgba(255, 236, 140, 0.55) 0%, rgba(160, 255, 120, 0.25) 35%, transparent 70%);
+  background: radial-gradient(ellipse, rgba(255, 255, 255, 0.7) 0%, rgba(240, 255, 225, 0.3) 35%, transparent 70%);
   opacity: var(--o, 1);
   transform: translate(calc(var(--x) * 1cqw - 50%), calc(var(--y) * 1cqw - 50%));
   mix-blend-mode: screen;
@@ -234,17 +195,17 @@
 }
 
 .route {
-  stroke: rgba(235, 245, 255, 0.8);
-  stroke-width: 1.1;
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 1.3;
 }
 
 .routeGlow {
-  stroke: rgba(120, 190, 255, 0.32);
+  stroke: rgba(255, 255, 255, 0.3);
   stroke-width: 4;
 }
 
 .routeHalo {
-  stroke: rgba(120, 190, 255, 0.12);
+  stroke: rgba(255, 255, 255, 0.12);
   stroke-width: 10;
 }
 
@@ -284,7 +245,7 @@
   left: 50%;
   width: 16px;
   height: 7px;
-  background: radial-gradient(ellipse, rgba(140, 200, 255, 0.95), transparent 70%);
+  background: radial-gradient(ellipse, rgba(255, 255, 255, 0.95), transparent 70%);
   transform: translateX(-50%);
 }
 
@@ -309,7 +270,7 @@
   animation: hubPulse 2.4s ease-in-out infinite;
   height: 16px;
   bottom: -8px;
-  background: radial-gradient(ellipse, rgba(200, 255, 170, 0.95), rgba(120, 220, 120, 0.4) 45%, transparent 72%);
+  background: radial-gradient(ellipse, rgba(255, 255, 255, 0.95), rgba(240, 255, 225, 0.45) 45%, transparent 72%);
 }
 
 .pinIcon {
@@ -317,7 +278,7 @@
   display: block;
   width: 100%;
   height: 100%;
-  filter: drop-shadow(0 4px 6px rgba(3, 20, 70, 0.45));
+  filter: drop-shadow(0 3px 5px rgba(6, 40, 110, 0.35));
 }
 
 .pinTooltip {
@@ -364,7 +325,7 @@
   background: var(--white);
   border: 0;
   border-radius: clamp(10px, 3vw, 14px);
-  box-shadow: 0 14px 34px rgba(3, 14, 45, 0.35);
+  box-shadow: 0 14px 34px rgba(30, 80, 20, 0.25);
   opacity: var(--o, 1);
   transform: translate(
     calc(var(--x) * 1cqw + var(--card-dx)),
@@ -377,7 +338,7 @@
 .placeCard:hover {
   --card-lift: 4px;
 
-  box-shadow: 0 18px 40px rgba(3, 14, 45, 0.42);
+  box-shadow: 0 18px 40px rgba(30, 80, 20, 0.32);
 }
 
 .placeContent {
@@ -389,7 +350,7 @@
 
 .placeCard:focus-visible {
   box-shadow:
-    0 14px 34px rgba(3, 14, 45, 0.35),
+    0 14px 34px rgba(30, 80, 20, 0.25),
     var(--focus);
 }
 
@@ -503,24 +464,17 @@
   }
 }
 
-@keyframes twinkle {
-  50% {
-    opacity: 0.45;
-    transform: scale(0.8);
-  }
-}
-
-/* Not enough room to the right of the pin on phones: lift the card above it. */
+/* Not enough room to the right of the pin on phones, and the title is above it: hang the card below. */
 @media (max-width: 767px) {
   .placeCard {
     --card-dx: -50%;
-    --card-dy: calc(-100% - 36px);
+    --card-dy: 12px;
   }
 
   /* The globe overflows the screen sideways: keep the glare on the visible part of the limb. */
   .sun {
-    top: 4.2%;
-    left: 70%;
+    top: 8%;
+    left: 30%;
   }
 }
 
@@ -528,31 +482,24 @@
 
 @media (min-width: 768px) {
   .hero {
-    --globe-size: clamp(820px, 80vw, 960px);
-    --globe-top: 180px;
-    --globe-x: 52%;
+    --globe-size: clamp(760px, 76vw, 980px);
+    --globe-top: 32px;
+    --globe-x: 64%;
 
-    height: calc(var(--globe-top) + var(--globe-size) * 0.47);
-    width: calc(100% - 2 * var(--page-x));
-    max-width: calc(var(--page-max) - 2 * var(--page-x));
-    margin: 0 auto;
-    border-radius: 50% 50% 0 0 / 56px 56px 0 0;
+    height: calc(var(--globe-top) + var(--globe-size) * 0.62);
   }
 
   .copy {
-    padding-top: 56px;
-  }
-
-  .title {
-    font-size: clamp(40px, 5.6vw, 68px);
+    margin-left: max(0px, (100% - var(--page-max)) / 2);
+    padding-top: clamp(56px, 8vw, 96px);
   }
 
   .subtitle {
-    max-width: 30em;
+    max-width: 12em;
   }
 
-  .hero::after {
-    height: 30%;
+  .hint {
+    margin-left: calc(max(0px, (100% - var(--page-max)) / 2) + var(--page-x) + 8px);
   }
 
   .pin {

@@ -1,9 +1,9 @@
 import { useCallback, useId, useRef, useState } from 'react'
-import { Heart, Menu, User, X } from 'lucide-react'
+import { Bell, Heart, Menu, MessageCircleQuestion, User, X } from 'lucide-react'
 import { useDismiss } from '../../hooks/useDismiss'
 import styles from './Header.module.css'
 
-type Panel = 'favorites' | 'profile' | 'menu'
+type Panel = 'favorites' | 'notifications' | 'help' | 'profile' | 'menu'
 
 interface Props {
   onStartSearch: () => void
@@ -11,7 +11,7 @@ interface Props {
 
 const menuLinks = [
   { href: '#search', label: 'Поиск отелей' },
-  { href: '#ideas', label: 'Идеи для путешествий' },
+  { href: '#ideas', label: 'Популярные направления' },
   { href: '#explore', label: 'Исследуйте мир' },
 ]
 
@@ -38,7 +38,18 @@ export function Header({ onStartSearch }: Props) {
 
         <div className={styles.actions} ref={actionsRef}>
           <button type="button" className={styles.iconButton} aria-label="Избранное" {...buttonProps('favorites')}>
-            <Heart size={26} strokeWidth={2} aria-hidden />
+            <Heart size={26} fill="currentColor" strokeWidth={2} aria-hidden />
+          </button>
+          <button type="button" className={styles.iconButton} aria-label="Уведомления" {...buttonProps('notifications')}>
+            <Bell size={25} fill="currentColor" strokeWidth={2} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={`${styles.iconButton} ${styles.help}`}
+            aria-label="Помощь"
+            {...buttonProps('help')}
+          >
+            <MessageCircleQuestion size={26} strokeWidth={2.2} aria-hidden />
           </button>
           <button
             type="button"
@@ -75,6 +86,24 @@ export function Header({ onStartSearch }: Props) {
                   </button>
                 </>
               )}
+              {open === 'notifications' && (
+                <>
+                  <p className={styles.panelTitle}>Новых уведомлений нет</p>
+                  <p className={styles.panelText}>Здесь появятся изменения цен и статусы бронирований.</p>
+                  <button type="button" className={styles.panelAction} onClick={close}>
+                    Понятно
+                  </button>
+                </>
+              )}
+              {open === 'help' && (
+                <>
+                  <p className={styles.panelTitle}>Поддержка</p>
+                  <p className={styles.panelText}>Чат поддержки недоступен в демо-версии.</p>
+                  <button type="button" className={styles.panelAction} onClick={close}>
+                    Понятно
+                  </button>
+                </>
+              )}
               {open === 'profile' && (
                 <>
                   <p className={styles.panelTitle}>Личный кабинет</p>
@@ -107,6 +136,8 @@ export function Header({ onStartSearch }: Props) {
 
 const panelTitle: Record<Panel, string> = {
   favorites: 'Избранное',
+  notifications: 'Уведомления',
+  help: 'Помощь',
   profile: 'Профиль',
   menu: 'Меню',
 }

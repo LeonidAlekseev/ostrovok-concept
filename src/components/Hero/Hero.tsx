@@ -131,7 +131,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
           globe: globeRect,
           hero: hero.getBoundingClientRect(),
           titleBottom: copyRef.current!.getBoundingClientRect().bottom,
-          card: { left: card.left - hubX, right: card.right - hubX, top: card.top - hubY },
+          card: { left: card.left - hubX, right: card.right - hubX, top: card.top - hubY, bottom: card.bottom - hubY },
         },
         recent,
       )
@@ -246,19 +246,20 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
 
   return (
     <section ref={heroRef} className={styles.hero} aria-labelledby="hero-title">
-      <div className={styles.sky} aria-hidden>
-        <span className={styles.sparkle} style={{ left: '6%', top: '14%' }} />
-        <span className={styles.sparkle} style={{ left: '93%', top: '9%' }} />
-        <span className={styles.sparkle} style={{ left: '84%', top: '32%' }} />
-        <span className={`${styles.sparkle} ${styles.sparkleSmall}`} style={{ left: '18%', top: '36%' }} />
-      </div>
-
       <div ref={copyRef} className={styles.copy}>
         <h1 id="hero-title" className={styles.title}>
-          Мир ближе, чем кажется
+          Мир ближе, <span className={styles.titleAccent}>чем кажется</span>
         </h1>
         <p className={styles.subtitle}>Найдите место для следующего путешествия</p>
       </div>
+
+      <p className={styles.hint} aria-hidden>
+        Вращайте глобус и&nbsp;выбирайте направление
+        <svg className={styles.hintArrow} viewBox="0 0 64 34" fill="none">
+          <path d="M3 22C14 6 38 2 52 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          <path d="M44 18.5 53 19l1-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </p>
 
       <div ref={globeRef} className={styles.globe}>
         <div className={styles.atmosphere} aria-hidden />
@@ -298,7 +299,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
               }}
               type="button"
               className={`${styles.pin} ${isHub ? styles.pinHub : ''}`}
-              style={{ ...positionStyle(point), '--o': depthOpacity(point.depth) } as CSSProperties}
+              style={{ ...positionStyle(point), '--o': depthOpacity(point.depth).toFixed(3) } as CSSProperties}
               data-hidden={point.depth <= 0.05 || undefined}
               aria-label={`${d.name}, ${d.country} — выбрать направление`}
               aria-pressed={selectedId === d.id}
@@ -349,8 +350,12 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
   )
 }
 
-/** Globe coordinates are percent of the globe box; CSS turns them into container units. */
-const positionStyle = (p: { x: number; y: number }) => ({ '--x': p.x, '--y': p.y }) as CSSProperties
+/**
+ * Globe coordinates are percent of the globe box; CSS turns them into container units.
+ * Rounded so the server and the browser, whose trigonometry differs in the last digit, render the same markup.
+ */
+const positionStyle = (p: { x: number; y: number }) =>
+  ({ '--x': p.x.toFixed(3), '--y': p.y.toFixed(3) }) as CSSProperties
 
 function setPosition(el: HTMLElement | SVGElement, x: number, y: number) {
   el.style.setProperty('--x', String(x))
