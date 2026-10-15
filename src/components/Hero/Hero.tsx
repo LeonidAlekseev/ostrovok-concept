@@ -19,6 +19,11 @@ interface Props {
 
 /** Degrees of longitude per second; one turn takes about five minutes. */
 const SPIN_SPEED = 1.2
+/** How quickly the spin follows a drag, and how quickly it settles back afterwards (per second). */
+const DRAG_FOLLOW_RATE = 8
+const SETTLE_RATE = 1.5
+/** Upper bound for a flick, in degrees per second. */
+const MAX_DRAG_SPEED = 400
 /** Seconds each new hotel stays in the spotlight. */
 const SPOTLIGHT_SECONDS = 5
 const REDUCED_MOTION_SPOTLIGHT_SECONDS = 8
@@ -104,6 +109,8 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
 
     const recent: string[] = [spotlightRef.current.destination.id]
     let speed = 0
+    // Horizontal pointer travel since the last frame while the globe is being dragged.
+    let drag: { pointerId: number; lastX: number; dx: number } | null = null
     let elapsed = 0
     let last = performance.now()
     let frame = 0
@@ -138,9 +145,18 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
       const paused = pausedRef.current.hover || pausedRef.current.focus
       const canSpin = glReady && !reducedMotion.matches
 
-      // Ease in and out of rotation instead of starting or stopping abruptly.
-      const targetSpeed = canSpin && !paused ? SPIN_SPEED : 0
-      speed += (targetSpeed - speed) * Math.min(dt * 2, 1)
+      // Ease in and out of rotation instead of starting or stopping abruptly. A drag pulls the spin
+      // towards the pointer's speed; once released, the globe coasts back to its own pace.
+      if (drag && dt > 0) {
+        // Near the centre one radius of pointer travel turns the globe by one radian.
+        const dragSpeed = (drag.dx / dt / (globe.clientWidth / 2)) * (180 / Math.PI)
+        drag.dx = 0
+        const target = Math.min(Math.max(dragSpeed, -MAX_DRAG_SPEED), MAX_DRAG_SPEED)
+        speed += (target - speed) * Math.min(dt * DRAG_FOLLOW_RATE, 1)
+      } else {
+        const targetSpeed = canSpin && !paused ? SPIN_SPEED : 0
+        speed += (targetSpeed - speed) * Math.min(dt * SETTLE_RATE, 1)
+      }
       const state = sceneRef.current
       state.centerLon -= speed * dt
       if (glReady) {
@@ -165,6 +181,27 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
       }
     }
 
+    const onPointerDown = (e: PointerEvent) => {
+      if (!glReady || drag || e.button !== 0) return
+      drag = { pointerId: e.pointerId, lastX: e.clientX, dx: 0 }
+      canvas.setPointerCapture(e.pointerId)
+      canvas.toggleAttribute('data-dragging', true)
+    }
+    const onPointerMove = (e: PointerEvent) => {
+      if (e.pointerId !== drag?.pointerId) return
+      drag.dx += e.clientX - drag.lastX
+      drag.lastX = e.clientX
+    }
+    const onPointerUp = (e: PointerEvent) => {
+      if (e.pointerId !== drag?.pointerId) return
+      drag = null
+      canvas.toggleAttribute('data-dragging', false)
+    }
+    canvas.addEventListener('pointerdown', onPointerDown)
+    canvas.addEventListener('pointermove', onPointerMove)
+    canvas.addEventListener('pointerup', onPointerUp)
+    canvas.addEventListener('pointercancel', onPointerUp)
+
     // Animate only while the hero is on screen.
     const observer = new IntersectionObserver(([entry]) => {
       cancelAnimationFrame(frame)
@@ -177,6 +214,10 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
     return () => {
       observer.disconnect()
       cancelAnimationFrame(frame)
+      canvas.removeEventListener('pointerdown', onPointerDown)
+      canvas.removeEventListener('pointermove', onPointerMove)
+      canvas.removeEventListener('pointerup', onPointerUp)
+      canvas.removeEventListener('pointercancel', onPointerUp)
       renderer?.dispose()
     }
   }, [markers, feed, paint])

@@ -153,10 +153,19 @@
   height: 100%;
   opacity: 0;
   transition: opacity 0.6s ease;
+  /* Only the disc itself can be grabbed; vertical swipes still scroll the page. */
+  clip-path: circle(50%);
+  touch-action: pan-y;
+  user-select: none;
 }
 
 .canvasShown {
   opacity: 1;
+  cursor: grab;
+}
+
+.canvas[data-dragging] {
+  cursor: grabbing;
 }
 
 /* Hidden only after the live globe has faded in on top of it. */
