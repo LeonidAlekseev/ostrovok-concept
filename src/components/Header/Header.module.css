@@ -22,7 +22,7 @@
   letter-spacing: -0.035em;
   line-height: 1;
   text-decoration: none;
-  border-radius: calc(12px * var(--corner-scale, 1));
+  border-radius: calc(10px * var(--corner-scale, 1));
   corner-shape: squircle;
   --corner-shape: squircle;
 }
@@ -111,7 +111,7 @@
   color: var(--text);
   font-weight: 550;
   text-decoration: none;
-  border-radius: calc(15px * var(--corner-scale, 1));
+  border-radius: calc(12px * var(--corner-scale, 1));
   corner-shape: squircle;
   --corner-shape: squircle;
 }

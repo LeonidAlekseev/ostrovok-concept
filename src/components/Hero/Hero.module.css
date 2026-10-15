@@ -282,7 +282,7 @@
   font-weight: 600;
   white-space: nowrap;
   background: var(--white);
-  border-radius: calc(12px * var(--corner-scale, 1));
+  border-radius: calc(10px * var(--corner-scale, 1));
   corner-shape: squircle;
   --corner-shape: squircle;
   box-shadow: var(--shadow-soft);
@@ -323,7 +323,7 @@
   text-align: left;
   background: var(--white);
   border: 0;
-  border-radius: calc(clamp(15px, 4.5vw, 21px) * var(--corner-scale, 1));
+  border-radius: calc(clamp(12px, 3.6vw, 17px) * var(--corner-scale, 1));
   corner-shape: squircle;
   --corner-shape: squircle;
   box-shadow: 0 14px 34px rgba(30, 80, 20, 0.25);
@@ -358,7 +358,7 @@
   color: var(--white);
   background: linear-gradient(135deg, #3d8bff, #0b3aa8);
   /* Concentric with the card's corner. */
-  border-radius: calc(calc(clamp(15px, 4.5vw, 21px) - var(--card-pad) + 3px) * var(--corner-scale, 1));
+  border-radius: calc(calc(clamp(12px, 3.6vw, 17px) - var(--card-pad) + 2px) * var(--corner-scale, 1));
   corner-shape: squircle;
   --corner-shape: squircle;
 }
@@ -434,7 +434,7 @@
     Menlo,
     monospace;
   background: rgba(0, 0, 0, 0.78);
-  border-radius: calc(9px * var(--corner-scale, 1));
+  border-radius: calc(7px * var(--corner-scale, 1));
   corner-shape: squircle;
   --corner-shape: squircle;
 }

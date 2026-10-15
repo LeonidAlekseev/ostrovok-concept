@@ -10,7 +10,7 @@
   /* No fill of its own: in the squircle fallback it would show as a dark fringe around the picture. */
   background: none;
   border: 0;
-  border-radius: calc(clamp(21px, 5.4vw, 33px) * var(--corner-scale, 1));
+  border-radius: calc(clamp(17px, 4.3vw, 26px) * var(--corner-scale, 1));
   corner-shape: squircle;
   --corner-shape: squircle;
   box-shadow: 0 6px 18px rgba(7, 22, 47, 0.12);

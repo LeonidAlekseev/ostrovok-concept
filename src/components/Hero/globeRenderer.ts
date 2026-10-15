@@ -90,6 +90,9 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
   const balloons = createFlyers(BALLOON_COUNT, BALLOON_SPEEDS)
   const planePath = new Path2D(PLANE_PATH)
   const balloonPath = new Path2D(BALLOON_PATH)
+  // Figures are pre-rendered with their shadow and drawn per frame with drawImage: the per-frame
+  // fill-with-shadow path ignored globalAlpha in some browsers, leaving the planes opaque.
+  let sprites: { px: number; plane: HTMLCanvasElement; balloon: HTMLCanvasElement } | null = null
   const controller = new AbortController()
 
   const ready = (async () => {
@@ -190,33 +193,30 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
         return FLYER_ALPHA * fade(q.depth)
       }
 
-      ctx.fillStyle = FLYER_COLOR
-      ctx.shadowColor = FLYER_SHADOW
-      ctx.shadowBlur = 3 * pixelRatio
-      ctx.shadowOffsetY = pixelRatio
+      if (sprites?.px !== px)
+        sprites = {
+          px,
+          plane: sprite(planePath, 24, 24, (PLANE_SIZE * px) / 24, pixelRatio),
+          balloon: sprite(balloonPath, 24, 28, (BALLOON_SIZE * px) / 28, pixelRatio),
+        }
+      const { plane: planeSprite, balloon: balloonSprite } = sprites
+
       // Balloons first: the planes fly above them. They stay upright whatever their course.
-      const balloonScale = (BALLOON_SIZE * px) / 28
       for (const balloon of balloons) {
         const alpha = place(balloon, BALLOON_SIZE * px)
         if (!alpha) continue
         ctx.globalAlpha = alpha
-        ctx.setTransform(balloonScale, 0, 0, balloonScale, q.x, q.y)
-        ctx.translate(-12, -14)
-        ctx.fill(balloonPath)
-        ctx.setTransform(1, 0, 0, 1, 0, 0)
+        ctx.drawImage(balloonSprite, q.x - balloonSprite.width / 2, q.y - balloonSprite.height / 2)
       }
 
       const head = { x: 0, y: 0, depth: 0 }
       const tail = { x: 0, y: 0, depth: 0 }
-      const scale = (PLANE_SIZE * px) / 24
       ctx.lineCap = 'round'
       ctx.lineWidth = 1.5 * pixelRatio
       for (const plane of planes) {
         const alpha = place(plane, PLANE_SIZE * px)
         if (!alpha) continue
         ctx.globalAlpha = alpha
-        // The contrail goes without a shadow, as a faint streak.
-        ctx.shadowColor = 'transparent'
 
         // The contrail starts behind the tail: overlapping the body, two translucent whites would add up
         // to an opaque plane that never fades. Half the plane's length, in radians of arc.
@@ -236,18 +236,15 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
         }
         ctx.strokeStyle = trail
         ctx.stroke()
-        ctx.shadowColor = FLYER_SHADOW
 
         projectVec(ahead(plane, 0.01), head)
         const angle = Math.atan2(head.y - q.y, head.x - q.x) + Math.PI / 2
-        ctx.setTransform(scale, 0, 0, scale, q.x, q.y)
+        ctx.setTransform(1, 0, 0, 1, q.x, q.y)
         ctx.rotate(angle)
-        ctx.translate(-12, -12)
-        ctx.fill(planePath)
+        ctx.drawImage(planeSprite, -planeSprite.width / 2, -planeSprite.height / 2)
         ctx.setTransform(1, 0, 0, 1, 0, 0)
       }
       ctx.globalAlpha = 1
-      ctx.shadowColor = 'transparent'
       return true
     },
     describe() {
@@ -261,6 +258,24 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
       controller.abort()
     },
   } satisfies GlobeRenderer
+}
+
+/** A white figure drawn on a `w`×`h` grid at `scale`, with its soft shadow, centred in its own canvas. */
+function sprite(path: Path2D, w: number, h: number, scale: number, pixelRatio: number): HTMLCanvasElement {
+  const blur = 3 * pixelRatio
+  const pad = Math.ceil(blur * 2)
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.ceil(w * scale) + 2 * pad
+  canvas.height = Math.ceil(h * scale) + 2 * pad
+  const ctx = canvas.getContext('2d')!
+  ctx.translate(pad, pad)
+  ctx.scale(scale, scale)
+  ctx.shadowColor = FLYER_SHADOW
+  ctx.shadowBlur = blur
+  ctx.shadowOffsetY = pixelRatio
+  ctx.fillStyle = FLYER_COLOR
+  ctx.fill(path)
+  return canvas
 }
 
 /** Converts flat [lon, lat, …] pairs in tenths of a degree to unit-sphere triples. */

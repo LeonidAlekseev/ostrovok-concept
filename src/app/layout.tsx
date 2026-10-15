@@ -14,8 +14,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  // Browser chrome and overscroll match the page, not the green hero (it would show below the footer).
-  themeColor: '#f2f4f7',
+  themeColor: '#a5e87b',
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {

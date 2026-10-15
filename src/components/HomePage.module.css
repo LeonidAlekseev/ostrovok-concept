@@ -2,6 +2,7 @@
   /* The hero starts under the transparent header. */
   margin-top: calc(-1 * var(--header-height));
   padding-bottom: clamp(24px, 6vw, 56px);
+  background: var(--page-bg);
 }
 
 .content {
@@ -46,7 +47,7 @@
   font-weight: 500;
   background: none;
   border: 0;
-  border-radius: calc(9px * var(--corner-scale, 1));
+  border-radius: calc(7px * var(--corner-scale, 1));
   corner-shape: squircle;
   --corner-shape: squircle;
   cursor: pointer;

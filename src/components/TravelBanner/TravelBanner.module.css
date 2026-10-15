@@ -7,7 +7,7 @@
   padding: clamp(12px, 3.4vw, 26px) clamp(16px, 4.6vw, 36px);
   overflow: hidden;
   background: var(--gray-bg);
-  border-radius: calc(clamp(27px, 6.9vw, 39px) * var(--corner-scale, 1));
+  border-radius: calc(clamp(22px, 5.5vw, 31px) * var(--corner-scale, 1));
   corner-shape: squircle;
   --corner-shape: squircle;
 }
@@ -45,8 +45,9 @@
 
 .route {
   position: absolute;
-  top: clamp(6px, 2vw, 16px);
-  right: clamp(10px, 3vw, 40px);
+  /* Clear of the rounded corner. */
+  top: clamp(14px, 3.6vw, 24px);
+  right: clamp(22px, 5.6vw, 48px);
   width: clamp(84px, 23vw, 220px);
   color: var(--green);
   pointer-events: none;
@@ -69,7 +70,7 @@
 .plane {
   position: absolute;
   top: 0;
-  right: -6px;
+  right: 0;
   width: 22%;
   height: auto;
   transform: rotate(10deg);

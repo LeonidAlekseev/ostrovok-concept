@@ -101,8 +101,10 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
           className={styles.clear}
           aria-label="Очистить направление"
           onClick={() => {
+            // Clearing ends the input: the suggestions fold and the keyboard goes away.
             onChange('')
-            inputRef.current?.focus()
+            close()
+            inputRef.current?.blur()
           }}
         >
           <X size={22} strokeWidth={1.8} aria-hidden />
