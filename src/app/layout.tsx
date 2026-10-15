@@ -3,7 +3,6 @@ import type { ReactNode } from 'react'
 import '@fontsource-variable/onest'
 import '@fontsource/caveat/600.css'
 import './globals.css'
-import { CornerShapes } from '../components/CornerShapes'
 
 export const metadata: Metadata = {
   title: 'Островок! — бронирование отелей',
@@ -20,10 +19,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ru">
-      <body>
-        {children}
-        <CornerShapes />
-      </body>
+      <body>{children}</body>
     </html>
   )
 }

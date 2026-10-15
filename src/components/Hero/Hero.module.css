@@ -67,11 +67,11 @@
 .globe {
   position: absolute;
   top: var(--globe-top);
-  left: var(--globe-x);
-  z-index: 1;
+  /* No z-index or transform: the globe makes no stacking context of its own, so the hotel card
+     can rise above the hint while the pins stay under the faded bottom. */
+  left: calc(var(--globe-x) - var(--globe-size) / 2);
   width: var(--globe-size);
   aspect-ratio: 1;
-  transform: translateX(-50%);
   /* Markers are placed in container units: --x/--y are percent of the globe box. */
   container-type: inline-size;
 }
@@ -282,9 +282,7 @@
   font-weight: 600;
   white-space: nowrap;
   background: var(--white);
-  border-radius: calc(10px * var(--corner-scale, 1));
-  corner-shape: squircle;
-  --corner-shape: squircle;
+  border-radius: 8px;
   box-shadow: var(--shadow-soft);
   opacity: 0;
   transform: translate(-50%, 4px);
@@ -316,16 +314,14 @@
   position: absolute;
   top: 0;
   left: 0;
-  z-index: 4;
+  z-index: 5;
   width: max-content;
   padding: var(--card-pad) calc(var(--card-pad) + 4px) var(--card-pad) var(--card-pad);
   color: var(--text);
   text-align: left;
   background: var(--white);
   border: 0;
-  border-radius: calc(clamp(12px, 3.6vw, 17px) * var(--corner-scale, 1));
-  corner-shape: squircle;
-  --corner-shape: squircle;
+  border-radius: clamp(10px, 3vw, 14px);
   box-shadow: 0 14px 34px rgba(30, 80, 20, 0.25);
   opacity: var(--o, 1);
   transform: translate(
@@ -358,9 +354,7 @@
   color: var(--white);
   background: linear-gradient(135deg, #3d8bff, #0b3aa8);
   /* Concentric with the card's corner. */
-  border-radius: calc(calc(clamp(12px, 3.6vw, 17px) - var(--card-pad) + 2px) * var(--corner-scale, 1));
-  corner-shape: squircle;
-  --corner-shape: squircle;
+  border-radius: calc(clamp(10px, 3vw, 14px) - var(--card-pad) + 2px);
 }
 
 .placeIcon svg {
@@ -434,9 +428,7 @@
     Menlo,
     monospace;
   background: rgba(0, 0, 0, 0.78);
-  border-radius: calc(7px * var(--corner-scale, 1));
-  corner-shape: squircle;
-  --corner-shape: squircle;
+  border-radius: 6px;
 }
 
 .stats summary {

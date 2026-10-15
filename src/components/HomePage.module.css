@@ -47,9 +47,7 @@
   font-weight: 500;
   background: none;
   border: 0;
-  border-radius: calc(7px * var(--corner-scale, 1));
-  corner-shape: squircle;
-  --corner-shape: squircle;
+  border-radius: 6px;
   cursor: pointer;
 }
 

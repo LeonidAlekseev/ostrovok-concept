@@ -34,6 +34,8 @@ const CENTER_RATE = 3
 /** Seconds each new hotel stays in the spotlight. */
 const SPOTLIGHT_SECONDS = 5
 const REDUCED_MOTION_SPOTLIGHT_SECONDS = 8
+/** The globe holds still while the page scrolls and this long after: the browser needs the frame budget to paint the page. */
+const SCROLL_PAUSE_MS = 150
 /** High-refresh screens get every other frame: the slow spin gains nothing from 120 fps. */
 const MIN_FRAME_MS = 10
 /** Below this speed (degrees per second) the globe is considered standing, so it is not redrawn. */
@@ -122,6 +124,10 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
     let elapsed = 0
     let last = performance.now()
     let frame = 0
+    let lastScroll = -Infinity
+    const onScroll = () => {
+      lastScroll = performance.now()
+    }
 
     const nextSpotlight = (points: Scene['points']) => {
       const globeRect = globe.getBoundingClientRect()
@@ -149,6 +155,10 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
     const tick = (now: number) => {
       frame = requestAnimationFrame(tick)
       if (now - last < MIN_FRAME_MS) return
+      if (now - lastScroll < SCROLL_PAUSE_MS) {
+        last = now
+        return
+      }
       const started = performance.now()
       const dt = Math.min((now - last) / 1000, 0.1)
       last = now
@@ -244,8 +254,10 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
       }
     })
     observer.observe(hero)
+    window.addEventListener('scroll', onScroll, { passive: true })
     return () => {
       observer.disconnect()
+      window.removeEventListener('scroll', onScroll)
       cancelAnimationFrame(frame)
       canvas.removeEventListener('pointerdown', onPointerDown)
       canvas.removeEventListener('pointermove', onPointerMove)

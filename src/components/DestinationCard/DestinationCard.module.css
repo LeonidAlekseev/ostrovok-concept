@@ -7,12 +7,11 @@
   overflow: hidden;
   color: var(--white);
   text-align: left;
-  /* No fill of its own: in the squircle fallback it would show as a dark fringe around the picture. */
-  background: none;
+  background: var(--navy);
   border: 0;
-  border-radius: calc(clamp(17px, 4.3vw, 26px) * var(--corner-scale, 1));
-  corner-shape: squircle;
-  --corner-shape: squircle;
+  border-radius: clamp(14px, 3.6vw, 22px);
+  /* Safari stops clipping a transformed child (the zooming photo) to the rounded corners without its own layer. */
+  isolation: isolate;
   box-shadow: 0 6px 18px rgba(7, 22, 47, 0.12);
   scroll-snap-align: start;
   transition:
@@ -26,17 +25,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  /* Placeholder while the photo loads. */
-  background: var(--navy);
   transition: transform 0.5s ease;
-}
-
-/* The card's shadow puts the Safari/Firefox fallback in layer mode, which does not clip children: shape them too. */
-.image,
-.shade {
-  border-radius: inherit;
-  corner-shape: squircle;
-  --corner-shape: squircle;
 }
 
 .shade {
