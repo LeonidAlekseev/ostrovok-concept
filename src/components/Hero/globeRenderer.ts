@@ -1,7 +1,5 @@
-import { GLOBE_CENTER } from '../../lib/globe'
+import type { GlobeView } from '../../lib/globe'
 
-/** Southern edge of the drawn globe (keep in sync with LAT_MIN in scripts/build-globe.py). */
-const LAT_MIN = -20
 /** Spacing of the latitude/longitude grid and the step its lines are sampled with, degrees. */
 const GRID_STEP = 15
 const GRID_SAMPLE = 2
@@ -17,7 +15,7 @@ const GRID_STYLE = 'rgba(255, 255, 255, 0.4)'
 const COAST_STYLE = 'rgba(255, 255, 255, 0.85)'
 
 export interface GlobeFrame {
-  centerLon: number
+  view: GlobeView
   /** Canvas size, CSS pixels. */
   size: number
   /** Top fraction of the canvas that is on screen; only it is drawn. */
@@ -70,17 +68,13 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
     coast = polylines(data.lines)
   })()
 
-  const lat0 = (GLOBE_CENTER.lat * Math.PI) / 180
-  const sin0 = Math.sin(lat0)
-  const cos0 = Math.cos(lat0)
-
   return {
     ready,
-    draw({ centerLon, size, visibleFraction, pixelRatio }) {
+    draw({ view, size, visibleFraction, pixelRatio }) {
       const px = Math.round(size * pixelRatio)
       const visible = Math.ceil(px * Math.min(Math.max(visibleFraction, 0), 1))
       // A standing globe (hover, reduced motion) costs nothing at all.
-      const key = `${centerLon}/${px}/${visible}`
+      const key = `${view.lon}/${view.lat}/${px}/${visible}`
       if (key === drawn && canvas.width === px) return false
       drawn = key
       if (canvas.width !== px || canvas.height !== px) {
@@ -89,9 +83,12 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
       }
       ctx.clearRect(0, 0, px, px)
 
-      const c = (centerLon * Math.PI) / 180
+      const c = (view.lon * Math.PI) / 180
       const cc = Math.cos(c)
       const sc = Math.sin(c)
+      const lat0 = (view.lat * Math.PI) / 180
+      const sin0 = Math.sin(lat0)
+      const cos0 = Math.cos(lat0)
       const r = px / 2
       // Orthographic projection, the same as projectToGlobe() in src/lib/globe.ts.
       const project = (p: Float32Array, i: number, out: { x: number; y: number; depth: number }) => {
@@ -176,14 +173,14 @@ function polylines(lines: number[][]): Polylines {
   return { points: toSphere(lines.flat()), starts }
 }
 
-/** Meridians and parallels over the drawn part of the globe, in the same tenths-of-a-degree format. */
+/** Meridians and parallels, in the same tenths-of-a-degree format. */
 function graticule(): number[][] {
   const lines: number[][] = []
   const range = (from: number, to: number, step: number) =>
     Array.from({ length: Math.floor((to - from) / step) + 1 }, (_, i) => from + i * step)
   for (const lon of range(-180, 180 - GRID_STEP, GRID_STEP))
-    lines.push(range(LAT_MIN, 90, GRID_SAMPLE).flatMap((lat) => [lon * 10, lat * 10]))
-  for (const lat of range(-15, 90 - GRID_STEP, GRID_STEP))
+    lines.push(range(-90, 90, GRID_SAMPLE).flatMap((lat) => [lon * 10, lat * 10]))
+  for (const lat of range(GRID_STEP - 90, 90 - GRID_STEP, GRID_STEP))
     lines.push(range(-180, 180, GRID_SAMPLE).flatMap((lon) => [lon * 10, lat * 10]))
   return lines
 }

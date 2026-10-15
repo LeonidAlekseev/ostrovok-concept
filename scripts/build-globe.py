@@ -10,8 +10,6 @@ Expected files in <sources-dir> (public domain, https://github.com/nvkelso/natur
 Output, all coordinates in tenths of a degree:
     dots   flat [lon, lat, lon, lat, …] of land dots on an even grid
     lines  polylines [[lon, lat, lon, lat, …], …] of the coastlines
-
-LAT_MIN must stay in sync with the renderer in src/components/Hero/globeRenderer.ts.
 """
 
 import json
@@ -21,8 +19,6 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 
-# The hero only ever shows the northern cap: nothing south of this latitude is drawn.
-LAT_MIN = -20.0
 # Distance between neighbouring dots, degrees of arc.
 DOT_STEP = 1.25
 # Coastline vertices closer than this to the previous kept one are dropped, degrees.
@@ -50,7 +46,7 @@ def land_mask(path: Path) -> np.ndarray:
 def land_dots(mask: np.ndarray) -> list[int]:
     """Rows of dots along the parallels, spaced evenly on the sphere."""
     dots = []
-    for lat in np.arange(90 - DOT_STEP / 2, LAT_MIN, -DOT_STEP):
+    for lat in np.arange(90 - DOT_STEP / 2, -90, -DOT_STEP):
         count = max(int(round(360 * np.cos(np.radians(lat)) / DOT_STEP)), 1)
         # Alternate rows are shifted by half a step, so the dots form a staggered pattern.
         shift = 0.5 * (round((90 - lat) / DOT_STEP) % 2)
@@ -75,8 +71,8 @@ def coastlines(path: Path) -> list[list[int]]:
                     kept.append([lon, lat])
             if part[-1] != kept[-1]:
                 kept.append(part[-1])
-            # Drop islands too small to read and anything that never reaches the visible cap.
-            if len(kept) < 4 or max(lat for _, lat in kept) < LAT_MIN:
+            # Drop islands too small to read.
+            if len(kept) < 4:
                 continue
             lines.append([round(v * 10) for point in kept for v in point])
     return lines

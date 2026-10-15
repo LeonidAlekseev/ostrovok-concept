@@ -5,7 +5,7 @@ import type { NewHotel } from '../../data/hotels'
 import { GLOBE_CENTER } from '../../lib/globe'
 import { appEnv, isProduction } from '../../lib/env'
 import { formatPrice } from '../../lib/format'
-import { createFrameMeter, createGlobeQuality, type FrameWindow } from './globePerformance'
+import { createFrameMeter, type FrameWindow } from './globePerformance'
 import { createGlobeRenderer, type GlobeRenderer } from './globeRenderer'
 import { createHotelFeed, depthOpacity, pickSpotlightCity, sceneAt, type Scene, type Spotlight } from './globeScene'
 import { StatsPanel, type StatsPanelHandle } from './StatsPanel'
@@ -27,6 +27,8 @@ const DRAG_FOLLOW_RATE = 8
 const SETTLE_RATE = 1.5
 /** Upper bound for a flick, in degrees per second. */
 const MAX_DRAG_SPEED = 400
+/** A vertical drag tilts the globe up to this latitude either way; the tilt stays after release. */
+const MAX_TILT = 85
 /** Seconds each new hotel stays in the spotlight. */
 const SPOTLIGHT_SECONDS = 5
 const REDUCED_MOTION_SPOTLIGHT_SECONDS = 8
@@ -45,11 +47,12 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
     sources: initialSourceIds.flatMap((id) => markers.find((d) => d.id === id) ?? []),
   }))
   // The initial layout is rendered once; afterwards the animation loop owns all positions.
-  const [initialScene] = useState(() => sceneAt(markers, spotlight, GLOBE_CENTER.lon))
+  const [initialScene] = useState(() => sceneAt(markers, spotlight, GLOBE_CENTER))
   const [spinning, setSpinning] = useState(false)
 
   const heroRef = useRef<HTMLElement>(null)
   const copyRef = useRef<HTMLDivElement>(null)
+  const hintRef = useRef<HTMLParagraphElement>(null)
   const globeRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const pinRefs = useRef(new Map<string, HTMLButtonElement>())
@@ -59,7 +62,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
   const statsRef = useRef<StatsPanelHandle>(null)
   const spotlightRef = useRef(spotlight)
   const pausedRef = useRef({ hover: false, focus: false })
-  const sceneRef = useRef({ centerLon: GLOBE_CENTER.lon })
+  const viewRef = useRef({ ...GLOBE_CENTER })
 
   /** Writes the current scene straight to the DOM, bypassing React on every frame. */
   const paint = useCallback((scene: Scene) => {
@@ -86,7 +89,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
   // A new spotlight is painted before the browser shows it, so the card never flashes at a stale spot.
   useLayoutEffect(() => {
     spotlightRef.current = spotlight
-    paint(sceneAt(markers, spotlight, sceneRef.current.centerLon))
+    paint(sceneAt(markers, spotlight, viewRef.current))
   }, [markers, spotlight, paint])
 
   useEffect(() => {
@@ -94,12 +97,10 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
     const globe = globeRef.current!
     const hero = heroRef.current!
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const quality = createGlobeQuality(window.devicePixelRatio || 1)
     const renderer = createGlobeRenderer(canvas, '/data/globe.json')
     if (!renderer) statsRef.current?.show('no canvas', 'Canvas 2D unavailable: bare sphere')
     const meter = createFrameMeter((frames) => {
-      quality.update(frames.fps)
-      if (renderer) statsRef.current?.show(`${Math.round(frames.fps)} fps`, describeStats(frames, quality, renderer))
+      if (renderer) statsRef.current?.show(`${Math.round(frames.fps)} fps`, describeStats(frames, renderer))
     })
     let ready = false
     let shown = false
@@ -112,8 +113,8 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
 
     const recent: string[] = [spotlightRef.current.destination.id]
     let speed = 0
-    // Horizontal pointer travel since the last frame while the globe is being dragged.
-    let drag: { pointerId: number; lastX: number; dx: number } | null = null
+    // Pointer travel since the last frame while the globe is being dragged.
+    let drag: { pointerId: number; lastX: number; lastY: number; dx: number; dy: number } | null = null
     let elapsed = 0
     let last = performance.now()
     let frame = 0
@@ -130,7 +131,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
         {
           globe: globeRect,
           hero: hero.getBoundingClientRect(),
-          titleBottom: copyRef.current!.getBoundingClientRect().bottom,
+          avoid: [copyRef.current!.getBoundingClientRect(), hintRef.current!.getBoundingClientRect()],
           card: { left: card.left - hubX, right: card.right - hubX, top: card.top - hubY, bottom: card.bottom - hubY },
         },
         recent,
@@ -149,13 +150,17 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
       last = now
       const paused = pausedRef.current.hover || pausedRef.current.focus
       const canSpin = ready && !reducedMotion.matches
+      const view = viewRef.current
 
       // Ease in and out of rotation instead of starting or stopping abruptly. A drag pulls the spin
       // towards the pointer's speed; once released, the globe coasts back to its own pace.
       if (drag && dt > 0) {
         // Near the centre one radius of pointer travel turns the globe by one radian.
-        const dragSpeed = (drag.dx / dt / (globe.clientWidth / 2)) * (180 / Math.PI)
-        drag.dx = 0
+        const radius = globe.clientWidth / 2
+        const dragSpeed = (drag.dx / dt / radius) * (180 / Math.PI)
+        // The tilt follows the pointer directly and keeps the new angle; the spin goes on around the tilted axis.
+        view.lat = Math.min(Math.max(view.lat + (drag.dy / radius) * (180 / Math.PI), -MAX_TILT), MAX_TILT)
+        drag.dx = drag.dy = 0
         const target = Math.min(Math.max(dragSpeed, -MAX_DRAG_SPEED), MAX_DRAG_SPEED)
         speed += (target - speed) * Math.min(dt * DRAG_FOLLOW_RATE, 1)
       } else {
@@ -163,20 +168,20 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
         speed += (targetSpeed - speed) * Math.min(dt * SETTLE_RATE, 1)
         if (Math.abs(speed) < MIN_SPEED) speed = 0
       }
-      const state = sceneRef.current
-      state.centerLon -= speed * dt
+      view.lon -= speed * dt
       const period = reducedMotion.matches ? REDUCED_MOTION_SPOTLIGHT_SECONDS : SPOTLIGHT_SECONDS
       if (!paused) elapsed += dt
-      const scene = sceneAt(markers, spotlightRef.current, state.centerLon)
+      const scene = sceneAt(markers, spotlightRef.current, view)
 
       let drew = false
       if (ready) {
         const globeRect = globe.getBoundingClientRect()
         drew = renderer!.draw({
-          centerLon: state.centerLon,
+          view,
           size: globeRect.width,
           visibleFraction: (hero.getBoundingClientRect().bottom - globeRect.top) / globeRect.height,
-          pixelRatio: quality.pixelRatio,
+          // Full device resolution keeps the thin lines and dots crisp.
+          pixelRatio: window.devicePixelRatio || 1,
         })
         if (!shown) {
           shown = true
@@ -193,14 +198,16 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
 
     const onPointerDown = (e: PointerEvent) => {
       if (!ready || drag || e.button !== 0) return
-      drag = { pointerId: e.pointerId, lastX: e.clientX, dx: 0 }
+      drag = { pointerId: e.pointerId, lastX: e.clientX, lastY: e.clientY, dx: 0, dy: 0 }
       canvas.setPointerCapture(e.pointerId)
       canvas.toggleAttribute('data-dragging', true)
     }
     const onPointerMove = (e: PointerEvent) => {
       if (e.pointerId !== drag?.pointerId) return
       drag.dx += e.clientX - drag.lastX
+      drag.dy += e.clientY - drag.lastY
       drag.lastX = e.clientX
+      drag.lastY = e.clientY
     }
     const onPointerUp = (e: PointerEvent) => {
       if (e.pointerId !== drag?.pointerId) return
@@ -253,7 +260,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
         <p className={styles.subtitle}>Найдите место для следующего путешествия</p>
       </div>
 
-      <p className={styles.hint} aria-hidden>
+      <p ref={hintRef} className={styles.hint} aria-hidden>
         Вращайте глобус и&nbsp;выбирайте направление
         <svg className={styles.hintArrow} viewBox="0 0 64 34" fill="none">
           <path d="M3 22C14 6 38 2 52 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -364,14 +371,13 @@ function setPosition(el: HTMLElement | SVGElement, x: number, y: number) {
 
 function describeStats(
   frames: FrameWindow,
-  quality: ReturnType<typeof createGlobeQuality>,
   renderer: GlobeRenderer,
 ) {
   const { geometry, canvas } = renderer.describe()
   const nav = navigator as Navigator & { deviceMemory?: number }
   return [
     `${Math.round(frames.fps)} fps · worst ${frames.worstMs.toFixed(1)} ms · js ${frames.cpuMs.toFixed(2)} ms`,
-    `globe ${Math.round(frames.draws)} draws/s · ${canvas} @${quality.pixelRatio}x · level ${quality.level}`,
+    `globe ${Math.round(frames.draws)} draws/s · ${canvas} @${window.devicePixelRatio}x`,
     geometry,
     `dpr ${window.devicePixelRatio} · ${nav.hardwareConcurrency} cores · ${nav.deviceMemory ?? '?'} GB`,
     `env ${appEnv}`,

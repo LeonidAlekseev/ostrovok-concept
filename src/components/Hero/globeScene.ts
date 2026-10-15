@@ -1,6 +1,6 @@
 import type { Destination } from '../../data/destinations'
 import type { NewHotel } from '../../data/hotels'
-import { projectToGlobe, type GlobePoint } from '../../lib/globe'
+import { projectToGlobe, type GlobePoint, type GlobeView } from '../../lib/globe'
 import { arc, routePath } from './globeGeometry'
 
 /** A recently added hotel highlighted on the globe, with flight routes arriving at its city. */
@@ -22,10 +22,10 @@ const routeLift = [0.3, 0.2, 0.25]
 /** Fades a marker out as it approaches the limb (depth 0) and hides it behind. */
 export const depthOpacity = (depth: number) => Math.min(Math.max((depth - 0.05) / 0.2, 0), 1)
 
-/** Positions of everything on the globe when it is turned to `centerLon`. */
-export function sceneAt(markers: Destination[], spotlight: Spotlight, centerLon: number): Scene {
-  const points = new Map(markers.map((d) => [d.id, projectToGlobe(d.lat, d.lon, centerLon)]))
-  const project = (d: Destination) => points.get(d.id) ?? projectToGlobe(d.lat, d.lon, centerLon)
+/** Positions of everything on the globe when it is turned to `view`. */
+export function sceneAt(markers: Destination[], spotlight: Spotlight, view: GlobeView): Scene {
+  const points = new Map(markers.map((d) => [d.id, projectToGlobe(d.lat, d.lon, view)]))
+  const project = (d: Destination) => points.get(d.id) ?? projectToGlobe(d.lat, d.lon, view)
   const hub = project(spotlight.destination)
   const routes = spotlight.sources.map((source, i) => {
     const from = project(source)
@@ -55,12 +55,12 @@ export function createHotelFeed(hotels: NewHotel[]) {
   }
 }
 
-/** Screen-space limits for a spotlight: the card must clear the title, the faded bottom and the sides. */
+/** Screen-space limits for a spotlight: the card must clear the text, the faded bottom and the sides. */
 export interface Viewport {
   globe: DOMRect
   hero: DOMRect
-  /** Bottom edge of the title block, px. */
-  titleBottom: number
+  /** Text blocks the card must not cover (the title, the hint). */
+  avoid: DOMRect[]
   /** Edges of the place card relative to its pin, px (the CSS decides where the card sits). */
   card: { left: number; right: number; top: number; bottom: number }
 }
@@ -89,9 +89,15 @@ export function pickSpotlightCity(
       x + view.card.left > view.hero.left + 12 &&
       x + view.card.right + 32 < view.hero.right &&
       x < view.hero.left + view.hero.width * 0.65 &&
-      y + view.card.top > view.titleBottom + 8 &&
       y < view.hero.bottom - view.hero.height * 0.32 &&
-      y + view.card.bottom < view.hero.bottom - view.hero.height * 0.28
+      y + view.card.bottom < view.hero.bottom - view.hero.height * 0.28 &&
+      view.avoid.every(
+        (r) =>
+          x + view.card.left > r.right + 8 ||
+          x + view.card.right < r.left - 8 ||
+          y + view.card.top > r.bottom + 8 ||
+          y + view.card.bottom < r.top - 8,
+      )
     )
   })
   const fresh = fits.filter((d) => !recent.includes(d.id))

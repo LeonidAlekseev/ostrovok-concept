@@ -119,9 +119,9 @@
   height: 100%;
   opacity: 0;
   transition: opacity 0.6s ease;
-  /* Only the disc itself can be grabbed; vertical swipes still scroll the page. */
+  /* Only the disc itself can be grabbed; on it, swipes in any direction turn the globe. */
   clip-path: circle(50%);
-  touch-action: pan-y;
+  touch-action: none;
   user-select: none;
 }
 
