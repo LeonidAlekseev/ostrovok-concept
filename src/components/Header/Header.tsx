@@ -1,9 +1,9 @@
 import { useCallback, useId, useRef, useState } from 'react'
-import { Bell, Heart, Menu, MessageCircleQuestion, User, X } from 'lucide-react'
+import { Bell, Heart, Menu, X } from 'lucide-react'
 import { useDismiss } from '../../hooks/useDismiss'
 import styles from './Header.module.css'
 
-type Panel = 'favorites' | 'notifications' | 'help' | 'profile' | 'menu'
+type Panel = 'favorites' | 'notifications' | 'menu'
 
 interface Props {
   onStartSearch: () => void
@@ -45,22 +45,6 @@ export function Header({ onStartSearch }: Props) {
           </button>
           <button
             type="button"
-            className={`${styles.iconButton} ${styles.help}`}
-            aria-label="Помощь"
-            {...buttonProps('help')}
-          >
-            <MessageCircleQuestion size={26} strokeWidth={2.2} aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={`${styles.iconButton} ${styles.profile}`}
-            aria-label="Профиль"
-            {...buttonProps('profile')}
-          >
-            <User size={22} fill="currentColor" strokeWidth={1.6} aria-hidden />
-          </button>
-          <button
-            type="button"
             className={styles.iconButton}
             aria-label={open === 'menu' ? 'Закрыть меню' : 'Открыть меню'}
             {...buttonProps('menu')}
@@ -95,24 +79,6 @@ export function Header({ onStartSearch }: Props) {
                   </button>
                 </>
               )}
-              {open === 'help' && (
-                <>
-                  <p className={styles.panelTitle}>Поддержка</p>
-                  <p className={styles.panelText}>Чат поддержки недоступен в демо-версии.</p>
-                  <button type="button" className={styles.panelAction} onClick={close}>
-                    Понятно
-                  </button>
-                </>
-              )}
-              {open === 'profile' && (
-                <>
-                  <p className={styles.panelTitle}>Личный кабинет</p>
-                  <p className={styles.panelText}>Вход недоступен в демо-версии. Поиск работает без авторизации.</p>
-                  <button type="button" className={styles.panelAction} onClick={close}>
-                    Понятно
-                  </button>
-                </>
-              )}
               {open === 'menu' && (
                 <nav aria-label="Основное меню">
                   <ul className={styles.menuList}>
@@ -137,7 +103,5 @@ export function Header({ onStartSearch }: Props) {
 const panelTitle: Record<Panel, string> = {
   favorites: 'Избранное',
   notifications: 'Уведомления',
-  help: 'Помощь',
-  profile: 'Профиль',
   menu: 'Меню',
 }

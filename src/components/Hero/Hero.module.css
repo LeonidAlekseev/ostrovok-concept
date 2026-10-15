@@ -1,7 +1,8 @@
 .hero {
   /* The sphere is much larger than the viewport: it rises from the lower right behind the title. */
   --globe-size: clamp(540px, 144vw, 640px);
-  --globe-top: clamp(24px, 8vw, 40px);
+  /* Offsets include the transparent header laid over the top of the hero. */
+  --globe-top: calc(var(--header-height) + clamp(24px, 8vw, 40px));
   --globe-x: 88%;
 
   position: relative;
@@ -29,7 +30,7 @@
   position: relative;
   z-index: 4;
   width: fit-content;
-  padding: clamp(18px, 5vw, 48px) var(--page-x) 0 calc(var(--page-x) + 8px);
+  padding: calc(var(--header-height) + clamp(18px, 5vw, 48px)) var(--page-x) 0 calc(var(--page-x) + 8px);
   pointer-events: none;
 }
 
@@ -474,7 +475,7 @@
 @media (min-width: 768px) {
   .hero {
     --globe-size: clamp(760px, 76vw, 980px);
-    --globe-top: 32px;
+    --globe-top: calc(var(--header-height) + 32px);
     --globe-x: 64%;
 
     height: calc(var(--globe-top) + var(--globe-size) * 0.62);
@@ -482,7 +483,7 @@
 
   .copy {
     margin-left: max(0px, (100% - var(--page-max)) / 2);
-    padding-top: clamp(56px, 8vw, 96px);
+    padding-top: calc(var(--header-height) + clamp(56px, 8vw, 96px));
   }
 
   .hint {

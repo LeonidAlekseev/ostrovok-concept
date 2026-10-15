@@ -1,5 +1,5 @@
 import type { GlobeView } from '../../lib/globe'
-import { advance, ahead, createPlanes, reroute, type Vec3 } from './globePlanes'
+import { advance, ahead, createFlyers, reroute, type Flyer, type Vec3 } from './globeFlyers'
 
 /** Spacing of the latitude/longitude grid and the step its lines are sampled with, degrees. */
 const GRID_STEP = 15
@@ -14,14 +14,24 @@ const DOT_LEVELS = [
 ]
 const GRID_STYLE = 'rgba(255, 255, 255, 0.4)'
 const COAST_STYLE = 'rgba(255, 255, 255, 0.85)'
+/** Planes cruise slowly, balloons drift slower still; speeds in degrees of arc per second. */
 const PLANE_COUNT = 9
-/** Plane length and its contrail length, CSS pixels and radians of arc. */
-const PLANE_SIZE = 17
+const PLANE_SPEEDS: Flyer['speeds'] = [0.8, 1.6]
+const BALLOON_COUNT = 4
+const BALLOON_SPEEDS: Flyer['speeds'] = [0.2, 0.45]
+/** Plane length and balloon height as fractions of the globe's diameter; contrail length, radians of arc. */
+const PLANE_SIZE = 0.03
+const BALLOON_SIZE = 0.036
 const TRAIL_ANGLE = 0.12
-const PLANE_COLOR = '#0645e8'
+const FLYER_COLOR = '#fff'
+/** A soft shadow keeps the white figures readable over the white dots. */
+const FLYER_SHADOW = 'rgba(20, 70, 10, 0.35)'
 /** Minimal top view of an airliner on a 24×24 grid, nose up. */
 const PLANE_PATH =
   'M12 1.5c.9 0 1.4.9 1.4 2v5.7l7.6 4.6v2l-7.6-2.4v5l2.6 1.9v1.6L12 21l-4 .9v-1.6l2.6-1.9v-5L3 15.8v-2l7.6-4.6V3.5c0-1.1.5-2 1.4-2Z'
+/** Minimal hot-air balloon on a 24×28 grid: envelope, ropes and basket. */
+const BALLOON_PATH =
+  'M12 1C6.5 1 2.5 5 2.5 10c0 4.6 4.3 8.2 7 11h5c2.7-2.8 7-6.4 7-11C21.5 5 17.5 1 12 1ZM9.6 21h.9v3h-.9ZM13.5 21h.9v3h-.9ZM9.3 24h5.4v3.2H9.3Z'
 
 export interface GlobeFrame {
   view: GlobeView
@@ -31,7 +41,7 @@ export interface GlobeFrame {
   visibleFraction: number
   /** Canvas pixels per CSS pixel. */
   pixelRatio: number
-  /** Seconds the planes fly since the previous frame; 0 holds them still. */
+  /** Seconds the planes and balloons fly since the previous frame; 0 holds them still. */
   dt: number
 }
 
@@ -64,8 +74,10 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
   let dots: Float32Array = new Float32Array()
   let coast: Polylines = { points: new Float32Array(), starts: [0] }
   let drawn = ''
-  const planes = createPlanes(PLANE_COUNT)
+  const planes = createFlyers(PLANE_COUNT, PLANE_SPEEDS)
+  const balloons = createFlyers(BALLOON_COUNT, BALLOON_SPEEDS)
   const planePath = new Path2D(PLANE_PATH)
+  const balloonPath = new Path2D(BALLOON_PATH)
   const controller = new AbortController()
 
   const ready = (async () => {
@@ -86,10 +98,11 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
     draw({ view, size, visibleFraction, pixelRatio, dt }) {
       const px = Math.round(size * pixelRatio)
       const visible = Math.ceil(px * Math.min(Math.max(visibleFraction, 0), 1))
-      // A standing globe with standing planes (reduced motion) costs nothing at all.
+      // A standing globe with standing flyers (reduced motion) costs nothing at all.
       const key = `${view.lon}/${view.lat}/${px}/${visible}`
       if (dt === 0 && key === drawn && canvas.width === px) return false
       advance(planes, dt)
+      advance(balloons, dt)
       drawn = key
       if (canvas.width !== px || canvas.height !== px) {
         canvas.width = px
@@ -153,20 +166,45 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
         ctx.fill()
       })
 
+      /** Projects a flyer into `q`; returns its opacity, 0 when it is out of sight. */
+      const place = (flyer: Flyer, size: number) => {
+        projectVec(flyer.pos, q)
+        // Behind the globe each flyer picks a new random course, so the flights never repeat.
+        if (q.depth < -0.3 && !flyer.rerouted) {
+          reroute(flyer)
+          flyer.rerouted = true
+        } else if (q.depth > 0) flyer.rerouted = false
+        if (q.depth < 0.05 || q.y > visible + size) return 0
+        return Math.min((q.depth - 0.05) / 0.2, 1)
+      }
+
+      ctx.fillStyle = FLYER_COLOR
+      ctx.shadowColor = FLYER_SHADOW
+      ctx.shadowBlur = 3 * pixelRatio
+      ctx.shadowOffsetY = pixelRatio
+      // Balloons first: the planes fly above them. They stay upright whatever their course.
+      const balloonScale = (BALLOON_SIZE * px) / 28
+      for (const balloon of balloons) {
+        const alpha = place(balloon, BALLOON_SIZE * px)
+        if (!alpha) continue
+        ctx.globalAlpha = alpha
+        ctx.setTransform(balloonScale, 0, 0, balloonScale, q.x, q.y)
+        ctx.translate(-12, -14)
+        ctx.fill(balloonPath)
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
+      }
+
       const head = { x: 0, y: 0, depth: 0 }
       const tail = { x: 0, y: 0, depth: 0 }
-      const scale = (PLANE_SIZE * pixelRatio) / 24
+      const scale = (PLANE_SIZE * px) / 24
       ctx.lineCap = 'round'
       ctx.lineWidth = 1.5 * pixelRatio
       for (const plane of planes) {
-        projectVec(plane.pos, q)
-        // Behind the globe each plane picks a new random course, so the flights never repeat.
-        if (q.depth < -0.3 && !plane.rerouted) {
-          reroute(plane)
-          plane.rerouted = true
-        } else if (q.depth > 0) plane.rerouted = false
-        if (q.depth < 0.05 || q.y > visible + PLANE_SIZE * pixelRatio) continue
-        ctx.globalAlpha = Math.min((q.depth - 0.05) / 0.2, 1)
+        const alpha = place(plane, PLANE_SIZE * px)
+        if (!alpha) continue
+        ctx.globalAlpha = alpha
+        // The contrail goes without a shadow, as a faint streak.
+        ctx.shadowColor = 'transparent'
 
         projectVec(ahead(plane, -TRAIL_ANGLE), tail)
         const trail = ctx.createLinearGradient(q.x, q.y, tail.x, tail.y)
@@ -180,17 +218,18 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
         }
         ctx.strokeStyle = trail
         ctx.stroke()
+        ctx.shadowColor = FLYER_SHADOW
 
         projectVec(ahead(plane, 0.01), head)
         const angle = Math.atan2(head.y - q.y, head.x - q.x) + Math.PI / 2
         ctx.setTransform(scale, 0, 0, scale, q.x, q.y)
         ctx.rotate(angle)
         ctx.translate(-12, -12)
-        ctx.fillStyle = PLANE_COLOR
         ctx.fill(planePath)
         ctx.setTransform(1, 0, 0, 1, 0, 0)
       }
       ctx.globalAlpha = 1
+      ctx.shadowColor = 'transparent'
       return true
     },
     describe() {

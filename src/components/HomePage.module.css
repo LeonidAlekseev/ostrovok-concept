@@ -1,4 +1,6 @@
 .main {
+  /* The hero starts under the transparent header. */
+  margin-top: calc(-1 * var(--header-height));
   padding-bottom: clamp(24px, 6vw, 56px);
 }
 

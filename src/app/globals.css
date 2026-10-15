@@ -10,7 +10,7 @@
   --text-2: #667085;
   --green: #4cc13a;
   --green-soft: #dcf7c4;
-  /* Background of the header and the hero. */
+  /* Background of the hero; the transparent header shows it too. */
   --lime: #a5e87b;
   --danger: #d92d20;
 
@@ -22,6 +22,7 @@
 
   --page-x: clamp(14px, 4vw, 40px);
   --page-max: 1240px;
+  --header-height: clamp(60px, 15vw, 72px);
 
   font-family:
     'Onest Variable',
