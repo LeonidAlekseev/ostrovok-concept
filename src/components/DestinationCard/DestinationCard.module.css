@@ -9,7 +9,7 @@
   text-align: left;
   background: var(--navy);
   border: 0;
-  border-radius: clamp(14px, 3.6vw, 22px);
+  border-radius: clamp(21px, 5.4vw, 33px);
   box-shadow: 0 6px 18px rgba(7, 22, 47, 0.12);
   scroll-snap-align: start;
   transition:

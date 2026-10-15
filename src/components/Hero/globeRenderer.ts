@@ -25,10 +25,13 @@ const BALLOON_SIZE = 0.036
 const TRAIL_ANGLE = 0.12
 const FLYER_COLOR = '#fff'
 /** Planes and balloons are slightly see-through, so they never outshine the globe and the pins. */
-const FLYER_ALPHA = 0.9
-/** Planes and balloons fade out smoothly between these depths as they near the horizon. */
-const FADE_FROM = 0.02
-const FADE_TO = 0.35
+const FLYER_ALPHA = 0.8
+/**
+ * Planes and balloons fade out smoothly between these depths as they near the horizon. Depth 0.6 is
+ * at 80% of the radius from the centre: a narrower band would be too thin to notice the fading.
+ */
+const FADE_FROM = 0
+const FADE_TO = 0.6
 const fade = (depth: number) => {
   const t = Math.min(Math.max((depth - FADE_FROM) / (FADE_TO - FADE_FROM), 0), 1)
   return t * t * (3 - 2 * t)

@@ -14,9 +14,9 @@
   --lime: #a5e87b;
   --danger: #d92d20;
 
-  --radius-sm: 12px;
-  --radius-md: 16px;
-  --radius-lg: 24px;
+  --radius-sm: 18px;
+  --radius-md: 24px;
+  --radius-lg: 36px;
   --shadow-soft: 0 12px 40px rgba(7, 22, 47, 0.12);
   --shadow-card: 0 18px 50px rgba(7, 22, 47, 0.16);
 
@@ -43,16 +43,20 @@
 *::before,
 *::after {
   box-sizing: border-box;
-  /* Apple-style continuous corners where supported; other browsers keep ordinary rounded ones. */
+  /* Apple-style continuous corners where supported; other browsers keep ordinary rounded ones.
+     A squircle looks as round as a circular corner about 1.5 times smaller, hence the larger radii. */
   corner-shape: squircle;
 }
 
 html {
   overflow-x: hidden;
+  /* No pull-to-refresh: a downward drag that starts on a pin or the hotel card would reload the page. */
+  overscroll-behavior-y: none;
 }
 
 body {
   margin: 0;
+  overscroll-behavior-y: none;
   min-width: 320px;
   overflow-x: hidden;
 }

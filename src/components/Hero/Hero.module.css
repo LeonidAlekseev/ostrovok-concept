@@ -270,7 +270,7 @@
   display: block;
   width: 100%;
   height: 100%;
-  filter: drop-shadow(0 3px 5px rgba(6, 40, 110, 0.35));
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.9));
 }
 
 .pinTooltip {
@@ -283,7 +283,7 @@
   font-weight: 600;
   white-space: nowrap;
   background: var(--white);
-  border-radius: 8px;
+  border-radius: 12px;
   box-shadow: var(--shadow-soft);
   opacity: 0;
   transform: translate(-50%, 4px);
@@ -322,7 +322,7 @@
   text-align: left;
   background: var(--white);
   border: 0;
-  border-radius: clamp(10px, 3vw, 14px);
+  border-radius: clamp(15px, 4.5vw, 21px);
   box-shadow: 0 14px 34px rgba(30, 80, 20, 0.25);
   opacity: var(--o, 1);
   transform: translate(
@@ -355,7 +355,7 @@
   color: var(--white);
   background: linear-gradient(135deg, #3d8bff, #0b3aa8);
   /* Concentric with the card's corner. */
-  border-radius: calc(clamp(10px, 3vw, 14px) - var(--card-pad) + 2px);
+  border-radius: calc(clamp(15px, 4.5vw, 21px) - var(--card-pad) + 3px);
 }
 
 .placeIcon svg {
@@ -429,7 +429,7 @@
     Menlo,
     monospace;
   background: rgba(0, 0, 0, 0.78);
-  border-radius: 6px;
+  border-radius: 9px;
 }
 
 .stats summary {
