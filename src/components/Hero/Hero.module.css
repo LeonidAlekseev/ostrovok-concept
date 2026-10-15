@@ -15,14 +15,14 @@
     var(--lime);
 }
 
-/* Fade the bottom of the scene into the white page behind the search form. */
+/* Fade the bottom of the scene into the page behind the search form. */
 .hero::after {
   content: '';
   position: absolute;
   inset: auto 0 0;
   z-index: 3;
   height: 30%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(240, 252, 232, 0.8) 60%, #ffffff 100%);
+  background: linear-gradient(180deg, rgba(242, 244, 247, 0) 0%, rgba(236, 246, 232, 0.8) 60%, var(--page-bg) 100%);
   pointer-events: none;
 }
 
@@ -242,13 +242,16 @@
 }
 
 .pin:hover,
-.pin:focus-visible,
-.pin[aria-pressed='true'] {
+.pin:focus-visible {
   --pin-scale: 1.15;
 }
 
+/* The selected pin grows and darkens; the globe turns it to the middle and stops. */
 .pin[aria-pressed='true'] {
-  color: #00a2ff;
+  --pin-scale: 1.45;
+
+  z-index: 3;
+  color: #0331a8;
 }
 
 .pinHub {

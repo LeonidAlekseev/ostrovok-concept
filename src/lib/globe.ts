@@ -27,3 +27,25 @@ export function projectToGlobe(lat: number, lon: number, view: GlobeView = GLOBE
   const py = Math.cos(φ0) * Math.sin(φ) - Math.sin(φ0) * Math.cos(φ) * Math.cos(λ)
   return { x: (1 + px) * 50, y: (1 - py) * 50, depth }
 }
+
+/**
+ * The view that puts the point (lat, lon) at (u, v) on the globe's disc (−1…1 from the centre, v up)
+ * with the view latitude within ±maxTilt, or null when no such view exists. Inverse of projectToGlobe().
+ */
+export function viewPlacing(lat: number, lon: number, u: number, v: number, maxTilt: number): GlobeView | null {
+  const φ = lat * rad
+  const sinλ = u / Math.cos(φ)
+  if (Math.abs(sinλ) > 1) return null
+  const λ = Math.asin(sinλ)
+  // v = a·cosφ0 − b·sinφ0 = r·cos(φ0 + δ)
+  const a = Math.sin(φ)
+  const b = Math.cos(φ) * Math.cos(λ)
+  const r = Math.hypot(a, b)
+  if (Math.abs(v) > r) return null
+  const δ = Math.atan2(b, a)
+  for (const φ0 of [Math.acos(v / r) - δ, -Math.acos(v / r) - δ]) {
+    const depth = a * Math.sin(φ0) + b * Math.cos(φ0)
+    if (depth > 0 && Math.abs(φ0) <= maxTilt * rad) return { lat: φ0 / rad, lon: lon - λ / rad }
+  }
+  return null
+}

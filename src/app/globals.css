@@ -4,7 +4,9 @@
   --blue-soft: #e6eeff;
   --navy: #07162f;
   --white: #ffffff;
-  --gray-bg: #f4f7fb;
+  /* Page background, and a step darker for blocks laid on it. */
+  --page-bg: #f2f4f7;
+  --gray-bg: #e8ecf2;
   --line: #dfe5ee;
   --text: #101828;
   --text-2: #667085;
@@ -32,7 +34,7 @@
     Roboto,
     sans-serif;
   color: var(--text);
-  background: var(--white);
+  background: var(--page-bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

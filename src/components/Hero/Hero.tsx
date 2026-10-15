@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { BedDouble, ChevronRight, Star } from 'lucide-react'
 import type { Destination } from '../../data/destinations'
 import type { NewHotel } from '../../data/hotels'
-import { GLOBE_CENTER } from '../../lib/globe'
+import { GLOBE_CENTER, viewPlacing, type GlobeView } from '../../lib/globe'
 import { appEnv, isProduction } from '../../lib/env'
 import { formatPrice } from '../../lib/format'
 import { createFrameMeter, type FrameWindow } from './globePerformance'
@@ -29,6 +29,8 @@ const SETTLE_RATE = 1.5
 const MAX_DRAG_SPEED = 400
 /** A vertical drag tilts the globe up to this latitude either way; the tilt stays after release. */
 const MAX_TILT = 85
+/** How quickly the globe turns a selected pin into view (per second). */
+const CENTER_RATE = 3
 /** Seconds each new hotel stays in the spotlight. */
 const SPOTLIGHT_SECONDS = 5
 const REDUCED_MOTION_SPOTLIGHT_SECONDS = 8
@@ -61,8 +63,10 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
   const cardRef = useRef<HTMLButtonElement>(null)
   const statsRef = useRef<StatsPanelHandle>(null)
   const spotlightRef = useRef(spotlight)
-  const pausedRef = useRef({ hover: false, focus: false })
+  const pausedRef = useRef({ hover: false, focus: false, selected: false })
   const viewRef = useRef({ ...GLOBE_CENTER })
+  /** View the globe is turning to, so that the selected pin comes to the middle of the visible globe. */
+  const targetRef = useRef<GlobeView | null>(null)
 
   /** Writes the current scene straight to the DOM, bypassing React on every frame. */
   const paint = useCallback((scene: Scene) => {
@@ -148,7 +152,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
       const started = performance.now()
       const dt = Math.min((now - last) / 1000, 0.1)
       last = now
-      const paused = pausedRef.current.hover || pausedRef.current.focus
+      const paused = pausedRef.current.hover || pausedRef.current.focus || pausedRef.current.selected
       const canSpin = ready && !reducedMotion.matches
       const view = viewRef.current
 
@@ -169,6 +173,15 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
         if (Math.abs(speed) < MIN_SPEED) speed = 0
       }
       view.lon -= speed * dt
+      const target = targetRef.current
+      if (target && !drag) {
+        const k = reducedMotion.matches ? 1 : Math.min(dt * CENTER_RATE, 1)
+        const dLat = target.lat - view.lat
+        const dLon = ((((target.lon - view.lon) % 360) + 540) % 360) - 180
+        view.lat += dLat * k
+        view.lon += dLon * k
+        if (Math.abs(dLat) < 0.01 && Math.abs(dLon) < 0.01) targetRef.current = null
+      }
       const period = reducedMotion.matches ? REDUCED_MOTION_SPOTLIGHT_SECONDS : SPOTLIGHT_SECONDS
       if (!paused) elapsed += dt
       const scene = sceneAt(markers, spotlightRef.current, view)
@@ -200,6 +213,8 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
     const onPointerDown = (e: PointerEvent) => {
       if (!ready || drag || e.button !== 0) return
       drag = { pointerId: e.pointerId, lastX: e.clientX, lastY: e.clientY, dx: 0, dy: 0 }
+      // A drag takes over from turning to the selected pin.
+      targetRef.current = null
       canvas.setPointerCapture(e.pointerId)
       canvas.toggleAttribute('data-dragging', true)
     }
@@ -239,6 +254,29 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
       renderer?.dispose()
     }
   }, [markers, feed, paint])
+
+  // A selected pin stops the spin and is brought to the middle of the visible part of the globe.
+  useEffect(() => {
+    const selected = markers.find((d) => d.id === selectedId)
+    pausedRef.current.selected = selected !== undefined
+    if (!selected) return
+    // The card moves to the selected city, so it never covers the pin.
+    if (spotlightRef.current.destination.id !== selected.id && feed.has(selected.id))
+      setSpotlight({ destination: selected, hotel: feed.next(selected.id)!, sources: [] })
+    const g = globeRef.current!.getBoundingClientRect()
+    const h = heroRef.current!.getBoundingClientRect()
+    const radius = g.width / 2
+    // Middle of the disc's visible part: the hero clips its sides and its faded bottom third.
+    const x = (Math.max(g.left, h.left) + Math.min(g.right, h.right)) / 2
+    const y = (Math.max(g.top, h.top) + Math.min(g.bottom, h.bottom - h.height * 0.3)) / 2
+    const u = (x - g.left - radius) / radius
+    const v = (g.top + radius - y) / radius
+    // Far north a city cannot reach every spot of the disc: move the spot towards the centre until it can.
+    for (const k of [1, 0.75, 0.5, 0.25, 0]) {
+      targetRef.current = viewPlacing(selected.lat, selected.lon, u * k, v * k, MAX_TILT)
+      if (targetRef.current) break
+    }
+  }, [markers, feed, selectedId])
 
   const pause = (key: 'hover' | 'focus', value: boolean) => () => {
     pausedRef.current[key] = value
