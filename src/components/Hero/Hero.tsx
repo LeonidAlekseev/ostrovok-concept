@@ -3,8 +3,10 @@ import { BedDouble, ChevronRight, Plane, Star } from 'lucide-react'
 import type { Destination } from '../../data/destinations'
 import type { NewHotel } from '../../data/hotels'
 import { GLOBE_CENTER } from '../../lib/globe'
+import { appEnv, isProduction } from '../../lib/env'
 import { formatPrice } from '../../lib/format'
-import { createGlobeRenderer } from './globeRenderer'
+import { createFrameMeter, createGlobeQuality, isLowEndDevice, type FrameWindow } from './globePerformance'
+import { createGlobeRenderer, type GlobeRenderer } from './globeRenderer'
 import { createHotelFeed, depthOpacity, pickSpotlightCity, sceneAt, type Scene, type Spotlight } from './globeScene'
 import styles from './Hero.module.css'
 
@@ -27,6 +29,10 @@ const MAX_DRAG_SPEED = 400
 /** Seconds each new hotel stays in the spotlight. */
 const SPOTLIGHT_SECONDS = 5
 const REDUCED_MOTION_SPOTLIGHT_SECONDS = 8
+/** High-refresh screens get every other frame: the slow spin gains nothing from 120 fps. */
+const MIN_FRAME_MS = 10
+/** Below this speed (degrees per second) the globe is considered standing, so it is not redrawn. */
+const MIN_SPEED = 0.001
 /** Routes to the first spotlight, matching the reference composition. */
 const initialSourceIds = ['london', 'lisbon', 'tbilisi']
 
@@ -50,6 +56,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
   const planeRef = useRef<SVGSVGElement>(null)
   const glowRef = useRef<HTMLDivElement>(null)
   const cardRef = useRef<HTMLButtonElement>(null)
+  const statsRef = useRef<HTMLPreElement>(null)
   const spotlightRef = useRef(spotlight)
   const pausedRef = useRef({ hover: false, focus: false })
   const sceneRef = useRef({ centerLon: GLOBE_CENTER.lon, flight: 0.42 })
@@ -94,9 +101,18 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
     const globe = globeRef.current!
     const hero = heroRef.current!
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const lowEnd = isLowEndDevice()
+    const quality = createGlobeQuality(window.devicePixelRatio || 1, lowEnd)
     const renderer = createGlobeRenderer(canvas, {
       small: '/images/earth-texture-2048.webp',
       large: '/images/earth-texture-3600.webp',
+      useLarge: !lowEnd && globe.clientWidth * quality.pixelRatio > 1400,
+    })
+    const stats = statsRef.current
+    if (stats && !renderer) stats.textContent = 'WebGL 2 unavailable: static poster'
+    const meter = createFrameMeter((frames) => {
+      if (quality.update(frames.fps)) globe.toggleAttribute('data-lite', quality.lite)
+      if (stats && renderer) stats.textContent = describeStats(frames, quality, renderer, lowEnd)
     })
     let glReady = false
     let shown = false
@@ -140,6 +156,8 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
 
     const tick = (now: number) => {
       frame = requestAnimationFrame(tick)
+      if (now - last < MIN_FRAME_MS) return
+      const started = performance.now()
       const dt = Math.min((now - last) / 1000, 0.1)
       last = now
       const paused = pausedRef.current.hover || pausedRef.current.focus
@@ -156,13 +174,15 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
       } else {
         const targetSpeed = canSpin && !paused ? SPIN_SPEED : 0
         speed += (targetSpeed - speed) * Math.min(dt * SETTLE_RATE, 1)
+        if (Math.abs(speed) < MIN_SPEED) speed = 0
       }
       const state = sceneRef.current
       state.centerLon -= speed * dt
+      let drew = false
       if (glReady) {
         const globeRect = globe.getBoundingClientRect()
         const visible = (hero.getBoundingClientRect().bottom - globeRect.top) / globeRect.height
-        renderer!.draw(state.centerLon, globeRect.width, visible)
+        drew = renderer!.draw(state.centerLon, globeRect.width, visible, quality.pixelRatio)
         if (!shown) {
           shown = true
           setSpinning(true)
@@ -179,6 +199,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
         state.flight = 0
         nextSpotlight(scene.points)
       }
+      if (glReady) meter.frame(now, performance.now() - started, drew)
     }
 
     const onPointerDown = (e: PointerEvent) => {
@@ -361,6 +382,8 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
           </span>
         </button>
       </div>
+
+      {!isProduction && <pre ref={statsRef} className={styles.stats} aria-hidden />}
     </section>
   )
 }
@@ -371,6 +394,24 @@ const positionStyle = (p: { x: number; y: number }) => ({ '--x': p.x, '--y': p.y
 function setPosition(el: HTMLElement | SVGElement, x: number, y: number) {
   el.style.setProperty('--x', String(x))
   el.style.setProperty('--y', String(y))
+}
+
+function describeStats(
+  frames: FrameWindow,
+  quality: ReturnType<typeof createGlobeQuality>,
+  renderer: GlobeRenderer,
+  lowEnd: boolean,
+) {
+  const { gpu, texture, canvas } = renderer.describe()
+  const nav = navigator as Navigator & { deviceMemory?: number }
+  return [
+    `${Math.round(frames.fps)} fps · worst ${frames.worstMs.toFixed(1)} ms · js ${frames.cpuMs.toFixed(2)} ms`,
+    `globe ${Math.round(frames.draws)} draws/s · ${canvas} @${quality.pixelRatio}x · level ${quality.level}${quality.lite ? ' lite' : ''}`,
+    `texture ${texture}`,
+    `gpu ${gpu}`,
+    `dpr ${window.devicePixelRatio} · ${nav.hardwareConcurrency} cores · ${nav.deviceMemory ?? '?'} GB${lowEnd ? ' · low-end' : ''}`,
+    `env ${appEnv}`,
+  ].join('\n')
 }
 
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2)

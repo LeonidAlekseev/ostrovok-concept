@@ -59,16 +59,28 @@ export interface GlobeRenderer {
   /** Resolves once the texture is uploaded and frames can be drawn. */
   ready: Promise<void>
   /**
-   * Draws the globe centred on `centerLon` into a canvas of `size` CSS pixels;
-   * only the top `visibleFraction` of it is rasterised.
+   * Draws the globe centred on `centerLon` into a canvas of `size` CSS pixels at `pixelRatio`
+   * canvas pixels per CSS pixel; only the top `visibleFraction` of it is rasterised.
+   * Returns false when nothing changed since the previous frame and drawing was skipped.
    */
-  draw(centerLon: number, size: number, visibleFraction: number): void
+  draw(centerLon: number, size: number, visibleFraction: number, pixelRatio: number): boolean
+  /** GPU name and texture details for the technical overlay. */
+  describe(): { gpu: string; texture: string; canvas: string }
   dispose(): void
 }
 
 /** WebGL 2 globe renderer, or null when WebGL 2 is unavailable (the static poster stays then). */
-export function createGlobeRenderer(canvas: HTMLCanvasElement, textures: { small: string; large: string }) {
-  const gl = canvas.getContext('webgl2', { alpha: true, antialias: false, premultipliedAlpha: true })
+export function createGlobeRenderer(
+  canvas: HTMLCanvasElement,
+  texture: { small: string; large: string; useLarge: boolean },
+) {
+  // A full-screen shader pass gains nothing from the discrete GPU on dual-GPU laptops; spare the battery.
+  const gl = canvas.getContext('webgl2', {
+    alpha: true,
+    antialias: false,
+    premultipliedAlpha: true,
+    powerPreference: 'low-power',
+  })
   if (!gl) return null
 
   const program = linkProgram(gl)
@@ -89,18 +101,19 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, textures: { small
   gl.uniform1f(uniform('uLatMin'), (TEXTURE_LAT_MIN * Math.PI) / 180)
   gl.uniform1i(uniform('uTex'), 0)
 
-  const texture = gl.createTexture()
+  const glTexture = gl.createTexture()
+  let textureSize = ''
+  let drawn = ''
   let disposed = false
 
   const ready = (async () => {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    const wantLarge = canvas.clientWidth * dpr > 1400 && gl.getParameter(gl.MAX_TEXTURE_SIZE) >= 4096
     const image = new Image()
     image.decoding = 'async'
-    image.src = wantLarge ? textures.large : textures.small
+    image.src = texture.useLarge && gl.getParameter(gl.MAX_TEXTURE_SIZE) >= 4096 ? texture.large : texture.small
     await image.decode()
     if (disposed) return
-    gl.bindTexture(gl.TEXTURE_2D, texture)
+    textureSize = `${image.naturalWidth}×${image.naturalHeight}`
+    gl.bindTexture(gl.TEXTURE_2D, glTexture)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image)
     gl.generateMipmap(gl.TEXTURE_2D)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
@@ -111,15 +124,18 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, textures: { small
 
   return {
     ready,
-    draw(centerLon, size, visibleFraction) {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2)
-      const px = Math.round(size * dpr)
+    draw(centerLon, size, visibleFraction, pixelRatio) {
+      const px = Math.round(size * pixelRatio)
+      const visible = Math.ceil(px * Math.min(Math.max(visibleFraction, 0), 1))
+      // A standing globe (hover, reduced motion) costs no GPU time at all.
+      const frame = `${centerLon}/${px}/${visible}`
+      if (frame === drawn && canvas.width === px) return false
+      drawn = frame
       if (canvas.width !== px || canvas.height !== px) {
         canvas.width = px
         canvas.height = px
       }
       gl.viewport(0, 0, px, px)
-      const visible = Math.ceil(px * Math.min(Math.max(visibleFraction, 0), 1))
       gl.enable(gl.SCISSOR_TEST)
       gl.scissor(0, px - visible, px, visible)
       gl.clearColor(0, 0, 0, 0)
@@ -127,10 +143,19 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, textures: { small
       gl.uniform1f(uLon0, (centerLon * Math.PI) / 180)
       gl.uniform1f(uPixel, 1.5 / px)
       gl.drawArrays(gl.TRIANGLES, 0, 3)
+      return true
+    },
+    describe() {
+      const debug = gl.getExtension('WEBGL_debug_renderer_info')
+      return {
+        gpu: String(gl.getParameter(debug ? debug.UNMASKED_RENDERER_WEBGL : gl.RENDERER)),
+        texture: textureSize || 'loading',
+        canvas: `${canvas.width}×${canvas.height}`,
+      }
     },
     dispose() {
       disposed = true
-      gl.deleteTexture(texture)
+      gl.deleteTexture(glTexture)
       gl.deleteBuffer(buffer)
       gl.deleteProgram(program)
     },
