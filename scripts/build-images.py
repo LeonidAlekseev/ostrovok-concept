@@ -4,7 +4,7 @@ Usage:
     uv run --with pillow --with numpy python scripts/build-images.py <sources-dir>
 
 Expected files in <sources-dir> (see public/images/CREDITS.md for origins):
-    bm.jpg        Blue Marble Next Generation + topography + bathymetry (3600x1800)
+    earth.jpg     Blue Marble Next Generation, topography + bathymetry, July (5400x2700)
     florence.jpg  Florence panorama with the Duomo
     eiffel.jpg    Eiffel Tower at sunset
     sea.jpg       Navagio bay, Zakynthos
@@ -57,8 +57,6 @@ def render_globe(texture: Image.Image, size: int) -> Image.Image:
         + tex[y0 + 1, x1] * fx * fy
     )
 
-    c = boost_ocean(c)
-
     # Soft daylight from the upper right, plus atmospheric haze at the limb.
     light = np.array([0.45, 0.55, 0.70])
     light /= np.linalg.norm(light)
@@ -75,20 +73,11 @@ def render_globe(texture: Image.Image, size: int) -> Image.Image:
     return ImageEnhance.Contrast(img).enhance(1.08)
 
 
-def boost_ocean(c: np.ndarray) -> np.ndarray:
-    """Lifts the dark Blue Marble ocean towards a vivid travel-poster blue."""
-    lum = c.mean(axis=-1, keepdims=True)
-    blueness = np.clip((c[..., 2:3] - c[..., 0:1]) * 3.0, 0, 1)
-    ocean = blueness * np.clip(1.2 - lum * 2.0, 0, 1)
-    return c * (1 + 0.45 * ocean) + ocean * np.array([0.0, 0.05, 0.2])
-
-
 def globe_texture(texture: Image.Image) -> Image.Image:
     """Equirectangular texture for the rotating WebGL globe (lighting is applied in the shader)."""
-    tex = np.asarray(texture.convert("RGB"), dtype=np.float32) / 255.0
-    rows = round(tex.shape[0] * (90 - TEXTURE_LAT_MIN) / 180)
-    c = boost_ocean(tex[:rows])
-    return Image.fromarray((np.clip(c, 0, 1) * 255).astype(np.uint8), "RGB")
+    texture = texture.convert("RGB")
+    rows = round(texture.height * (90 - TEXTURE_LAT_MIN) / 180)
+    return texture.crop((0, 0, texture.width, rows))
 
 
 def crop_to(img: Image.Image, ratio: float, cx: float, cy: float, zoom: float = 1.0) -> Image.Image:
@@ -110,13 +99,13 @@ def save(img: Image.Image, name: str, width: int, quality: int = 80) -> None:
 def main(src: Path) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
 
-    globe = render_globe(Image.open(src / "bm.jpg"), 2000)
+    globe = render_globe(Image.open(src / "earth.jpg"), 2000)
     save(globe, "earth-europe-2000.webp", 2000, 82)
     save(globe, "earth-europe-1200.webp", 1200, 82)
 
-    texture = globe_texture(Image.open(src / "bm.jpg"))
-    save(texture, "earth-texture-3600.webp", 3600, 80)
-    save(texture, "earth-texture-2048.webp", 2048, 80)
+    texture = globe_texture(Image.open(src / "earth.jpg"))
+    save(texture, "earth-texture-4096.webp", 4096, 85)
+    save(texture, "earth-texture-2048.webp", 2048, 85)
 
     photos = {
         "sea.jpg": ("sea-navagio.webp", 1.15, 0.6, 0.6, 1.0, 900),
@@ -124,6 +113,9 @@ def main(src: Path) -> None:
         "eiffel.jpg": ("paris-eiffel.webp", 1.15, 0.585, 0.42, 1.9, 900),
     }
     for source, (name, ratio, cx, cy, zoom, width) in photos.items():
+        if not (src / source).exists():
+            print(f"{source}: missing, {name} kept as is")
+            continue
         img = Image.open(src / source).convert("RGB")
         save(crop_to(img, ratio, cx, cy, zoom), name, width)
 

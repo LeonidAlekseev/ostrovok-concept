@@ -1,4 +1,4 @@
-import { GLOBE_CENTER } from '../../lib/globe'
+import { GLOBE_CENTER, type GlobePoint } from '../../lib/globe'
 
 /** Southern edge of the cropped texture (keep in sync with TEXTURE_LAT_MIN in scripts/build-images.py). */
 const TEXTURE_LAT_MIN = -20
@@ -18,12 +18,19 @@ precision highp float;
 in vec2 vUv;
 out vec4 outColor;
 uniform sampler2D uTex;
-uniform float uLat0;
+// sin and cos of the view latitude.
+uniform vec2 uLat0;
 uniform float uLon0;
 uniform float uLatMin;
 uniform float uPixel;
+// View-space position of the spotlighted city (xyz) and its glow strength (w).
+uniform vec4 uCity;
 const float PI = 3.14159265;
 const vec3 LIGHT = normalize(vec3(0.45, 0.55, 0.70));
+// 1 - cos of the glow's angular radius, 0.16 rad: as wide as the CSS glow it replaced.
+const float GLOW_RADIUS = 0.0128;
+const vec3 GLOW_CORE = vec3(1.0, 0.925, 0.55) * 0.55;
+const vec3 GLOW_EDGE = vec3(0.63, 1.0, 0.47) * 0.25;
 
 void main() {
   float u = vUv.x, v = vUv.y;
@@ -32,8 +39,8 @@ void main() {
   if (alpha <= 0.0) discard;
   float z = sqrt(max(1.0 - rho * rho, 0.0));
 
-  float lat = asin(clamp(z * sin(uLat0) + v * cos(uLat0), -1.0, 1.0));
-  float lon = uLon0 + atan(u, z * cos(uLat0) - v * sin(uLat0));
+  float lat = asin(clamp(z * uLat0.x + v * uLat0.y, -1.0, 1.0));
+  float lon = uLon0 + atan(u, z * uLat0.y - v * uLat0.x);
   float s = lon / (2.0 * PI) + 0.5;
   float t = (PI / 2.0 - lat) / (PI / 2.0 - uLatMin);
 
@@ -52,23 +59,52 @@ void main() {
   float gray = dot(c, vec3(0.299, 0.587, 0.114));
   c = clamp(mix(vec3(gray), c, 1.25), 0.0, 1.0);
   c = clamp(mix(vec3(0.4), c, 1.08), 0.0, 1.0);
+
+  // Pool of light around the spotlighted city, screen-blended; it follows the sphere's curvature.
+  float r = sqrt(max(1.0 - dot(vec3(u, v, z), uCity.xyz), 0.0) / GLOW_RADIUS);
+  vec3 glow = r < 0.5 ? mix(GLOW_CORE, GLOW_EDGE, r * 2.0) : mix(GLOW_EDGE, vec3(0.0), min(r * 2.0 - 1.0, 1.0));
+  c += glow * uCity.w * (1.0 - c);
+
+  // Interleaved gradient noise of one 8-bit step hides banding in the haze and the terminator.
+  c += (fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5) / 255.0;
   outColor = vec4(c * alpha, alpha);
 }`
+
+export interface GlobeFrame {
+  centerLon: number
+  /** Canvas size, CSS pixels. */
+  size: number
+  /** Top fraction of the canvas that is on screen; only it is rasterised. */
+  visibleFraction: number
+  /** Canvas pixels per CSS pixel. */
+  pixelRatio: number
+  /** Spotlighted city and the strength of the light pool around it, 0…1. */
+  city: GlobePoint
+  cityGlow: number
+}
 
 export interface GlobeRenderer {
   /** Resolves once the texture is uploaded and frames can be drawn. */
   ready: Promise<void>
-  /**
-   * Draws the globe centred on `centerLon` into a canvas of `size` CSS pixels;
-   * only the top `visibleFraction` of it is rasterised.
-   */
-  draw(centerLon: number, size: number, visibleFraction: number): void
+  /** Draws a frame; returns false when nothing changed since the previous one and drawing was skipped. */
+  draw(frame: GlobeFrame): boolean
+  /** GPU name and texture details for the technical overlay. */
+  describe(): { gpu: string; texture: string; canvas: string }
   dispose(): void
 }
 
 /** WebGL 2 globe renderer, or null when WebGL 2 is unavailable (the static poster stays then). */
-export function createGlobeRenderer(canvas: HTMLCanvasElement, textures: { small: string; large: string }) {
-  const gl = canvas.getContext('webgl2', { alpha: true, antialias: false, premultipliedAlpha: true })
+export function createGlobeRenderer(
+  canvas: HTMLCanvasElement,
+  texture: { small: string; large: string; useLarge: boolean },
+) {
+  // A full-screen shader pass gains nothing from the discrete GPU on dual-GPU laptops; spare the battery.
+  const gl = canvas.getContext('webgl2', {
+    alpha: true,
+    antialias: false,
+    premultipliedAlpha: true,
+    powerPreference: 'low-power',
+  })
   if (!gl) return null
 
   const program = linkProgram(gl)
@@ -85,22 +121,25 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, textures: { small
   const uniform = (name: string) => gl.getUniformLocation(program, name)
   const uLon0 = uniform('uLon0')
   const uPixel = uniform('uPixel')
-  gl.uniform1f(uniform('uLat0'), (GLOBE_CENTER.lat * Math.PI) / 180)
+  const uCity = uniform('uCity')
+  const lat0 = (GLOBE_CENTER.lat * Math.PI) / 180
+  gl.uniform2f(uniform('uLat0'), Math.sin(lat0), Math.cos(lat0))
   gl.uniform1f(uniform('uLatMin'), (TEXTURE_LAT_MIN * Math.PI) / 180)
   gl.uniform1i(uniform('uTex'), 0)
 
-  const texture = gl.createTexture()
+  const glTexture = gl.createTexture()
+  let textureSize = ''
+  let drawn = ''
   let disposed = false
 
   const ready = (async () => {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    const wantLarge = canvas.clientWidth * dpr > 1400 && gl.getParameter(gl.MAX_TEXTURE_SIZE) >= 4096
     const image = new Image()
     image.decoding = 'async'
-    image.src = wantLarge ? textures.large : textures.small
+    image.src = texture.useLarge && gl.getParameter(gl.MAX_TEXTURE_SIZE) >= 4096 ? texture.large : texture.small
     await image.decode()
     if (disposed) return
-    gl.bindTexture(gl.TEXTURE_2D, texture)
+    textureSize = `${image.naturalWidth}×${image.naturalHeight}`
+    gl.bindTexture(gl.TEXTURE_2D, glTexture)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image)
     gl.generateMipmap(gl.TEXTURE_2D)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
@@ -111,26 +150,39 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, textures: { small
 
   return {
     ready,
-    draw(centerLon, size, visibleFraction) {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2)
-      const px = Math.round(size * dpr)
+    draw({ centerLon, size, visibleFraction, pixelRatio, city, cityGlow }) {
+      const px = Math.round(size * pixelRatio)
+      const visible = Math.ceil(px * Math.min(Math.max(visibleFraction, 0), 1))
+      // A standing globe (hover, reduced motion) costs no GPU time at all.
+      const key = `${centerLon}/${px}/${visible}/${city.x}/${city.y}/${cityGlow}`
+      if (key === drawn && canvas.width === px) return false
+      drawn = key
       if (canvas.width !== px || canvas.height !== px) {
         canvas.width = px
         canvas.height = px
       }
       gl.viewport(0, 0, px, px)
-      const visible = Math.ceil(px * Math.min(Math.max(visibleFraction, 0), 1))
       gl.enable(gl.SCISSOR_TEST)
       gl.scissor(0, px - visible, px, visible)
       gl.clearColor(0, 0, 0, 0)
       gl.clear(gl.COLOR_BUFFER_BIT)
       gl.uniform1f(uLon0, (centerLon * Math.PI) / 180)
       gl.uniform1f(uPixel, 1.5 / px)
+      gl.uniform4f(uCity, city.x / 50 - 1, 1 - city.y / 50, city.depth, cityGlow)
       gl.drawArrays(gl.TRIANGLES, 0, 3)
+      return true
+    },
+    describe() {
+      const debug = gl.getExtension('WEBGL_debug_renderer_info')
+      return {
+        gpu: String(gl.getParameter(debug ? debug.UNMASKED_RENDERER_WEBGL : gl.RENDERER)),
+        texture: textureSize || 'loading',
+        canvas: `${canvas.width}×${canvas.height}`,
+      }
     },
     dispose() {
       disposed = true
-      gl.deleteTexture(texture)
+      gl.deleteTexture(glTexture)
       gl.deleteBuffer(buffer)
       gl.deleteProgram(program)
     },

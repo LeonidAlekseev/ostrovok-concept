@@ -1,7 +1,7 @@
 .hero {
   /* The sphere is much larger than the viewport: only its northern cap is visible. */
-  --globe-size: clamp(560px, 173vw, 840px);
-  --globe-top: clamp(92px, 25vw, 116px);
+  --globe-size: clamp(460px, 140vw, 680px);
+  --globe-top: clamp(112px, 31vw, 140px);
   --globe-x: 52%;
 
   position: relative;
@@ -168,8 +168,8 @@
   cursor: grabbing;
 }
 
-/* Hidden only after the live globe has faded in on top of it. */
-.earthHidden {
+/* Poster parts the live globe renders itself: hidden only after it has faded in. */
+.replaced {
   visibility: hidden;
   transition: visibility 0s 0.6s;
 }
@@ -233,7 +233,8 @@
 }
 
 .route,
-.routeGlow {
+.routeGlow,
+.routeHalo {
   fill: none;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
@@ -242,25 +243,16 @@
 .route {
   stroke: rgba(235, 245, 255, 0.8);
   stroke-width: 1.1;
-  stroke-dasharray: 60 6;
-  animation: flow 9s linear infinite;
 }
 
 .routeGlow {
-  stroke: rgba(120, 190, 255, 0.7);
-  stroke-width: 3;
+  stroke: rgba(120, 190, 255, 0.32);
+  stroke-width: 4;
 }
 
-.plane {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 2;
-  opacity: var(--o, 1);
-  transform: translate(calc(var(--x) * 1cqw - 50%), calc(var(--y) * 1cqw - 50%)) rotate(var(--angle));
-  color: #fff;
-  filter: drop-shadow(0 0 6px rgba(140, 200, 255, 0.9));
-  pointer-events: none;
+.routeHalo {
+  stroke: rgba(120, 190, 255, 0.12);
+  stroke-width: 10;
 }
 
 /* ---------- Pins ---------- */
@@ -281,6 +273,7 @@
   border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
   opacity: var(--o, 1);
   transform: translate(calc(var(--x) * 1cqw - 50%), calc(var(--y) * 1cqw - 100%)) scale(var(--pin-scale));
+  will-change: transform;
   transition:
     width 0.5s ease,
     height 0.5s ease,
@@ -384,6 +377,7 @@
     calc(var(--x) * 1cqw + var(--card-dx)),
     calc(var(--y) * 1cqw + var(--card-dy) - var(--card-lift))
   );
+  will-change: transform;
   transition: box-shadow 0.2s ease;
 }
 
@@ -471,10 +465,35 @@
   color: var(--text-2);
 }
 
-@keyframes flow {
-  to {
-    stroke-dashoffset: -132;
-  }
+/* Technical overlay, outside production only; mounted on <body>. */
+.stats {
+  position: fixed;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2147483647;
+  max-width: calc(100vw - 16px);
+  padding: 4px 8px;
+  color: #b7ffb0;
+  font:
+    11px/1.4 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  background: rgba(0, 0, 0, 0.78);
+  border-radius: 6px;
+}
+
+.stats summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+.stats pre {
+  margin: 4px 0 2px;
+  overflow: hidden;
+  font: inherit;
+  white-space: pre;
+  text-overflow: ellipsis;
 }
 
 @keyframes cardIn {
@@ -504,13 +523,19 @@
     --card-dx: -50%;
     --card-dy: calc(-100% - 36px);
   }
+
+  /* The globe overflows the screen sideways: keep the glare on the visible part of the limb. */
+  .sun {
+    top: 4.2%;
+    left: 70%;
+  }
 }
 
 /* ---------- Tablet & desktop ---------- */
 
 @media (min-width: 768px) {
   .hero {
-    --globe-size: clamp(1000px, 100vw, 1180px);
+    --globe-size: clamp(820px, 80vw, 960px);
     --globe-top: 180px;
     --globe-x: 52%;
 
