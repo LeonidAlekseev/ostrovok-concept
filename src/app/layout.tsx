@@ -7,7 +7,13 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'Островок! — бронирование отелей',
   description: 'Островок! — найдите отель для следующего путешествия',
-  icons: { icon: '/favicon.svg' },
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.png', type: 'image/png', sizes: '128x128' },
+    ],
+    apple: '/favicon.png',
+  },
 }
 
 export const viewport: Viewport = {

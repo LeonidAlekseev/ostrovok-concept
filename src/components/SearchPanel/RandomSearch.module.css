@@ -1,0 +1,571 @@
+/* ---------- Form ---------- */
+
+.form {
+  display: flex;
+  flex-direction: column;
+}
+
+.lead {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 3.4vw, 20px);
+  margin-bottom: clamp(14px, 3.6vw, 20px);
+}
+
+.leadIcon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: clamp(56px, 16vw, 80px);
+  height: clamp(56px, 16vw, 80px);
+  font-size: clamp(30px, 8.6vw, 44px);
+  background: radial-gradient(circle at 50% 40%, #fff6d8, #ffe08a);
+  border-radius: 50%;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(17px, 4.6vw, 24px);
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  color: var(--text-2);
+  font-size: clamp(14px, 3.7vw, 17px);
+}
+
+.label {
+  display: block;
+  margin: 0 0 8px;
+  padding: 0;
+  font-weight: 600;
+}
+
+.input {
+  width: 100%;
+  height: clamp(48px, 12.4vw, 56px);
+  margin-bottom: 16px;
+  padding: 0 16px;
+  font-size: clamp(16px, 4.1vw, 18px);
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(6, 69, 232, 0.1);
+}
+
+.signs {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.signGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.sign {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 42px;
+  padding: 0 10px;
+  overflow: hidden;
+  font-size: 14px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: #f1f4f9;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s;
+}
+
+.sign:hover {
+  background: var(--blue-soft);
+}
+
+.sign[aria-checked='true'] {
+  color: var(--blue);
+  font-weight: 650;
+  background: var(--blue-soft);
+  border-color: var(--blue);
+}
+
+.sign:focus-visible {
+  box-shadow: 0 0 0 3px rgba(6, 69, 232, 0.3);
+}
+
+.signSymbol {
+  flex: none;
+  font-size: 18px;
+  /* Text presentation: the emoji variants of the zodiac glyphs ignore the selected colour. */
+  font-family: 'Segoe UI Symbol', 'Apple Symbols', 'Noto Sans Symbols', sans-serif;
+}
+
+.error {
+  margin: 12px 4px 0;
+  color: var(--danger);
+  font-size: 14px;
+}
+
+.spin {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: clamp(52px, 13.6vw, 60px);
+  margin-top: 18px;
+  overflow: hidden;
+  color: var(--white);
+  font-size: clamp(17px, 4.6vw, 19px);
+  font-weight: 650;
+  background: linear-gradient(100deg, #0645e8, #5b3df5 55%, #c13df5);
+  border: 0;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 24px rgba(91, 61, 245, 0.3);
+  transition: transform 0.1s;
+}
+
+/* A highlight sweeps across the button now and then, inviting a pull. */
+.spin::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: shine 2.8s ease-in-out infinite;
+  content: '';
+}
+
+.spin:active {
+  transform: translateY(1px);
+}
+
+/* ---------- Game ---------- */
+
+.game {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.player {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.playerSign {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: var(--white);
+  font-family: 'Segoe UI Symbol', 'Apple Symbols', 'Noto Sans Symbols', sans-serif;
+  font-size: 22px;
+  background: linear-gradient(135deg, #0645e8, #c13df5);
+  border-radius: 50%;
+}
+
+.playerName {
+  display: block;
+  font-weight: 700;
+}
+
+.playerHint {
+  display: block;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  margin-left: auto;
+  padding: 0 12px;
+  color: var(--blue);
+  font-size: 14px;
+  font-weight: 550;
+  background: var(--blue-soft);
+  border: 0;
+  border-radius: 999px;
+}
+
+/* ---------- Slot machine ---------- */
+
+.machine {
+  --h: clamp(52px, 14vw, 64px);
+  position: relative;
+  margin-right: 22px;
+  padding: 18px 12px 14px;
+  background: linear-gradient(160deg, #0b1f5c, #0645e8 60%, #3b2bb8);
+  border-radius: 22px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.18),
+    0 14px 30px rgba(6, 30, 110, 0.3);
+}
+
+/* A marquee of bulbs along the top edge; they chase while the reels spin. */
+.lights {
+  position: absolute;
+  top: 6px;
+  right: 16px;
+  left: 16px;
+  height: 6px;
+  background: radial-gradient(circle, #ffe08a 0 2.5px, transparent 3px) 0 50% / 16px 6px repeat-x;
+  opacity: 0.85;
+}
+
+.machineSpinning .lights {
+  animation: chase 0.4s linear infinite;
+}
+
+.machineWon .lights {
+  animation: blink 0.5s steps(2) 6;
+}
+
+.reels {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.reel {
+  min-width: 0;
+}
+
+.reelLabel {
+  display: block;
+  margin-bottom: 6px;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.window {
+  position: relative;
+  height: var(--h);
+  overflow: hidden;
+  background: var(--white);
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 2px rgba(255, 224, 138, 0.6);
+}
+
+/* Curved-glass shading: symbols darken as they roll over the top and bottom edges. */
+.window::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(7, 22, 47, 0.28), transparent 30%, transparent 70%, rgba(7, 22, 47, 0.28));
+  pointer-events: none;
+  content: '';
+}
+
+.machineWon .window {
+  animation: win 0.9s ease-out;
+}
+
+.strip {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  transition: transform var(--d) cubic-bezier(0.12, 0.8, 0.22, 1.04);
+}
+
+.machineSpinning .strip {
+  filter: blur(0.4px);
+}
+
+.symbol {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--h);
+  padding: 0 6px;
+  overflow: hidden;
+  color: var(--navy);
+  font-size: clamp(12px, 3.3vw, 15px);
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.lever {
+  position: absolute;
+  top: 26%;
+  right: -20px;
+  width: 8px;
+  height: 46%;
+  background: linear-gradient(90deg, #8a95ad, #d9dfeb, #8a95ad);
+  border-radius: 4px;
+  transform-origin: 50% 100%;
+}
+
+.leverBall {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  background: radial-gradient(circle at 35% 30%, #ff9db5, #ff2d55 55%, #b3002a);
+  border-radius: 50%;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.25);
+  transform: translateX(-50%);
+}
+
+.machineSpinning .lever {
+  animation: pull 0.7s ease-in-out;
+}
+
+/* ---------- Result ticket ---------- */
+
+.ticket {
+  position: relative;
+  padding: 18px 18px 16px;
+  color: var(--white);
+  background:
+    radial-gradient(circle at 90% 0%, rgba(165, 232, 123, 0.55), transparent 45%),
+    linear-gradient(135deg, #0645e8, #5b3df5 60%, #a03df5);
+  border-radius: 20px;
+  box-shadow: 0 16px 36px rgba(91, 61, 245, 0.3);
+  animation: ticketIn 0.6s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+.ticketKicker {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.85;
+}
+
+.ticketHotel {
+  margin: 6px 0 0;
+  font-size: clamp(22px, 6vw, 30px);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.ticketCity {
+  margin: 4px 0 0;
+  font-size: 16px;
+  opacity: 0.9;
+}
+
+.ticketMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ticketStars {
+  display: inline-flex;
+  gap: 2px;
+  color: #ffd257;
+}
+
+.ticketStars svg {
+  width: 15px;
+  height: 15px;
+}
+
+.ticketRating {
+  padding: 2px 8px;
+  color: var(--navy);
+  background: var(--lime);
+  border-radius: 8px;
+}
+
+.ticketMood {
+  display: inline-block;
+  margin: 12px 0 0;
+  padding: 6px 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+}
+
+.prophecy {
+  margin: 12px 0 0;
+  font-family: Caveat, cursive;
+  font-size: clamp(21px, 5.6vw, 25px);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.confetti {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  pointer-events: none;
+}
+
+.confetti span {
+  position: absolute;
+  width: 8px;
+  height: 12px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: confetti 1.6s cubic-bezier(0.2, 0.7, 0.4, 1) var(--delay) forwards;
+}
+
+.confetti span:nth-child(3n) {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* ---------- Actions ---------- */
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.share,
+.again {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 50px;
+  font-size: 16px;
+  font-weight: 650;
+  border: 0;
+  border-radius: var(--radius-sm);
+  transition:
+    background-color 0.2s,
+    opacity 0.2s;
+}
+
+.share {
+  color: var(--white);
+  background: var(--blue);
+  box-shadow: 0 8px 20px rgba(6, 69, 232, 0.25);
+}
+
+.share:hover:not(:disabled) {
+  background: var(--blue-hover);
+}
+
+.again {
+  color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.again:hover:not(:disabled) {
+  background: #d6e3ff;
+}
+
+.share:disabled,
+.again:disabled {
+  opacity: 0.5;
+  box-shadow: none;
+}
+
+.share svg,
+.again svg {
+  width: 20px;
+  height: 20px;
+}
+
+.shareNote {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 14px;
+  text-align: center;
+}
+
+@media (min-width: 640px) {
+  .signGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 980px) {
+  .signGrid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@keyframes shine {
+  60%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes chase {
+  to {
+    background-position-x: 16px;
+  }
+}
+
+@keyframes blink {
+  to {
+    opacity: 0.2;
+  }
+}
+
+@keyframes pull {
+  45% {
+    transform: scaleY(-0.6);
+  }
+}
+
+@keyframes win {
+  30% {
+    box-shadow:
+      inset 0 0 0 3px #ffe08a,
+      0 0 18px rgba(255, 224, 138, 0.9);
+  }
+}
+
+@keyframes ticketIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+}
+
+@keyframes confetti {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0);
+  }
+  55% {
+    opacity: 1;
+    transform: translate(var(--x), var(--y)) rotate(calc(var(--r) / 2));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--x) * 1.15), calc(var(--y) + 260px)) rotate(var(--r));
+  }
+}

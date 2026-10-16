@@ -26,7 +26,7 @@ export function SearchForm({ search, destinationRef, submitRef }: Props) {
   }
 
   return (
-    <form className={styles.card} ref={formRef} onSubmit={onSubmit} noValidate aria-label="Поиск отелей">
+    <form ref={formRef} onSubmit={onSubmit} noValidate aria-label="Поиск отелей">
       <div className={styles.grid}>
         <DestinationField
           value={query.destination}

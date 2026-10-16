@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { ArrowRight } from 'lucide-react'
 import { destinations, FEATURED_DESTINATION_ID, scenarios, type Destination } from '../data/destinations'
 import { newHotels } from '../data/hotels'
@@ -10,7 +11,7 @@ import { resolveTarget } from '../lib/search'
 import { DestinationCard } from './DestinationCard/DestinationCard'
 import { Header } from './Header/Header'
 import { Hero } from './Hero/Hero'
-import { SearchForm } from './SearchForm/SearchForm'
+import { SearchPanel, type SearchMode } from './SearchPanel/SearchPanel'
 import { TravelBanner } from './TravelBanner/TravelBanner'
 import styles from './HomePage.module.css'
 
@@ -27,16 +28,35 @@ export function HomePage() {
   const search = useHotelSearch()
   const destinationRef = useRef<HTMLInputElement>(null)
   const submitRef = useRef<HTMLButtonElement>(null)
-  const { setDestination } = search
+  const [mode, setMode] = useState<SearchMode>('assistant')
+  const { setDestination, searchFor } = search
+
+  /** Shows the manual form right away, so its fields can take focus in the same handler. */
+  const openManual = useCallback(() => flushSync(() => setMode('manual')), [])
 
   /** Put a destination or scenario into the search and move focus to the submit button. */
   const applyToSearch = useCallback(
     (text: string) => {
+      openManual()
       setDestination(text)
       submitRef.current?.focus({ preventScroll: true })
       submitRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     },
-    [setDestination],
+    [openManual, setDestination],
+  )
+
+  const startSearch = useCallback(() => {
+    openManual()
+    destinationRef.current?.focus()
+  }, [openManual])
+
+  const chooseFromAssistant = useCallback(
+    (query: Parameters<typeof searchFor>[0]) => {
+      openManual()
+      document.getElementById('search')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      return searchFor(query)
+    },
+    [openManual, searchFor],
   )
 
   const target = resolveTarget(search.query.destination)
@@ -45,7 +65,7 @@ export function HomePage() {
 
   return (
     <>
-      <Header onStartSearch={() => destinationRef.current?.focus()} />
+      <Header onStartSearch={startSearch} />
       <main className={styles.main}>
         <Hero
           markers={globeDestinations}
@@ -57,7 +77,15 @@ export function HomePage() {
 
         <div className={styles.content}>
           <section id="search" className={styles.search} aria-label="Поиск отелей">
-            <SearchForm search={search} destinationRef={destinationRef} submitRef={submitRef} />
+            <SearchPanel
+              mode={mode}
+              onModeChange={setMode}
+              search={search}
+              destinationRef={destinationRef}
+              submitRef={submitRef}
+              onPreview={(d) => setDestination(d.name)}
+              onChoose={chooseFromAssistant}
+            />
           </section>
 
           <section id="ideas" aria-labelledby="ideas-title">
@@ -65,7 +93,7 @@ export function HomePage() {
               <h2 id="ideas-title" className={styles.sectionTitle}>
                 Популярные направления
               </h2>
-              <button type="button" className={styles.seeAll} onClick={() => destinationRef.current?.focus()}>
+              <button type="button" className={styles.seeAll} onClick={startSearch}>
                 Смотреть все
                 <ArrowRight size={18} aria-hidden />
               </button>
