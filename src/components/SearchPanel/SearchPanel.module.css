@@ -11,7 +11,6 @@
 .tabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin: clamp(6px, 2vw, 10px);
 }
 
 .tab {
@@ -26,7 +25,7 @@
   font-size: clamp(13px, 3.8vw, 18px);
   font-weight: 500;
   white-space: nowrap;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.45);
   border: 0;
   border-radius: 999px;
   transition:
@@ -36,7 +35,7 @@
 }
 
 .tab:hover {
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--white);
 }
 
 .tab[aria-selected='true'] {
@@ -70,7 +69,9 @@
   --pad: clamp(14px, 3.6vw, 22px);
   padding: var(--pad);
   background: var(--white);
-  border-radius: clamp(18px, 4.6vw, 24px);
+  /* Only the outer corners, following the panel; the edge under the tabs stays straight. */
+  border-bottom-right-radius: inherit;
+  border-bottom-left-radius: inherit;
   animation: panelIn 0.25s ease-out;
 }
 
