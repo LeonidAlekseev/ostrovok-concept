@@ -52,11 +52,10 @@ export function useHotelSearch() {
     setErrors((e) => withoutKey(e, 'guests'))
   }, [])
 
-  /** Returns validation errors so the caller can move focus to the first invalid field. */
-  const submit = useCallback(async (): Promise<SearchErrors> => {
-    const found = validateSearch(query, todayIso())
+  const run = useCallback(async (q: SearchQuery): Promise<SearchErrors> => {
+    const found = validateSearch(q, todayIso())
     setErrors(found)
-    const target = resolveTarget(query.destination)
+    const target = resolveTarget(q.destination)
     if (Object.keys(found).length > 0 || !target) return found
 
     abortRef.current?.abort()
@@ -64,7 +63,7 @@ export function useHotelSearch() {
     abortRef.current = controller
     setStatus({ state: 'loading' })
     try {
-      const result = await runDemoSearch(query, target, controller.signal)
+      const result = await runDemoSearch(q, target, controller.signal)
       window.history.replaceState(null, '', `?${result.params}`)
       setStatus({ state: 'done', result })
     } catch (error) {
@@ -72,9 +71,21 @@ export function useHotelSearch() {
       setStatus({ state: 'error', message: error instanceof Error ? error.message : 'Не удалось выполнить поиск' })
     }
     return found
-  }, [query])
+  }, [])
 
-  return { query, errors, status, setDestination, setDates, setGuests, submit }
+  /** Returns validation errors so the caller can move focus to the first invalid field. */
+  const submit = useCallback(() => run(query), [run, query])
+
+  /** Fills the whole form at once (e.g. from the assistant) and searches. */
+  const searchFor = useCallback(
+    (q: SearchQuery) => {
+      setQuery(q)
+      return run(q)
+    },
+    [run],
+  )
+
+  return { query, errors, status, setDestination, setDates, setGuests, submit, searchFor }
 }
 
 export type HotelSearch = ReturnType<typeof useHotelSearch>
