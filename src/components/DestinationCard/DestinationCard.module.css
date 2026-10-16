@@ -10,6 +10,8 @@
   background: var(--navy);
   border: 0;
   border-radius: clamp(14px, 3.6vw, 22px);
+  /* Safari stops clipping a transformed child (the zooming photo) to the rounded corners without its own layer. */
+  isolation: isolate;
   box-shadow: 0 6px 18px rgba(7, 22, 47, 0.12);
   scroll-snap-align: start;
   transition:
@@ -32,16 +34,28 @@
   background: linear-gradient(180deg, rgba(7, 22, 47, 0) 42%, rgba(7, 22, 47, 0.62) 100%);
 }
 
-.title {
+.text {
   position: absolute;
   bottom: clamp(9px, 2.6vw, 20px);
   left: clamp(8px, 2.6vw, 22px);
   right: calc(clamp(24px, 6.2vw, 44px) + clamp(8px, 2.6vw, 26px));
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
+}
+
+.title {
   font-size: clamp(12px, 3.15vw, 24px);
   font-weight: 550;
   letter-spacing: -0.01em;
   line-height: 1.15;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
+}
+
+.price {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: clamp(11px, 2.8vw, 18px);
+  white-space: nowrap;
 }
 
 .arrow {
@@ -84,12 +98,6 @@
 
 .card:hover .arrow {
   transform: translateX(2px);
-}
-
-.card:focus-visible {
-  box-shadow:
-    0 0 0 3px var(--white),
-    0 0 0 6px rgba(6, 69, 232, 0.5);
 }
 
 .card[aria-pressed='true'] {

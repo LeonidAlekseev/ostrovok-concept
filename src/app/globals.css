@@ -4,12 +4,16 @@
   --blue-soft: #e6eeff;
   --navy: #07162f;
   --white: #ffffff;
-  --gray-bg: #f4f7fb;
+  /* Background of the content below the hero, and a step darker for blocks laid on it. */
+  --page-bg: #f2f4f7;
+  --gray-bg: #e8ecf2;
   --line: #dfe5ee;
   --text: #101828;
   --text-2: #667085;
   --green: #4cc13a;
   --green-soft: #dcf7c4;
+  /* Background of the page and the hero; the transparent header shows it too. */
+  --lime: #a5e87b;
   --danger: #d92d20;
 
   --radius-sm: 12px;
@@ -17,10 +21,10 @@
   --radius-lg: 24px;
   --shadow-soft: 0 12px 40px rgba(7, 22, 47, 0.12);
   --shadow-card: 0 18px 50px rgba(7, 22, 47, 0.16);
-  --focus: 0 0 0 3px rgba(6, 69, 232, 0.35);
 
   --page-x: clamp(14px, 4vw, 40px);
   --page-max: 1240px;
+  --header-height: clamp(60px, 15vw, 72px);
 
   font-family:
     'Onest Variable',
@@ -30,7 +34,9 @@
     Roboto,
     sans-serif;
   color: var(--text);
-  background: var(--white);
+  /* Shows only where Safari uncovers the page edge (its toolbars collapsing): match the content
+     at the bottom. The hero and the browser chrome (theme-color) carry the green. */
+  background: var(--page-bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -43,14 +49,16 @@
   box-sizing: border-box;
 }
 
+/* clip, not hidden: hidden on both html and body makes body a scroll container, which iOS Safari
+   scrolls and repaints badly (a blank strip at the bottom while its toolbar collapses). */
 html {
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {
   margin: 0;
   min-width: 320px;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 button,
@@ -72,9 +80,9 @@ img {
   max-width: 100%;
 }
 
+:focus,
 :focus-visible {
   outline: none;
-  box-shadow: var(--focus);
 }
 
 .visually-hidden {

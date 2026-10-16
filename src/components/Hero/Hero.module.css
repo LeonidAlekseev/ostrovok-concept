@@ -1,117 +1,70 @@
 .hero {
-  /* The sphere is much larger than the viewport: only its northern cap is visible. */
-  --globe-size: clamp(560px, 173vw, 840px);
-  --globe-top: clamp(92px, 25vw, 116px);
-  --globe-x: 52%;
+  /* The sphere is much larger than the viewport: it rises from the lower right behind the title. */
+  --globe-size: clamp(540px, 144vw, 640px);
+  /* Offsets include the transparent header laid over the top of the hero. */
+  --globe-top: calc(var(--header-height) + clamp(24px, 8vw, 40px));
+  --globe-x: 88%;
 
   position: relative;
   isolation: isolate;
-  height: calc(var(--globe-top) + var(--globe-size) * 0.6);
+  height: calc(var(--globe-top) + var(--globe-size) * 0.76);
   overflow: hidden;
-  color: var(--white);
+  color: var(--navy);
   background:
-    radial-gradient(ellipse 70% 45% at 18% 4%, rgba(46, 104, 230, 0.42), transparent 70%),
-    radial-gradient(ellipse 60% 40% at 88% 30%, rgba(40, 92, 210, 0.35), transparent 70%),
-    linear-gradient(180deg, #050f2a 0%, #071d4f 55%, #0a3bb0 100%);
-  border-radius: 50% 50% 0 0 / 36px 36px 0 0;
+    radial-gradient(ellipse 60% 45% at 85% 30%, rgba(214, 255, 176, 0.75), transparent 70%),
+    var(--lime);
+  /* A long press on the globe must not start selecting the title or the hint (iOS) or open the callout. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* Fade the bottom of the scene into the white page behind the search form. */
+/* Fade the bottom of the scene into the page behind the search form. */
 .hero::after {
   content: '';
   position: absolute;
   inset: auto 0 0;
   z-index: 3;
-  height: 26%;
-  background: linear-gradient(180deg, rgba(150, 196, 255, 0) 0%, rgba(176, 212, 255, 0.82) 55%, #ffffff 100%);
+  height: 30%;
+  background: linear-gradient(180deg, rgba(242, 244, 247, 0) 0%, rgba(236, 246, 232, 0.8) 60%, var(--page-bg) 100%);
   pointer-events: none;
-}
-
-.sky {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background-image:
-    radial-gradient(1.4px 1.4px at 8% 22%, #fff 50%, transparent 52%),
-    radial-gradient(1.2px 1.2px at 23% 8%, #fff 50%, transparent 52%),
-    radial-gradient(1px 1px at 37% 30%, rgba(255, 255, 255, 0.9) 50%, transparent 52%),
-    radial-gradient(1.6px 1.6px at 56% 6%, #fff 50%, transparent 52%),
-    radial-gradient(1px 1px at 69% 24%, #fff 50%, transparent 52%),
-    radial-gradient(1.3px 1.3px at 78% 14%, #fff 50%, transparent 52%),
-    radial-gradient(1.1px 1.1px at 96% 26%, #fff 50%, transparent 52%),
-    radial-gradient(1px 1px at 3% 46%, rgba(255, 255, 255, 0.8) 50%, transparent 52%),
-    radial-gradient(1.2px 1.2px at 91% 44%, #fff 50%, transparent 52%),
-    radial-gradient(0.9px 0.9px at 45px 30px, rgba(255, 255, 255, 0.75) 50%, transparent 52%),
-    radial-gradient(0.8px 0.8px at 110px 95px, rgba(255, 255, 255, 0.55) 50%, transparent 52%),
-    radial-gradient(0.8px 0.8px at 160px 20px, rgba(255, 255, 255, 0.6) 50%, transparent 52%),
-    radial-gradient(0.7px 0.7px at 20px 130px, rgba(255, 255, 255, 0.5) 50%, transparent 52%);
-  background-size:
-    100% 100%,
-    100% 100%,
-    100% 100%,
-    100% 100%,
-    100% 100%,
-    100% 100%,
-    100% 100%,
-    100% 100%,
-    100% 100%,
-    190px 170px,
-    190px 170px,
-    230px 150px,
-    170px 210px;
-}
-
-.sparkle {
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  background:
-    radial-gradient(circle, #fff 0 1.4px, transparent 2.4px),
-    linear-gradient(90deg, transparent 45%, rgba(255, 255, 255, 0.85) 50%, transparent 55%),
-    linear-gradient(0deg, transparent 45%, rgba(255, 255, 255, 0.85) 50%, transparent 55%);
-  border-radius: 50%;
-  filter: drop-shadow(0 0 3px rgba(170, 210, 255, 0.9));
-  animation: twinkle 4s ease-in-out infinite;
-}
-
-.sparkle:nth-child(2) {
-  animation-delay: -1.3s;
-}
-
-.sparkle:nth-child(3) {
-  animation-delay: -2.6s;
-}
-
-.sparkleSmall {
-  width: 9px;
-  height: 9px;
 }
 
 .copy {
   position: relative;
   z-index: 4;
-  padding: clamp(26px, 8vw, 56px) var(--page-x) 0;
-  text-align: center;
+  width: fit-content;
+  padding: calc(var(--header-height) + clamp(18px, 5vw, 48px)) var(--page-x) 0 calc(var(--page-x) + 8px);
+  pointer-events: none;
 }
 
 .title {
   margin: 0;
-  font-size: clamp(22px, 7vw, 60px);
-  font-weight: 750;
-  letter-spacing: -0.03em;
-  line-height: 1.08;
-  text-shadow: 0 2px 18px rgba(3, 12, 40, 0.55);
-  text-wrap: balance;
+  font-size: clamp(32px, 9vw, 72px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
 }
 
-.subtitle {
-  max-width: 19em;
-  margin: clamp(6px, 1.6vw, 14px) auto 0;
-  color: rgba(232, 240, 255, 0.92);
-  font-size: clamp(14px, 4vw, 21px);
-  font-weight: 450;
-  line-height: 1.3;
-  text-shadow: 0 1px 12px rgba(3, 12, 40, 0.6);
+.titleAccent {
+  display: block;
+  color: var(--blue);
+}
+
+.hint {
+  position: relative;
+  z-index: 4;
+  width: 7em;
+  margin: clamp(32px, 9vw, 64px) 0 0 calc(var(--page-x) + 4px);
+  color: var(--blue);
+  font-family: Caveat, cursive;
+  font-size: clamp(17px, 4.6vw, 22px);
+  font-weight: 600;
+  line-height: 1.05;
+  transform: rotate(-10deg);
+  transform-origin: left top;
+  pointer-events: none;
 }
 
 /* ---------- Globe ---------- */
@@ -119,11 +72,15 @@
 .globe {
   position: absolute;
   top: var(--globe-top);
-  left: var(--globe-x);
-  z-index: 1;
+  /* No z-index or transform: the globe makes no stacking context of its own, so the hotel card
+     can rise above the hint while the pins stay under the faded bottom. */
+  left: calc(var(--globe-x) - var(--globe-size) / 2);
   width: var(--globe-size);
   aspect-ratio: 1;
-  transform: translateX(-50%);
+  /* Markers are placed by --x/--y, percent of the globe box: --unit is 1% of it. No container query
+     units: Safari turns a query container into its own stacking layer, trapping the hotel card
+     under the hint. */
+  --unit: calc(var(--globe-size) / 100);
 }
 
 .atmosphere {
@@ -131,10 +88,9 @@
   inset: 0;
   border-radius: 50%;
   box-shadow:
-    0 0 0 1.5px rgba(170, 220, 255, 0.7),
-    0 0 22px 6px rgba(110, 185, 255, 0.85),
-    0 0 70px 26px rgba(40, 120, 255, 0.55),
-    0 0 160px 60px rgba(20, 80, 230, 0.35);
+    0 0 0 1.5px rgba(255, 255, 255, 0.6),
+    0 0 24px 6px rgba(240, 255, 225, 0.7),
+    0 0 80px 24px rgba(214, 255, 176, 0.55);
 }
 
 .earth {
@@ -142,33 +98,55 @@
   width: 100%;
   height: 100%;
   border-radius: 50%;
+  /* Translucent glassy sphere: the dots and lines on top carry the geography. */
+  background:
+    radial-gradient(circle at 65% 15%, rgba(255, 255, 255, 0.45), transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.12) 50%, rgba(255, 255, 255, 0.5) 100%);
 }
 
-.earthFailed {
-  background: radial-gradient(circle at 60% 30%, #3d8bff, #0b3aa8 60%, #061f63);
-  color: transparent;
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  /* Only the disc itself can be grabbed; on it, swipes in any direction turn the globe. */
+  clip-path: circle(50%);
+  touch-action: none;
+}
+
+.canvasShown {
+  opacity: 1;
+  cursor: grab;
+}
+
+.canvas[data-dragging] {
+  cursor: grabbing;
 }
 
 .rim {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 50%, transparent 62%, rgba(120, 190, 255, 0.28) 68%, transparent 71%);
-  box-shadow: inset 0 0 26px 4px rgba(150, 210, 255, 0.55);
+  box-shadow: inset 0 0 30px 6px rgba(245, 255, 235, 0.55);
   pointer-events: none;
 }
 
 .sun {
+  /* The glare sits exactly on the limb, at this angle from the globe's centre (clockwise from 3 o'clock). */
+  --sun-angle: -50deg;
+
   position: absolute;
-  top: 11%;
-  left: 82%;
+  top: calc(50% + 50% * sin(var(--sun-angle)));
+  left: calc(50% + 50% * cos(var(--sun-angle)));
   width: 26%;
   aspect-ratio: 1;
   background: radial-gradient(
     circle,
     rgba(255, 255, 255, 0.95) 0 3%,
-    rgba(210, 232, 255, 0.55) 9%,
-    rgba(120, 180, 255, 0.18) 30%,
+    rgba(240, 255, 225, 0.6) 9%,
+    rgba(214, 255, 176, 0.2) 30%,
     transparent 62%
   );
   transform: translate(-50%, -50%);
@@ -178,10 +156,13 @@
 
 .cityGlow {
   position: absolute;
+  top: 0;
+  left: 0;
   width: 16%;
   aspect-ratio: 1.3;
-  background: radial-gradient(ellipse, rgba(255, 236, 140, 0.55) 0%, rgba(160, 255, 120, 0.25) 35%, transparent 70%);
-  transform: translate(-50%, -50%);
+  background: radial-gradient(ellipse, rgba(255, 255, 255, 0.7) 0%, rgba(240, 255, 225, 0.3) 35%, transparent 70%);
+  opacity: var(--o, 1);
+  transform: translate(calc(var(--x) * var(--unit) - 50%), calc(var(--y) * var(--unit) - 50%));
   mix-blend-mode: screen;
   pointer-events: none;
 }
@@ -195,37 +176,48 @@
   pointer-events: none;
 }
 
+.routeGroup {
+  transition: opacity 0.4s ease;
+}
+
 .route,
-.routeGlow {
+.routeGlow,
+.routeHalo {
   fill: none;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
 }
 
 .route {
-  stroke: rgba(235, 245, 255, 0.8);
-  stroke-width: 1.1;
-  stroke-dasharray: 60 6;
-  animation: flow 9s linear infinite;
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 1.3;
 }
 
 .routeGlow {
-  stroke: rgba(120, 190, 255, 0.7);
-  stroke-width: 3;
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 4;
 }
 
-.plane {
-  position: absolute;
-  z-index: 2;
-  color: #fff;
-  filter: drop-shadow(0 0 6px rgba(140, 200, 255, 0.9));
-  pointer-events: none;
+.routeHalo {
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 10;
 }
 
 /* ---------- Pins ---------- */
 
+/* Registered so it can transition: the pin's transform is rewritten every frame, the scale eases on its own. */
+@property --pin-scale {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 1;
+}
+
 .pin {
+  --pin-scale: 1;
+
   position: absolute;
+  top: 0;
+  left: 0;
   z-index: 2;
   width: 18px;
   height: 24px;
@@ -234,8 +226,20 @@
   background: none;
   border: 0;
   border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
-  transform: translate(-50%, -100%);
-  transition: transform 0.2s ease;
+  opacity: var(--o, 1);
+  transform: translate(calc(var(--x) * var(--unit) - 50%), calc(var(--y) * var(--unit) - 100%)) scale(var(--pin-scale));
+  will-change: transform;
+  /* Like the globe's disc: a swipe that starts on a pin must not pull the page to refresh. */
+  touch-action: none;
+  transition:
+    --pin-scale 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.4s ease;
+}
+
+.pin[data-hidden] {
+  visibility: hidden;
 }
 
 .pin::before {
@@ -245,18 +249,21 @@
   left: 50%;
   width: 16px;
   height: 7px;
-  background: radial-gradient(ellipse, rgba(140, 200, 255, 0.95), transparent 70%);
+  background: radial-gradient(ellipse, rgba(255, 255, 255, 0.95), transparent 70%);
   transform: translateX(-50%);
 }
 
 .pin:hover,
-.pin:focus-visible,
-.pin[aria-pressed='true'] {
-  transform: translate(-50%, -100%) scale(1.15);
+.pin:focus-visible {
+  --pin-scale: 1.15;
 }
 
+/* The selected pin grows and darkens; the globe turns it to the middle and stops. */
 .pin[aria-pressed='true'] {
-  color: #00a2ff;
+  --pin-scale: 1.45;
+
+  z-index: 3;
+  color: #0331a8;
 }
 
 .pinHub {
@@ -267,9 +274,10 @@
 
 .pinHub::before {
   width: 42px;
+  animation: hubPulse 2.4s ease-in-out infinite;
   height: 16px;
   bottom: -8px;
-  background: radial-gradient(ellipse, rgba(200, 255, 170, 0.95), rgba(120, 220, 120, 0.4) 45%, transparent 72%);
+  background: radial-gradient(ellipse, rgba(255, 255, 255, 0.95), rgba(240, 255, 225, 0.45) 45%, transparent 72%);
 }
 
 .pinIcon {
@@ -277,7 +285,7 @@
   display: block;
   width: 100%;
   height: 100%;
-  filter: drop-shadow(0 4px 6px rgba(3, 20, 70, 0.45));
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.9));
 }
 
 .pinTooltip {
@@ -309,60 +317,109 @@
 /* ---------- Featured place card ---------- */
 
 .placeCard {
+  --card-dx: 22px;
+  --card-dy: calc(-100% - 12px);
+  --card-lift: 0px;
+  /* Inset of the picture, the same on every side; its size equals the text block's height. */
+  --card-pad: clamp(5px, 1.4vw, 7px);
+  --badge-size: clamp(9px, 2.5vw, 12px);
+  --name-size: clamp(13px, 3.5vw, 17px);
+  --meta-size: clamp(10px, 2.75vw, 13px);
+  --text-gap: 2px;
+
   position: absolute;
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  gap: clamp(7px, 2vw, 12px);
+  top: 0;
+  left: 0;
+  z-index: 5;
   width: max-content;
-  padding: 4px 6px 4px 4px;
+  padding: var(--card-pad) calc(var(--card-pad) + 4px) var(--card-pad) var(--card-pad);
   color: var(--text);
   text-align: left;
   background: var(--white);
   border: 0;
   border-radius: clamp(10px, 3vw, 14px);
-  box-shadow: 0 14px 34px rgba(3, 14, 45, 0.35);
-  transform: translate(8px, calc(-100% - 8px));
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+  box-shadow: 0 14px 34px rgba(30, 80, 20, 0.25);
+  opacity: var(--o, 1);
+  transform: translate(
+    calc(var(--x) * var(--unit) + var(--card-dx)),
+    calc(var(--y) * var(--unit) + var(--card-dy) - var(--card-lift))
+  );
+  will-change: transform;
+  touch-action: none;
+  transition: box-shadow 0.2s ease;
 }
 
 .placeCard:hover {
-  transform: translate(8px, calc(-100% - 12px));
-  box-shadow: 0 18px 40px rgba(3, 14, 45, 0.42);
+  --card-lift: 4px;
+
+  box-shadow: 0 18px 40px rgba(30, 80, 20, 0.32);
 }
 
-.placeCard:focus-visible {
-  box-shadow:
-    0 14px 34px rgba(3, 14, 45, 0.35),
-    var(--focus);
+.placeContent {
+  display: flex;
+  align-items: center;
+  gap: clamp(7px, 2vw, 12px);
+  animation: cardIn 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.placeImage {
+.placeIcon {
+  display: grid;
   flex: none;
-  width: clamp(40px, 11vw, 72px);
+  place-items: center;
+  width: calc(1.25 * (var(--badge-size) + var(--name-size) + var(--meta-size)) + 2 * var(--text-gap));
+  aspect-ratio: 1;
+  color: var(--white);
+  background: linear-gradient(135deg, #3d8bff, #0b3aa8);
+  /* Concentric with the card's corner. */
+  border-radius: calc(clamp(10px, 3vw, 14px) - var(--card-pad) + 2px);
+}
+
+.placeIcon svg {
+  width: 48%;
   height: auto;
-  aspect-ratio: 1.15;
-  object-fit: cover;
-  border-radius: clamp(7px, 2vw, 10px);
 }
 
 .placeText {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--text-gap);
   min-width: 0;
+  line-height: 1.25;
+}
+
+.placeBadge {
+  color: #1f9d55;
+  font-size: var(--badge-size);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .placeName {
-  font-size: clamp(13px, 3.5vw, 17px);
+  font-size: var(--name-size);
   font-weight: 650;
+}
+
+.placeMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: calc(1.25 * var(--meta-size));
+}
+
+.placeStars {
+  display: flex;
+  color: #ffb800;
+}
+
+.placeStars svg {
+  width: clamp(9px, 2.5vw, 12px);
+  height: auto;
 }
 
 .placePrice {
   color: var(--text-2);
-  font-size: clamp(10px, 2.75vw, 13px);
+  font-size: var(--meta-size);
   white-space: nowrap;
 }
 
@@ -373,24 +430,61 @@
   color: var(--text-2);
 }
 
-@keyframes flow {
-  to {
-    stroke-dashoffset: -132;
+/* Technical overlay, outside production only; mounted on <body>. */
+.stats {
+  position: fixed;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2147483647;
+  max-width: calc(100vw - 16px);
+  padding: 4px 8px;
+  color: #b7ffb0;
+  font:
+    11px/1.4 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  background: rgba(0, 0, 0, 0.78);
+  border-radius: 6px;
+}
+
+.stats summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+.stats pre {
+  margin: 4px 0 2px;
+  overflow: hidden;
+  font: inherit;
+  white-space: pre;
+  text-overflow: ellipsis;
+}
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
   }
 }
 
-@keyframes twinkle {
+@keyframes hubPulse {
   50% {
-    opacity: 0.45;
-    transform: scale(0.8);
+    opacity: 0.55;
+    transform: translateX(-50%) scale(1.25);
   }
 }
 
-/* Not enough room to the right of the pin: lift the card above it. */
-@media (max-width: 374px) {
-  .placeCard,
-  .placeCard:hover {
-    transform: translate(-42%, calc(-100% - 52px));
+/* Not enough room to the right of the pin on phones, and the title is above it: hang the card below. */
+@media (max-width: 767px) {
+  .placeCard {
+    --card-dx: -50%;
+    --card-dy: 12px;
+  }
+
+  /* The globe overflows the screen sideways: keep the glare on the visible part of the limb. */
+  .sun {
+    --sun-angle: -112deg;
   }
 }
 
@@ -398,36 +492,20 @@
 
 @media (min-width: 768px) {
   .hero {
-    --globe-size: clamp(1000px, 100vw, 1180px);
-    --globe-top: 180px;
-    --globe-x: 52%;
+    --globe-size: clamp(760px, 76vw, 980px);
+    --globe-top: calc(var(--header-height) + 32px);
+    --globe-x: 64%;
 
-    height: calc(var(--globe-top) + var(--globe-size) * 0.47);
-    width: calc(100% - 2 * var(--page-x));
-    max-width: calc(var(--page-max) - 2 * var(--page-x));
-    margin: 0 auto;
-    border-radius: 50% 50% 0 0 / 56px 56px 0 0;
+    height: calc(var(--globe-top) + var(--globe-size) * 0.62);
   }
 
   .copy {
-    padding-top: 56px;
+    margin-left: max(0px, (100% - var(--page-max)) / 2);
+    padding-top: calc(var(--header-height) + clamp(56px, 8vw, 96px));
   }
 
-  .title {
-    font-size: clamp(40px, 5.6vw, 68px);
-  }
-
-  .subtitle {
-    max-width: 30em;
-  }
-
-  .placeCard,
-  .placeCard:hover {
-    transform: translate(22px, calc(-100% - 12px));
-  }
-
-  .hero::after {
-    height: 30%;
+  .hint {
+    margin-left: calc(max(0px, (100% - var(--page-max)) / 2) + var(--page-x) + 8px);
   }
 
   .pin {
@@ -438,5 +516,12 @@
   .pinHub {
     width: 44px;
     height: 58px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .placeContent,
+  .pinHub::before {
+    animation: none;
   }
 }

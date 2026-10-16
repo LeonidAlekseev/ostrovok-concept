@@ -67,11 +67,8 @@
   border-color: #c3ccda;
 }
 
-.field:focus-within,
-.fieldButton:focus-visible,
 .fieldButton[aria-expanded='true'] {
   border-color: var(--blue);
-  box-shadow: var(--focus);
 }
 
 .fieldInvalid,
@@ -186,12 +183,6 @@
 
 .submit:active {
   transform: translateY(1px);
-}
-
-.submit:focus-visible {
-  box-shadow:
-    0 0 0 3px var(--white),
-    0 0 0 6px rgba(6, 69, 232, 0.45);
 }
 
 .spin {

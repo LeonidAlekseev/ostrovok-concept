@@ -1,9 +1,9 @@
 import { useCallback, useId, useRef, useState } from 'react'
-import { Heart, Menu, User, X } from 'lucide-react'
+import { Bell, Heart, Menu, X } from 'lucide-react'
 import { useDismiss } from '../../hooks/useDismiss'
 import styles from './Header.module.css'
 
-type Panel = 'favorites' | 'profile' | 'menu'
+type Panel = 'favorites' | 'notifications' | 'menu'
 
 interface Props {
   onStartSearch: () => void
@@ -11,7 +11,7 @@ interface Props {
 
 const menuLinks = [
   { href: '#search', label: 'Поиск отелей' },
-  { href: '#ideas', label: 'Идеи для путешествий' },
+  { href: '#ideas', label: 'Популярные направления' },
   { href: '#explore', label: 'Исследуйте мир' },
 ]
 
@@ -38,15 +38,10 @@ export function Header({ onStartSearch }: Props) {
 
         <div className={styles.actions} ref={actionsRef}>
           <button type="button" className={styles.iconButton} aria-label="Избранное" {...buttonProps('favorites')}>
-            <Heart size={26} strokeWidth={2} aria-hidden />
+            <Heart size={26} fill="currentColor" strokeWidth={2} aria-hidden />
           </button>
-          <button
-            type="button"
-            className={`${styles.iconButton} ${styles.profile}`}
-            aria-label="Профиль"
-            {...buttonProps('profile')}
-          >
-            <User size={22} fill="currentColor" strokeWidth={1.6} aria-hidden />
+          <button type="button" className={styles.iconButton} aria-label="Уведомления" {...buttonProps('notifications')}>
+            <Bell size={25} fill="currentColor" strokeWidth={2} aria-hidden />
           </button>
           <button
             type="button"
@@ -54,7 +49,11 @@ export function Header({ onStartSearch }: Props) {
             aria-label={open === 'menu' ? 'Закрыть меню' : 'Открыть меню'}
             {...buttonProps('menu')}
           >
-            {open === 'menu' ? <X size={30} aria-hidden /> : <Menu size={30} strokeWidth={1.8} aria-hidden />}
+            {open === 'menu' ? (
+              <X size={28} strokeWidth={2.8} aria-hidden />
+            ) : (
+              <Menu size={28} strokeWidth={2.8} aria-hidden />
+            )}
           </button>
 
           {open && (
@@ -75,10 +74,10 @@ export function Header({ onStartSearch }: Props) {
                   </button>
                 </>
               )}
-              {open === 'profile' && (
+              {open === 'notifications' && (
                 <>
-                  <p className={styles.panelTitle}>Личный кабинет</p>
-                  <p className={styles.panelText}>Вход недоступен в демо-версии. Поиск работает без авторизации.</p>
+                  <p className={styles.panelTitle}>Новых уведомлений нет</p>
+                  <p className={styles.panelText}>Здесь появятся изменения цен и статусы бронирований.</p>
                   <button type="button" className={styles.panelAction} onClick={close}>
                     Понятно
                   </button>
@@ -107,6 +106,6 @@ export function Header({ onStartSearch }: Props) {
 
 const panelTitle: Record<Panel, string> = {
   favorites: 'Избранное',
-  profile: 'Профиль',
+  notifications: 'Уведомления',
   menu: 'Меню',
 }

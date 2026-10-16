@@ -2,6 +2,8 @@ import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Inlined into the client bundle; see src/lib/env.ts.
+  env: { APP_ENV: process.env.VERCEL_ENV ?? '' },
   async headers() {
     return [
       {
