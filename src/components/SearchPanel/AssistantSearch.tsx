@@ -107,11 +107,11 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
       <div className={`${styles.intro} ${started ? styles.introCompact : ''}`}>
         <RobotAvatar className={styles.avatar} />
         <div className={styles.introText}>
-          <h2 className={styles.title}>Расскажите, о каком путешествии вы мечтаете?</h2>
-          <p className={styles.subtitle}>Я подберу идеальные отели и направления</p>
+          <h2 className={styles.title}>О каком путешествии вы мечтаете?</h2>
+          <p className={styles.subtitle}>Я подберу идеальное жилье и направление</p>
         </div>
         {started && (
-          <button type="button" className={styles.reset} onClick={reset}>
+          <button type='button' className={styles.reset} onClick={reset}>
             <RotateCcw size={16} aria-hidden />
             <span>Заново</span>
           </button>
@@ -119,7 +119,7 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
       </div>
 
       {started && (
-        <ol ref={logRef} className={styles.log} aria-live="polite" aria-label="Диалог с ассистентом">
+        <ol ref={logRef} className={styles.log} aria-live='polite' aria-label='Диалог с ассистентом'>
           {messages.map((message, i) => (
             <li key={i} className={message.from === 'user' ? styles.userMessage : styles.agentMessage}>
               {message.from === 'agent' && <RobotAvatar className={styles.messageAvatar} />}
@@ -132,7 +132,7 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
           {thinking && (
             <li className={styles.agentMessage}>
               <RobotAvatar className={styles.messageAvatar} />
-              <div className={`${styles.bubble} ${styles.typing}`} aria-label="Ассистент думает">
+              <div className={`${styles.bubble} ${styles.typing}`} aria-label='Ассистент думает'>
                 <span />
                 <span />
                 <span />
@@ -144,7 +144,7 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
 
       <form className={styles.composer} onSubmit={onSubmit}>
         <Sparkles className={styles.composerIcon} aria-hidden />
-        <label htmlFor={inputId} className="visually-hidden">
+        <label htmlFor={inputId} className='visually-hidden'>
           Опишите поездку
         </label>
         <textarea
@@ -152,7 +152,7 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
           className={styles.input}
           rows={2}
           value={text}
-          enterKeyHint="send"
+          enterKeyHint='send'
           placeholder={
             started
               ? 'Ответьте или уточните пожелания…'
@@ -161,7 +161,7 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
         />
-        <button type="submit" className={styles.send} aria-label="Отправить" disabled={!text.trim() || thinking}>
+        <button type='submit' className={styles.send} aria-label='Отправить' disabled={!text.trim() || thinking}>
           <SendHorizontal aria-hidden />
         </button>
       </form>
@@ -169,7 +169,7 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
       <ul className={styles.chips} aria-label={question ? 'Быстрые ответы' : 'Идеи для поездки'}>
         {chips.map(({ emoji, label }) => (
           <li key={label}>
-            <button type="button" className={styles.chip} onClick={() => send(label)} disabled={thinking}>
+            <button type='button' className={styles.chip} onClick={() => send(label)} disabled={thinking}>
               {emoji && (
                 <span className={styles.chipEmoji} aria-hidden>
                   {emoji}
@@ -207,7 +207,7 @@ function PlanView({ plan, onChoose }: { plan: Plan; onChoose: Props['onChoose'] 
         {plan.options.map(({ destination, hotel, total, fitsBudget }) => (
           <li key={destination.id}>
             <button
-              type="button"
+              type='button'
               className={styles.option}
               onClick={() => void onChoose({ ...plan.query, destination: destination.name })}
             >
@@ -220,7 +220,7 @@ function PlanView({ plan, onChoose }: { plan: Plan; onChoose: Props['onChoose'] 
                   <span className={styles.optionHotel}>
                     {hotel.name}
                     <span className={styles.optionRating}>
-                      <Star size={12} fill="currentColor" strokeWidth={0} aria-hidden />
+                      <Star size={12} fill='currentColor' strokeWidth={0} aria-hidden />
                       {hotel.rating.toFixed(1)}
                     </span>
                   </span>
