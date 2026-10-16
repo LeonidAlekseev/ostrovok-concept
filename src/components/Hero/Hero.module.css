@@ -10,9 +10,7 @@
   height: calc(var(--globe-top) + var(--globe-size) * 0.76);
   overflow: hidden;
   color: var(--navy);
-  background:
-    radial-gradient(ellipse 60% 45% at 85% 30%, rgba(214, 255, 176, 0.75), transparent 70%),
-    var(--lime);
+  background: radial-gradient(ellipse 60% 45% at 85% 30%, rgba(214, 255, 176, 0.75), transparent 70%), var(--lime);
   /* A long press on the globe must not start selecting the title or the hint (iOS) or open the callout. */
   -webkit-user-select: none;
   user-select: none;
@@ -59,7 +57,7 @@
   margin: clamp(32px, 9vw, 64px) 0 0 calc(var(--page-x) + 4px);
   color: var(--blue);
   font-family: Caveat, cursive;
-  font-size: clamp(17px, 4.6vw, 22px);
+  font-size: clamp(17px, 4.6vw, 27px);
   font-weight: 600;
   line-height: 1.05;
   transform: rotate(-10deg);
