@@ -70,7 +70,7 @@ export function RandomSearch({ onPreview }: Props) {
           </span>
           <div>
             <h2 className={styles.title}>Доверьтесь звёздам</h2>
-            <p className={styles.subtitle}>Барабан выберет один из лучших новых отелей — кому как повезёт</p>
+            <p className={styles.subtitle}>Барабан выберет один из лучших отелей — кому как повезёт</p>
           </div>
         </div>
 
@@ -83,19 +83,19 @@ export function RandomSearch({ onPreview }: Props) {
           className={styles.input}
           value={name}
           maxLength={24}
-          autoComplete="given-name"
-          placeholder="Ваше имя"
+          autoComplete='given-name'
+          placeholder='Ваше имя'
           onChange={(e) => setName(e.target.value)}
         />
 
         <fieldset className={styles.signs}>
           <legend className={styles.label}>Кто вы по знаку зодиака?</legend>
-          <div className={styles.signGrid} role="radiogroup">
+          <div className={styles.signGrid} role='radiogroup'>
             {zodiac.map((z) => (
               <button
                 key={z.id}
-                type="button"
-                role="radio"
+                type='button'
+                role='radio'
                 aria-checked={sign?.id === z.id}
                 className={styles.sign}
                 onClick={() => setSign(z)}
@@ -110,12 +110,12 @@ export function RandomSearch({ onPreview }: Props) {
         </fieldset>
 
         {error && (
-          <p className={styles.error} role="alert">
+          <p className={styles.error} role='alert'>
             {error}
           </p>
         )}
 
-        <button type="submit" className={styles.spin}>
+        <button type='submit' className={styles.spin}>
           <Dices aria-hidden />
           Крутить барабан
         </button>
@@ -150,7 +150,7 @@ export function RandomSearch({ onPreview }: Props) {
           <span className={styles.playerName}>{name.trim()}</span>
           <span className={styles.playerHint}>{sign.name}</span>
         </span>
-        <button type="button" className={styles.edit} onClick={() => setEditing(true)}>
+        <button type='button' className={styles.edit} onClick={() => setEditing(true)}>
           <PencilLine size={16} aria-hidden />
           Изменить
         </button>
@@ -158,7 +158,7 @@ export function RandomSearch({ onPreview }: Props) {
 
       <SlotMachine key={round.id} fortune={fortune} spinning={!landed} onLanded={onLanded} />
 
-      <div aria-live="polite">
+      <div aria-live='polite'>
         {landed && (
           <article className={styles.ticket}>
             <Confetti />
@@ -172,7 +172,7 @@ export function RandomSearch({ onPreview }: Props) {
             <p className={styles.ticketMeta}>
               <span className={styles.ticketStars} aria-label={`${fortune.hotel.stars} звезды`}>
                 {Array.from({ length: fortune.hotel.stars }, (_, i) => (
-                  <Star key={i} fill="currentColor" strokeWidth={0} aria-hidden />
+                  <Star key={i} fill='currentColor' strokeWidth={0} aria-hidden />
                 ))}
               </span>
               <span className={styles.ticketRating}>{fortune.hotel.rating.toFixed(1)}</span>
@@ -185,17 +185,17 @@ export function RandomSearch({ onPreview }: Props) {
       </div>
 
       <div className={styles.actions}>
-        <button type="button" className={styles.share} onClick={share} disabled={!landed}>
+        <button type='button' className={styles.share} onClick={share} disabled={!landed}>
           <Share2 aria-hidden />
           Поделиться
         </button>
-        <button type="button" className={styles.again} onClick={() => spin()} disabled={!landed}>
+        <button type='button' className={styles.again} onClick={() => spin()} disabled={!landed}>
           <RotateCcw aria-hidden />
           Ещё раз
         </button>
       </div>
       {shareNote && (
-        <p className={styles.shareNote} role="status">
+        <p className={styles.shareNote} role='status'>
           {shareNote}
         </p>
       )}
@@ -263,7 +263,7 @@ function SlotMachine({ fortune, spinning, onLanded }: { fortune: Fortune; spinni
           </div>
         ))}
       </div>
-      <p className="visually-hidden" role="status">
+      <p className='visually-hidden' role='status'>
         {spinning ? 'Барабан крутится…' : `Выпало: ${fortune.city.name}, ${fortune.hotel.name}, ${fortune.mood}`}
       </p>
     </div>
