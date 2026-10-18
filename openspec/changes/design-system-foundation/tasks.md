@@ -8,7 +8,7 @@
 
 - [x] 2.1 Добавить `"paths": { "@/*": ["./src/*"] }` в `tsconfig.json` и проверить `npm run typecheck`
 - [x] 2.2 Установить `tailwindcss` и `@tailwindcss/postcss`, создать `postcss.config.mjs` по гайду Next 16 и проверить, что `npm run build` проходит и в CSS есть утилиты Tailwind
-- [ ] 2.3 Выполнить `npx shadcn@latest init -t next -b radix` отдельным коммитом и проверить, что появились `components.json` (ui → `@/components/ui`, utils → `@/lib/utils`, iconLibrary → lucide), `src/lib/utils.ts` с `cn()` и зависимости `radix-ui`, `class-variance-authority`, `clsx`, `tailwind-merge`
+- [ ] 2.3 Выполнить `npx shadcn@latest init -t next -b base` отдельным коммитом и проверить, что появились `components.json` (ui → `@/components/ui`, utils → `@/lib/utils`, iconLibrary → lucide), `src/lib/utils.ts` с `cn()` и зависимости `@base-ui/react`, `class-variance-authority`, `clsx`, `tailwind-merge`
 - [ ] 2.4 Слить сгенерированный `globals.css` с прежним: вернуть ресеты в `@layer base`, `.visually-hidden`, блок reduced motion и шрифты, удалить `.dark`; проверить `npm run build` и сверить страницу со скриншотами 1.1
 
 ## 3. Токены

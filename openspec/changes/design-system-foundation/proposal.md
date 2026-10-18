@@ -7,7 +7,7 @@
 ## What Changes
 
 - Подключить Tailwind CSS v4 (`@tailwindcss/postcss`) рядом с CSS Modules — гибридная схема: примитивы на Tailwind, доменная графика (глобус, слот-машина, hero) остаётся в модулях.
-- Инициализировать shadcn/ui на базе Radix: `components.json`, `cn()` (`clsx` + `tailwind-merge`), `class-variance-authority`, алиас `@/*` → `src/*`.
+- Инициализировать shadcn/ui на базе Base UI (`@base-ui/react`): `components.json`, `cn()` (`clsx` + `tailwind-merge`), `class-variance-authority`, алиас `@/*` → `src/*`.
 - Ввести трёхслойные токены: палитра бренда (значения без изменений) → семантические роли shadcn (`--primary`, `--background`, `--muted`, `--border`, `--ring`, `--destructive`, …) → `@theme` Tailwind. CSS Modules читают те же семантические переменные.
 - Вынести декоративные акценты (конфетти, робот-аватар, прочие литералы модулей) в токены `--decor-*` с прежними значениями.
 - Ввести шкалы радиусов, типографики, отступов и брейкпоинтов; привести к ним модули.
@@ -25,7 +25,7 @@
 
 ## Impact
 
-- **Зависимости:** `tailwindcss`, `@tailwindcss/postcss`, `radix-ui`, `class-variance-authority`, `clsx`, `tailwind-merge`, `tw-animate-css` (если его требует shadcn), dev-CLI `shadcn` через `npx`.
+- **Зависимости:** `tailwindcss`, `@tailwindcss/postcss`, `@base-ui/react`, `class-variance-authority`, `clsx`, `tailwind-merge`, `tw-animate-css` (если его требует shadcn), dev-CLI `shadcn` через `npx`.
 - **Конфигурация:** новые `postcss.config.mjs`, `components.json`; `paths` в `tsconfig.json`.
 - **Код:** `src/app/globals.css` (переписывается слоями), новые `src/lib/utils.ts` и `src/components/ui/*`, правки всех `*.module.css` (литералы → токены, шкалы, фокус) и TSX компонентов, где кнопки, поля, ошибки и карточки переходят на примитивы.
 - **Риски:** preflight Tailwind сбрасывает базовые стили (отступы, списки, кнопки) — возможны визуальные регрессии. Порядок CSS-слоёв решает, кто побеждает: модули или утилиты. Подробности — в design.md.

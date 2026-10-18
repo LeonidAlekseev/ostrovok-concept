@@ -4,9 +4,9 @@
 
 Мотивация — в proposal.md (раздел Why). Текущее состояние, которое определяет подход:
 
-- Стили: `src/app/globals.css` (токены, ресеты, `.visually-hidden`, reduced motion) и 11 CSS Modules. Tailwind, Radix, `cn` и алиасов нет.
+- Стили: `src/app/globals.css` (токены, ресеты, `.visually-hidden`, reduced motion) и 11 CSS Modules. Tailwind, Base UI, `cn` и алиасов нет.
 - Next 16 подключает Tailwind v4 через `@tailwindcss/postcss` и `@import 'tailwindcss'` в глобальном CSS (`node_modules/next/dist/docs/01-app/01-getting-started/11-css.md`). Порядок CSS в production определяется порядком импортов.
-- shadcn CLI 4.22: `shadcn init -t next -b radix`, флаги `--css-variables` (по умолчанию) и `--preset`. Компоненты кладутся в `@/components/ui`.
+- shadcn CLI 4.22: `shadcn init -t next -b base`, флаги `--css-variables` (по умолчанию) и `--preset`. Компоненты кладутся в `@/components/ui`.
 - Иконки уже на `lucide-react` — это библиотека иконок shadcn, замена не нужна.
 - В `src/components/ui/` уже лежит `SmartImage`. Это нормальное соседство: в `ui/` живут все примитивы, и shadcn-, и свои.
 - Тестов нет. Поведение зафиксировано в `openspec/specs/*`, визуал — в `references/homepage.jpg` и в текущей вёрстке.
@@ -21,7 +21,7 @@
 **Non-Goals:**
 - Тёмная тема. Блок `.dark`, который сгенерирует shadcn, удаляется.
 - Перевод доменной графики (глобус, пины, карточка отеля на глобусе, слот-машина, конфетти, баннер) на Tailwind. Эти части только переходят на токены и шкалы.
-- Составные виджеты на Radix — это change `migrate-composite-components`.
+- Составные виджеты на Base UI — это change `migrate-composite-components`.
 - Пиксельное совпадение с текущим видом за пределами палитры: шкалы могут сдвинуть размеры на 1–2 px.
 
 ## Decisions
@@ -93,7 +93,7 @@ shadcn-примитивы рассчитаны на preflight (`border-style: so
 
 ### D6. Инициализация shadcn
 
-`npx shadcn@latest init -t next -b radix` с CSS-переменными. Генерированный `globals.css` используется как каркас (`@import 'tailwindcss'`, `tw-animate-css`, `@theme inline`, `@layer base`). Его нейтральная палитра и блок `.dark` заменяются слоями из D1. `components.json`: `aliases.ui = @/components/ui`, `aliases.utils = @/lib/utils`, `iconLibrary = lucide`. В `tsconfig.json`: `"paths": { "@/*": ["./src/*"] }`. Существующие относительные импорты не переписываются массово, а меняются на `@/` только в затронутых файлах.
+`npx shadcn@latest init -t next -b base` с CSS-переменными. Генерированный `globals.css` используется как каркас (`@import 'tailwindcss'`, `tw-animate-css`, `@theme inline`, `@layer base`). Его нейтральная палитра и блок `.dark` заменяются слоями из D1. `components.json`: `aliases.ui = @/components/ui`, `aliases.utils = @/lib/utils`, `iconLibrary = lucide`. В `tsconfig.json`: `"paths": { "@/*": ["./src/*"] }`. Существующие относительные импорты не переписываются массово, а меняются на `@/` только в затронутых файлах.
 
 ### D7. Набор примитивов и варианты
 
