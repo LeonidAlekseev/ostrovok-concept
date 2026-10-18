@@ -9,8 +9,14 @@
   isolation: isolate;
   height: calc(var(--globe-top) + var(--globe-size) * 0.76);
   overflow: hidden;
-  color: var(--navy);
-  background: radial-gradient(ellipse 60% 45% at 85% 30%, rgba(214, 255, 176, 0.75), transparent 70%), var(--lime);
+  color: var(--brand-foreground);
+  background:
+    radial-gradient(
+      ellipse 60% 45% at 85% 30%,
+      color-mix(in srgb, var(--decor-glow) 75%, transparent),
+      transparent 70%
+    ),
+    var(--brand);
   /* A long press on the globe must not start selecting the title or the hint (iOS) or open the callout. */
   -webkit-user-select: none;
   user-select: none;
@@ -25,7 +31,12 @@
   inset: auto 0 0;
   z-index: 3;
   height: 30%;
-  background: linear-gradient(180deg, rgba(242, 244, 247, 0) 0%, rgba(236, 246, 232, 0.8) 60%, var(--page-bg) 100%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--background) 0%, transparent) 0%,
+    color-mix(in srgb, var(--decor-haze) 80%, transparent) 60%,
+    var(--background) 100%
+  );
   pointer-events: none;
 }
 
@@ -47,7 +58,7 @@
 
 .titleAccent {
   display: block;
-  color: var(--blue);
+  color: var(--primary);
 }
 
 .hint {
@@ -55,7 +66,7 @@
   z-index: 4;
   width: 7em;
   margin: clamp(32px, 9vw, 64px) 0 0 calc(var(--page-x) + 4px);
-  color: var(--blue);
+  color: var(--primary);
   font-family: Caveat, cursive;
   font-size: clamp(17px, 4.6vw, 27px);
   font-weight: 600;
@@ -86,9 +97,9 @@
   inset: 0;
   border-radius: 50%;
   box-shadow:
-    0 0 0 1.5px rgba(255, 255, 255, 0.6),
-    0 0 24px 6px rgba(240, 255, 225, 0.7),
-    0 0 80px 24px rgba(214, 255, 176, 0.55);
+    0 0 0 1.5px color-mix(in srgb, var(--decor-light) 60%, transparent),
+    0 0 24px 6px color-mix(in srgb, var(--decor-glow-soft) 70%, transparent),
+    0 0 80px 24px color-mix(in srgb, var(--decor-glow) 55%, transparent);
 }
 
 .earth {
@@ -98,8 +109,12 @@
   border-radius: 50%;
   /* Translucent glassy sphere: the dots and lines on top carry the geography. */
   background:
-    radial-gradient(circle at 65% 15%, rgba(255, 255, 255, 0.45), transparent 40%),
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.12) 50%, rgba(255, 255, 255, 0.5) 100%);
+    radial-gradient(circle at 65% 15%, color-mix(in srgb, var(--decor-light) 45%, transparent), transparent 40%),
+    radial-gradient(
+      circle at 50% 50%,
+      color-mix(in srgb, var(--decor-light) 12%, transparent) 50%,
+      color-mix(in srgb, var(--decor-light) 50%, transparent) 100%
+    );
 }
 
 .canvas {
@@ -127,7 +142,7 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  box-shadow: inset 0 0 30px 6px rgba(245, 255, 235, 0.55);
+  box-shadow: inset 0 0 30px 6px color-mix(in srgb, var(--decor-rim) 55%, transparent);
   pointer-events: none;
 }
 
@@ -142,9 +157,9 @@
   aspect-ratio: 1;
   background: radial-gradient(
     circle,
-    rgba(255, 255, 255, 0.95) 0 3%,
-    rgba(240, 255, 225, 0.6) 9%,
-    rgba(214, 255, 176, 0.2) 30%,
+    color-mix(in srgb, var(--decor-light) 95%, transparent) 0 3%,
+    color-mix(in srgb, var(--decor-glow-soft) 60%, transparent) 9%,
+    color-mix(in srgb, var(--decor-glow) 20%, transparent) 30%,
     transparent 62%
   );
   transform: translate(-50%, -50%);
@@ -158,7 +173,12 @@
   left: 0;
   width: 16%;
   aspect-ratio: 1.3;
-  background: radial-gradient(ellipse, rgba(255, 255, 255, 0.7) 0%, rgba(240, 255, 225, 0.3) 35%, transparent 70%);
+  background: radial-gradient(
+    ellipse,
+    color-mix(in srgb, var(--decor-light) 70%, transparent) 0%,
+    color-mix(in srgb, var(--decor-glow-soft) 30%, transparent) 35%,
+    transparent 70%
+  );
   opacity: var(--o, 1);
   transform: translate(calc(var(--x) * var(--unit) - 50%), calc(var(--y) * var(--unit) - 50%));
   mix-blend-mode: screen;
@@ -187,17 +207,17 @@
 }
 
 .route {
-  stroke: rgba(255, 255, 255, 0.95);
+  stroke: color-mix(in srgb, var(--decor-light) 95%, transparent);
   stroke-width: 1.3;
 }
 
 .routeGlow {
-  stroke: rgba(255, 255, 255, 0.3);
+  stroke: color-mix(in srgb, var(--decor-light) 30%, transparent);
   stroke-width: 4;
 }
 
 .routeHalo {
-  stroke: rgba(255, 255, 255, 0.12);
+  stroke: color-mix(in srgb, var(--decor-light) 12%, transparent);
   stroke-width: 10;
 }
 
@@ -220,7 +240,7 @@
   width: 18px;
   height: 24px;
   padding: 0;
-  color: var(--blue);
+  color: var(--primary);
   background: none;
   border: 0;
   border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
@@ -247,7 +267,7 @@
   left: 50%;
   width: 16px;
   height: 7px;
-  background: radial-gradient(ellipse, rgba(255, 255, 255, 0.95), transparent 70%);
+  background: radial-gradient(ellipse, color-mix(in srgb, var(--decor-light) 95%, transparent), transparent 70%);
   transform: translateX(-50%);
 }
 
@@ -261,7 +281,7 @@
   --pin-scale: 1.45;
 
   z-index: 3;
-  color: #0331a8;
+  color: var(--decor-pin-selected);
 }
 
 .pinHub {
@@ -275,7 +295,12 @@
   animation: hubPulse 2.4s ease-in-out infinite;
   height: 16px;
   bottom: -8px;
-  background: radial-gradient(ellipse, rgba(255, 255, 255, 0.95), rgba(240, 255, 225, 0.45) 45%, transparent 72%);
+  background: radial-gradient(
+    ellipse,
+    color-mix(in srgb, var(--decor-light) 95%, transparent),
+    color-mix(in srgb, var(--decor-glow-soft) 45%, transparent) 45%,
+    transparent 72%
+  );
 }
 
 .pinIcon {
@@ -283,7 +308,7 @@
   display: block;
   width: 100%;
   height: 100%;
-  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.9));
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--decor-light) 90%, transparent));
 }
 
 .pinTooltip {
@@ -291,11 +316,11 @@
   bottom: calc(100% + 6px);
   left: 50%;
   padding: 4px 8px;
-  color: var(--text);
+  color: var(--foreground);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
-  background: var(--white);
+  background: var(--card);
   border-radius: 8px;
   box-shadow: var(--shadow-soft);
   opacity: 0;
@@ -331,12 +356,12 @@
   z-index: 5;
   width: max-content;
   padding: var(--card-pad) calc(var(--card-pad) + 4px) var(--card-pad) var(--card-pad);
-  color: var(--text);
+  color: var(--foreground);
   text-align: left;
-  background: var(--white);
+  background: var(--card);
   border: 0;
   border-radius: clamp(10px, 3vw, 14px);
-  box-shadow: 0 14px 34px rgba(30, 80, 20, 0.25);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--decor-hotel-shadow) 25%, transparent);
   opacity: var(--o, 1);
   transform: translate(
     calc(var(--x) * var(--unit) + var(--card-dx)),
@@ -350,7 +375,7 @@
 .placeCard:hover {
   --card-lift: 4px;
 
-  box-shadow: 0 18px 40px rgba(30, 80, 20, 0.32);
+  box-shadow: 0 18px 40px color-mix(in srgb, var(--decor-hotel-shadow) 32%, transparent);
 }
 
 .placeContent {
@@ -366,8 +391,8 @@
   place-items: center;
   width: calc(1.25 * (var(--badge-size) + var(--name-size) + var(--meta-size)) + 2 * var(--text-gap));
   aspect-ratio: 1;
-  color: var(--white);
-  background: linear-gradient(135deg, #3d8bff, #0b3aa8);
+  color: var(--primary-foreground);
+  background: linear-gradient(135deg, var(--decor-hotel-from), var(--decor-hotel-to));
   /* Concentric with the card's corner. */
   border-radius: calc(clamp(10px, 3vw, 14px) - var(--card-pad) + 2px);
 }
@@ -386,7 +411,7 @@
 }
 
 .placeBadge {
-  color: #1f9d55;
+  color: var(--decor-badge-green);
   font-size: var(--badge-size);
   font-weight: 650;
   letter-spacing: 0.02em;
@@ -407,7 +432,7 @@
 
 .placeStars {
   display: flex;
-  color: #ffb800;
+  color: var(--decor-star);
 }
 
 .placeStars svg {
@@ -416,7 +441,7 @@
 }
 
 .placePrice {
-  color: var(--text-2);
+  color: var(--muted-foreground);
   font-size: var(--meta-size);
   white-space: nowrap;
 }
@@ -425,7 +450,7 @@
   flex: none;
   width: clamp(14px, 3.8vw, 18px);
   margin-left: clamp(0px, 1vw, 14px);
-  color: var(--text-2);
+  color: var(--muted-foreground);
 }
 
 /* Technical overlay, outside production only; mounted on <body>. */
@@ -436,13 +461,13 @@
   z-index: 2147483647;
   max-width: calc(100vw - 16px);
   padding: 4px 8px;
-  color: #b7ffb0;
+  color: var(--decor-stats);
   font:
     11px/1.4 ui-monospace,
     SFMono-Regular,
     Menlo,
     monospace;
-  background: rgba(0, 0, 0, 0.78);
+  background: color-mix(in srgb, var(--decor-black) 78%, transparent);
   border-radius: 6px;
 }
 

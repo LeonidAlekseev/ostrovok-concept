@@ -5,14 +5,14 @@
   aspect-ratio: 1.12;
   padding: 0;
   overflow: hidden;
-  color: var(--white);
+  color: var(--primary-foreground);
   text-align: left;
-  background: var(--navy);
+  background: var(--brand-foreground);
   border: 0;
   border-radius: clamp(14px, 3.6vw, 22px);
   /* Safari stops clipping a transformed child (the zooming photo) to the rounded corners without its own layer. */
   isolation: isolate;
-  box-shadow: 0 6px 18px rgba(7, 22, 47, 0.12);
+  box-shadow: var(--shadow-card);
   scroll-snap-align: start;
   transition:
     transform 0.25s ease,
@@ -31,7 +31,11 @@
 .shade {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(7, 22, 47, 0) 42%, rgba(7, 22, 47, 0.62) 100%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--shadow-color) 0%, transparent) 42%,
+    color-mix(in srgb, var(--shadow-color) 62%, transparent) 100%
+  );
 }
 
 .text {
@@ -42,7 +46,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
+  text-shadow: 0 1px 8px color-mix(in srgb, var(--decor-black) 35%, transparent);
 }
 
 .title {
@@ -53,7 +57,7 @@
 }
 
 .price {
-  color: rgba(255, 255, 255, 0.85);
+  color: color-mix(in srgb, var(--decor-light) 85%, transparent);
   font-size: clamp(11px, 2.8vw, 18px);
   white-space: nowrap;
 }
@@ -66,10 +70,10 @@
   place-items: center;
   width: clamp(24px, 6.2vw, 44px);
   height: clamp(24px, 6.2vw, 44px);
-  color: var(--navy);
-  background: var(--white);
+  color: var(--brand-foreground);
+  background: var(--card);
   border-radius: 50%;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--decor-black) 18%, transparent);
   transition:
     transform 0.25s ease,
     background-color 0.25s,
@@ -83,7 +87,7 @@
 
 .card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 14px 30px rgba(7, 22, 47, 0.2);
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--shadow-color) 20%, transparent);
 }
 
 .card:hover .image {
@@ -92,8 +96,8 @@
 
 .card:hover .arrow,
 .card[aria-pressed='true'] .arrow {
-  color: var(--white);
-  background: var(--blue);
+  color: var(--primary-foreground);
+  background: var(--primary);
 }
 
 .card:hover .arrow {
@@ -102,8 +106,8 @@
 
 .card[aria-pressed='true'] {
   box-shadow:
-    0 0 0 3px var(--blue),
-    0 10px 24px rgba(6, 69, 232, 0.25);
+    0 0 0 3px var(--primary),
+    0 10px 24px color-mix(in srgb, var(--primary) 25%, transparent);
 }
 
 @media (min-width: 980px) {

@@ -27,7 +27,7 @@ const REEL_SECONDS = 1.4
 const REEL_STAGGER = 0.7
 const cityNames = [...new Set(bestHotels.map((h) => cityOf(h).name))]
 const hotelNames = bestHotels.map((h) => h.name)
-const CONFETTI = ['#0645e8', '#a5e87b', '#ffb020', '#ff5c8a', '#5ee7ff']
+const CONFETTI = [1, 2, 3, 4, 5].map((n) => `var(--decor-confetti-${n})`)
 
 export function RandomSearch({ onPreview }: Props) {
   const [name, setName] = useState('')

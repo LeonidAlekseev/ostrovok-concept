@@ -53,6 +53,31 @@ Vercel определяет проект как Next.js без дополнит�
   (рейтинг от 9,0), глобус поворачивается к городу, результат можно отправить в соцсети
   (`src/lib/fortune.ts`).
 
+## Стили
+
+Гибрид: Tailwind CSS v4 (через `@tailwindcss/postcss`, `postcss.config.mjs`) и CSS Modules.
+Примитивы интерфейса — компоненты shadcn/ui на Base UI в `src/components/ui/` (настройки CLI —
+`components.json`, добавить компонент: `npx shadcn@latest add <имя>`); там же лежат свои
+примитивы вроде `SmartImage`. Доменные части (глобус, слот-машина, hero, карточки направлений)
+стилизуются своими `*.module.css`.
+
+Все токены описаны в `src/app/globals.css` слоями:
+
+1. **Бренд** — `--brand-*`, сырые значения палитры. На них ссылается только `globals.css`.
+2. **Роли** — `--background`, `--foreground`, `--primary`, `--primary-hover`, `--secondary`,
+   `--muted`, `--muted-foreground`, `--border`, `--ring`, `--destructive`, `--brand` (лайм),
+   `--success` и другие. Их читают и Tailwind-классы, и модули: `var(--primary)`.
+   Прозрачные варианты строятся через `color-mix(in srgb, var(--роль) 12%, transparent)`.
+3. **Тени и декор** — `--shadow-soft`, `--shadow-card`, `--shadow-popover`, `--shadow-color` и
+   `--decor-*` для иллюстраций, стекла, слот-машины и конфетти. Литералы цветов вне
+   `globals.css` не пишутся (кроме `themeColor` в `layout.tsx` и canvas глобуса).
+4. **Тема Tailwind** — `@theme` / `@theme inline` превращает роли в классы `bg-primary`,
+   `text-muted-foreground`, `border-border`.
+
+Правило: один элемент стилизуется **либо** утилитами Tailwind, **либо** модулем. Класс из
+модуля на примитиве из `ui/` допустим только для раскладки (`grid-area`, `margin`, `width`), не
+для цвета и состояний: модули не входят в CSS-слои и перебивают утилиты, а `cn()` их не видит.
+
 ## Демо-режим
 
 Бэкенда нет: поиск валидирует форму, формирует параметры запроса

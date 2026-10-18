@@ -14,10 +14,10 @@
 ## 3. Токены
 
 - [x] 3.1 Описать в `globals.css` слой бренда (`--brand-*`, значения из `specs/design-system`), семантические роли из D1 и `@theme inline`; проверить, что классы `bg-primary`, `text-muted-foreground`, `border-border` дают цвета бренда
-- [ ] 3.2 Добавить токены теней (`--shadow-soft`, `--shadow-card`, `--shadow-popover`) и `--decor-*` для конфетти, робота, барабана и прочих литералов модулей с прежними значениями
-- [ ] 3.3 Перевести все `*.module.css` со старых имён (`--blue`, `--text-2`, …) и литералов на роли, `color-mix()` и `--decor-*`, удалить старые имена; проверить, что `grep -nE '#[0-9a-fA-F]{3,8}\b|rgba?\(' src --include=*.module.css` ничего не находит, а цвета на скриншотах прежние
-- [ ] 3.4 Перенести цвета из TSX (`RobotAvatar`, `CONFETTI` в `RandomSearch`, `PinIcon` в `Hero`) на `var(--decor-*)` / `currentColor`, кроме цветов canvas в `globeRenderer.ts`; проверить сценарий «Конфетти» из `specs/design-system`
-- [ ] 3.5 Добавить в README раздел «Стили»: Tailwind + CSS Modules, слои токенов в `globals.css`, правило D2 «один элемент — один способ стилизации», где лежат примитивы; проверить, что пути и команды в разделе существуют
+- [x] 3.2 Добавить токены теней (`--shadow-soft`, `--shadow-card`, `--shadow-popover`) и `--decor-*` для конфетти, робота, барабана и прочих литералов модулей с прежними значениями
+- [x] 3.3 Перевести все `*.module.css` со старых имён (`--blue`, `--text-2`, …) и литералов на роли, `color-mix()` и `--decor-*`, удалить старые имена; проверить, что `grep -nE '#[0-9a-fA-F]{3,8}\b|rgba?\(' src --include=*.module.css` ничего не находит, а цвета на скриншотах прежние
+- [x] 3.4 Перенести цвета из TSX (`RobotAvatar`, `CONFETTI` в `RandomSearch`, `PinIcon` в `Hero`) на `var(--decor-*)` / `currentColor`, кроме цветов canvas в `globeRenderer.ts`; проверить сценарий «Конфетти» из `specs/design-system`
+- [x] 3.5 Добавить в README раздел «Стили»: Tailwind + CSS Modules, слои токенов в `globals.css`, правило D2 «один элемент — один способ стилизации», где лежат примитивы; проверить, что пути и команды в разделе существуют
 
 ## 4. Шкалы
 

@@ -50,28 +50,76 @@
   --input: var(--brand-line);
   --ring: var(--brand-blue);
 
-  /* Old names, kept until the modules move to the roles. */
-  --blue: var(--brand-blue);
-  --blue-hover: var(--brand-blue-hover);
-  --blue-soft: var(--brand-blue-soft);
-  --navy: var(--brand-navy);
-  --white: var(--brand-white);
-  --page-bg: var(--brand-page-bg);
-  --gray-bg: var(--brand-gray-bg);
-  --line: var(--brand-line);
-  --text: var(--brand-text);
-  --text-2: var(--brand-text-2);
-  --green: var(--brand-green);
-  --green-soft: var(--brand-green-soft);
-  --lime: var(--brand-lime);
-  --danger: var(--brand-danger);
-
   --radius: 0.625rem;
   --radius-sm: 12px;
   --radius-md: 16px;
   --radius-lg: 24px;
-  --shadow-soft: 0 12px 40px rgba(7, 22, 47, 0.12);
-  --shadow-card: 0 18px 50px rgba(7, 22, 47, 0.16);
+
+  /* Shadows. --shadow-color tints every shadow and shading in the modules. */
+  --shadow-color: var(--brand-navy);
+  --shadow-soft: 0 12px 40px color-mix(in srgb, var(--shadow-color) 12%, transparent);
+  --shadow-card: 0 6px 18px color-mix(in srgb, var(--shadow-color) 12%, transparent);
+  --shadow-popover: 0 18px 50px color-mix(in srgb, var(--shadow-color) 16%, transparent);
+
+  /* Decorative accents: illustrations, glass and glow, the slot machine, confetti. Values outside
+     the brand palette live only here. */
+  --decor-light: var(--brand-white);
+  --decor-black: #000000;
+  --decor-border-strong: #c3ccda;
+  --decor-placeholder: #475467;
+  --decor-placeholder-soft: #7a8599;
+  --decor-disabled: #c0c7d2;
+  --decor-secondary-hover: #d6e3ff;
+  --decor-surface-soft: #f1f4f9;
+  --decor-mint: #e9f9dc;
+  --decor-rating: #b7791f;
+  --decor-trail: #9fdc8c;
+  --decor-photo-from: #2b5cd9;
+  --decor-photo-to: #0b2a6b;
+  /* Hero and globe. */
+  --decor-glow: #d6ffb0;
+  --decor-glow-soft: #f0ffe1;
+  --decor-rim: #f5ffeb;
+  --decor-haze: #ecf6e8;
+  --decor-glass-fallback: #eefbe4;
+  --decor-pin-selected: #0331a8;
+  --decor-hotel-from: #3d8bff;
+  --decor-hotel-to: #0b3aa8;
+  --decor-hotel-shadow: #1e5014;
+  --decor-badge-green: #1f9d55;
+  --decor-star: #ffb800;
+  --decor-stats: #b7ffb0;
+  /* Slot machine and its ticket. */
+  --decor-gold: #ffe08a;
+  --decor-gold-light: #fff6d8;
+  --decor-violet: #5b3df5;
+  --decor-magenta: #c13df5;
+  --decor-purple: #a03df5;
+  --decor-machine-dark: #0b1f5c;
+  --decor-machine-indigo: #3b2bb8;
+  --decor-machine-shadow: #061e6e;
+  --decor-lever-dark: #8a95ad;
+  --decor-lever-light: #d9dfeb;
+  --decor-knob: #ff2d55;
+  --decor-knob-light: #ff9db5;
+  --decor-knob-dark: #b3002a;
+  --decor-ticket-star: #ffd257;
+  --decor-confetti-1: var(--brand-blue);
+  --decor-confetti-2: var(--brand-lime);
+  --decor-confetti-3: #ffb020;
+  --decor-confetti-4: #ff5c8a;
+  --decor-confetti-5: #5ee7ff;
+  /* Assistant robot avatar. */
+  --decor-robot-bg-from: #eef3ff;
+  --decor-robot-bg-to: #d9e4ff;
+  --decor-robot-head-from: var(--brand-white);
+  --decor-robot-head-to: #dfe6fb;
+  --decor-robot-visor-from: #1d2a5c;
+  --decor-robot-visor-to: #0b1233;
+  --decor-robot-metal: #8ea3e8;
+  --decor-robot-bulb: #6d8cf5;
+  --decor-robot-outline: #c9d5f7;
+  --decor-robot-eyes: #5ee7ff;
 
   --page-x: clamp(14px, 4vw, 40px);
   --page-max: 1240px;

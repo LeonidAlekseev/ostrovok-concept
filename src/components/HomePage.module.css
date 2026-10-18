@@ -2,7 +2,7 @@
   /* The hero starts under the transparent header. */
   margin-top: calc(-1 * var(--header-height));
   padding-bottom: clamp(24px, 6vw, 56px);
-  background: var(--page-bg);
+  background: var(--background);
 }
 
 .content {
@@ -42,7 +42,7 @@
   align-items: center;
   gap: 4px;
   padding: 4px 0;
-  color: var(--blue);
+  color: var(--primary);
   font-size: clamp(13px, 3.6vw, 18px);
   font-weight: 500;
   background: none;
@@ -52,7 +52,7 @@
 }
 
 .seeAll:hover {
-  color: var(--blue-hover);
+  color: var(--primary-hover);
 }
 
 .seeAll:hover svg {

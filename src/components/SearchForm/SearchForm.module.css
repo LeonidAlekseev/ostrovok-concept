@@ -42,10 +42,10 @@
   width: 100%;
   height: clamp(48px, 12.4vw, 56px);
   padding: 0 clamp(10px, 3vw, 18px);
-  color: var(--text);
+  color: var(--foreground);
   text-align: left;
-  background: var(--white);
-  border: 1px solid var(--line);
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   transition:
     border-color 0.2s,
@@ -53,21 +53,21 @@
 }
 
 .field:hover {
-  border-color: #c3ccda;
+  border-color: var(--decor-border-strong);
 }
 
 .fieldButton[aria-expanded='true'] {
-  border-color: var(--blue);
+  border-color: var(--primary);
 }
 
 .fieldInvalid,
 .fieldInvalid:hover {
-  border-color: var(--danger);
+  border-color: var(--destructive);
 }
 
 .fieldIcon {
   flex: none;
-  color: var(--navy);
+  color: var(--brand-foreground);
 }
 
 .input {
@@ -83,7 +83,7 @@
 }
 
 .input::placeholder {
-  color: #475467;
+  color: var(--decor-placeholder);
   opacity: 1;
 }
 
@@ -93,7 +93,7 @@
   right: clamp(48px, 13vw, 58px);
   bottom: 22%;
   width: 1px;
-  background: var(--line);
+  background: var(--border);
 }
 
 .clear {
@@ -105,7 +105,7 @@
   width: 38px;
   height: 38px;
   padding: 0;
-  color: var(--text-2);
+  color: var(--muted-foreground);
   background: none;
   border: 0;
   border-radius: 50%;
@@ -113,8 +113,8 @@
 }
 
 .clear:hover {
-  color: var(--text);
-  background: var(--gray-bg);
+  color: var(--foreground);
+  background: var(--muted);
 }
 
 .value {
@@ -128,7 +128,7 @@
   flex: none;
   /* The glyph has built-in side bearings; pull it towards the edge. */
   margin: 0 -4px 0 auto;
-  color: var(--navy);
+  color: var(--brand-foreground);
   transition: transform 0.2s;
 }
 
@@ -138,7 +138,7 @@
 
 .error {
   margin: 6px 4px 0;
-  color: var(--danger);
+  color: var(--destructive);
   font-size: 13px;
   line-height: 1.35;
 }
@@ -152,14 +152,14 @@
   gap: 12px;
   height: clamp(50px, 12.8vw, 56px);
   padding: 0 28px;
-  color: var(--white);
+  color: var(--primary-foreground);
   font-size: clamp(17px, 4.6vw, 19px);
   font-weight: 600;
   white-space: nowrap;
-  background: var(--blue);
+  background: var(--primary);
   border: 0;
   border-radius: var(--radius-sm);
-  box-shadow: 0 8px 20px rgba(6, 69, 232, 0.25);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--primary) 25%, transparent);
   transition:
     background-color 0.2s,
     transform 0.1s,
@@ -167,7 +167,7 @@
 }
 
 .submit:hover {
-  background: var(--blue-hover);
+  background: var(--primary-hover);
 }
 
 .submit:active {
@@ -187,9 +187,9 @@
   z-index: 30;
   margin: 0;
   padding: 8px;
-  background: var(--white);
+  background: var(--card);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-popover);
   animation: pop 0.16s ease-out;
 }
 
@@ -210,12 +210,12 @@
 }
 
 .option[aria-selected='true'] {
-  background: var(--gray-bg);
+  background: var(--muted);
 }
 
 .optionIcon {
   flex: none;
-  color: var(--blue);
+  color: var(--primary);
 }
 
 .optionLabel {
@@ -225,14 +225,14 @@
 
 .optionHint {
   display: block;
-  color: var(--text-2);
+  color: var(--muted-foreground);
   font-size: 13px;
   font-weight: 400;
 }
 
 .popoverHint {
   margin: 4px 8px 0;
-  color: var(--text-2);
+  color: var(--muted-foreground);
   font-size: 13px;
 }
 
@@ -242,7 +242,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 10px 8px 4px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border);
 }
 
 .popoverSummary {
@@ -253,15 +253,15 @@
 .popoverDone {
   height: 38px;
   padding: 0 16px;
-  color: var(--white);
+  color: var(--primary-foreground);
   font-weight: 600;
-  background: var(--blue);
+  background: var(--primary);
   border: 0;
   border-radius: 10px;
 }
 
 .popoverDone:hover {
-  background: var(--blue-hover);
+  background: var(--primary-hover);
 }
 
 .popoverDoneWide {
@@ -302,7 +302,7 @@
   width: 36px;
   height: 36px;
   padding: 0;
-  color: var(--navy);
+  color: var(--brand-foreground);
   background: none;
   border: 0;
   border-radius: 50%;
@@ -310,7 +310,7 @@
 }
 
 .calendarArrow:hover:not(:disabled) {
-  background: var(--gray-bg);
+  background: var(--muted);
 }
 
 .calendarArrow:disabled {
@@ -346,7 +346,7 @@
 
 .weekdays span {
   padding: 4px 0;
-  color: var(--text-2);
+  color: var(--muted-foreground);
   font-size: 12px;
   text-align: center;
 }
@@ -361,23 +361,23 @@
 }
 
 .day:hover:not(:disabled) {
-  background: var(--blue-soft);
+  background: var(--secondary);
 }
 
 .day:disabled {
-  color: #c0c7d2;
+  color: var(--decor-disabled);
 }
 
 .dayInRange {
-  background: var(--blue-soft);
+  background: var(--secondary);
   border-radius: 0;
 }
 
 .dayEdge,
 .dayEdge:hover:not(:disabled) {
-  color: var(--white);
+  color: var(--primary-foreground);
   font-weight: 600;
-  background: var(--blue);
+  background: var(--primary);
 }
 
 /* ---------- Guests ---------- */
@@ -397,7 +397,7 @@
 
 .stepperHint {
   display: block;
-  color: var(--text-2);
+  color: var(--muted-foreground);
   font-size: 13px;
 }
 
@@ -414,18 +414,18 @@
   width: 36px;
   height: 36px;
   padding: 0;
-  color: var(--blue);
-  background: var(--white);
-  border: 1px solid var(--line);
+  color: var(--primary);
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 50%;
 }
 
 .stepperButton:hover:not(:disabled) {
-  border-color: var(--blue);
+  border-color: var(--primary);
 }
 
 .stepperButton:disabled {
-  color: #c0c7d2;
+  color: var(--decor-disabled);
 }
 
 .stepperValue {
@@ -443,7 +443,7 @@
 .results {
   margin-top: 14px;
   padding: 14px 4px 2px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border);
 }
 
 .resultsLoading {
@@ -451,7 +451,7 @@
   align-items: center;
   gap: 8px;
   margin: 0;
-  color: var(--text-2);
+  color: var(--muted-foreground);
 }
 
 .resultsTitle {
@@ -462,7 +462,7 @@
 
 .resultsMeta {
   margin: 2px 0 10px;
-  color: var(--text-2);
+  color: var(--muted-foreground);
   font-size: 14px;
 }
 
@@ -481,7 +481,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
-  background: var(--gray-bg);
+  background: var(--muted);
   border-radius: 12px;
 }
 
@@ -495,7 +495,7 @@
   display: flex;
   gap: 8px;
   margin: 12px 0 0;
-  color: var(--text-2);
+  color: var(--muted-foreground);
   font-size: 13px;
   line-height: 1.45;
 }

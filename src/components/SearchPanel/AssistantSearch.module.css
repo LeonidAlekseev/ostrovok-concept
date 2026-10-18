@@ -33,7 +33,7 @@
 
 .subtitle {
   margin: 6px 0 0;
-  color: var(--text-2);
+  color: var(--muted-foreground);
   font-size: clamp(14px, 3.7vw, 18px);
 }
 
@@ -57,16 +57,16 @@
   gap: 6px;
   height: 36px;
   padding: 0 12px;
-  color: var(--blue);
+  color: var(--primary);
   font-size: 14px;
   font-weight: 550;
-  background: var(--blue-soft);
+  background: var(--secondary);
   border: 0;
   border-radius: 999px;
 }
 
 .reset:hover {
-  background: #d6e3ff;
+  background: var(--decor-secondary-hover);
 }
 
 @media (max-width: 479px) {
@@ -121,20 +121,20 @@
   min-width: 0;
   max-width: min(100%, 560px);
   padding: 10px 14px;
-  background: var(--gray-bg);
+  background: var(--muted);
   border-radius: 18px 18px 18px 6px;
 }
 
 .userMessage .bubble {
   max-width: 85%;
-  color: var(--white);
-  background: var(--blue);
+  color: var(--primary-foreground);
+  background: var(--primary);
   border-radius: 18px 18px 6px;
 }
 
 .agentMessage .bubble:has(.plan) {
   flex: 1;
-  background: #f1f4f9;
+  background: var(--decor-surface-soft);
 }
 
 .messageText {
@@ -152,7 +152,7 @@
 .typing span {
   width: 7px;
   height: 7px;
-  background: var(--text-2);
+  background: var(--muted-foreground);
   border-radius: 50%;
   animation: dot 1s ease-in-out infinite;
 }
@@ -183,7 +183,7 @@
   gap: 12px;
   margin: 0;
   padding: 10px 12px;
-  background: linear-gradient(120deg, #e6eeff, #e9f9dc);
+  background: linear-gradient(120deg, var(--secondary), var(--decor-mint));
   border-radius: 14px;
 }
 
@@ -194,7 +194,7 @@
 
 .atmosphereLabel {
   display: block;
-  color: var(--text-2);
+  color: var(--muted-foreground);
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -208,7 +208,7 @@
 
 .planMeta {
   margin: 0;
-  color: var(--text-2);
+  color: var(--muted-foreground);
   font-size: 14px;
 }
 
@@ -228,8 +228,8 @@
   width: 100%;
   padding: 10px 8px 10px 12px;
   text-align: left;
-  background: var(--white);
-  border: 1px solid var(--line);
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 12px;
   transition:
     border-color 0.2s,
@@ -238,8 +238,8 @@
 
 .option:hover,
 .option:focus-visible {
-  border-color: var(--blue);
-  box-shadow: 0 4px 14px rgba(6, 69, 232, 0.12);
+  border-color: var(--primary);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--primary) 12%, transparent);
 }
 
 .optionText {
@@ -261,13 +261,13 @@
 
 .optionCountry {
   margin-left: 6px;
-  color: var(--text-2);
+  color: var(--muted-foreground);
   font-size: 13px;
   font-weight: 400;
 }
 
 .optionHotel {
-  color: var(--text-2);
+  color: var(--muted-foreground);
   font-size: 13px;
 }
 
@@ -276,7 +276,7 @@
   align-items: center;
   gap: 2px;
   margin-left: 6px;
-  color: #b7791f;
+  color: var(--decor-rating);
   font-weight: 600;
 }
 
@@ -290,25 +290,25 @@
 .optionHint,
 .optionOver {
   display: block;
-  color: var(--text-2);
+  color: var(--muted-foreground);
   font-size: 12px;
   font-weight: 400;
 }
 
 .optionOver {
-  color: var(--danger);
+  color: var(--destructive);
 }
 
 .optionChevron {
   flex: none;
   width: 20px;
   height: 20px;
-  color: var(--navy);
+  color: var(--brand-foreground);
 }
 
 .planNote {
   margin: 0;
-  color: var(--text-2);
+  color: var(--muted-foreground);
   font-size: 13px;
 }
 
@@ -320,8 +320,8 @@
   align-items: center;
   gap: clamp(10px, 2.6vw, 16px);
   padding: clamp(10px, 2.6vw, 14px) clamp(10px, 2.6vw, 14px) clamp(10px, 2.6vw, 14px) clamp(14px, 3.6vw, 22px);
-  background: var(--white);
-  border: 1px solid var(--line);
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: clamp(16px, 4vw, 20px);
   transition:
     border-color 0.2s,
@@ -329,15 +329,15 @@
 }
 
 .composer:focus-within {
-  border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgba(6, 69, 232, 0.1);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 10%, transparent);
 }
 
 .composerIcon {
   flex: none;
   width: clamp(22px, 6vw, 28px);
   height: clamp(22px, 6vw, 28px);
-  color: var(--blue);
+  color: var(--primary);
   fill: currentColor;
 }
 
@@ -354,7 +354,7 @@
 }
 
 .input::placeholder {
-  color: #7a8599;
+  color: var(--decor-placeholder-soft);
   opacity: 1;
 }
 
@@ -365,11 +365,11 @@
   width: clamp(48px, 13vw, 64px);
   height: clamp(48px, 13vw, 64px);
   padding: 0;
-  color: var(--white);
-  background: var(--blue);
+  color: var(--primary-foreground);
+  background: var(--primary);
   border: 0;
   border-radius: 50%;
-  box-shadow: 0 8px 20px rgba(6, 69, 232, 0.25);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--primary) 25%, transparent);
   transition:
     background-color 0.2s,
     transform 0.1s,
@@ -382,7 +382,7 @@
 }
 
 .send:hover:not(:disabled) {
-  background: var(--blue-hover);
+  background: var(--primary-hover);
 }
 
 .send:active:not(:disabled) {
@@ -416,17 +416,17 @@
   gap: 8px;
   height: clamp(40px, 10.6vw, 48px);
   padding: 0 clamp(14px, 3.6vw, 20px);
-  color: var(--text);
+  color: var(--foreground);
   font-size: clamp(14px, 3.7vw, 16px);
   white-space: nowrap;
-  background: #f1f4f9;
+  background: var(--decor-surface-soft);
   border: 0;
   border-radius: 999px;
   transition: background-color 0.2s;
 }
 
 .chip:hover:not(:disabled) {
-  background: var(--blue-soft);
+  background: var(--secondary);
 }
 
 .chip:disabled {

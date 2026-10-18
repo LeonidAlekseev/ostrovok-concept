@@ -2,17 +2,22 @@
 .panel {
   position: relative;
   z-index: 10;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(220, 247, 196, 0.22) 55%, rgba(255, 255, 255, 0.32));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--decor-light) 50%, transparent),
+    color-mix(in srgb, var(--success-soft) 22%, transparent) 55%,
+    color-mix(in srgb, var(--decor-light) 32%, transparent)
+  );
   border-radius: clamp(22px, 5.6vw, 30px);
   -webkit-backdrop-filter: blur(22px) saturate(180%);
   backdrop-filter: blur(22px) saturate(180%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.35),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.35),
-    inset 0 0 24px rgba(255, 255, 255, 0.25),
-    0 20px 50px rgba(7, 22, 47, 0.14),
-    0 2px 6px rgba(7, 22, 47, 0.04);
+    inset 0 1px 0 color-mix(in srgb, var(--decor-light) 90%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--decor-light) 35%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--decor-light) 35%, transparent),
+    inset 0 0 24px color-mix(in srgb, var(--decor-light) 25%, transparent),
+    0 20px 50px color-mix(in srgb, var(--shadow-color) 14%, transparent),
+    0 2px 6px color-mix(in srgb, var(--shadow-color) 4%, transparent);
 }
 
 /* Specular highlight along the top-left edge; painted under the content (the panel is a stacking context). */
@@ -21,8 +26,8 @@
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(120% 60% at 0% 0%, rgba(255, 255, 255, 0.55), transparent 55%),
-    radial-gradient(80% 50% at 100% 100%, rgba(255, 255, 255, 0.2), transparent 60%);
+    radial-gradient(120% 60% at 0% 0%, color-mix(in srgb, var(--decor-light) 55%, transparent), transparent 55%),
+    radial-gradient(80% 50% at 100% 100%, color-mix(in srgb, var(--decor-light) 20%, transparent), transparent 60%);
   border-radius: inherit;
   pointer-events: none;
   content: '';
@@ -30,7 +35,7 @@
 
 @media (prefers-reduced-transparency: reduce) {
   .panel {
-    background: #eefbe4;
+    background: var(--decor-glass-fallback);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -51,11 +56,11 @@
   min-width: 0;
   height: clamp(44px, 12vw, 58px);
   padding: 0 clamp(6px, 2vw, 18px);
-  color: var(--navy);
+  color: var(--brand-foreground);
   font-size: clamp(13px, 3.8vw, 18px);
   font-weight: 500;
   white-space: nowrap;
-  background: rgba(255, 255, 255, 0.45);
+  background: color-mix(in srgb, var(--decor-light) 45%, transparent);
   border: 0;
   border-radius: 999px;
   transition:
@@ -65,18 +70,18 @@
 }
 
 .tab:hover {
-  background: var(--white);
+  background: var(--card);
 }
 
 .tab[aria-selected='true'] {
-  color: var(--blue);
+  color: var(--primary);
   font-weight: 650;
-  background: var(--white);
-  box-shadow: 0 6px 18px rgba(7, 22, 47, 0.08);
+  background: var(--card);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--shadow-color) 8%, transparent);
 }
 
 .tab:focus-visible {
-  box-shadow: 0 0 0 3px rgba(6, 69, 232, 0.35);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 35%, transparent);
 }
 
 .tabIcon {
@@ -98,7 +103,7 @@
   /* Children that bleed to the card edge (scrolling chips) read the padding from here. */
   --pad: clamp(14px, 3.6vw, 22px);
   padding: var(--pad);
-  background: var(--white);
+  background: var(--card);
   /* Only the outer corners, following the panel; the edge under the tabs stays straight. */
   border-bottom-right-radius: inherit;
   border-bottom-left-radius: inherit;

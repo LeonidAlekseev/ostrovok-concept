@@ -458,10 +458,10 @@ function PinIcon() {
       <path
         d='M12 1.2C6.04 1.2 1.2 5.9 1.2 11.7c0 7.6 9.2 17.6 10 18.5a1.1 1.1 0 0 0 1.6 0c.8-.9 10-10.9 10-18.5C22.8 5.9 17.96 1.2 12 1.2Z'
         fill='currentColor'
-        stroke='#fff'
+        style={{ stroke: 'var(--decor-light)' }}
         strokeWidth='1.6'
       />
-      <circle cx='12' cy='11.6' r='4.2' fill='#fff' />
+      <circle cx='12' cy='11.6' r='4.2' style={{ fill: 'var(--decor-light)' }} />
     </svg>
   )
 }
