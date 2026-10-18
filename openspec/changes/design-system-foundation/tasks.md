@@ -32,8 +32,8 @@
 
 ## 6. Примитивы
 
-- [ ] 6.1 Добавить через `npx shadcn@latest add` компоненты `button`, `input`, `textarea`, `label`, `badge`, `card`, `field`; проверить `npm run typecheck` и `npm run lint`
-- [ ] 6.2 Настроить варианты Button под D7 (`default` с `--primary-hover`, `secondary`, `ghost`, `outline`, `link`; размеры `sm`, `default`, `lg`, `icon`, `icon-sm`; `shape: pill`) и Badge (`secondary`, `destructive`, `success`); проверить состояния hover и disabled на временной странице или в dev-режиме, затем удалить временную страницу
+- [x] 6.1 Добавить через `npx shadcn@latest add` компоненты `button`, `input`, `textarea`, `label`, `badge`, `card`, `field`; проверить `npm run typecheck` и `npm run lint`
+- [x] 6.2 Настроить варианты Button под D7 (`default` с `--primary-hover`, `secondary`, `ghost`, `outline`, `link`; размеры `sm`, `default`, `lg`, `icon`, `icon-sm`; `shape: pill`) и Badge (`secondary`, `destructive`, `success`); проверить состояния hover и disabled на временной странице или в dev-режиме, затем удалить временную страницу
 
 ## 7. Перевод компонентов
 

@@ -40,6 +40,7 @@
   --primary-foreground: var(--brand-white);
   --secondary: var(--brand-blue-soft);
   --secondary-foreground: var(--brand-blue);
+  --secondary-hover: var(--decor-secondary-hover);
   --muted: var(--brand-gray-bg);
   --muted-foreground: var(--brand-text-2);
   /* Hover in menus and lists: lime is too loud for it. */
@@ -49,6 +50,7 @@
   --brand-foreground: var(--brand-navy);
   --success: var(--brand-green);
   --success-soft: var(--brand-green-soft);
+  --success-foreground: var(--decor-badge-green);
   --destructive: var(--brand-danger);
   --border: var(--brand-line);
   --input: var(--brand-line);
@@ -61,6 +63,7 @@
   --shadow-soft: 0 12px 40px color-mix(in srgb, var(--shadow-color) 12%, transparent);
   --shadow-card: 0 6px 18px color-mix(in srgb, var(--shadow-color) 12%, transparent);
   --shadow-popover: 0 18px 50px color-mix(in srgb, var(--shadow-color) 16%, transparent);
+  --shadow-primary: 0 8px 20px color-mix(in srgb, var(--primary) 25%, transparent);
 
   /* Decorative accents: illustrations, glass and glow, the slot machine, confetti. Values outside
      the brand palette live only here. */
@@ -173,6 +176,7 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary-hover: var(--secondary-hover);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
@@ -181,6 +185,7 @@
   --color-brand-foreground: var(--brand-foreground);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
+  --color-success-foreground: var(--success-foreground);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
   --color-input: var(--input);

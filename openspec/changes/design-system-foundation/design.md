@@ -79,7 +79,7 @@ shadcn-примитивы рассчитаны на preflight (`border-style: so
 ### D4. Фокус
 
 Глобальное `:focus, :focus-visible { outline: none }` удаляется. В `@layer base`:
-`:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px }`. В примитивах — родной `focus-visible:ring-*` shadcn на `--ring`. Синий ring даёт контраст 4,77:1 на лайме, 6,3:1 на `--background`, 5,96:1 на `--secondary` и 6,94:1 на белом, то есть везде выше порога 3:1. На синих кнопках используется `outline-offset`, чтобы кольцо легло на фон, а не на кнопку. Модули, где фокус был спрятан намеренно (canvas глобуса), явно задают `outline: none` там, где элемент не интерактивен.
+`:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px }`. Кнопки и бейджи-примитивы используют то же кольцо из `@layer base`, а не `focus-visible:ring-ring/50` из шаблона shadcn: полупрозрачное кольцо на лайме не гарантирует 3:1. Поля ввода оставляют шаблонное `focus-visible:border-ring` — рамка полностью синяя. Синий ring даёт контраст 4,77:1 на лайме, 6,3:1 на `--background`, 5,96:1 на `--secondary` и 6,94:1 на белом, то есть везде выше порога 3:1. На синих кнопках используется `outline-offset`, чтобы кольцо легло на фон, а не на кнопку. Модули, где фокус был спрятан намеренно (canvas глобуса), явно задают `outline: none` там, где элемент не интерактивен.
 
 ### D5. Шкалы
 
