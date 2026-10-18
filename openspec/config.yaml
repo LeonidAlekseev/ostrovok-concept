@@ -1,5 +1,9 @@
 schema: spec-driven
 
+context: |
+  Write all artifacts in Russian. Keep OpenSpec keywords in English: SHALL/MUST,
+  Requirement, Scenario, WHEN/THEN, ADDED/MODIFIED/REMOVED/RENAMED.
+
 # Project context (optional)
 # Add only constraints that should guide OpenSpec artifacts and workflows.
 # Include constraints an agent cannot infer by reading the code.
