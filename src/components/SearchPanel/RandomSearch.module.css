@@ -45,26 +45,6 @@
   font-weight: 600;
 }
 
-.input {
-  width: 100%;
-  height: clamp(48px, 12.4vw, 56px);
-  margin-bottom: 16px;
-  padding: 0 16px;
-  font-size: clamp(16px, 4.1vw, 18px);
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  outline: none;
-  transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
-}
-
-.input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 10%, transparent);
-}
-
 .signs {
   min-width: 0;
   margin: 0;
@@ -117,27 +97,17 @@
 
 .error {
   margin: 12px 4px 0;
-  color: var(--destructive);
-  font-size: var(--text-sm);
+}
+
+.nameError {
+  margin: -10px 4px 16px;
 }
 
 .spin {
+  /* Clips the sweeping highlight. */
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  height: clamp(52px, 13.6vw, 60px);
   margin-top: 18px;
   overflow: hidden;
-  color: var(--primary-foreground);
-  font-size: clamp(17px, 4.6vw, 19px);
-  font-weight: 650;
-  background: linear-gradient(100deg, var(--primary), var(--decor-violet) 55%, var(--decor-magenta));
-  border: 0;
-  border-radius: var(--radius-lg);
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--decor-violet) 30%, transparent);
-  transition: transform 0.1s;
 }
 
 /* A highlight sweeps across the button now and then, inviting a pull. */
@@ -153,10 +123,6 @@
   transform: translateX(-100%);
   animation: shine 2.8s ease-in-out infinite;
   content: '';
-}
-
-.spin:active {
-  transform: translateY(1px);
 }
 
 /* ---------- Game ---------- */
@@ -198,18 +164,7 @@
 }
 
 .edit {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 36px;
   margin-left: auto;
-  padding: 0 12px;
-  color: var(--primary);
-  font-size: var(--text-sm);
-  font-weight: 550;
-  background: var(--secondary);
-  border: 0;
-  border-radius: var(--radius-full);
 }
 
 /* ---------- Slot machine ---------- */
@@ -356,12 +311,6 @@
 .ticket {
   position: relative;
   padding: 18px 18px 16px;
-  color: var(--primary-foreground);
-  background:
-    radial-gradient(circle at 90% 0%, color-mix(in srgb, var(--brand) 55%, transparent), transparent 45%),
-    linear-gradient(135deg, var(--primary), var(--decor-violet) 60%, var(--decor-purple));
-  border-radius: var(--radius-2xl);
-  box-shadow: 0 16px 36px color-mix(in srgb, var(--decor-violet) 30%, transparent);
   animation: ticketIn 0.6s cubic-bezier(0.2, 1.4, 0.4, 1);
 }
 
@@ -460,53 +409,6 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-}
-
-.share,
-.again {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 50px;
-  font-size: var(--text-base);
-  font-weight: 650;
-  border: 0;
-  border-radius: var(--radius-lg);
-  transition:
-    background-color 0.2s,
-    opacity 0.2s;
-}
-
-.share {
-  color: var(--primary-foreground);
-  background: var(--primary);
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--primary) 25%, transparent);
-}
-
-.share:hover:not(:disabled) {
-  background: var(--primary-hover);
-}
-
-.again {
-  color: var(--primary);
-  background: var(--secondary);
-}
-
-.again:hover:not(:disabled) {
-  background: var(--decor-secondary-hover);
-}
-
-.share:disabled,
-.again:disabled {
-  opacity: 0.5;
-  box-shadow: none;
-}
-
-.share svg,
-.again svg {
-  width: 20px;
-  height: 20px;
 }
 
 .shareNote {

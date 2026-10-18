@@ -1,6 +1,11 @@
 import { useEffect, useEffectEvent, useId, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { Dices, PencilLine, RotateCcw, Share2, Star } from 'lucide-react'
-import type { Destination } from '../../data/destinations'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { FieldError } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import type { Destination } from '@/data/destinations'
 import { formatPrice } from '../../lib/format'
 import {
   bestHotels,
@@ -61,6 +66,9 @@ export function RandomSearch({ onPreview }: Props) {
     if (round) onPreview(round.fortune.city)
   }
 
+  // The name check runs first, so an error with an empty name is always about the name.
+  const nameInvalid = Boolean(error) && !name.trim()
+
   if (editing || !round || !sign)
     return (
       <form className={styles.form} onSubmit={spin} noValidate>
@@ -74,19 +82,21 @@ export function RandomSearch({ onPreview }: Props) {
           </div>
         </div>
 
-        <label className={styles.label} htmlFor={nameId}>
+        <Label className='mb-2 text-base leading-[normal] font-semibold' htmlFor={nameId}>
           Как вас зовут?
-        </label>
-        <input
+        </Label>
+        <Input
           ref={nameRef}
           id={nameId}
-          className={styles.input}
+          className='mb-4 h-[clamp(48px,12.4vw,56px)] bg-card px-4 text-base focus-visible:ring-ring/10 sm:text-lg md:text-lg'
+          aria-invalid={nameInvalid || undefined}
           value={name}
           maxLength={24}
           autoComplete='given-name'
           placeholder='Ваше имя'
           onChange={(e) => setName(e.target.value)}
         />
+        <FieldError className={styles.nameError}>{nameInvalid && error}</FieldError>
 
         <fieldset className={styles.signs}>
           <legend className={styles.label}>Кто вы по знаку зодиака?</legend>
@@ -109,16 +119,16 @@ export function RandomSearch({ onPreview }: Props) {
           </div>
         </fieldset>
 
-        {error && (
-          <p className={styles.error} role='alert'>
-            {error}
-          </p>
-        )}
+        <FieldError className={styles.error}>{!nameInvalid && error}</FieldError>
 
-        <button type='submit' className={styles.spin}>
-          <Dices aria-hidden />
+        <Button
+          type='submit'
+          size='lg'
+          className={`${styles.spin} h-[clamp(52px,13.6vw,60px)] gap-2.5 bg-(image:--decor-spin-gradient) text-[clamp(17px,4.6vw,19px)] shadow-(--decor-spin-shadow)`}
+        >
+          <Dices className='size-6' aria-hidden />
           Крутить барабан
-        </button>
+        </Button>
       </form>
     )
 
@@ -150,17 +160,20 @@ export function RandomSearch({ onPreview }: Props) {
           <span className={styles.playerName}>{name.trim()}</span>
           <span className={styles.playerHint}>{sign.name}</span>
         </span>
-        <button type='button' className={styles.edit} onClick={() => setEditing(true)}>
-          <PencilLine size={16} aria-hidden />
+        <Button variant='secondary' size='sm' shape='pill' className={styles.edit} onClick={() => setEditing(true)}>
+          <PencilLine className='size-4' aria-hidden />
           Изменить
-        </button>
+        </Button>
       </div>
 
       <SlotMachine key={round.id} fortune={fortune} spinning={!landed} onLanded={onLanded} />
 
       <div aria-live='polite'>
         {landed && (
-          <article className={styles.ticket}>
+          <Card
+            role='article'
+            className={`${styles.ticket} gap-0 rounded-2xl bg-(image:--decor-ticket-gradient) py-0 text-primary-foreground shadow-(--decor-ticket-shadow)`}
+          >
             <Confetti />
             <p className={styles.ticketKicker}>
               Звёзды выбрали для {name.trim()} {sign.symbol}
@@ -180,19 +193,19 @@ export function RandomSearch({ onPreview }: Props) {
             </p>
             <p className={styles.ticketMood}>Настроение: {fortune.mood}</p>
             <p className={styles.prophecy}>{prophecyFor(sign, fortune.city)}</p>
-          </article>
+          </Card>
         )}
       </div>
 
       <div className={styles.actions}>
-        <button type='button' className={styles.share} onClick={share} disabled={!landed}>
+        <Button size='lg' className='h-12.5 px-3 text-base' onClick={share} disabled={!landed}>
           <Share2 aria-hidden />
           Поделиться
-        </button>
-        <button type='button' className={styles.again} onClick={() => spin()} disabled={!landed}>
+        </Button>
+        <Button variant='secondary' size='lg' className='h-12.5 px-3 text-base' onClick={() => spin()} disabled={!landed}>
           <RotateCcw aria-hidden />
           Ещё раз
-        </button>
+        </Button>
       </div>
       {shareNote && (
         <p className={styles.shareNote} role='status'>
