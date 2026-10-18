@@ -1,3 +1,5 @@
+@reference "../../app/globals.css";
+
 .card {
   position: relative;
   display: block;
@@ -110,7 +112,7 @@
     0 10px 24px color-mix(in srgb, var(--primary) 25%, transparent);
 }
 
-@media (min-width: 980px) {
+@media (width >= --theme(--breakpoint-lg)) {
   .card {
     aspect-ratio: 1.4;
   }

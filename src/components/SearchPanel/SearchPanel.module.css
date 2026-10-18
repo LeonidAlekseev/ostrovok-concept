@@ -1,3 +1,5 @@
+@reference "../../app/globals.css";
+
 /* Liquid glass: the globe shows through, blurred and saturated, under a bright rim and a specular sheen. */
 .panel {
   position: relative;
@@ -62,7 +64,7 @@
   white-space: nowrap;
   background: color-mix(in srgb, var(--decor-light) 45%, transparent);
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   transition:
     background-color 0.2s,
     color 0.2s,
@@ -122,12 +124,12 @@
 }
 
 /* Phones: the icon goes above the label, otherwise "Случайность" does not fit a third of the width. */
-@media (max-width: 519px) {
+@media (width < --theme(--breakpoint-sm)) {
   .tab {
     flex-direction: column;
     gap: 2px;
     height: 56px;
-    font-size: 13px;
+    font-size: var(--text-sm);
   }
 
   .tabIcon {

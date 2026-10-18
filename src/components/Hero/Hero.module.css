@@ -1,3 +1,5 @@
+@reference "../../app/globals.css";
+
 .hero {
   /* The sphere is much larger than the viewport: it rises from the lower right behind the title. */
   --globe-size: clamp(540px, 144vw, 640px);
@@ -50,7 +52,7 @@
 
 .title {
   margin: 0;
-  font-size: clamp(32px, 9vw, 72px);
+  font-size: var(--text-display);
   font-weight: 800;
   letter-spacing: -0.035em;
   line-height: 1.02;
@@ -67,7 +69,7 @@
   width: 7em;
   margin: clamp(32px, 9vw, 64px) 0 0 calc(var(--page-x) + 4px);
   color: var(--primary);
-  font-family: Caveat, cursive;
+  font-family: var(--font-hand);
   font-size: clamp(17px, 4.6vw, 27px);
   font-weight: 600;
   line-height: 1.05;
@@ -317,11 +319,11 @@
   left: 50%;
   padding: 4px 8px;
   color: var(--foreground);
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 600;
   white-space: nowrap;
   background: var(--card);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   box-shadow: var(--shadow-soft);
   opacity: 0;
   transform: translate(-50%, 4px);
@@ -468,7 +470,7 @@
     Menlo,
     monospace;
   background: color-mix(in srgb, var(--decor-black) 78%, transparent);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .stats summary {
@@ -499,7 +501,7 @@
 }
 
 /* Not enough room to the right of the pin on phones, and the title is above it: hang the card below. */
-@media (max-width: 767px) {
+@media (width < --theme(--breakpoint-md)) {
   .placeCard {
     --card-dx: -50%;
     --card-dy: 12px;
@@ -513,7 +515,7 @@
 
 /* ---------- Tablet & desktop ---------- */
 
-@media (min-width: 768px) {
+@media (width >= --theme(--breakpoint-md)) {
   .hero {
     --globe-size: clamp(760px, 76vw, 980px);
     --globe-top: calc(var(--header-height) + 32px);

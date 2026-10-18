@@ -22,7 +22,7 @@
   letter-spacing: -0.035em;
   line-height: 1;
   text-decoration: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
 .actions {
@@ -61,21 +61,21 @@
   width: min(300px, calc(100vw - 2 * var(--page-x)));
   padding: 18px;
   background: var(--card);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-popover);
   animation: pop 0.18s ease-out;
 }
 
 .panelTitle {
   margin: 0 0 6px;
-  font-size: 16px;
+  font-size: var(--text-base);
   font-weight: 650;
 }
 
 .panelText {
   margin: 0 0 14px;
   color: var(--muted-foreground);
-  font-size: 14px;
+  font-size: var(--text-sm);
   line-height: 1.45;
 }
 
@@ -86,7 +86,7 @@
   font-weight: 600;
   background: var(--primary);
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-lg);
 }
 
 .panelAction:hover {
@@ -105,7 +105,7 @@
   color: var(--foreground);
   font-weight: 550;
   text-decoration: none;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 .menuLink:hover {

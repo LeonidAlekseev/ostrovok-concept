@@ -1,3 +1,5 @@
+@reference "../../app/globals.css";
+
 .grid {
   display: grid;
   grid-template-columns: minmax(0, 1.42fr) minmax(0, 1fr);
@@ -46,7 +48,7 @@
   text-align: left;
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-lg);
   transition:
     border-color 0.2s,
     box-shadow 0.2s;
@@ -139,7 +141,7 @@
 .error {
   margin: 6px 4px 0;
   color: var(--destructive);
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.35;
 }
 
@@ -158,7 +160,7 @@
   white-space: nowrap;
   background: var(--primary);
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-lg);
   box-shadow: 0 8px 20px color-mix(in srgb, var(--primary) 25%, transparent);
   transition:
     background-color 0.2s,
@@ -188,7 +190,7 @@
   margin: 0;
   padding: 8px;
   background: var(--card);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-popover);
   animation: pop 0.16s ease-out;
 }
@@ -205,7 +207,7 @@
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 
@@ -226,14 +228,14 @@
 .optionHint {
   display: block;
   color: var(--muted-foreground);
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 400;
 }
 
 .popoverHint {
   margin: 4px 8px 0;
   color: var(--muted-foreground);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .popoverFooter {
@@ -246,7 +248,7 @@
 }
 
 .popoverSummary {
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 550;
 }
 
@@ -257,7 +259,7 @@
   font-weight: 600;
   background: var(--primary);
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 .popoverDone:hover {
@@ -329,7 +331,7 @@
 .monthTitle {
   margin: 0;
   padding: 10px 0 8px;
-  font-size: 15px;
+  font-size: var(--text-base);
   font-weight: 650;
   text-align: center;
 }
@@ -347,17 +349,17 @@
 .weekdays span {
   padding: 4px 0;
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: var(--text-xs);
   text-align: center;
 }
 
 .day {
   height: 40px;
   padding: 0;
-  font-size: 14px;
+  font-size: var(--text-sm);
   background: none;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 .day:hover:not(:disabled) {
@@ -398,7 +400,8 @@
 .stepperHint {
   display: block;
   color: var(--muted-foreground);
-  font-size: 13px;
+  /* A step below the other hints: "не больше, чем взрослых" must stay on one line on phones. */
+  font-size: var(--text-xs);
 }
 
 .stepper {
@@ -456,14 +459,14 @@
 
 .resultsTitle {
   margin: 0;
-  font-size: 17px;
+  font-size: var(--text-lg);
   font-weight: 650;
 }
 
 .resultsMeta {
   margin: 2px 0 10px;
   color: var(--muted-foreground);
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 
 .resultsList {
@@ -482,7 +485,7 @@
   gap: 12px;
   padding: 10px 12px;
   background: var(--muted);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
 }
 
 .resultsPrice {
@@ -496,7 +499,7 @@
   gap: 8px;
   margin: 12px 0 0;
   color: var(--muted-foreground);
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.45;
 }
 
@@ -524,20 +527,20 @@
 
 /* ---------- Narrow phones: stack dates and guests ---------- */
 
-@media (max-width: 374px) {
+@media (width < --theme(--breakpoint-xs)) {
   .grid {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: 'destination' 'dates' 'guests' 'submit';
   }
 
   .value {
-    font-size: 15px;
+    font-size: var(--text-sm);
   }
 }
 
 /* ---------- Tablet & desktop ---------- */
 
-@media (min-width: 768px) {
+@media (width >= --theme(--breakpoint-md)) {
   .datesPopover {
     width: 620px;
   }
@@ -551,7 +554,7 @@
   }
 }
 
-@media (min-width: 980px) {
+@media (width >= --theme(--breakpoint-lg)) {
   .grid {
     grid-template-columns: minmax(0, 1.55fr) minmax(0, 1.2fr) minmax(0, 0.95fr) auto;
     grid-template-areas: 'destination dates guests submit';

@@ -2,6 +2,10 @@
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 
+/* No dark theme: tie shadcn's dark: classes to a .dark class that the page never sets, instead of the
+   default prefers-color-scheme. */
+@custom-variant dark (&:is(.dark *));
+
 /* Tokens come in three layers: brand values -> semantic roles -> Tailwind theme (@theme inline).
    Components and CSS Modules read the roles; the brand layer is referenced only here. */
 
@@ -50,10 +54,7 @@
   --input: var(--brand-line);
   --ring: var(--brand-blue);
 
-  --radius: 0.625rem;
-  --radius-sm: 12px;
-  --radius-md: 16px;
-  --radius-lg: 24px;
+  --radius: 12px;
 
   /* Shadows. --shadow-color tints every shadow and shading in the modules. */
   --shadow-color: var(--brand-navy);
@@ -126,9 +127,38 @@
   --header-height: clamp(60px, 15vw, 72px);
 }
 
-@theme {
+/* static: CSS Modules read these at run time, where Tailwind cannot see the usage. */
+@theme static {
+  /* lg is the layout's desktop step; xl equals --page-max. */
+  --breakpoint-xs: 375px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 980px;
+  --breakpoint-xl: 1240px;
   --font-sans: 'Onest Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-hand: Caveat, cursive;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 12px);
+  --radius-full: 9999px;
+  /* Type scale: Tailwind's defaults, declared here so the modules can read them. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+  --text-6xl: 3.75rem;
+  --text-7xl: 4.5rem;
+  /* Fluid headings, one per role: the hero title, section titles, titles inside the search panel. */
+  --text-display: clamp(32px, 9vw, 72px);
+  --text-title: clamp(17px, 4.6vw, 30px);
+  --text-heading: clamp(17px, 4.6vw, 24px);
 }
 
 @theme inline {

@@ -49,7 +49,7 @@ export function Calendar({ start, end, min, max, onPick }: Props) {
     event.preventDefault()
     const next = addDays(focused, step)
     if (next < min) return
-    // Two months are visible on wide screens; the second one is hidden by CSS on small ones.
+    // Two months are visible from --breakpoint-md up; the second one is hidden by CSS below it.
     const visible = window.matchMedia('(min-width: 768px)').matches ? 2 : 1
     const key = monthKey(next)
     if (key < view) setView(key)
