@@ -46,7 +46,7 @@
 
 ## 8. Итоговая проверка
 
-- [ ] 8.1 Пройти все сценарии `openspec/specs/*` и `specs/design-system` вручную на 375 и 1280 px, сравнить со скриншотами 1.1, прогнать `npm run typecheck && npm run lint && npm run build`, `openspec validate design-system-foundation --strict`
+- [x] 8.1 Пройти все сценарии `openspec/specs/*` и `specs/design-system` вручную на 375 и 1280 px, сравнить со скриншотами 1.1, прогнать `npm run typecheck && npm run lint && npm run build`, `openspec validate design-system-foundation --strict`
 
 ## Workflow follow-up
 
