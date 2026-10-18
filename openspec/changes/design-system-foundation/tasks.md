@@ -9,11 +9,11 @@
 - [x] 2.1 Добавить `"paths": { "@/*": ["./src/*"] }` в `tsconfig.json` и проверить `npm run typecheck`
 - [x] 2.2 Установить `tailwindcss` и `@tailwindcss/postcss`, создать `postcss.config.mjs` по гайду Next 16 и проверить, что `npm run build` проходит и в CSS есть утилиты Tailwind
 - [x] 2.3 Выполнить `npx shadcn@latest init -t next -b base` отдельным коммитом и проверить, что появились `components.json` (ui → `@/components/ui`, utils → `@/lib/utils`, iconLibrary → lucide), `src/lib/utils.ts` с `cn()` и зависимости `@base-ui/react`, `class-variance-authority`, `cn`
-- [ ] 2.4 Слить сгенерированный `globals.css` с прежним: вернуть ресеты в `@layer base`, `.visually-hidden`, блок reduced motion и шрифты, удалить `.dark`; проверить `npm run build` и сверить страницу со скриншотами 1.1
+- [x] 2.4 Слить сгенерированный `globals.css` с прежним: вернуть ресеты в `@layer base`, `.visually-hidden`, блок reduced motion и шрифты, удалить `.dark`; проверить `npm run build` и сверить страницу со скриншотами 1.1
 
 ## 3. Токены
 
-- [ ] 3.1 Описать в `globals.css` слой бренда (`--brand-*`, значения из `specs/design-system`), семантические роли из D1 и `@theme inline`; проверить, что классы `bg-primary`, `text-muted-foreground`, `border-border` дают цвета бренда
+- [x] 3.1 Описать в `globals.css` слой бренда (`--brand-*`, значения из `specs/design-system`), семантические роли из D1 и `@theme inline`; проверить, что классы `bg-primary`, `text-muted-foreground`, `border-border` дают цвета бренда
 - [ ] 3.2 Добавить токены теней (`--shadow-soft`, `--shadow-card`, `--shadow-popover`) и `--decor-*` для конфетти, робота, барабана и прочих литералов модулей с прежними значениями
 - [ ] 3.3 Перевести все `*.module.css` со старых имён (`--blue`, `--text-2`, …) и литералов на роли, `color-mix()` и `--decor-*`, удалить старые имена; проверить, что `grep -nE '#[0-9a-fA-F]{3,8}\b|rgba?\(' src --include=*.module.css` ничего не находит, а цвета на скриншотах прежние
 - [ ] 3.4 Перенести цвета из TSX (`RobotAvatar`, `CONFETTI` в `RandomSearch`, `PinIcon` в `Hero`) на `var(--decor-*)` / `currentColor`, кроме цветов canvas в `globeRenderer.ts`; проверить сценарий «Конфетти» из `specs/design-system`
