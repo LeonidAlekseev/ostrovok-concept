@@ -1,7 +1,10 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { ChevronRight, RotateCcw, SendHorizontal, Sparkles, Star } from 'lucide-react'
-import type { Destination } from '../../data/destinations'
-import type { HotelSearch } from '../../hooks/useHotelSearch'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import type { Destination } from '@/data/destinations'
+import type { HotelSearch } from '@/hooks/useHotelSearch'
 import {
   describeBrief,
   makePlan,
@@ -111,10 +114,10 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
           <p className={styles.subtitle}>Я подберу идеальное жилье и направление</p>
         </div>
         {started && (
-          <button type='button' className={styles.reset} onClick={reset}>
-            <RotateCcw size={16} aria-hidden />
+          <Button variant='secondary' size='sm' shape='pill' className={styles.reset} onClick={reset}>
+            <RotateCcw className='size-4' aria-hidden />
             <span>Заново</span>
-          </button>
+          </Button>
         )}
       </div>
 
@@ -147,9 +150,10 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
         <label htmlFor={inputId} className='visually-hidden'>
           Опишите поездку
         </label>
-        <textarea
+        {/* The composer draws the box and the focus state; the textarea is bare inside it. */}
+        <Textarea
           id={inputId}
-          className={styles.input}
+          className='min-h-0 flex-1 resize-none rounded-none border-0 bg-transparent p-0 text-base leading-[1.4] field-sizing-fixed focus-visible:border-0 sm:text-lg md:text-lg'
           rows={2}
           value={text}
           enterKeyHint='send'
@@ -161,22 +165,34 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
         />
-        <button type='submit' className={styles.send} aria-label='Отправить' disabled={!text.trim() || thinking}>
+        <Button
+          type='submit'
+          size='icon'
+          className={`${styles.send} shadow-(--shadow-primary)`}
+          aria-label='Отправить'
+          disabled={!text.trim() || thinking}
+        >
           <SendHorizontal aria-hidden />
-        </button>
+        </Button>
       </form>
 
       <ul className={styles.chips} aria-label={question ? 'Быстрые ответы' : 'Идеи для поездки'}>
         {chips.map(({ emoji, label }) => (
           <li key={label}>
-            <button type='button' className={styles.chip} onClick={() => send(label)} disabled={thinking}>
+            <Button
+              variant='secondary'
+              shape='pill'
+              className='h-[clamp(40px,10.6vw,48px)] bg-(--decor-surface-soft) px-[clamp(14px,3.6vw,20px)] text-[clamp(14px,3.7vw,16px)] font-normal text-foreground hover:bg-secondary'
+              onClick={() => send(label)}
+              disabled={thinking}
+            >
               {emoji && (
                 <span className={styles.chipEmoji} aria-hidden>
                   {emoji}
                 </span>
               )}
               {label}
-            </button>
+            </Button>
           </li>
         ))}
       </ul>
@@ -219,18 +235,22 @@ function PlanView({ plan, onChoose }: { plan: Plan; onChoose: Props['onChoose'] 
                 {hotel && (
                   <span className={styles.optionHotel}>
                     {hotel.name}
-                    <span className={styles.optionRating}>
-                      <Star size={12} fill='currentColor' strokeWidth={0} aria-hidden />
+                    <Badge className='ml-1.5 gap-0.5'>
+                      <Star fill='currentColor' strokeWidth={0} aria-hidden />
                       {hotel.rating.toFixed(1)}
-                    </span>
+                    </Badge>
                   </span>
                 )}
               </span>
               <span className={styles.optionPrice}>
                 от {formatPrice(total)}
-                <span className={fitsBudget ? styles.optionHint : styles.optionOver}>
-                  {fitsBudget ? `за ${nights}` : 'выше бюджета'}
-                </span>
+                {fitsBudget ? (
+                  <span className={styles.optionHint}>за {nights}</span>
+                ) : (
+                  <Badge variant='destructive' className='mt-0.5 ml-auto flex'>
+                    выше бюджета
+                  </Badge>
+                )}
               </span>
               <ChevronRight className={styles.optionChevron} aria-hidden />
             </button>

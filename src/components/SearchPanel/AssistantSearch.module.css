@@ -53,22 +53,7 @@
 }
 
 .reset {
-  display: inline-flex;
   flex: none;
-  align-items: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 12px;
-  color: var(--primary);
-  font-size: var(--text-sm);
-  font-weight: 550;
-  background: var(--secondary);
-  border: 0;
-  border-radius: var(--radius-full);
-}
-
-.reset:hover {
-  background: var(--decor-secondary-hover);
 }
 
 @media (width < --theme(--breakpoint-sm)) {
@@ -273,15 +258,6 @@
   font-size: var(--text-sm);
 }
 
-.optionRating {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: 6px;
-  color: var(--decor-rating);
-  font-weight: 600;
-}
-
 .optionPrice {
   flex: none;
   font-weight: 650;
@@ -289,16 +265,11 @@
   white-space: nowrap;
 }
 
-.optionHint,
-.optionOver {
+.optionHint {
   display: block;
   color: var(--muted-foreground);
   font-size: var(--text-xs);
   font-weight: 400;
-}
-
-.optionOver {
-  color: var(--destructive);
 }
 
 .optionChevron {
@@ -343,57 +314,15 @@
   fill: currentColor;
 }
 
-.input {
-  flex: 1;
-  min-width: 0;
-  padding: 0;
-  font-size: clamp(16px, 4.1vw, 18px);
-  line-height: 1.4;
-  background: transparent;
-  border: 0;
-  outline: none;
-  resize: none;
-}
-
-.input::placeholder {
-  color: var(--decor-placeholder-soft);
-  opacity: 1;
-}
-
 .send {
-  display: grid;
   flex: none;
-  place-items: center;
   width: clamp(48px, 13vw, 64px);
   height: clamp(48px, 13vw, 64px);
-  padding: 0;
-  color: var(--primary-foreground);
-  background: var(--primary);
-  border: 0;
-  border-radius: 50%;
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--primary) 25%, transparent);
-  transition:
-    background-color 0.2s,
-    transform 0.1s,
-    opacity 0.2s;
 }
 
 .send svg {
   width: 45%;
   height: 45%;
-}
-
-.send:hover:not(:disabled) {
-  background: var(--primary-hover);
-}
-
-.send:active:not(:disabled) {
-  transform: scale(0.96);
-}
-
-.send:disabled {
-  opacity: 0.55;
-  box-shadow: none;
 }
 
 /* ---------- Chips ---------- */
@@ -410,29 +339,6 @@
 
 .chips::-webkit-scrollbar {
   display: none;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: clamp(40px, 10.6vw, 48px);
-  padding: 0 clamp(14px, 3.6vw, 20px);
-  color: var(--foreground);
-  font-size: clamp(14px, 3.7vw, 16px);
-  white-space: nowrap;
-  background: var(--decor-surface-soft);
-  border: 0;
-  border-radius: var(--radius-full);
-  transition: background-color 0.2s;
-}
-
-.chip:hover:not(:disabled) {
-  background: var(--secondary);
-}
-
-.chip:disabled {
-  opacity: 0.6;
 }
 
 .chipEmoji {
