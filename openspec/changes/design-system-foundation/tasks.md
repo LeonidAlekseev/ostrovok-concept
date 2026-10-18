@@ -37,7 +37,7 @@
 
 ## 7. Перевод компонентов
 
-- [ ] 7.1 Header: иконки-кнопки и `panelAction` → Button, оболочка панели → Card; проверить сценарии `specs/site-header`
+- [x] 7.1 Header: иконки-кнопки и `panelAction` → Button, оболочка панели → Card; проверить сценарии `specs/site-header`
 - [ ] 7.2 SearchForm: «Найти отель», `popoverDone`, степперы, стрелки календаря, «Очистить направление» → Button; ошибки полей → FieldError с прежними `id`; поле направления — классы Input; блок результатов → Card; проверить сценарии `specs/manual-search`
 - [ ] 7.3 AssistantSearch: «Отправить», «Заново», чипы → Button; поле запроса → Textarea; «выше бюджета» и рейтинг → Badge; проверить сценарии `specs/assistant-search`
 - [ ] 7.4 RandomSearch: поле имени → Input + Label, ошибка → FieldError (`role="alert"` сохраняется), «Крутить барабан», «Изменить», «Поделиться», «Ещё раз» → Button, билет → Card; проверить сценарии `specs/random-search`

@@ -32,37 +32,11 @@
   gap: clamp(0px, 1vw, 14px);
 }
 
-.iconButton {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  color: var(--primary);
-  background: transparent;
-  border: 0;
-  border-radius: 50%;
-  transition:
-    background-color 0.2s,
-    color 0.2s,
-    transform 0.2s;
-}
-
-.iconButton:hover,
-.iconButton[aria-expanded='true'] {
-  color: var(--primary-hover);
-  background: color-mix(in srgb, var(--decor-light) 35%, transparent);
-}
-
 .panel {
   position: absolute;
   top: calc(100% + 10px);
   right: 0;
   width: min(300px, calc(100vw - 2 * var(--page-x)));
-  padding: 18px;
-  background: var(--card);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-popover);
   animation: pop 0.18s ease-out;
 }
 
@@ -77,20 +51,6 @@
   color: var(--muted-foreground);
   font-size: var(--text-sm);
   line-height: 1.45;
-}
-
-.panelAction {
-  width: 100%;
-  height: 42px;
-  color: var(--primary-foreground);
-  font-weight: 600;
-  background: var(--primary);
-  border: 0;
-  border-radius: var(--radius-lg);
-}
-
-.panelAction:hover {
-  background: var(--primary-hover);
 }
 
 .menuList {

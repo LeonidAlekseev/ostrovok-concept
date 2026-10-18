@@ -1,6 +1,8 @@
 import { useCallback, useId, useRef, useState } from 'react'
 import { Bell, Heart, Menu, X } from 'lucide-react'
-import { useDismiss } from '../../hooks/useDismiss'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { useDismiss } from '@/hooks/useDismiss'
 import styles from './Header.module.css'
 
 type Panel = 'favorites' | 'notifications' | 'menu'
@@ -8,6 +10,10 @@ type Panel = 'favorites' | 'notifications' | 'menu'
 interface Props {
   onStartSearch: () => void
 }
+
+// Blue on the lime hero; the white glaze replaces ghost's grey hover there.
+const iconButton =
+  'text-primary hover:bg-card/35 hover:text-primary-hover aria-expanded:bg-card/35 aria-expanded:text-primary-hover'
 
 const menuLinks = [
   { href: '#search', label: 'Поиск отелей' },
@@ -37,50 +43,61 @@ export function Header({ onStartSearch }: Props) {
         </a>
 
         <div className={styles.actions} ref={actionsRef}>
-          <button type="button" className={styles.iconButton} aria-label="Избранное" {...buttonProps('favorites')}>
-            <Heart size={26} fill="currentColor" strokeWidth={2} aria-hidden />
-          </button>
-          <button type="button" className={styles.iconButton} aria-label="Уведомления" {...buttonProps('notifications')}>
-            <Bell size={25} fill="currentColor" strokeWidth={2} aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={styles.iconButton}
+          <Button variant="ghost" size="icon" className={iconButton} aria-label="Избранное" {...buttonProps('favorites')}>
+            <Heart className="size-6.5" fill="currentColor" strokeWidth={2} aria-hidden />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={iconButton}
+            aria-label="Уведомления"
+            {...buttonProps('notifications')}
+          >
+            <Bell className="size-6.25" fill="currentColor" strokeWidth={2} aria-hidden />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={iconButton}
             aria-label={open === 'menu' ? 'Закрыть меню' : 'Открыть меню'}
             {...buttonProps('menu')}
           >
             {open === 'menu' ? (
-              <X size={28} strokeWidth={2.8} aria-hidden />
+              <X className="size-7" strokeWidth={2.8} aria-hidden />
             ) : (
-              <Menu size={28} strokeWidth={2.8} aria-hidden />
+              <Menu className="size-7" strokeWidth={2.8} aria-hidden />
             )}
-          </button>
+          </Button>
 
           {open && (
-            <div className={styles.panel} id={panelId} role="dialog" aria-label={panelTitle[open]}>
+            <Card
+              className={`${styles.panel} gap-0 p-4.5 shadow-(--shadow-popover)`}
+              id={panelId}
+              role="dialog"
+              aria-label={panelTitle[open]}
+            >
               {open === 'favorites' && (
                 <>
                   <p className={styles.panelTitle}>Избранное пока пусто</p>
                   <p className={styles.panelText}>Сохраняйте понравившиеся отели, чтобы вернуться к ним позже.</p>
-                  <button
-                    type="button"
-                    className={styles.panelAction}
+                  <Button
+                    className="w-full"
                     onClick={() => {
                       close()
                       onStartSearch()
                     }}
                   >
                     Найти отель
-                  </button>
+                  </Button>
                 </>
               )}
               {open === 'notifications' && (
                 <>
                   <p className={styles.panelTitle}>Новых уведомлений нет</p>
                   <p className={styles.panelText}>Здесь появятся изменения цен и статусы бронирований.</p>
-                  <button type="button" className={styles.panelAction} onClick={close}>
+                  <Button className="w-full" onClick={close}>
                     Понятно
-                  </button>
+                  </Button>
                 </>
               )}
               {open === 'menu' && (
@@ -96,7 +113,7 @@ export function Header({ onStartSearch }: Props) {
                   </ul>
                 </nav>
               )}
-            </div>
+            </Card>
           )}
         </div>
       </div>
