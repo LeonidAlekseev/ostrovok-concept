@@ -116,7 +116,8 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
         {started && (
           <Button variant='secondary' size='sm' shape='pill' className={styles.reset} onClick={reset}>
             <RotateCcw className='size-4' aria-hidden />
-            <span>Заново</span>
+            {/* Phones show the icon only; the label stays as the button's accessible name. */}
+            <span className='max-sm:sr-only'>Заново</span>
           </Button>
         )}
       </div>
