@@ -58,7 +58,7 @@
   border-color: var(--decor-border-strong);
 }
 
-.field:has(> .input:focus),
+.field:not(.fieldInvalid):has(> input:focus),
 .fieldButton[aria-expanded='true'] {
   border-color: var(--primary);
 }
@@ -71,23 +71,6 @@
 .fieldIcon {
   flex: none;
   color: var(--brand-foreground);
-}
-
-.input {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-  /* Room for the divider and clear button laid over the field. */
-  padding: 0 56px 0 0;
-  font-size: clamp(16px, 4.1vw, 18px);
-  background: transparent;
-  border: 0;
-  outline: none;
-}
-
-.input::placeholder {
-  color: var(--decor-placeholder);
-  opacity: 1;
 }
 
 .divider {
@@ -103,21 +86,7 @@
   position: absolute;
   top: 50%;
   right: clamp(6px, 2vw, 10px);
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  color: var(--muted-foreground);
-  background: none;
-  border: 0;
-  border-radius: 50%;
   transform: translateY(-50%);
-}
-
-.clear:hover {
-  color: var(--foreground);
-  background: var(--muted);
 }
 
 .value {
@@ -141,41 +110,10 @@
 
 .error {
   margin: 6px 4px 0;
-  color: var(--destructive);
-  font-size: var(--text-sm);
   line-height: 1.35;
 }
 
 /* ---------- Submit ---------- */
-
-.submit {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  height: clamp(50px, 12.8vw, 56px);
-  padding: 0 28px;
-  color: var(--primary-foreground);
-  font-size: clamp(17px, 4.6vw, 19px);
-  font-weight: 600;
-  white-space: nowrap;
-  background: var(--primary);
-  border: 0;
-  border-radius: var(--radius-lg);
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--primary) 25%, transparent);
-  transition:
-    background-color 0.2s,
-    transform 0.1s,
-    box-shadow 0.2s;
-}
-
-.submit:hover {
-  background: var(--primary-hover);
-}
-
-.submit:active {
-  transform: translateY(1px);
-}
 
 .spin {
   animation: spin 0.9s linear infinite;
@@ -253,25 +191,6 @@
   font-weight: 550;
 }
 
-.popoverDone {
-  height: 38px;
-  padding: 0 16px;
-  color: var(--primary-foreground);
-  font-weight: 600;
-  background: var(--primary);
-  border: 0;
-  border-radius: var(--radius-md);
-}
-
-.popoverDone:hover {
-  background: var(--primary-hover);
-}
-
-.popoverDoneWide {
-  width: 100%;
-  margin-top: 8px;
-}
-
 .datesPopover {
   width: min(330px, calc(100vw - 2 * var(--page-x) - 8px));
 }
@@ -300,24 +219,8 @@
 }
 
 .calendarArrow {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  color: var(--brand-foreground);
-  background: none;
-  border: 0;
-  border-radius: 50%;
+  /* The nav strip lets clicks through to the month title; the arrows take them back. */
   pointer-events: auto;
-}
-
-.calendarArrow:hover:not(:disabled) {
-  background: var(--muted);
-}
-
-.calendarArrow:disabled {
-  opacity: 0.3;
 }
 
 .months {
@@ -412,26 +315,6 @@
   gap: 6px;
 }
 
-.stepperButton {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  color: var(--primary);
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 50%;
-}
-
-.stepperButton:hover:not(:disabled) {
-  border-color: var(--primary);
-}
-
-.stepperButton:disabled {
-  color: var(--decor-disabled);
-}
-
 .stepperValue {
   min-width: 24px;
   font-weight: 600;
@@ -447,7 +330,6 @@
 .results {
   margin-top: 14px;
   padding: 14px 4px 2px;
-  border-top: 1px solid var(--border);
 }
 
 .resultsLoading {
@@ -561,8 +443,7 @@
     grid-template-areas: 'destination dates guests submit';
   }
 
-  .field,
-  .submit {
+  .field {
     height: 60px;
   }
 }

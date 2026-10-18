@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { addDays, formatLongDate, fromIso, monthGrid, monthTitle, toIso, type IsoDate } from '../../lib/dates'
 import styles from './SearchForm.module.css'
 
@@ -68,23 +69,25 @@ export function Calendar({ start, end, min, max, onPick }: Props) {
   return (
     <div className={styles.calendar}>
       <div className={styles.calendarNav}>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon-sm"
           className={styles.calendarArrow}
           aria-label="Предыдущий месяц"
           disabled={view <= monthKey(min)}
           onClick={() => shiftView(-1)}
         >
-          <ChevronLeft size={20} aria-hidden />
-        </button>
-        <button
-          type="button"
+          <ChevronLeft aria-hidden />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
           className={styles.calendarArrow}
           aria-label="Следующий месяц"
           onClick={() => shiftView(1)}
         >
-          <ChevronRight size={20} aria-hidden />
-        </button>
+          <ChevronRight aria-hidden />
+        </Button>
       </div>
       <div className={styles.months} ref={gridRef} onKeyDown={onKeyDown} onPointerLeave={() => setHover(null)}>
         {[view, view + 1].map((key, index) => {

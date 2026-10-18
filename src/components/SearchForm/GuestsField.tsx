@@ -1,6 +1,8 @@
 import { useCallback, useId, useRef, useState } from 'react'
 import { ChevronDown, Minus, Plus, User } from 'lucide-react'
-import { useDismiss } from '../../hooks/useDismiss'
+import { Button } from '@/components/ui/button'
+import { FieldError } from '@/components/ui/field'
+import { useDismiss } from '@/hooks/useDismiss'
 import { countRu, guestsLabel } from '../../lib/format'
 import { GUEST_LIMITS, type Guests } from '../../lib/search'
 import styles from './SearchForm.module.css'
@@ -69,15 +71,15 @@ export function GuestsField({ value, error, onChange }: Props) {
                 <span className={styles.stepperHint}>{row.hint}</span>
               </span>
               <span className={styles.stepper}>
-                <button
-                  type="button"
-                  className={styles.stepperButton}
+                <Button
+                  variant="outline"
+                  size="icon-sm"
                   aria-label={`${row.title}: уменьшить`}
                   disabled={value[row.key] <= GUEST_LIMITS[row.key].min}
                   onClick={() => change(row.key, -1)}
                 >
-                  <Minus size={18} aria-hidden />
-                </button>
+                  <Minus className="size-4.5" aria-hidden />
+                </Button>
                 <output
                   className={styles.stepperValue}
                   aria-live="polite"
@@ -85,35 +87,33 @@ export function GuestsField({ value, error, onChange }: Props) {
                 >
                   {value[row.key]}
                 </output>
-                <button
-                  type="button"
-                  className={styles.stepperButton}
+                <Button
+                  variant="outline"
+                  size="icon-sm"
                   aria-label={`${row.title}: увеличить`}
                   disabled={value[row.key] >= max(row.key)}
                   onClick={() => change(row.key, 1)}
                 >
-                  <Plus size={18} aria-hidden />
-                </button>
+                  <Plus className="size-4.5" aria-hidden />
+                </Button>
               </span>
             </div>
           ))}
-          <button
-            type="button"
-            className={`${styles.popoverDone} ${styles.popoverDoneWide}`}
+          <Button
+            className="mt-2 w-full"
             onClick={() => {
               close()
               triggerRef.current?.focus()
             }}
           >
             Готово
-          </button>
+          </Button>
         </div>
       )}
-      {error && (
-        <p className={styles.error} id={errorId}>
-          {error}
-        </p>
-      )}
+      {/* Not an alert: the error is announced through aria-describedby when focus moves to the field. */}
+      <FieldError className={styles.error} id={errorId} role={undefined}>
+        {error}
+      </FieldError>
     </div>
   )
 }

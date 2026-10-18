@@ -1,6 +1,7 @@
 import { useRef, type FormEvent, type RefObject } from 'react'
 import { ArrowRight, LoaderCircle } from 'lucide-react'
-import type { HotelSearch } from '../../hooks/useHotelSearch'
+import { Button } from '@/components/ui/button'
+import type { HotelSearch } from '@/hooks/useHotelSearch'
 import { DateField } from './DateField'
 import { DestinationField } from './DestinationField'
 import { GuestsField } from './GuestsField'
@@ -36,14 +37,14 @@ export function SearchForm({ search, destinationRef, submitRef }: Props) {
         />
         <DateField checkIn={query.checkIn} checkOut={query.checkOut} error={errors.dates} onChange={setDates} />
         <GuestsField value={query.guests} error={errors.guests} onChange={setGuests} />
-        <button ref={submitRef} className={`${styles.submit} ${styles.areaSubmit}`} type="submit" aria-busy={loading}>
+        <Button ref={submitRef} size="lg" className={`${styles.areaSubmit} h-[clamp(50px,12.8vw,56px)] gap-3 lg:h-15`} type="submit" aria-busy={loading}>
           Найти отель
           {loading ? (
-            <LoaderCircle className={styles.spin} size={24} aria-hidden />
+            <LoaderCircle className={`${styles.spin} size-6`} aria-hidden />
           ) : (
-            <ArrowRight size={26} strokeWidth={2} aria-hidden />
+            <ArrowRight className="size-6.5" strokeWidth={2} aria-hidden />
           )}
-        </button>
+        </Button>
       </div>
       <SearchResults status={status} />
     </form>

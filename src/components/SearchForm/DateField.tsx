@@ -1,6 +1,8 @@
 import { useCallback, useId, useRef, useState } from 'react'
 import { CalendarDays } from 'lucide-react'
-import { useDismiss } from '../../hooks/useDismiss'
+import { Button } from '@/components/ui/button'
+import { FieldError } from '@/components/ui/field'
+import { useDismiss } from '@/hooks/useDismiss'
 import { addDays, formatDateRange, nightsBetween, todayIso, type IsoDate } from '../../lib/dates'
 import { countRu } from '../../lib/format'
 import { MAX_NIGHTS } from '../../lib/search'
@@ -85,17 +87,14 @@ export function DateField({ checkIn, checkOut, error, onChange }: Props) {
             <span className={styles.popoverSummary}>
               {draftStart ? formatDateRange(draftStart, null) : `${label} · ${countRu(nights, nightForms)}`}
             </span>
-            <button type="button" className={styles.popoverDone} onClick={close}>
-              {draftStart ? 'Отмена' : 'Готово'}
-            </button>
+            <Button onClick={close}>{draftStart ? 'Отмена' : 'Готово'}</Button>
           </div>
         </div>
       )}
-      {error && (
-        <p className={styles.error} id={errorId}>
-          {error}
-        </p>
-      )}
+      {/* Not an alert: the error is announced through aria-describedby when focus moves to the field. */}
+      <FieldError className={styles.error} id={errorId} role={undefined}>
+        {error}
+      </FieldError>
     </div>
   )
 }

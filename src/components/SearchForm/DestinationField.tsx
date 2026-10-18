@@ -1,7 +1,9 @@
 import { useCallback, useId, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
 import { MapPin, X } from 'lucide-react'
-import { scenarios } from '../../data/destinations'
-import { useDismiss } from '../../hooks/useDismiss'
+import { Button } from '@/components/ui/button'
+import { FieldError } from '@/components/ui/field'
+import { scenarios } from '@/data/destinations'
+import { useDismiss } from '@/hooks/useDismiss'
 import { formatPrice } from '../../lib/format'
 import { suggestDestinations } from '../../lib/search'
 import styles from './SearchForm.module.css'
@@ -73,7 +75,8 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
           <span className="visually-hidden">Направление</span>
           <input
             ref={inputRef}
-            className={styles.input}
+            // Input's text styles; the bordered box is the shared .field, moved with the combobox later.
+            className="h-full min-w-0 flex-1 bg-transparent pr-14 text-base outline-none placeholder:text-muted-foreground sm:text-lg"
             type="text"
             role="combobox"
             placeholder="Куда отправимся?"
@@ -96,9 +99,10 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
           />
         </label>
         <span className={styles.divider} aria-hidden />
-        <button
-          type="button"
-          className={styles.clear}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className={`${styles.clear} text-muted-foreground hover:text-foreground`}
           aria-label="Очистить направление"
           onClick={() => {
             // Clearing ends the input: the suggestions fold and the keyboard goes away.
@@ -107,8 +111,8 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
             inputRef.current?.blur()
           }}
         >
-          <X size={22} strokeWidth={1.8} aria-hidden />
-        </button>
+          <X className="size-5.5" strokeWidth={1.8} aria-hidden />
+        </Button>
       </div>
 
       {showList && (
@@ -138,11 +142,10 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
           ))}
         </ul>
       )}
-      {error && (
-        <p className={styles.error} id={errorId}>
-          {error}
-        </p>
-      )}
+      {/* Not an alert: the error is announced through aria-describedby when focus moves to the field. */}
+      <FieldError className={styles.error} id={errorId} role={undefined}>
+        {error}
+      </FieldError>
     </div>
   )
 }

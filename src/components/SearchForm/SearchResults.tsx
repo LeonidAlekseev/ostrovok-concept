@@ -1,5 +1,6 @@
 import { Info, LoaderCircle } from 'lucide-react'
-import type { SearchStatus } from '../../hooks/useHotelSearch'
+import { Card } from '@/components/ui/card'
+import type { SearchStatus } from '@/hooks/useHotelSearch'
 import { formatDateRange } from '../../lib/dates'
 import { countRu, formatPrice, guestsLabel } from '../../lib/format'
 import type { SearchResult } from '../../lib/search'
@@ -11,16 +12,16 @@ interface Props {
 
 export function SearchResults({ status }: Props) {
   return (
-    <div className={styles.results} aria-live="polite">
+    <Card className={`${styles.results} gap-0 rounded-none border-t py-0`} aria-live="polite">
       {status.state === 'loading' && (
         <p className={styles.resultsLoading}>
           <LoaderCircle className={styles.spin} size={18} aria-hidden />
           Ищем варианты…
         </p>
       )}
-      {status.state === 'error' && <p className={styles.error}>{status.message}</p>}
+      {status.state === 'error' && <p className="m-0 text-sm text-destructive">{status.message}</p>}
       {status.state === 'done' && <Done result={status.result} />}
-    </div>
+    </Card>
   )
 }
 
