@@ -82,10 +82,6 @@
   box-shadow: 0 6px 18px color-mix(in srgb, var(--shadow-color) 8%, transparent);
 }
 
-.tab:focus-visible {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 35%, transparent);
-}
-
 .tabIcon {
   flex: none;
   width: clamp(18px, 5vw, 24px);

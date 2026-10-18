@@ -58,6 +58,7 @@
   border-color: var(--decor-border-strong);
 }
 
+.field:has(> .input:focus),
 .fieldButton[aria-expanded='true'] {
   border-color: var(--primary);
 }

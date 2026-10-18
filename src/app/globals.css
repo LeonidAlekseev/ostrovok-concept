@@ -222,9 +222,12 @@
     cursor: default;
   }
 
-  :focus,
+  /* One focus ring for every control. Only :focus-visible: a pointer click on a button shows nothing.
+     Blue keeps at least 3:1 against lime, white and the page background; the offset puts the ring on
+     the surrounding surface, not on a blue button itself. */
   :focus-visible {
-    outline: none;
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
 }
 
