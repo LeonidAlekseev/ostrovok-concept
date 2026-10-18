@@ -39,30 +39,7 @@
 }
 
 .seeAll {
-  display: inline-flex;
   flex: none;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 0;
-  color: var(--primary);
-  font-size: clamp(13px, 3.6vw, 18px);
-  font-weight: 500;
-  background: none;
-  border: 0;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.seeAll:hover {
-  color: var(--primary-hover);
-}
-
-.seeAll:hover svg {
-  transform: translateX(2px);
-}
-
-.seeAll svg {
-  transition: transform 0.2s;
 }
 
 .cards {

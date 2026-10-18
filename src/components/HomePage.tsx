@@ -3,7 +3,8 @@
 import { useCallback, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { ArrowRight } from 'lucide-react'
-import { destinations, FEATURED_DESTINATION_ID, scenarios, type Destination } from '../data/destinations'
+import { Button } from '@/components/ui/button'
+import { destinations, FEATURED_DESTINATION_ID, scenarios, type Destination } from '@/data/destinations'
 import { newHotels } from '../data/hotels'
 import { useHotelSearch } from '../hooks/useHotelSearch'
 import { formatPrice } from '../lib/format'
@@ -93,10 +94,14 @@ export function HomePage() {
               <h2 id="ideas-title" className={styles.sectionTitle}>
                 Популярные направления
               </h2>
-              <button type="button" className={styles.seeAll} onClick={startSearch}>
+              <Button
+                variant="link"
+                className={`${styles.seeAll} gap-1 py-1 text-[clamp(13px,3.6vw,18px)] font-medium hover:[&_svg]:translate-x-0.5 [&_svg]:transition-transform`}
+                onClick={startSearch}
+              >
                 Смотреть все
-                <ArrowRight size={18} aria-hidden />
-              </button>
+                <ArrowRight className="size-4.5" aria-hidden />
+              </Button>
             </div>
             <ul className={styles.cards}>
               {scenarios.map((scenario) => (

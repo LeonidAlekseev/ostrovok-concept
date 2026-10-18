@@ -78,6 +78,19 @@ Vercel определяет проект как Next.js без дополнит�
 модуля на примитиве из `ui/` допустим только для раскладки (`grid-area`, `margin`, `width`), не
 для цвета и состояний: модули не входят в CSS-слои и перебивают утилиты, а `cn()` их не видит.
 
+Примитивы в `src/components/ui/`:
+
+- **Button** (`button.tsx`): варианты `default` (синяя, при наведении `--primary-hover`),
+  `secondary` (мягкий синий), `ghost`, `outline`, `link`; размеры `sm`, `default`, `lg`, `icon`,
+  `icon-sm`; `shape="pill"` для круглых концов. У `default` + `lg` своя тень. Недоступная кнопка
+  приглушена (`opacity: .5`) и не реагирует на наведение.
+- **Badge** (`badge.tsx`): `secondary`, `destructive`, `success`.
+- **Input**, **Textarea**, **Label**, **Card**, **Field** (`FieldError` и др.) — шаблоны shadcn на
+  токенах бренда; `Card` без обводки.
+- **SmartImage** — своя картинка с заглушкой при ошибке загрузки.
+
+Фокус у всех элементов — одно кольцо `:focus-visible` на `--ring` из `globals.css`.
+
 ## Демо-режим
 
 Бэкенда нет: поиск валидирует форму, формирует параметры запроса

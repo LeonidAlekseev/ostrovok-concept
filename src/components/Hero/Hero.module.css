@@ -412,14 +412,6 @@
   line-height: 1.25;
 }
 
-.placeBadge {
-  color: var(--decor-badge-green);
-  font-size: var(--badge-size);
-  font-weight: 650;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
 .placeName {
   font-size: var(--name-size);
   font-weight: 650;

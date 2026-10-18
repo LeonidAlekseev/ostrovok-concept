@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { BedDouble, ChevronRight, Star } from 'lucide-react'
-import type { Destination } from '../../data/destinations'
+import { Badge } from '@/components/ui/badge'
+import type { Destination } from '@/data/destinations'
 import type { NewHotel } from '../../data/hotels'
 import { GLOBE_CENTER, viewPlacing, type GlobeView } from '../../lib/globe'
 import { appEnv, isProduction } from '../../lib/env'
@@ -407,7 +408,13 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
               <BedDouble />
             </span>
             <span className={styles.placeText}>
-              <span className={styles.placeBadge}>Новый отель · {destination.name}</span>
+              {/* Line height 1.25 and no vertical padding: the picture is sized from the three text lines. */}
+              <Badge
+                variant='success'
+                className='rounded-sm px-1 py-0 text-(length:--badge-size) leading-[1.25] tracking-[0.02em] uppercase'
+              >
+                Новый отель · {destination.name}
+              </Badge>
               <span className={styles.placeName}>{hotel.name}</span>
               <span className={styles.placeMeta}>
                 <span className={styles.placeStars} aria-hidden>

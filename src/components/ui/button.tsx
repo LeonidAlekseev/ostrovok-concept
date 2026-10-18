@@ -30,7 +30,7 @@ const buttonVariants = cva(
       // Large primary actions float above the panel.
       { variant: 'default', size: 'lg', className: 'shadow-(--shadow-primary)' },
       // A link has no box: only the text and the icon.
-      { variant: 'link', className: 'h-auto rounded-sm px-0' },
+      { variant: 'link', className: 'h-auto rounded-sm border-0 px-0' },
     ],
     defaultVariants: {
       variant: 'default',
