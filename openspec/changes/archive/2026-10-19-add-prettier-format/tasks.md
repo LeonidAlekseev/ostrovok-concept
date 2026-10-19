@@ -6,8 +6,8 @@
 
 ## 2. Форматирование проекта
 
-- [ ] 2.1 Запустить `npm run format` и закоммитить результат отдельным коммитом; проверка: `git show --stat` содержит только форматирование и `package.json`/lockfile.
-- [ ] 2.2 Проверить, что после форматирования `npm run format:check`, `npm run typecheck`, `npm run lint` и `npm run build` проходят; проверка: все четыре команды завершаются с кодом 0.
+- [x] 2.1 Запустить `npm run format` и закоммитить результат отдельным коммитом; проверка: `git show --stat` содержит только форматирование и `package.json`/lockfile.
+- [x] 2.2 Проверить, что после форматирования `npm run format:check`, `npm run typecheck`, `npm run lint` и `npm run build` проходят; проверка: все четыре команды завершаются с кодом 0.
 
 ## Workflow follow-up
 
