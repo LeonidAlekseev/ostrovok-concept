@@ -13,7 +13,7 @@
 
 ## 3. Правило утилит
 
-- [ ] 3.1 Привести все компоненты из proposal.md к правилу `translate`/`scale`/`rotate`/`box-shadow`; проверка: в `src/components` (кроме `ui/*`) нет `[translate:`, `[scale:`, `[rotate:`, `[box-shadow:` там, где есть стандартная утилита; скриншоты совпадают.
+- [x] 3.1 Привести все компоненты из proposal.md к правилу `translate`/`scale`/`rotate`/`box-shadow`; проверка: в `src/components` (кроме `ui/*`) нет `[translate:`, `[scale:`, `[rotate:`, `[box-shadow:` там, где есть стандартная утилита; скриншоты совпадают.
 
 ## 4. Итог
 

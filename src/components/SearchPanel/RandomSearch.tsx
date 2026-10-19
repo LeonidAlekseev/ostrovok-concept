@@ -35,14 +35,14 @@ const hotelNames = bestHotels.map((h) => h.name)
 const CONFETTI = [1, 2, 3, 4, 5].map((n) => `var(--decor-confetti-${n})`)
 // Text presentation: the emoji variants of the zodiac glyphs ignore the selected colour.
 // A highlight sweeps across the spin button now and then, inviting a pull (the button clips it); the keyframes
-// are in globals.css, the transform stays a plain property so they animate from it.
+// in globals.css move its translate from here.
 const shineSweep =
-  "after:absolute after:inset-0 after:[transform:translateX(-100%)] after:[background:linear-gradient(100deg,transparent_30%,color-mix(in_srgb,var(--decor-light)_35%,transparent)_50%,transparent_70%)] after:content-['']"
+  "after:absolute after:inset-0 after:-translate-x-full after:[background:linear-gradient(100deg,transparent_30%,color-mix(in_srgb,var(--decor-light)_35%,transparent)_50%,transparent_70%)] after:content-['']"
 // Curved-glass shading: symbols darken as they roll over the top and bottom edges.
 const windowShade =
   "after:pointer-events-none after:absolute after:inset-0 after:content-[''] after:[background:linear-gradient(180deg,color-mix(in_srgb,var(--shadow-color)_28%,transparent),transparent_30%,transparent_70%,color-mix(in_srgb,var(--shadow-color)_28%,transparent))]"
 const machineBody =
-  '[background:linear-gradient(160deg,var(--decor-machine-dark),var(--primary)_60%,var(--decor-machine-indigo))] [box-shadow:inset_0_2px_0_color-mix(in_srgb,var(--decor-light)_18%,transparent),0_14px_30px_color-mix(in_srgb,var(--decor-machine-shadow)_30%,transparent)]'
+  '[background:linear-gradient(160deg,var(--decor-machine-dark),var(--primary)_60%,var(--decor-machine-indigo))] shadow-[inset_0_2px_0_color-mix(in_srgb,var(--decor-light)_18%,transparent),0_14px_30px_color-mix(in_srgb,var(--decor-machine-shadow)_30%,transparent)]'
 // A marquee of bulbs along the top edge; they chase while the reels spin.
 const bulbs = '[background:radial-gradient(circle,var(--decor-gold)_0_2.5px,transparent_3px)_0_50%/16px_6px_repeat-x]'
 const symbolFont = "font-['Segoe_UI_Symbol','Apple_Symbols','Noto_Sans_Symbols',sans-serif]"
@@ -195,7 +195,7 @@ export function RandomSearch({ onPreview }: Props) {
         {landed && (
           <Card
             role="article"
-            className={`relative gap-0 rounded-2xl bg-(image:--decor-ticket-gradient) px-4.5 pt-4.5 pb-4 text-primary-foreground animate-in fade-in zoom-in-96 slide-in-from-bottom-[10px] animation-duration-600 ease-[cubic-bezier(0.2,1.4,0.4,1)] [box-shadow:var(--decor-ticket-shadow)]`}
+            className={`relative gap-0 rounded-2xl bg-(image:--decor-ticket-gradient) px-4.5 pt-4.5 pb-4 text-primary-foreground animate-in fade-in zoom-in-96 slide-in-from-bottom-[10px] animation-duration-600 ease-[cubic-bezier(0.2,1.4,0.4,1)] shadow-(--decor-ticket-shadow)`}
           >
             <Confetti />
             <p className="text-sm/[normal] font-semibold tracking-[0.06em] uppercase opacity-85">
@@ -290,7 +290,7 @@ function SlotMachine({ fortune, spinning, onLanded }: { fortune: Fortune; spinni
         className={`${spinning ? 'animate-slot-pull' : ''} absolute top-[26%] -right-5 h-[46%] w-2 origin-bottom rounded-sm bg-[linear-gradient(90deg,var(--decor-lever-dark),var(--decor-lever-light),var(--decor-lever-dark))]`}
         aria-hidden
       >
-        <span className="absolute -top-3.5 left-1/2 size-5.5 [translate:-50%_0] rounded-full bg-[radial-gradient(circle_at_35%_30%,var(--decor-knob-light),var(--decor-knob)_55%,var(--decor-knob-dark))] [box-shadow:0_3px_6px_color-mix(in_srgb,var(--decor-black)_25%,transparent)]" />
+        <span className="absolute -top-3.5 left-1/2 size-5.5 -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_35%_30%,var(--decor-knob-light),var(--decor-knob)_55%,var(--decor-knob-dark))] shadow-[0_3px_6px_color-mix(in_srgb,var(--decor-black)_25%,transparent)]" />
       </div>
       <div
         className={`${spinning ? 'animate-slot-chase' : 'animate-slot-blink'} ${bulbs} absolute top-1.5 right-4 left-4 h-1.5 opacity-85`}
@@ -302,8 +302,10 @@ function SlotMachine({ fortune, spinning, onLanded }: { fortune: Fortune; spinni
             <span className="mb-1.5 block text-center text-xs/[normal] font-semibold tracking-[0.08em] text-(--decor-light)/75 uppercase">
               {['Город', 'Отель', 'Настроение'][i]}
             </span>
+            {/* inset-shadow, not shadow: the win flash animates box-shadow from this rim, and Tailwind puts the
+                inset shadow first in the box-shadow list, where the flash's inset rim is. */}
             <div
-              className={`${spinning ? '' : 'animate-slot-win'} ${windowShade} relative h-(--h) overflow-hidden rounded-lg bg-card [box-shadow:inset_0_0_0_2px_color-mix(in_srgb,var(--decor-gold)_60%,transparent)]`}
+              className={`${spinning ? '' : 'animate-slot-win'} ${windowShade} relative h-(--h) overflow-hidden rounded-lg bg-card inset-shadow-[0_0_0_2px_color-mix(in_srgb,var(--decor-gold)_60%,transparent)]`}
             >
               <ul
                 className={`transition-transform duration-(--d) ease-[cubic-bezier(0.12,0.8,0.22,1.04)] ${spinning ? 'blur-[0.4px]' : ''}`}

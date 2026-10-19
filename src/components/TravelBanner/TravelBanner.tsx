@@ -20,7 +20,7 @@ export function TravelBanner() {
         <span className="text-[clamp(12px,3.3vw,18px)] text-muted-foreground">выбирайте свой следующий отель</span>
       </p>
       <span
-        className="pointer-events-none absolute top-[clamp(14px,3.6vw,24px)] right-[clamp(22px,5.6vw,48px)] w-[clamp(84px,23vw,220px)] text-success md:top-1/2 md:[translate:0_-50%]"
+        className="pointer-events-none absolute top-[clamp(14px,3.6vw,24px)] right-[clamp(22px,5.6vw,48px)] w-[clamp(84px,23vw,220px)] text-success md:top-1/2 md:-translate-y-1/2"
         aria-hidden
       >
         <svg className="block h-auto w-full" viewBox="0 0 180 70" preserveAspectRatio="xMaxYMid meet">
@@ -30,7 +30,7 @@ export function TravelBanner() {
           />
         </svg>
         <Plane
-          className="absolute top-0 right-0 h-auto w-[22%] [rotate:10deg]"
+          className="absolute top-0 right-0 h-auto w-[22%] rotate-10"
           size={30}
           fill="currentColor"
           strokeWidth={1}
