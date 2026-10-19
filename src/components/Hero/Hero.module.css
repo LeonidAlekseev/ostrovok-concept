@@ -447,37 +447,6 @@
   color: var(--muted-foreground);
 }
 
-/* Technical overlay, outside production only; mounted on <body>. */
-.stats {
-  position: fixed;
-  right: 8px;
-  bottom: 8px;
-  z-index: 2147483647;
-  max-width: calc(100vw - 16px);
-  padding: 4px 8px;
-  color: var(--decor-stats);
-  font:
-    11px/1.4 ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
-  background: color-mix(in srgb, var(--decor-black) 78%, transparent);
-  border-radius: var(--radius-sm);
-}
-
-.stats summary {
-  cursor: pointer;
-  user-select: none;
-}
-
-.stats pre {
-  margin: 4px 0 2px;
-  overflow: hidden;
-  font: inherit;
-  white-space: pre;
-  text-overflow: ellipsis;
-}
-
 @keyframes cardIn {
   from {
     opacity: 0;
