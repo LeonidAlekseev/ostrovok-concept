@@ -10,6 +10,7 @@ import { useHotelSearch } from '../hooks/useHotelSearch'
 import { formatPrice } from '../lib/format'
 import { resolveTarget } from '../lib/search'
 import { DestinationCard } from './DestinationCard/DestinationCard'
+import { HomeCollections } from './HomeCollections/HomeCollections'
 import { Hero } from './Hero/Hero'
 import { SearchPanel, type SearchMode } from './SearchPanel/SearchPanel'
 import { TravelBanner } from './TravelBanner/TravelBanner'
@@ -125,6 +126,8 @@ export function HomePage() {
             ))}
           </ul>
         </section>
+
+        <HomeCollections />
 
         <TravelBanner />
       </div>
