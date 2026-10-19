@@ -123,7 +123,7 @@ Tailwind CSS v4 (через `@tailwindcss/postcss`, `postcss.config.mjs`) и sha
 
 Шапка (`src/components/Header`) и подвал (`src/components/Footer`) рендерятся в
 `src/app/layout.tsx` на каждой странице; страница сама рендерит свой `main`. Сейчас есть `/`,
-`/hotels/<id>`, `/hotels/<id>/rooms`, `/booking`, `/booking/confirmation` и страница 404 (`src/app/not-found.tsx`). Шапка и подвал уже ссылаются на разделы, которые
+`/hotels/<id>`, `/hotels/<id>/rooms`, `/booking`, `/booking/confirmation`, `/login`, `/register` и страница 404 (`src/app/not-found.tsx`). Шапка и подвал уже ссылаются на разделы, которые
 добавляют следующие changes: `/favorites`, `/trips`, `/help`, `/legal/terms`, `/legal/privacy`,
 `/legal/cookies`. Все маршруты пререндерятся статически.
 
@@ -174,6 +174,25 @@ Tailwind CSS v4 (через `@tailwindcss/postcss`, `postcss.config.mjs`) и sha
 `validateCard`; `createBooking`). Поля — переиспользуемые компоненты `src/components/BookingFields`
 (`GuestsFields`, `ContactFields`, `RequestsField`, `CardFields` на `TextField`): они получают значения,
 `onChange` и ошибки по id поля, форму и состояние держит страница.
+
+### Вход и регистрация
+
+Настоящей аутентификации нет: подойдут любой email и пароль от 8 символов, пароль нигде не
+сохраняется. Успешный вход или регистрация записывает демо-сессию `{ name, email }`
+(`signIn` в `src/lib/auth.ts`); имя — из регистрации, при входе — прежнее имя для того же email или
+часть email до `@`. «Выйти» (`signOut`) удаляет только сессию: избранное и бронирования остаются.
+Формы и проверки (`validateLogin`, `validateRegister`) — `src/components/Auth/AuthForm.tsx`,
+`src/lib/auth.ts`; «Не меньше 8 символов», «Пароли не совпадают», согласие с условиями — у полей.
+
+`/login` и `/register` — полные страницы (`AuthPage`). Переход на них из приложения (ссылка «Войти» в
+шапке) перехватывается: слот `@modal` с `(.)login` и `(.)register` показывает ту же форму диалогом
+(`AuthDialog`) поверх текущей страницы; кнопка, Escape и клик по подложке делают `router.back()`.
+Переключатель «Вход / Регистрация» — `router.replace`, диалог остаётся перехваченным. Параметр `next`
+задаёт страницу после входа (`resolveNext`): только путь с `/`, но не `//`, не с `\` и
+управляющими символами, иначе `/`. Без `next` диалог закрывается, полная страница ведёт на `/`.
+
+В шапке гость видит «Войти» (так же до гидрации), вошедший — кнопку с именем и меню «Мои поездки»,
+«Избранное», «Выйти» (`src/components/Header/UserMenu.tsx`).
 
 ### Состояние в браузере
 

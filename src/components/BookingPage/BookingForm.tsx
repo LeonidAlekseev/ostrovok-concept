@@ -21,22 +21,13 @@ import {
 } from '@/lib/booking'
 import { todayIso } from '@/lib/dates'
 import type { Offer } from '@/lib/offer'
+import { focusField } from '@/lib/focusField'
 import { saveBooking } from '@/lib/storage'
 
 /** The demo "processing" pause before the booking is made. */
 export const PROCESSING_MS = 1000
 
 /** Splits the session name into first and last name; "Анна Петрова" → Анна / Петрова. */
-/** Focuses the field with this id; a checkbox's id is on its hidden input, so its visible box gets the focus. */
-function focusField(id: string) {
-  const element = document.getElementById(id)
-  const target =
-    element instanceof HTMLInputElement && element.type === 'checkbox'
-      ? element.parentElement?.querySelector<HTMLElement>('[role=checkbox]')
-      : element
-  target?.focus()
-}
-
 const splitName = (name: string) => {
   const [first = '', ...rest] = name.trim().split(/\s+/)
   return { firstName: first, lastName: rest.join(' ') }
