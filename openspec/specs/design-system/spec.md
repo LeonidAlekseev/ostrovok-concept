@@ -53,6 +53,13 @@
 - **WHEN** форма показывает ошибку в поле направления или имени игрока
 - **THEN** у поля рамка `#d92d20`, текст ошибки под ним того же цвета
 
+### Requirement: Утилита объединения классов
+Компоненты `src/components/ui/*` SHALL собирать классы через `cn()`, реэкспортированный из `src/lib/utils.ts` из пакета `cn` (shadcn). Пакет `cn` SHALL быть принятой заменой `clsx` + `tailwind-merge` с тем же API: отдельные зависимости `clsx` и `tailwind-merge` не добавляются, а импорт `cn` из `'cn'` вместо `@/lib/utils` не считается отклонением от `components.json`.
+
+#### Scenario: Импорт утилиты
+- **WHEN** компонент в `src/components/ui/` объединяет классы
+- **THEN** он импортирует `cn` из `@/lib/utils` (или напрямую из `'cn'`), а `src/lib/utils.ts` реэкспортирует `cn` из пакета `cn`
+
 ### Requirement: Сохранение поведения при смене оформления
 Перенос оформления на систему SHALL не менять тексты, ARIA-роли и атрибуты, порядок фокуса и клавиатурное поведение из спецификаций `home-page`, `site-header`, `search-modes`, `manual-search`, `assistant-search`, `random-search`, `hero-globe`.
 
