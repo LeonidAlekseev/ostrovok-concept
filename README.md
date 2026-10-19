@@ -16,6 +16,10 @@ npm run lint
 npm run typecheck
 ```
 
+CI (GitHub Actions, `.github/workflows/ci.yml`) на каждый PR и push в `dev` и `main` запускает
+`npm ci`, `npm run lint`, `npm run typecheck`, `npm test` и `npm run format:check` в job `checks`
+(проверка `CI / checks`). Сборку в CI не запускают: её выполняет Vercel.
+
 ## Деплой на Vercel
 
 Vercel определяет проект как Next.js без дополнительной настройки:
