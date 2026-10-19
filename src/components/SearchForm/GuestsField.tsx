@@ -34,19 +34,20 @@ export function GuestsField({ value, error, onChange }: Props) {
   }
 
   return (
-    <div className={`${styles.fieldWrap} ${styles.areaGuests}`}>
+    <div className={`${styles.areaGuests} relative min-w-0`}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
-          className={`group ${styles.field} ${fieldBox(Boolean(error))}`}
+          className={`group ${fieldBox(Boolean(error))}`}
           aria-label={`Гости: ${guestsLabel(value)}${value.rooms === 1 ? ', 1 номер' : ''}`}
           aria-describedby={error ? errorId : undefined}
         >
           <User className="shrink-0 text-brand-foreground" size={22} strokeWidth={1.8} aria-hidden />
-          <span className={styles.value} title={guestsLabel(value)}>
+          <span className="truncate text-[clamp(13px,3.55vw,18px)] max-xs:text-sm/[normal]" title={guestsLabel(value)}>
             {guestsLabel(value)}
           </span>
           <ChevronDown
-            className={`${styles.chevron} text-brand-foreground transition-transform duration-200 group-data-popup-open:rotate-180`}
+            // The glyph has built-in side bearings; -mr-1 pulls it towards the edge.
+            className={`-mr-1 ml-auto flex-none text-brand-foreground transition-transform duration-200 group-data-popup-open:rotate-180`}
             size={22}
             aria-hidden
           />
@@ -58,16 +59,16 @@ export function GuestsField({ value, error, onChange }: Props) {
           // Stays under the field and lets the page scroll, as it did before the popover moved to Base UI.
           collisionAvoidance={{ side: 'none' }}
           aria-label="Гости и номера"
-          className={`${styles.popoverSurface} ${styles.guestsPopover} m-0 p-3 shadow-(--shadow-popover)`}
+          className={`m-0 w-[min(310px,calc(100vw-2*var(--page-x)-8px))] p-3 animate-in fade-in slide-in-from-top-1 animation-duration-160 ease-out shadow-(--shadow-popover)`}
         >
           {rows.map((row) => (
-            <div className={styles.stepperRow} key={row.key}>
+            <div className="flex items-center justify-between gap-3 px-1 py-2" key={row.key}>
               <span>
                 <span className="block font-semibold">{row.title}</span>
                 {/* A step below the other hints: "не больше, чем взрослых" must stay on one line on phones. */}
                 <span className="block text-xs text-muted-foreground">{row.hint}</span>
               </span>
-              <span className={styles.stepper}>
+              <span className="flex flex-none items-center gap-1.5">
                 <Button
                   variant="outline"
                   size="icon-sm"
@@ -102,7 +103,7 @@ export function GuestsField({ value, error, onChange }: Props) {
         </PopoverContent>
       </Popover>
       {/* Not an alert: the error is announced through aria-describedby when focus moves to the field. */}
-      <FieldError className={styles.error} id={errorId} role={undefined}>
+      <FieldError className="mx-1 mt-1.5 leading-[1.35]" id={errorId} role={undefined}>
         {error}
       </FieldError>
     </div>

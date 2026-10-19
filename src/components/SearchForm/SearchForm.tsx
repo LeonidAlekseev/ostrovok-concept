@@ -46,7 +46,7 @@ export function SearchForm({ search, destinationRef, submitRef }: Props) {
         >
           Найти отель
           {loading ? (
-            <LoaderCircle className={`${styles.spin} size-6`} aria-hidden />
+            <LoaderCircle className="size-6 animate-[spin_0.9s_linear_infinite]" aria-hidden />
           ) : (
             <ArrowRight className="size-6.5" strokeWidth={2} aria-hidden />
           )}
