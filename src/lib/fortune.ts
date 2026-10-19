@@ -1,5 +1,5 @@
 import { destinations, type Destination } from '../data/destinations'
-import { newHotels, type NewHotel } from '../data/hotels'
+import { newHotels, type HotelSummary } from './catalog'
 
 /** "Полный рандом": the stars (that is, Math.random) pick one of the best new hotels. */
 
@@ -86,10 +86,10 @@ export const tripMoods = [
 const BEST_RATING = 9
 export const bestHotels = newHotels.filter((h) => h.rating >= BEST_RATING)
 
-export const cityOf = (hotel: NewHotel): Destination => destinations.find((d) => d.id === hotel.destinationId)!
+export const cityOf = (hotel: HotelSummary): Destination => destinations.find((d) => d.id === hotel.destinationId)!
 
 export interface Fortune {
-  hotel: NewHotel
+  hotel: HotelSummary
   city: Destination
   mood: string
 }

@@ -1,5 +1,5 @@
 import { destinations, type Destination } from '../data/destinations'
-import { newHotels, type NewHotel } from '../data/hotels'
+import { newHotels, type HotelSummary } from './catalog'
 import { addDays, fromIso, toIso, type IsoDate } from './dates'
 import { countRu, formatPrice } from './format'
 import { MAX_NIGHTS, type Guests, type SearchQuery } from './search'
@@ -38,7 +38,7 @@ export interface Question {
 
 export interface AssistantOption {
   destination: Destination
-  hotel?: NewHotel
+  hotel?: HotelSummary
   perNight: number
   total: number
   fitsBudget: boolean
