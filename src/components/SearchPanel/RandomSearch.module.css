@@ -69,23 +69,6 @@
   font-size: var(--text-sm);
   white-space: nowrap;
   text-overflow: ellipsis;
-  background: var(--decor-surface-soft);
-  border: 1px solid transparent;
-  border-radius: var(--radius-lg);
-  transition:
-    background-color 0.2s,
-    border-color 0.2s;
-}
-
-.sign:hover {
-  background: var(--secondary);
-}
-
-.sign[aria-checked='true'] {
-  color: var(--primary);
-  font-weight: 650;
-  background: var(--secondary);
-  border-color: var(--primary);
 }
 
 .signSymbol {

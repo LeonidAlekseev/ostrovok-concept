@@ -44,33 +44,6 @@
   width: 100%;
   height: clamp(48px, 12.4vw, 56px);
   padding: 0 clamp(10px, 3vw, 18px);
-  color: var(--foreground);
-  text-align: left;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
-}
-
-.field:hover {
-  border-color: var(--decor-border-strong);
-}
-
-.field:not(.fieldInvalid):has(> input:focus),
-.fieldButton[aria-expanded='true'] {
-  border-color: var(--primary);
-}
-
-.fieldInvalid,
-.fieldInvalid:hover {
-  border-color: var(--destructive);
-}
-
-.fieldIcon {
-  flex: none;
-  color: var(--brand-foreground);
 }
 
 .divider {
@@ -100,12 +73,6 @@
   flex: none;
   /* The glyph has built-in side bearings; pull it towards the edge. */
   margin: 0 -4px 0 auto;
-  color: var(--brand-foreground);
-  transition: transform 0.2s;
-}
-
-.chevronOpen {
-  transform: rotate(180deg);
 }
 
 .error {
@@ -121,13 +88,8 @@
 
 /* ---------- Popovers ---------- */
 
-/* Surface only: placement comes from the Base UI popover (see components/ui/popover.tsx). */
+/* Entrance only: the surface is Tailwind, placement comes from the Base UI popover (see components/ui/popover.tsx). */
 .popoverSurface {
-  margin: 0;
-  padding: 8px;
-  background: var(--card);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-popover);
   animation: pop 0.16s ease-out;
 }
 
@@ -137,24 +99,7 @@
   list-style: none;
 }
 
-.option {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-
-.option[data-highlighted] {
-  background: var(--muted);
-}
-
-.optionIcon {
-  flex: none;
-  color: var(--primary);
-}
-
+/* Used by SearchResults, which is outside the composite widgets. */
 .optionLabel {
   display: block;
   font-weight: 600;
@@ -167,33 +112,12 @@
   font-weight: 400;
 }
 
-.popoverHint {
-  margin: 4px 8px 0;
-  color: var(--muted-foreground);
-  font-size: var(--text-sm);
-}
-
-.popoverFooter {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 8px 4px;
-  border-top: 1px solid var(--border);
-}
-
-.popoverSummary {
-  font-size: var(--text-sm);
-  font-weight: 550;
-}
-
 .datesPopover {
   width: min(330px, calc(100vw - 2 * var(--page-x) - 8px));
 }
 
 .guestsPopover {
   width: min(310px, calc(100vw - 2 * var(--page-x) - 8px));
-  padding: 12px;
 }
 
 /* ---------- Calendar ---------- */
@@ -226,58 +150,10 @@
   display: none;
 }
 
-.monthTitle {
-  margin: 0;
-  padding: 10px 0 8px;
-  font-size: var(--text-base);
-  font-weight: 650;
-  text-align: center;
-}
-
-.monthTitle::first-letter {
-  text-transform: uppercase;
-}
-
 .weekdays,
 .days {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-}
-
-.weekdays span {
-  padding: 4px 0;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  text-align: center;
-}
-
-.day {
-  height: 40px;
-  padding: 0;
-  font-size: var(--text-sm);
-  background: none;
-  border: 0;
-  border-radius: var(--radius-md);
-}
-
-.day:hover:not(:disabled) {
-  background: var(--secondary);
-}
-
-.day:disabled {
-  color: var(--decor-disabled);
-}
-
-.dayInRange {
-  background: var(--secondary);
-  border-radius: 0;
-}
-
-.dayEdge,
-.dayEdge:hover:not(:disabled) {
-  color: var(--primary-foreground);
-  font-weight: 600;
-  background: var(--primary);
 }
 
 /* ---------- Guests ---------- */
@@ -290,29 +166,11 @@
   padding: 8px 4px;
 }
 
-.stepperTitle {
-  display: block;
-  font-weight: 600;
-}
-
-.stepperHint {
-  display: block;
-  color: var(--muted-foreground);
-  /* A step below the other hints: "не больше, чем взрослых" must stay on one line on phones. */
-  font-size: var(--text-xs);
-}
-
 .stepper {
   display: flex;
   flex: none;
   align-items: center;
   gap: 6px;
-}
-
-.stepperValue {
-  min-width: 24px;
-  font-weight: 600;
-  text-align: center;
 }
 
 /* ---------- Results ---------- */

@@ -108,7 +108,11 @@ export function RandomSearch({ onPreview }: Props) {
             onValueChange={(id) => setSign(zodiac.find((z) => z.id === id) ?? null)}
           >
             {zodiac.map((z) => (
-              <RadioGroupItem key={z.id} value={z.id} className={styles.sign}>
+              <RadioGroupItem
+                key={z.id}
+                value={z.id}
+                className={`${styles.sign} rounded-lg border border-transparent bg-(--decor-surface-soft) transition-[background-color,border-color] hover:bg-secondary data-checked:border-primary data-checked:bg-secondary data-checked:font-[650] data-checked:text-primary`}
+              >
                 <span className={styles.signSymbol} aria-hidden>
                   {z.symbol}
                 </span>

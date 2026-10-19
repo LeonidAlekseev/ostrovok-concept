@@ -95,10 +95,14 @@ export function Calendar({ start, end, min, max, onPick }: Props) {
           const month = key % 12
           return (
             <div key={key} className={`${styles.month} ${index === 1 ? styles.monthSecond : ''}`}>
-              <p className={styles.monthTitle}>{monthTitle.format(new Date(year, month, 1))}</p>
+              <p className="m-0 pt-2.5 pb-2 text-center text-base font-[650] first-letter:uppercase">
+                {monthTitle.format(new Date(year, month, 1))}
+              </p>
               <div className={styles.weekdays} aria-hidden>
                 {weekdays.map((w) => (
-                  <span key={w}>{w}</span>
+                  <span className="py-1 text-center text-xs text-muted-foreground" key={w}>
+                    {w}
+                  </span>
                 ))}
               </div>
               <div className={styles.days} role="group" aria-label={monthTitle.format(new Date(year, month, 1))}>
@@ -110,11 +114,10 @@ export function Calendar({ start, end, min, max, onPick }: Props) {
                       key={iso}
                       type="button"
                       data-date={iso}
-                      className={[
-                        styles.day,
-                        iso === start || iso === end ? styles.dayEdge : '',
-                        rangeEnd && iso > start && iso < rangeEnd ? styles.dayInRange : '',
-                      ].join(' ')}
+                      // Selected edges are aria-pressed; the days between them are the range.
+                      className={`h-10 border-0 p-0 text-sm enabled:hover:bg-secondary disabled:text-(--decor-disabled) aria-pressed:bg-primary aria-pressed:font-semibold aria-pressed:text-primary-foreground aria-pressed:enabled:hover:bg-primary ${
+                        rangeEnd && iso > start && iso < rangeEnd ? 'rounded-none bg-secondary' : 'rounded-md bg-transparent'
+                      }`}
                       tabIndex={iso === focused ? 0 : -1}
                       disabled={isDisabled(iso)}
                       aria-pressed={iso === start || iso === end}
