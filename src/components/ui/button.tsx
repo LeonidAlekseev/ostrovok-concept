@@ -1,6 +1,6 @@
 import { Button as ButtonPrimitive } from '@base-ui/react/button'
 import { cva, type VariantProps } from 'class-variance-authority'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 
 // Focus is the global :focus-visible ring from globals.css, the same as on every other control.
 const buttonVariants = cva(

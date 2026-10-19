@@ -1,6 +1,6 @@
 import { useState, type ImgHTMLAttributes } from 'react'
 import { ImageOff } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 
 type Props = ImgHTMLAttributes<HTMLImageElement> & { alt: string }
 
