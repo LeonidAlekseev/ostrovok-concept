@@ -91,10 +91,9 @@ In both branches, never create the root as a side effect: do not run `openspec i
    files or planning artifacts unless the user separately asks for that content.
 
    When a task needs code you have not read yet (where a symbol lives, who calls
-   it, what an edit affects), query CodeGraph first if the repo has a `.codegraph/`
-   index: the `codegraph_explore` MCP tool, or `codegraph explore "<symbols or question>"`
-   in the shell. Fall back to grep and file reads only for what it does not cover
-   (configs, docs, CSS).
+   it, what an edit affects), query the codebase-memory-mcp graph first if the repo
+   is indexed: `search_graph`, `trace_path`, `get_code_snippet`. Fall back to grep and
+   file reads only for what it does not cover (configs, docs, CSS).
 
 5. **Show current progress**
 
