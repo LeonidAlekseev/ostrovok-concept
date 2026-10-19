@@ -5,17 +5,18 @@
 - [ ] 1.1 `npm run build`, записать размер CSS (сырой и gzip −9) в proposal.md, раздел «Замеры»; проверка: числа записаны.
 - [ ] 1.2 Снять скриншоты состояний из design.md; проверка: файлы в `/tmp/reduce-globe-css-screenshots/before`.
 
-## 2. Hero и тема
+## 2. Анимации и модули
 
-- [ ] 2.1 Перевести выражаемое утилитами в компонентах `Hero`; проверка: `npm run build` проходит, скриншоты совпадают в пределах отклонений.
-- [ ] 2.2 Убрать `static` у `@theme`, обеспечить токены, нужные модулям; проверка: проверка `static` из design.md, скриншоты совпадают.
+- [ ] 2.1 `@keyframes` из `AssistantSearch.module.css` и `RandomSearch.module.css` в `@theme`, запуск утилитами `animate-*`, оба модуля удалены; проверка: `npm run build` проходит, скриншоты совпадают в пределах отклонений.
+- [ ] 2.2 `Hero` на утилиты и `@theme`, `Hero.module.css` удалён; проверка: как в 2.1.
+- [ ] 2.3 Убрать `static` у `@theme`; проверка: проверка `static` из design.md, скриншоты совпадают.
 
-## 3. Политика утилит
+## 3. Правило утилит
 
-- [ ] 3.1 Привести `HomePage`, `DestinationCard`, `TravelBanner`, `Header`, `Hero` к политике из README; проверка: скриншоты совпадают.
+- [ ] 3.1 Привести все компоненты из proposal.md к правилу `translate`/`scale`/`rotate`/`box-shadow`; проверка: в `src/components` (кроме `ui/*`) нет `[translate:`, `[scale:`, `[rotate:`, `[box-shadow:` там, где есть стандартная утилита; скриншоты совпадают.
 
 ## 4. Итог
 
-- [ ] 4.1 Повторить сборку и скриншоты, записать разницу размеров и результат pixelmatch в proposal.md; проверка: gzip не больше +2 %, в репозитории нет файлов скриншотов.
-- [ ] 4.2 Обновить раздел «Стили» README (модули, `@theme`); проверка: README соответствует коду.
-- [ ] 4.3 `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check` проходят.
+- [ ] 4.1 Повторить сборку и скриншоты, записать размеры и результат pixelmatch в proposal.md; проверка: числа записаны, в репозитории нет файлов скриншотов.
+- [ ] 4.2 Обновить раздел «Стили» README; проверка: README соответствует коду, `find src -name '*.module.css'` пуст.
+- [ ] 4.3 `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check`, `npm run build` проходят.
