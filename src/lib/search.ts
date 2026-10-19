@@ -38,7 +38,7 @@ export function withStartDates(query: SearchQuery, today: IsoDate): SearchQuery 
   return { ...query, checkIn, checkOut: query.checkOut || addDays(checkIn, 1) }
 }
 
-const normalize = (s: string) => s.trim().toLocaleLowerCase('ru').replace(/ё/g, 'е')
+export const normalize = (s: string) => s.trim().toLocaleLowerCase('ru').replace(/ё/g, 'е')
 
 export function findScenario(text: string): Scenario | undefined {
   const q = normalize(text)
