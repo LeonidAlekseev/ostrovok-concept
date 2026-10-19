@@ -329,9 +329,9 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
   const { hotel, destination } = spotlight
 
   return (
-    <section ref={heroRef} className={styles.hero} aria-labelledby='hero-title'>
+    <section ref={heroRef} className={styles.hero} aria-labelledby="hero-title">
       <div ref={copyRef} className={styles.copy}>
-        <h1 id='hero-title' className={styles.title}>
+        <h1 id="hero-title" className={styles.title}>
           Найди свой <span className={styles.titleAccent}>уголок</span>
         </h1>
       </div>
@@ -348,7 +348,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
         <div className={styles.sun} aria-hidden />
         <div ref={glowRef} className={styles.cityGlow} style={positionStyle(initialScene.hub)} aria-hidden />
 
-        <svg className={styles.routes} viewBox='0 0 100 100' preserveAspectRatio='none' aria-hidden>
+        <svg className={styles.routes} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
           {initialScene.routes.map((route, i) => (
             <g
               key={i}
@@ -376,7 +376,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
                 if (el) pinRefs.current.set(d.id, el)
                 else pinRefs.current.delete(d.id)
               }}
-              type='button'
+              type="button"
               className={`${styles.pin} ${isHub ? styles.pinHub : ''}`}
               style={{ ...positionStyle(point), '--o': depthOpacity(point.depth).toFixed(3) } as CSSProperties}
               data-hidden={point.depth <= 0.05 || undefined}
@@ -395,7 +395,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
 
         <button
           ref={cardRef}
-          type='button'
+          type="button"
           className={styles.placeCard}
           style={positionStyle(initialScene.hub)}
           aria-label={`Новый отель ${hotel.name}, ${destination.name}, от ${formatPrice(hotel.priceFrom)} за ночь — выбрать направление`}
@@ -410,8 +410,8 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
             <span className={styles.placeText}>
               {/* Line height 1.25 and no vertical padding: the picture is sized from the three text lines. */}
               <Badge
-                variant='success'
-                className='rounded-sm px-1 py-0 text-(length:--badge-size) leading-[1.25] tracking-[0.02em] uppercase'
+                variant="success"
+                className="rounded-sm px-1 py-0 text-(length:--badge-size) leading-[1.25] tracking-[0.02em] uppercase"
               >
                 Новый отель · {destination.name}
               </Badge>
@@ -419,7 +419,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
               <span className={styles.placeMeta}>
                 <span className={styles.placeStars} aria-hidden>
                   {Array.from({ length: hotel.stars }, (_, i) => (
-                    <Star key={i} fill='currentColor' strokeWidth={0} />
+                    <Star key={i} fill="currentColor" strokeWidth={0} />
                   ))}
                 </span>
                 <span className={styles.placePrice}>от {formatPrice(hotel.priceFrom)}/ночь</span>
@@ -461,14 +461,14 @@ function describeStats(frames: FrameWindow, renderer: GlobeRenderer) {
 
 function PinIcon() {
   return (
-    <svg className={styles.pinIcon} viewBox='0 0 24 32' aria-hidden>
+    <svg className={styles.pinIcon} viewBox="0 0 24 32" aria-hidden>
       <path
-        d='M12 1.2C6.04 1.2 1.2 5.9 1.2 11.7c0 7.6 9.2 17.6 10 18.5a1.1 1.1 0 0 0 1.6 0c.8-.9 10-10.9 10-18.5C22.8 5.9 17.96 1.2 12 1.2Z'
-        fill='currentColor'
+        d="M12 1.2C6.04 1.2 1.2 5.9 1.2 11.7c0 7.6 9.2 17.6 10 18.5a1.1 1.1 0 0 0 1.6 0c.8-.9 10-10.9 10-18.5C22.8 5.9 17.96 1.2 12 1.2Z"
+        fill="currentColor"
         style={{ stroke: 'var(--decor-light)' }}
-        strokeWidth='1.6'
+        strokeWidth="1.6"
       />
-      <circle cx='12' cy='11.6' r='4.2' style={{ fill: 'var(--decor-light)' }} />
+      <circle cx="12" cy="11.6" r="4.2" style={{ fill: 'var(--decor-light)' }} />
     </svg>
   )
 }

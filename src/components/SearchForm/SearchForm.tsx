@@ -37,7 +37,13 @@ export function SearchForm({ search, destinationRef, submitRef }: Props) {
         />
         <DateField checkIn={query.checkIn} checkOut={query.checkOut} error={errors.dates} onChange={setDates} />
         <GuestsField value={query.guests} error={errors.guests} onChange={setGuests} />
-        <Button ref={submitRef} size="lg" className={`${styles.areaSubmit} h-[clamp(50px,12.8vw,56px)] gap-3 lg:h-15`} type="submit" aria-busy={loading}>
+        <Button
+          ref={submitRef}
+          size="lg"
+          className={`${styles.areaSubmit} h-[clamp(50px,12.8vw,56px)] gap-3 lg:h-15`}
+          type="submit"
+          aria-busy={loading}
+        >
           Найти отель
           {loading ? (
             <LoaderCircle className={`${styles.spin} size-6`} aria-hidden />

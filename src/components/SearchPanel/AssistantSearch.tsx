@@ -114,16 +114,16 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
           <p className={styles.subtitle}>Я подберу идеальное жилье и направление</p>
         </div>
         {started && (
-          <Button variant='secondary' size='sm' shape='pill' className={styles.reset} onClick={reset}>
-            <RotateCcw className='size-4' aria-hidden />
+          <Button variant="secondary" size="sm" shape="pill" className={styles.reset} onClick={reset}>
+            <RotateCcw className="size-4" aria-hidden />
             {/* Phones show the icon only; the label stays as the button's accessible name. */}
-            <span className='max-sm:sr-only'>Заново</span>
+            <span className="max-sm:sr-only">Заново</span>
           </Button>
         )}
       </div>
 
       {started && (
-        <ol ref={logRef} className={styles.log} aria-live='polite' aria-label='Диалог с ассистентом'>
+        <ol ref={logRef} className={styles.log} aria-live="polite" aria-label="Диалог с ассистентом">
           {messages.map((message, i) => (
             <li key={i} className={message.from === 'user' ? styles.userMessage : styles.agentMessage}>
               {message.from === 'agent' && <RobotAvatar className={styles.messageAvatar} />}
@@ -136,7 +136,7 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
           {thinking && (
             <li className={styles.agentMessage}>
               <RobotAvatar className={styles.messageAvatar} />
-              <div className={`${styles.bubble} ${styles.typing}`} aria-label='Ассистент думает'>
+              <div className={`${styles.bubble} ${styles.typing}`} aria-label="Ассистент думает">
                 <span />
                 <span />
                 <span />
@@ -148,16 +148,16 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
 
       <form className={styles.composer} onSubmit={onSubmit}>
         <Sparkles className={styles.composerIcon} aria-hidden />
-        <label htmlFor={inputId} className='visually-hidden'>
+        <label htmlFor={inputId} className="visually-hidden">
           Опишите поездку
         </label>
         {/* The composer draws the box and the focus state; the textarea is bare inside it. */}
         <Textarea
           id={inputId}
-          className='min-h-0 flex-1 resize-none rounded-none border-0 bg-transparent p-0 text-base leading-[1.4] field-sizing-fixed focus-visible:border-0 sm:text-lg md:text-lg'
+          className="min-h-0 flex-1 resize-none rounded-none border-0 bg-transparent p-0 text-base leading-[1.4] field-sizing-fixed focus-visible:border-0 sm:text-lg md:text-lg"
           rows={2}
           value={text}
-          enterKeyHint='send'
+          enterKeyHint="send"
           placeholder={
             started
               ? 'Ответьте или уточните пожелания…'
@@ -167,10 +167,10 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
           onKeyDown={onKeyDown}
         />
         <Button
-          type='submit'
-          size='icon'
+          type="submit"
+          size="icon"
           className={`${styles.send} shadow-(--shadow-primary)`}
-          aria-label='Отправить'
+          aria-label="Отправить"
           disabled={!text.trim() || thinking}
         >
           <SendHorizontal aria-hidden />
@@ -181,9 +181,9 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
         {chips.map(({ emoji, label }) => (
           <li key={label}>
             <Button
-              variant='secondary'
-              shape='pill'
-              className='h-[clamp(40px,10.6vw,48px)] bg-(--decor-surface-soft) px-[clamp(14px,3.6vw,20px)] text-[clamp(14px,3.7vw,16px)] font-normal text-foreground hover:bg-secondary'
+              variant="secondary"
+              shape="pill"
+              className="h-[clamp(40px,10.6vw,48px)] bg-(--decor-surface-soft) px-[clamp(14px,3.6vw,20px)] text-[clamp(14px,3.7vw,16px)] font-normal text-foreground hover:bg-secondary"
               onClick={() => send(label)}
               disabled={thinking}
             >
@@ -224,7 +224,7 @@ function PlanView({ plan, onChoose }: { plan: Plan; onChoose: Props['onChoose'] 
         {plan.options.map(({ destination, hotel, total, fitsBudget }) => (
           <li key={destination.id}>
             <button
-              type='button'
+              type="button"
               className={styles.option}
               onClick={() => void onChoose({ ...plan.query, destination: destination.name })}
             >
@@ -236,8 +236,8 @@ function PlanView({ plan, onChoose }: { plan: Plan; onChoose: Props['onChoose'] 
                 {hotel && (
                   <span className={styles.optionHotel}>
                     {hotel.name}
-                    <Badge className='ml-1.5 gap-0.5'>
-                      <Star fill='currentColor' strokeWidth={0} aria-hidden />
+                    <Badge className="ml-1.5 gap-0.5">
+                      <Star fill="currentColor" strokeWidth={0} aria-hidden />
                       {hotel.rating.toFixed(1)}
                     </Badge>
                   </span>
@@ -248,7 +248,7 @@ function PlanView({ plan, onChoose }: { plan: Plan; onChoose: Props['onChoose'] 
                 {fitsBudget ? (
                   <span className={styles.optionHint}>за {nights}</span>
                 ) : (
-                  <Badge variant='destructive' className='mt-0.5 ml-auto flex'>
+                  <Badge variant="destructive" className="mt-0.5 ml-auto flex">
                     выше бюджета
                   </Badge>
                 )}
