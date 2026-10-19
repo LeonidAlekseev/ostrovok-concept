@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { todayIso } from '../lib/dates'
+import { addDays, todayIso } from '../lib/dates'
 import {
   resolveTarget,
   runDemoSearch,
@@ -22,10 +22,11 @@ function withoutKey(errors: SearchErrors, key: keyof SearchErrors): SearchErrors
   return next
 }
 
+// Dates stay empty during prerender and hydration so server and client markup match; the effect below fills them.
 const initialQuery: SearchQuery = {
   destination: '',
-  checkIn: '2026-10-17',
-  checkOut: '2026-10-18',
+  checkIn: '',
+  checkOut: '',
   guests: { adults: 2, children: 0, rooms: 1 },
 }
 
@@ -36,6 +37,11 @@ export function useHotelSearch() {
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => () => abortRef.current?.abort(), [])
+
+  useEffect(() => {
+    const checkIn = addDays(todayIso(), 1)
+    setQuery((q) => ({ ...q, checkIn, checkOut: addDays(checkIn, 1) }))
+  }, [])
 
   const setDestination = useCallback((destination: string) => {
     setQuery((q) => ({ ...q, destination }))
