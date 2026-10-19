@@ -1,18 +1,7 @@
-/* The typing indicator: three dots bouncing in turn. Everything else is Tailwind classes in AssistantSearch.tsx. */
-.typing span {
-  width: 7px;
-  height: 7px;
-  background: var(--muted-foreground);
-  border-radius: 50%;
+/* The typing indicator: three dots bouncing in turn. Tailwind has no way to declare the keyframes here; the
+   dots' size and colour are Tailwind classes and the stagger is an inline animation-delay in AssistantSearch.tsx. */
+.dot {
   animation: dot 1s ease-in-out infinite;
-}
-
-.typing span:nth-child(2) {
-  animation-delay: 0.15s;
-}
-
-.typing span:nth-child(3) {
-  animation-delay: 0.3s;
 }
 
 @keyframes dot {

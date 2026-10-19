@@ -6,7 +6,6 @@ import { DateField } from './DateField'
 import { DestinationField } from './DestinationField'
 import { GuestsField } from './GuestsField'
 import { SearchResults } from './SearchResults'
-import styles from './SearchForm.module.css'
 
 interface Props {
   search: HotelSearch
@@ -28,7 +27,8 @@ export function SearchForm({ search, destinationRef, submitRef }: Props) {
 
   return (
     <form ref={formRef} onSubmit={onSubmit} noValidate aria-label="Поиск отелей">
-      <div className={styles.grid}>
+      {/* Phones: destination and submit take the full row, dates and guests share one (stacked below xs). */}
+      <div className="grid grid-cols-[minmax(0,1.42fr)_minmax(0,1fr)] gap-[clamp(8px,2.4vw,12px)] max-xs:grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1.2fr)_minmax(0,0.95fr)_auto]">
         <DestinationField
           value={query.destination}
           error={errors.destination}
@@ -40,7 +40,7 @@ export function SearchForm({ search, destinationRef, submitRef }: Props) {
         <Button
           ref={submitRef}
           size="lg"
-          className={`${styles.areaSubmit} h-[clamp(50px,12.8vw,56px)] gap-3 lg:h-15`}
+          className="col-span-full h-[clamp(50px,12.8vw,56px)] gap-3 lg:col-auto lg:h-15"
           type="submit"
           aria-busy={loading}
         >

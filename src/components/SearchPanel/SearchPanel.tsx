@@ -6,7 +6,18 @@ import type { HotelSearch } from '../../hooks/useHotelSearch'
 import { SearchForm } from '../SearchForm/SearchForm'
 import { AssistantSearch } from './AssistantSearch'
 import { RandomSearch } from './RandomSearch'
-import styles from './SearchPanel.module.css'
+
+/* Liquid glass: the globe shows through, blurred and saturated, under a bright rim and a specular sheen. */
+const glassFill =
+  '[background:linear-gradient(135deg,color-mix(in_srgb,var(--decor-light)_50%,transparent),color-mix(in_srgb,var(--success-soft)_22%,transparent)_55%,color-mix(in_srgb,var(--decor-light)_32%,transparent))]'
+const glassBlur = '[backdrop-filter:blur(22px)_saturate(180%)]'
+const glassRim =
+  '[box-shadow:inset_0_1px_0_color-mix(in_srgb,var(--decor-light)_90%,transparent),inset_0_-1px_0_color-mix(in_srgb,var(--decor-light)_35%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--decor-light)_35%,transparent),inset_0_0_24px_color-mix(in_srgb,var(--decor-light)_25%,transparent),0_20px_50px_color-mix(in_srgb,var(--shadow-color)_14%,transparent),0_2px_6px_color-mix(in_srgb,var(--shadow-color)_4%,transparent)]'
+// Specular highlight along the top-left edge, painted under the content (the panel is a stacking context).
+const glassSheen =
+  "before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:rounded-[inherit] before:content-[''] before:[background:radial-gradient(120%_60%_at_0%_0%,color-mix(in_srgb,var(--decor-light)_55%,transparent),transparent_55%),radial-gradient(80%_50%_at_100%_100%,color-mix(in_srgb,var(--decor-light)_20%,transparent),transparent_60%)]"
+const glassOpaque =
+  '[@media(prefers-reduced-transparency:reduce)]:[background:var(--decor-glass-fallback)] [@media(prefers-reduced-transparency:reduce)]:[backdrop-filter:none]'
 
 export type SearchMode = 'assistant' | 'manual' | 'random'
 
@@ -33,7 +44,7 @@ export function SearchPanel({ mode, onModeChange, search, destinationRef, submit
     <Tabs
       value={mode}
       onValueChange={(value) => onModeChange(value as SearchMode)}
-      className={`${styles.panel} relative z-10 rounded-[clamp(22px,5.6vw,30px)]`}
+      className={`relative z-10 rounded-[clamp(22px,5.6vw,30px)] ${glassFill} ${glassBlur} ${glassRim} ${glassSheen} ${glassOpaque}`}
     >
       {/* Arrow keys move focus and select the tab (WAI-ARIA automatic activation). */}
       <TabsList

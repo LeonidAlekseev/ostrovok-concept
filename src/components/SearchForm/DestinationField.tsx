@@ -13,7 +13,6 @@ import {
 import { formatPrice } from '../../lib/format'
 import { findScenario, suggestDestinations } from '../../lib/search'
 import { fieldBox } from './fieldBox'
-import styles from './SearchForm.module.css'
 
 interface Props {
   value: string
@@ -46,7 +45,7 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
   }, [value])
 
   return (
-    <div className={`${styles.areaDestination} relative min-w-0`} ref={fieldRef}>
+    <div className="relative col-span-full min-w-0 lg:col-auto" ref={fieldRef}>
       {/* The text is the destination: a picked suggestion fills it in. */}
       <Combobox
         items={options}
@@ -100,7 +99,7 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
           sideOffset={8}
           // Stays under the field and lets the page scroll, as it did before the list moved to Base UI.
           collisionAvoidance={{ side: 'none' }}
-          className={`m-0 max-h-80 w-(--anchor-width) overflow-y-auto animate-in fade-in slide-in-from-top-1 animation-duration-160 ease-out rounded-xl bg-card p-2 shadow-(--shadow-popover)`}
+          className={`m-0 max-h-80 w-(--anchor-width) overflow-y-auto animate-in fade-in slide-in-from-top-1 animation-duration-160 ease-out rounded-xl bg-card p-2 [box-shadow:var(--shadow-popover)]`}
         >
           <ComboboxList aria-label="Подходящие направления">
             {options.map((option) => (
