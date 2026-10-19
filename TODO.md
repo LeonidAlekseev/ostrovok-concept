@@ -12,6 +12,17 @@
       `translate`/`scale`/`rotate`/`shadow` — `reduce-globe-css` — в работе. Обновлён по решению
       пользователя 2026-10-19: порог размера CSS отменён.
 
+Шаблоны основных страниц — кликабельный прототип на демо-данных (план согласован пользователем
+2026-10-19; вход — модальное окно и страница, карта — MapLibre + OSM, поиск ведёт на `/search`, без
+Zustand). Не больше двух исполнителей одновременно:
+
+- [ ] Этап 1: `add-prototype-foundation` — старт после merge `reduce-globe-css`.
+- [ ] Этап 2: `add-search-results-page`, `add-hotel-pages` — после этапа 1.
+- [ ] Этап 3: `add-booking-checkout`, `add-auth-pages` — после этапа 1.
+- [ ] Этап 4: `add-account-pages` (после `add-booking-checkout` и `add-auth-pages`),
+      `add-help-and-legal-pages` (после этапа 1).
+- [ ] Этап 5: `add-home-collections` — после `add-search-results-page` и `add-hotel-pages`.
+
 ## Ожидает согласования
 
 - [ ] **Переделать разбор пожелания.** `parseWish` (`src/lib/assistant.ts`) ищет город по точному
