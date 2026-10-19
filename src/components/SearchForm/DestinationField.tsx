@@ -46,7 +46,7 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
   }, [value])
 
   return (
-    <div className={`${styles.fieldWrap} ${styles.areaDestination}`} ref={fieldRef}>
+    <div className={`${styles.areaDestination} relative min-w-0`} ref={fieldRef}>
       {/* The text is the destination: a picked suggestion fills it in. */}
       <Combobox
         items={options}
@@ -62,10 +62,10 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
         }}
         openOnInputClick
       >
-        <ComboboxInputGroup className={styles.fieldRow}>
-          <label className={`${styles.field} ${fieldBox(Boolean(error))}`}>
+        <ComboboxInputGroup className="relative">
+          <label className={fieldBox(Boolean(error))}>
             <MapPin className="shrink-0 text-brand-foreground" size={22} strokeWidth={1.8} aria-hidden />
-            <span className="visually-hidden">Направление</span>
+            <span className="sr-only">Направление</span>
             <ComboboxInput
               ref={inputRef}
               // Input's text styles; the bordered box is the label's fieldBox.
@@ -77,11 +77,12 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
               aria-describedby={error ? errorId : undefined}
             />
           </label>
-          <span className={styles.divider} aria-hidden />
+          <span className="absolute top-[22%] right-[clamp(48px,13vw,58px)] bottom-[22%] w-px bg-border" aria-hidden />
           <Button
             variant="ghost"
             size="icon-sm"
-            className={`${styles.clear} text-muted-foreground hover:text-foreground`}
+            // Centred by auto margins: a transform would fight the button's pressed shift.
+            className="absolute inset-y-0 right-[clamp(6px,2vw,10px)] my-auto text-muted-foreground hover:text-foreground"
             aria-label="Очистить направление"
             onClick={() => {
               // Clearing ends the input: the suggestions fold and the keyboard goes away.
@@ -99,7 +100,7 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
           sideOffset={8}
           // Stays under the field and lets the page scroll, as it did before the list moved to Base UI.
           collisionAvoidance={{ side: 'none' }}
-          className={`${styles.popoverSurface} ${styles.suggestions} m-0 w-(--anchor-width) rounded-xl bg-card p-2 shadow-(--shadow-popover)`}
+          className={`m-0 max-h-80 w-(--anchor-width) overflow-y-auto animate-in fade-in slide-in-from-top-1 animation-duration-160 ease-out rounded-xl bg-card p-2 shadow-(--shadow-popover)`}
         >
           <ComboboxList aria-label="Подходящие направления">
             {options.map((option) => (
@@ -119,7 +120,7 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
         </ComboboxContent>
       </Combobox>
       {/* Not an alert: the error is announced through aria-describedby when focus moves to the field. */}
-      <FieldError className={styles.error} id={errorId} role={undefined}>
+      <FieldError className="mx-1 mt-1.5 leading-[1.35]" id={errorId} role={undefined}>
         {error}
       </FieldError>
     </div>

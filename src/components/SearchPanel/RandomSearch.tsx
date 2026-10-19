@@ -34,6 +34,8 @@ const REEL_STAGGER = 0.7
 const cityNames = [...new Set(bestHotels.map((h) => cityOf(h).name))]
 const hotelNames = bestHotels.map((h) => h.name)
 const CONFETTI = [1, 2, 3, 4, 5].map((n) => `var(--decor-confetti-${n})`)
+// Text presentation: the emoji variants of the zodiac glyphs ignore the selected colour.
+const symbolFont = "font-['Segoe_UI_Symbol','Apple_Symbols','Noto_Sans_Symbols',sans-serif]"
 
 export function RandomSearch({ onPreview }: Props) {
   const [name, setName] = useState('')
@@ -72,14 +74,19 @@ export function RandomSearch({ onPreview }: Props) {
 
   if (editing || !round || !sign)
     return (
-      <form className={styles.form} onSubmit={spin} noValidate>
-        <div className={styles.lead}>
-          <span className={styles.leadIcon} aria-hidden>
+      <form className="flex flex-col" onSubmit={spin} noValidate>
+        <div className="mb-[clamp(14px,3.6vw,20px)] flex items-center gap-[clamp(12px,3.4vw,20px)]">
+          <span
+            className="grid size-[clamp(56px,16vw,80px)] flex-none place-items-center rounded-full bg-[radial-gradient(circle_at_50%_40%,var(--decor-gold-light),var(--decor-gold))] text-[clamp(30px,8.6vw,44px)]"
+            aria-hidden
+          >
             🎰
           </span>
           <div>
-            <h2 className={styles.title}>Доверьтесь звёздам</h2>
-            <p className={styles.subtitle}>Барабан выберет один из лучших отелей — кому как повезёт</p>
+            <h2 className="text-(length:--text-heading) leading-[1.25] font-bold">Доверьтесь звёздам</h2>
+            <p className="mt-1 text-[clamp(14px,3.7vw,17px)] text-muted-foreground">
+              Барабан выберет один из лучших отелей — кому как повезёт
+            </p>
           </div>
         </div>
 
@@ -97,13 +104,13 @@ export function RandomSearch({ onPreview }: Props) {
           placeholder="Ваше имя"
           onChange={(e) => setName(e.target.value)}
         />
-        <FieldError className={styles.nameError}>{nameInvalid && error}</FieldError>
+        <FieldError className="mx-1 -mt-2.5 mb-4">{nameInvalid && error}</FieldError>
 
-        <fieldset className={styles.signs}>
-          <legend className={styles.label}>Кто вы по знаку зодиака?</legend>
+        <fieldset className="min-w-0">
+          <legend className="mb-2 block font-semibold">Кто вы по знаку зодиака?</legend>
           {/* Arrow keys move the choice inside the group; one Tab stop for the whole grid. */}
           <RadioGroup
-            className={styles.signGrid}
+            className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 lg:grid-cols-6"
             value={sign?.id ?? null}
             onValueChange={(id) => setSign(zodiac.find((z) => z.id === id) ?? null)}
           >
@@ -111,9 +118,9 @@ export function RandomSearch({ onPreview }: Props) {
               <RadioGroupItem
                 key={z.id}
                 value={z.id}
-                className={`${styles.sign} rounded-lg border border-transparent bg-(--decor-surface-soft) transition-[background-color,border-color] hover:bg-secondary data-checked:border-primary data-checked:bg-secondary data-checked:font-[650] data-checked:text-primary`}
+                className={`flex h-10.5 min-w-0 items-center gap-1.5 overflow-hidden px-2.5 text-sm/[normal] text-ellipsis whitespace-nowrap rounded-lg border border-transparent bg-(--decor-surface-soft) transition-[background-color,border-color] hover:bg-secondary data-checked:border-primary data-checked:bg-secondary data-checked:font-[650] data-checked:text-primary`}
               >
-                <span className={styles.signSymbol} aria-hidden>
+                <span className={`flex-none text-lg/[normal] ${symbolFont}`} aria-hidden>
                   {z.symbol}
                 </span>
                 {z.name}
@@ -122,12 +129,12 @@ export function RandomSearch({ onPreview }: Props) {
           </RadioGroup>
         </fieldset>
 
-        <FieldError className={styles.error}>{!nameInvalid && error}</FieldError>
+        <FieldError className="mx-1 mt-3">{!nameInvalid && error}</FieldError>
 
         <Button
           type="submit"
           size="lg"
-          className={`${styles.spin} h-[clamp(52px,13.6vw,60px)] gap-2.5 bg-(image:--decor-spin-gradient) text-[clamp(17px,4.6vw,19px)] shadow-(--decor-spin-shadow)`}
+          className={`${styles.spin} relative mt-4.5 overflow-hidden h-[clamp(52px,13.6vw,60px)] gap-2.5 bg-(image:--decor-spin-gradient) text-[clamp(17px,4.6vw,19px)] shadow-(--decor-spin-shadow)`}
         >
           <Dices className="size-6" aria-hidden />
           Крутить барабан
@@ -154,16 +161,19 @@ export function RandomSearch({ onPreview }: Props) {
   }
 
   return (
-    <div className={styles.game}>
-      <div className={styles.player}>
-        <span className={styles.playerSign} aria-hidden>
+    <div className="flex flex-col gap-3.5">
+      <div className="flex items-center gap-3">
+        <span
+          className={`grid size-11 flex-none place-items-center rounded-full bg-[linear-gradient(135deg,var(--primary),var(--decor-magenta))] text-2xl/[normal] text-primary-foreground ${symbolFont}`}
+          aria-hidden
+        >
           {sign.symbol}
         </span>
         <span>
-          <span className={styles.playerName}>{name.trim()}</span>
-          <span className={styles.playerHint}>{sign.name}</span>
+          <span className="block font-bold">{name.trim()}</span>
+          <span className="block text-sm/[normal] text-muted-foreground">{sign.name}</span>
         </span>
-        <Button variant="secondary" size="sm" shape="pill" className={styles.edit} onClick={() => setEditing(true)}>
+        <Button variant="secondary" size="sm" shape="pill" className="ml-auto" onClick={() => setEditing(true)}>
           <PencilLine className="size-4" aria-hidden />
           Изменить
         </Button>
@@ -175,32 +185,43 @@ export function RandomSearch({ onPreview }: Props) {
         {landed && (
           <Card
             role="article"
-            className={`${styles.ticket} gap-0 rounded-2xl bg-(image:--decor-ticket-gradient) py-0 text-primary-foreground shadow-(--decor-ticket-shadow)`}
+            className={`relative gap-0 rounded-2xl bg-(image:--decor-ticket-gradient) px-4.5 pt-4.5 pb-4 text-primary-foreground animate-in fade-in zoom-in-96 slide-in-from-bottom-[10px] animation-duration-600 ease-[cubic-bezier(0.2,1.4,0.4,1)] shadow-(--decor-ticket-shadow)`}
           >
             <Confetti />
-            <p className={styles.ticketKicker}>
+            <p className="text-sm/[normal] font-semibold tracking-[0.06em] uppercase opacity-85">
               Звёзды выбрали для {name.trim()} {sign.symbol}
             </p>
-            <h3 className={styles.ticketHotel}>{fortune.hotel.name}</h3>
-            <p className={styles.ticketCity}>
+            <h3 className="mt-1.5 text-[clamp(22px,6vw,30px)] leading-[1.1] font-extrabold tracking-[-0.02em]">
+              {fortune.hotel.name}
+            </h3>
+            <p className="mt-1 text-base/[normal] opacity-90">
               {fortune.city.name}, {fortune.city.country}
             </p>
-            <p className={styles.ticketMeta}>
-              <span className={styles.ticketStars} aria-label={`${fortune.hotel.stars} звезды`}>
+            <p className="mt-3 flex flex-wrap items-center gap-2.5 text-base/[normal] font-semibold">
+              <span
+                className="inline-flex gap-0.5 text-(--decor-ticket-star) *:size-3.75"
+                aria-label={`${fortune.hotel.stars} звезды`}
+              >
                 {Array.from({ length: fortune.hotel.stars }, (_, i) => (
                   <Star key={i} fill="currentColor" strokeWidth={0} aria-hidden />
                 ))}
               </span>
-              <span className={styles.ticketRating}>{fortune.hotel.rating.toFixed(1)}</span>
+              <span className="rounded-sm bg-brand px-2 py-0.5 text-brand-foreground">
+                {fortune.hotel.rating.toFixed(1)}
+              </span>
               <span>от {formatPrice(fortune.hotel.priceFrom)}/ночь</span>
             </p>
-            <p className={styles.ticketMood}>Настроение: {fortune.mood}</p>
-            <p className={styles.prophecy}>{prophecyFor(sign, fortune.city)}</p>
+            <p className="mt-3 inline-block rounded-full bg-(--decor-light)/18 px-3 py-1.5 font-semibold">
+              Настроение: {fortune.mood}
+            </p>
+            <p className="mt-3 font-hand text-[clamp(21px,5.6vw,25px)] leading-[1.2] font-semibold">
+              {prophecyFor(sign, fortune.city)}
+            </p>
           </Card>
         )}
       </div>
 
-      <div className={styles.actions}>
+      <div className="grid grid-cols-2 gap-2">
         <Button size="lg" className="h-12.5 px-3 text-base" onClick={share} disabled={!landed}>
           <Share2 aria-hidden />
           Поделиться
@@ -217,7 +238,7 @@ export function RandomSearch({ onPreview }: Props) {
         </Button>
       </div>
       {shareNote && (
-        <p className={styles.shareNote} role="status">
+        <p className="text-center text-sm/[normal] text-muted-foreground" role="status">
           {shareNote}
         </p>
       )}
@@ -254,18 +275,27 @@ function SlotMachine({ fortune, spinning, onLanded }: { fortune: Fortune; spinni
   }, [])
 
   return (
-    <div className={`${styles.machine} ${spinning ? styles.machineSpinning : styles.machineWon}`}>
-      <div className={styles.lever} aria-hidden>
-        <span className={styles.leverBall} />
+    <div
+      className={`${styles.machine} ${spinning ? styles.machineSpinning : styles.machineWon} relative mr-5.5 rounded-2xl px-3 pt-4.5 pb-3.5 [--h:clamp(52px,14vw,64px)]`}
+    >
+      <div
+        className={`${styles.lever} absolute top-[26%] -right-5 h-[46%] w-2 origin-bottom rounded-sm bg-[linear-gradient(90deg,var(--decor-lever-dark),var(--decor-lever-light),var(--decor-lever-dark))]`}
+        aria-hidden
+      >
+        <span className="absolute -top-3.5 left-1/2 size-5.5 -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_35%_30%,var(--decor-knob-light),var(--decor-knob)_55%,var(--decor-knob-dark))] [box-shadow:0_3px_6px_color-mix(in_srgb,var(--decor-black)_25%,transparent)]" />
       </div>
-      <div className={styles.lights} aria-hidden />
-      <div className={styles.reels} aria-hidden>
+      <div className={`${styles.lights} absolute top-1.5 right-4 left-4 h-1.5 opacity-85`} aria-hidden />
+      <div className="grid grid-cols-3 gap-2" aria-hidden>
         {strips.map((strip, i) => (
-          <div key={i} className={styles.reel}>
-            <span className={styles.reelLabel}>{['Город', 'Отель', 'Настроение'][i]}</span>
-            <div className={styles.window}>
+          <div key={i} className="min-w-0">
+            <span className="mb-1.5 block text-center text-xs/[normal] font-semibold tracking-[0.08em] text-(--decor-light)/75 uppercase">
+              {['Город', 'Отель', 'Настроение'][i]}
+            </span>
+            <div
+              className={`${styles.window} relative h-(--h) overflow-hidden rounded-lg bg-card [box-shadow:inset_0_0_0_2px_color-mix(in_srgb,var(--decor-gold)_60%,transparent)]`}
+            >
               <ul
-                className={styles.strip}
+                className={`transition-transform duration-(--d) ease-[cubic-bezier(0.12,0.8,0.22,1.04)] ${spinning ? 'blur-[0.4px]' : ''}`}
                 style={
                   {
                     '--n': strip.length,
@@ -276,7 +306,10 @@ function SlotMachine({ fortune, spinning, onLanded }: { fortune: Fortune; spinni
                 onTransitionEnd={i === strips.length - 1 ? land : undefined}
               >
                 {strip.map((item, k) => (
-                  <li key={k} className={styles.symbol}>
+                  <li
+                    key={k}
+                    className="flex h-(--h) items-center justify-center overflow-hidden px-1.5 text-center text-[clamp(12px,3.3vw,15px)] leading-[1.15] font-bold text-brand-foreground"
+                  >
                     {item}
                   </li>
                 ))}
@@ -285,7 +318,7 @@ function SlotMachine({ fortune, spinning, onLanded }: { fortune: Fortune; spinni
           </div>
         ))}
       </div>
-      <p className="visually-hidden" role="status">
+      <p className="sr-only" role="status">
         {spinning ? 'Барабан крутится…' : `Выпало: ${fortune.city.name}, ${fortune.hotel.name}, ${fortune.mood}`}
       </p>
     </div>

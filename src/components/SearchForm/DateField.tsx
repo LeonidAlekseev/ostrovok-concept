@@ -46,15 +46,15 @@ export function DateField({ checkIn, checkOut, error, onChange }: Props) {
   const nights = hasDates ? nightsBetween(checkIn, checkOut) : 0
 
   return (
-    <div className={`${styles.fieldWrap} ${styles.areaDates}`}>
+    <div className={`${styles.areaDates} relative min-w-0`}>
       <Popover open={open} onOpenChange={onOpenChange}>
         <PopoverTrigger
-          className={`${styles.field} ${fieldBox(Boolean(error))}`}
+          className={`${fieldBox(Boolean(error))}`}
           aria-label={`Даты поездки: ${label}, ${countRu(nights, nightForms)}`}
           aria-describedby={error ? errorId : undefined}
         >
           <CalendarDays className="shrink-0 text-brand-foreground" size={22} strokeWidth={1.8} aria-hidden />
-          <span className={styles.value} title={label}>
+          <span className="truncate text-[clamp(13px,3.55vw,18px)] max-xs:text-sm/[normal]" title={label}>
             {label}
           </span>
         </PopoverTrigger>
@@ -67,7 +67,7 @@ export function DateField({ checkIn, checkOut, error, onChange }: Props) {
           // The calendar focuses its own selected day; the popover must not move focus to the month arrow.
           initialFocus={false}
           aria-label="Выбор дат заезда и выезда"
-          className={`${styles.popoverSurface} ${styles.datesPopover} m-0 p-2 shadow-(--shadow-popover)`}
+          className={`m-0 w-[min(330px,calc(100vw-2*var(--page-x)-8px))] p-2 md:w-155 animate-in fade-in slide-in-from-top-1 animation-duration-160 ease-out shadow-(--shadow-popover)`}
         >
           <p className="mx-2 mt-1 mb-0 text-sm text-muted-foreground" aria-live="polite">
             {draftStart ? 'Выберите дату выезда' : 'Выберите дату заезда'}
@@ -88,7 +88,7 @@ export function DateField({ checkIn, checkOut, error, onChange }: Props) {
         </PopoverContent>
       </Popover>
       {/* Not an alert: the error is announced through aria-describedby when focus moves to the field. */}
-      <FieldError className={styles.error} id={errorId} role={undefined}>
+      <FieldError className="mx-1 mt-1.5 leading-[1.35]" id={errorId} role={undefined}>
         {error}
       </FieldError>
     </div>
