@@ -1,5 +1,5 @@
 import { destinations, scenarios, type Destination, type Scenario, type ScenarioId } from '../data/destinations'
-import { nightsBetween, type IsoDate } from './dates'
+import { fromIso, nightsBetween, toIso, type IsoDate } from './dates'
 
 export const GUEST_LIMITS = {
   adults: { min: 1, max: 10 },
@@ -84,16 +84,48 @@ export function validateSearch(query: SearchQuery, today: IsoDate): SearchErrors
   return errors
 }
 
+/** Dates and guests of a stay: shared by search and offer URLs. */
+export type Stay = Pick<SearchQuery, 'checkIn' | 'checkOut' | 'guests'>
+
+export function setStayParams(params: URLSearchParams, { checkIn, checkOut, guests }: Stay): URLSearchParams {
+  params.set('checkin', checkIn)
+  params.set('checkout', checkOut)
+  params.set('adults', String(guests.adults))
+  if (guests.children) params.set('children', String(guests.children))
+  params.set('rooms', String(guests.rooms))
+  return params
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+const isIsoDate = (value: string | null): value is IsoDate =>
+  value !== null && ISO_DATE.test(value) && toIso(fromIso(value)) === value
+const toCount = (value: string | null) => (value !== null && /^\d+$/.test(value) ? Number(value) : NaN)
+
+/**
+ * Reads the stay written by `setStayParams`; `null` if the dates are missing or malformed.
+ * Guest counts are read as is (a missing one is NaN): `validateSearch` judges them.
+ */
+export function parseStayParams(params: Pick<URLSearchParams, 'get'>): Stay | null {
+  const checkIn = params.get('checkin')
+  const checkOut = params.get('checkout')
+  if (!isIsoDate(checkIn) || !isIsoDate(checkOut)) return null
+  const children = params.get('children')
+  return {
+    checkIn,
+    checkOut,
+    guests: {
+      adults: toCount(params.get('adults')),
+      children: children === null ? 0 : toCount(children),
+      rooms: toCount(params.get('rooms')),
+    },
+  }
+}
+
 export function toSearchParams(query: SearchQuery, target: SearchTarget): URLSearchParams {
   const params = new URLSearchParams()
   if (target.kind === 'destination') params.set('destination', target.destination.id)
   else params.set('scenario', target.scenario)
-  params.set('checkin', query.checkIn)
-  params.set('checkout', query.checkOut)
-  params.set('adults', String(query.guests.adults))
-  if (query.guests.children) params.set('children', String(query.guests.children))
-  params.set('rooms', String(query.guests.rooms))
-  return params
+  return setStayParams(params, query)
 }
 
 export interface SearchResultItem {
