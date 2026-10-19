@@ -1,0 +1,135 @@
+import { describe, expect, it } from 'vitest'
+import { makePlan, mergeBrief, parseWish } from './assistant'
+
+describe('parseWish', () => {
+  it('reads theme, month and budget from a full request', () => {
+    expect(parseWish('Хочу на море в октябре, бюджет до 70 000 ₽')).toEqual({
+      vibe: 'sea',
+      when: 9,
+      budget: 70_000,
+    })
+  })
+
+  it('reads party, mood, nights and a "70к" budget', () => {
+    expect(parseWish('В горы на 5 ночей с детьми, 70к, спокойно')).toEqual({
+      vibe: 'mountains',
+      party: 'family',
+      mood: 'calm',
+      nights: 5,
+      budget: 70_000,
+    })
+  })
+
+  it('treats a weekend as two nights soon and reads a "тыс." budget', () => {
+    expect(parseWish('На выходные вдвоём до 50 тыс.')).toEqual({
+      vibe: 'weekend',
+      party: 'couple',
+      nights: 2,
+      when: 'soon',
+      budget: 50_000,
+    })
+  })
+
+  it('reads a season, friends and a plain budget', () => {
+    expect(parseWish('летом с друзьями, бюджет 120000')).toEqual({ party: 'friends', when: 6, budget: 120_000 })
+  })
+
+  it('reads a catalogue city named in the nominative case', () => {
+    expect(parseWish('Прага, скоро')).toEqual({ destinationId: 'prague', when: 'soon' })
+  })
+
+  it('does not read a city named in another case', () => {
+    // Diverges from assistant-search spec, "Разбор пожелания": the assistant SHALL extract
+    // a named catalogue city, but only the exact nominative name is matched.
+    expect(parseWish('Хочу в Прагу, что-то активное, на неделю')).toEqual({ mood: 'active', nights: 7 })
+  })
+
+  it('leaves unknown fields undefined', () => {
+    expect(parseWish('привет')).toEqual({})
+  })
+})
+
+describe('mergeBrief', () => {
+  it('adds new answers to what is already known', () => {
+    expect(mergeBrief({ vibe: 'sea', when: 9 }, 'вдвоём', 'party')).toEqual({ vibe: 'sea', when: 9, party: 'couple' })
+  })
+
+  it('keeps the theme when a later reply says "на выходные"', () => {
+    expect(mergeBrief({ vibe: 'sea', when: 9 }, 'на выходные', 'when')).toEqual({
+      vibe: 'sea',
+      when: 'soon',
+      nights: 2,
+    })
+  })
+
+  it('hands the asked question over to the assistant on "не важно"', () => {
+    expect(mergeBrief({ vibe: 'sea' }, 'не важно', 'when')).toEqual({ vibe: 'sea', when: 'any' })
+    expect(mergeBrief({ vibe: 'sea', when: 9 }, 'без разницы', 'party')).toEqual({ vibe: 'sea', when: 9, party: 'any' })
+  })
+
+  it('hands over the theme on "удиви меня" without a pending question', () => {
+    expect(mergeBrief({}, 'удиви меня', null)).toEqual({ vibe: 'any' })
+  })
+
+  it('does not hand over a question the reply already answered', () => {
+    expect(mergeBrief({}, 'не знаю, наверное на море', 'vibe')).toEqual({ vibe: 'sea' })
+  })
+})
+
+describe('makePlan', () => {
+  const today = '2026-10-19' // Monday
+
+  it('plans a theme chosen by the traveller', () => {
+    const plan = makePlan({ vibe: 'sea', when: 10, party: 'couple' }, today)
+    expect(plan).toMatchObject({
+      emoji: '🌊',
+      atmosphere: 'Морской бриз',
+      why: 'Солёный ветер, пляж и закаты над водой.',
+      nights: 5,
+      query: { checkIn: '2026-11-07', checkOut: '2026-11-12', guests: { adults: 2, children: 0, rooms: 1 } },
+      overBudget: false,
+    })
+  })
+
+  it('offers only warm destinations for the sea in winter', () => {
+    const plan = makePlan({ vibe: 'sea', when: 0, party: 'solo' }, today)
+    expect(plan.options.length).toBeGreaterThan(0)
+    for (const o of plan.options) expect(['dubai', 'cancun', 'honolulu', 'miami']).toContain(o.destination.id)
+  })
+
+  it('explains its own pick when the theme is left open', () => {
+    const plan = makePlan({ vibe: 'any', when: 'any', party: 'any' }, today)
+    expect(plan.atmosphere).toBe('Далеко-далеко')
+    expect(plan.why).toBe('Выбрал сам: зимой хочется туда, где лето. Значит, лето посреди любого сезона.')
+  })
+
+  it('offers at most three options, those within budget first', () => {
+    const plan = makePlan({ vibe: 'europe', when: 4, party: 'couple', budget: 40_000 }, today)
+    expect(plan.options).toHaveLength(3)
+    const fits = plan.options.map((o) => o.fitsBudget)
+    expect(fits).toEqual([...fits].sort((a, b) => Number(b) - Number(a)))
+    expect(fits[0]).toBe(true)
+    for (const o of plan.options) expect(o.total).toBe(o.perNight * plan.nights * plan.query.guests.rooms)
+  })
+
+  it('marks the plan over budget when no option fits', () => {
+    const plan = makePlan({ destinationId: 'prague', when: 'soon', party: 'friends', budget: 1000 }, today)
+    expect(plan).toMatchObject({
+      nights: 2,
+      query: { checkIn: '2026-10-23', checkOut: '2026-10-25', guests: { adults: 4, children: 0, rooms: 2 } },
+      overBudget: true,
+    })
+    expect(plan.options).toHaveLength(1)
+    expect(plan.options[0]).toMatchObject({
+      destination: { id: 'prague' },
+      perNight: 6900,
+      total: 27_600,
+      fitsBudget: false,
+    })
+  })
+
+  it('caps nights at 30 and gives families a week by default', () => {
+    expect(makePlan({ vibe: 'sea', when: 6, party: 'family' }, today).nights).toBe(7)
+    expect(makePlan({ vibe: 'sea', when: 6, party: 'solo', nights: 45 }, today).nights).toBe(30)
+  })
+})
