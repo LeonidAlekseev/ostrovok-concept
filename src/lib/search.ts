@@ -1,4 +1,4 @@
-import { destinations, scenarios, type Destination, type ScenarioId } from '../data/destinations'
+import { destinations, scenarios, type Destination, type Scenario, type ScenarioId } from '../data/destinations'
 import { nightsBetween, type IsoDate } from './dates'
 
 export const GUEST_LIMITS = {
@@ -31,12 +31,17 @@ export type SearchErrors = Partial<Record<'destination' | 'dates' | 'guests', st
 
 const normalize = (s: string) => s.trim().toLocaleLowerCase('ru').replace(/ё/g, 'е')
 
+export function findScenario(text: string): Scenario | undefined {
+  const q = normalize(text)
+  return q ? scenarios.find((s) => normalize(s.title) === q) : undefined
+}
+
 export function resolveTarget(text: string): SearchTarget | null {
   const q = normalize(text)
   if (!q) return null
   const destination = destinations.find((d) => normalize(d.name) === q)
   if (destination) return { kind: 'destination', destination }
-  const scenario = scenarios.find((s) => normalize(s.title) === q)
+  const scenario = findScenario(q)
   if (scenario) return { kind: 'scenario', scenario: scenario.id, title: scenario.title }
   return null
 }
@@ -44,7 +49,7 @@ export function resolveTarget(text: string): SearchTarget | null {
 export function suggestDestinations(text: string, limit = 6): Destination[] {
   const q = normalize(text)
   if (!q) return destinations.filter((d) => d.onGlobe).slice(0, limit)
-  const scenario = scenarios.find((s) => normalize(s.title) === q)
+  const scenario = findScenario(q)
   if (scenario) return destinations.filter((d) => d.scenarios.includes(scenario.id)).slice(0, limit)
   const starts = destinations.filter((d) => normalize(d.name).startsWith(q) || normalize(d.country).startsWith(q))
   const contains = destinations.filter(
