@@ -121,11 +121,15 @@
 
 /* ---------- Popovers ---------- */
 
+/* Legacy absolute placement under the field. Portaled popovers take only .popoverSurface. */
 .popover {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
   z-index: 30;
+}
+
+.popoverSurface {
   margin: 0;
   padding: 8px;
   background: var(--card);
@@ -196,8 +200,6 @@
 }
 
 .guestsPopover {
-  right: 0;
-  left: auto;
   width: min(310px, calc(100vw - 2 * var(--page-x) - 8px));
   padding: 12px;
 }

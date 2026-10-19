@@ -117,7 +117,7 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
 
       {showList && (
         <ul
-          className={`${styles.popover} ${styles.suggestions}`}
+          className={`${styles.popover} ${styles.popoverSurface} ${styles.suggestions}`}
           id={listId}
           role="listbox"
           aria-label="Подходящие направления"

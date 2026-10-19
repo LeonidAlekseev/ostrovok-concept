@@ -1,8 +1,8 @@
-import { useCallback, useId, useRef, useState } from 'react'
+import { useId, useState } from 'react'
 import { ChevronDown, Minus, Plus, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/field'
-import { useDismiss } from '@/hooks/useDismiss'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { countRu, guestsLabel } from '../../lib/format'
 import { GUEST_LIMITS, type Guests } from '../../lib/search'
 import styles from './SearchForm.module.css'
@@ -21,12 +21,7 @@ const rows: { key: keyof Guests; title: string; hint: string; forms: [string, st
 
 export function GuestsField({ value, error, onChange }: Props) {
   const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const popoverId = useId()
   const errorId = useId()
-  const close = useCallback(() => setOpen(false), [])
-  useDismiss(rootRef, open, close)
 
   const max = (key: keyof Guests) =>
     key === 'rooms' ? Math.min(GUEST_LIMITS.rooms.max, value.adults) : GUEST_LIMITS[key].max
@@ -38,31 +33,27 @@ export function GuestsField({ value, error, onChange }: Props) {
   }
 
   return (
-    <div className={`${styles.fieldWrap} ${styles.areaGuests}`} ref={rootRef}>
-      <button
-        ref={triggerRef}
-        type="button"
-        className={`${styles.field} ${styles.fieldButton} ${error ? styles.fieldInvalid : ''}`}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls={open ? popoverId : undefined}
-        aria-label={`Гости: ${guestsLabel(value)}${value.rooms === 1 ? ', 1 номер' : ''}`}
-        aria-describedby={error ? errorId : undefined}
-        onClick={() => setOpen((o) => !o)}
-      >
-        <User className={styles.fieldIcon} size={22} strokeWidth={1.8} aria-hidden />
-        <span className={styles.value} title={guestsLabel(value)}>
-          {guestsLabel(value)}
-        </span>
-        <ChevronDown className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`} size={22} aria-hidden />
-      </button>
+    <div className={`${styles.fieldWrap} ${styles.areaGuests}`}>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
+          className={`${styles.field} ${styles.fieldButton} ${error ? styles.fieldInvalid : ''}`}
+          aria-label={`Гости: ${guestsLabel(value)}${value.rooms === 1 ? ', 1 номер' : ''}`}
+          aria-describedby={error ? errorId : undefined}
+        >
+          <User className={styles.fieldIcon} size={22} strokeWidth={1.8} aria-hidden />
+          <span className={styles.value} title={guestsLabel(value)}>
+            {guestsLabel(value)}
+          </span>
+          <ChevronDown className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`} size={22} aria-hidden />
+        </PopoverTrigger>
 
-      {open && (
-        <div
-          className={`${styles.popover} ${styles.guestsPopover}`}
-          id={popoverId}
-          role="dialog"
+        <PopoverContent
+          align="end"
+          sideOffset={8}
+          // Stays under the field and lets the page scroll, as it did before the popover moved to Base UI.
+          collisionAvoidance={{ side: 'none' }}
           aria-label="Гости и номера"
+          className={`${styles.popoverSurface} ${styles.guestsPopover}`}
         >
           {rows.map((row) => (
             <div className={styles.stepperRow} key={row.key}>
@@ -99,17 +90,11 @@ export function GuestsField({ value, error, onChange }: Props) {
               </span>
             </div>
           ))}
-          <Button
-            className="mt-2 w-full"
-            onClick={() => {
-              close()
-              triggerRef.current?.focus()
-            }}
-          >
+          <Button className="mt-2 w-full" onClick={() => setOpen(false)}>
             Готово
           </Button>
-        </div>
-      )}
+        </PopoverContent>
+      </Popover>
       {/* Not an alert: the error is announced through aria-describedby when focus moves to the field. */}
       <FieldError className={styles.error} id={errorId} role={undefined}>
         {error}

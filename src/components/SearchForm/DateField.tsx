@@ -68,7 +68,7 @@ export function DateField({ checkIn, checkOut, error, onChange }: Props) {
 
       {open && (
         <div
-          className={`${styles.popover} ${styles.datesPopover}`}
+          className={`${styles.popover} ${styles.popoverSurface} ${styles.datesPopover}`}
           id={popoverId}
           role="dialog"
           aria-label="Выбор дат заезда и выезда"

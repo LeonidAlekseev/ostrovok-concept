@@ -13,11 +13,18 @@ function PopoverContent({
   className,
   align = 'start',
   sideOffset = 8,
+  collisionAvoidance,
   ...props
-}: PopoverPrimitive.Popup.Props & Pick<PopoverPrimitive.Positioner.Props, 'align' | 'sideOffset'>) {
+}: PopoverPrimitive.Popup.Props &
+  Pick<PopoverPrimitive.Positioner.Props, 'align' | 'sideOffset' | 'collisionAvoidance'>) {
   return (
     <PopoverPrimitive.Portal>
-      <PopoverPrimitive.Positioner align={align} sideOffset={sideOffset} className="isolate z-50">
+      <PopoverPrimitive.Positioner
+        align={align}
+        sideOffset={sideOffset}
+        collisionAvoidance={collisionAvoidance}
+        className="isolate z-50"
+      >
         <PopoverPrimitive.Popup
           data-slot="popover-content"
           className={cn('flex flex-col rounded-xl bg-card text-card-foreground outline-none', className)}
