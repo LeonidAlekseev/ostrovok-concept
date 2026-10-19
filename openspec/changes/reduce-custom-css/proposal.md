@@ -26,3 +26,7 @@
 - `src/components/**/*.module.css`, `src/app/globals.css` (путь уточнить при реализации).
 - Компоненты, которые переходят на классы Tailwind.
 - Пересекается с `migrate-composite-components` (задача 4.1) на тех же компонентах: выполнять после неё.
+
+## Замеры
+
+До изменений (`npm run build` от `9d6a547`): суммарный размер CSS сборки — **91 511 байт** (gzip −9: 18 883 байт). В Next.js 16 CSS лежит в `.next/static/chunks/*.css`, а не в `.next/static/css`: `09-az9in33rlu.css` — 53 799 байт, `3wnssp1fkdp5z.css` — 37 712 байт.
