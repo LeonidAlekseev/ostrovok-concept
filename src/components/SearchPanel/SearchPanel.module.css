@@ -1,16 +1,12 @@
-@reference "../../app/globals.css";
-
-/* Liquid glass: the globe shows through, blurred and saturated, under a bright rim and a specular sheen. */
+/* Liquid glass: the globe shows through, blurred and saturated, under a bright rim and a specular sheen.
+   Layout, size and the radius are Tailwind classes in SearchPanel.tsx. */
 .panel {
-  position: relative;
-  z-index: 10;
   background: linear-gradient(
     135deg,
     color-mix(in srgb, var(--decor-light) 50%, transparent),
     color-mix(in srgb, var(--success-soft) 22%, transparent) 55%,
     color-mix(in srgb, var(--decor-light) 32%, transparent)
   );
-  border-radius: clamp(22px, 5.6vw, 30px);
   -webkit-backdrop-filter: blur(22px) saturate(180%);
   backdrop-filter: blur(22px) saturate(180%);
   box-shadow:
@@ -40,67 +36,5 @@
     background: var(--decor-glass-fallback);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
-  }
-}
-
-.tabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(4px, 1.4vw, 8px);
-  padding: clamp(6px, 2vw, 10px);
-}
-
-.tab {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(6px, 1.8vw, 12px);
-  min-width: 0;
-  height: clamp(44px, 12vw, 58px);
-  padding: 0 clamp(6px, 2vw, 18px);
-  font-size: clamp(13px, 3.8vw, 18px);
-  white-space: nowrap;
-}
-
-.tabIcon {
-  flex: none;
-  width: clamp(18px, 5vw, 24px);
-  height: clamp(18px, 5vw, 24px);
-}
-
-.body {
-  /* Children that bleed to the card edge (scrolling chips) read the padding from here. */
-  --pad: clamp(14px, 3.6vw, 22px);
-  padding: var(--pad);
-  background: var(--card);
-  /* Only the outer corners, following the panel; the edge under the tabs stays straight. */
-  border-bottom-right-radius: inherit;
-  border-bottom-left-radius: inherit;
-  animation: panelIn 0.25s ease-out;
-}
-
-.body[hidden] {
-  display: none;
-}
-
-@keyframes panelIn {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-}
-
-/* Phones: the icon goes above the label, otherwise "Случайность" does not fit a third of the width. */
-@media (width < --theme(--breakpoint-sm)) {
-  .tab {
-    flex-direction: column;
-    gap: 2px;
-    height: 56px;
-    font-size: var(--text-sm);
-  }
-
-  .tabIcon {
-    width: 20px;
-    height: 20px;
   }
 }
