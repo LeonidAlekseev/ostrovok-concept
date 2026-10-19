@@ -170,12 +170,16 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
             <li className={messageClass}>
               <RobotAvatar className={messageAvatarClass} />
               <div
-                className={`${styles.typing} flex gap-1 rounded-[18px_18px_18px_6px] bg-muted px-4 py-3.5`}
+                className="flex gap-1 rounded-[18px_18px_18px_6px] bg-muted px-4 py-3.5"
                 aria-label="Ассистент думает"
               >
-                <span />
-                <span />
-                <span />
+                {[0, 0.15, 0.3].map((delay) => (
+                  <span
+                    key={delay}
+                    className={`${styles.dot} size-[7px] rounded-full bg-muted-foreground`}
+                    style={{ animationDelay: `${delay}s` }}
+                  />
+                ))}
               </div>
             </li>
           )}
