@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { destinations } from '../data/destinations'
-import { resolveTarget, suggestDestinations, validateSearch, type SearchQuery } from './search'
+import { findScenario, resolveTarget, suggestDestinations, validateSearch, type SearchQuery } from './search'
 
 const ids = (list: { id: string }[]) => list.map((d) => d.id)
 
@@ -21,6 +21,18 @@ describe('resolveTarget', () => {
   it('does not resolve partial names or countries', () => {
     expect(resolveTarget('Праг')).toBeNull()
     expect(resolveTarget('Чехия')).toBeNull()
+  })
+})
+
+describe('findScenario', () => {
+  it('finds a scenario by title ignoring case, outer spaces and ё/е', () => {
+    expect(findScenario('  нА вЫХОДНЫЕ ')).toMatchObject({ id: 'weekend' })
+    expect(findScenario('Города Ёвропы')).toMatchObject({ id: 'europe' })
+  })
+
+  it('returns undefined for empty or unknown text', () => {
+    expect(findScenario('   ')).toBeUndefined()
+    expect(findScenario('В горы')).toBeUndefined()
   })
 })
 
