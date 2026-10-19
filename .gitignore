@@ -29,3 +29,6 @@ out
 next-env.d.ts
 *.tsbuildinfo
 .vercel
+
+# Скриншоты визуальных проверок: хранятся вне репозитория
+openspec/**/screenshots/
