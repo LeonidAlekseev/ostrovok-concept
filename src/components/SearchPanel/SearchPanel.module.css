@@ -58,43 +58,14 @@
   min-width: 0;
   height: clamp(44px, 12vw, 58px);
   padding: 0 clamp(6px, 2vw, 18px);
-  color: var(--brand-foreground);
   font-size: clamp(13px, 3.8vw, 18px);
-  font-weight: 500;
   white-space: nowrap;
-  background: color-mix(in srgb, var(--decor-light) 45%, transparent);
-  border: 0;
-  border-radius: var(--radius-full);
-  transition:
-    background-color 0.2s,
-    color 0.2s,
-    box-shadow 0.2s;
-}
-
-.tab:hover {
-  background: var(--card);
-}
-
-.tab[aria-selected='true'] {
-  color: var(--primary);
-  font-weight: 650;
-  background: var(--card);
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--shadow-color) 8%, transparent);
 }
 
 .tabIcon {
   flex: none;
   width: clamp(18px, 5vw, 24px);
   height: clamp(18px, 5vw, 24px);
-}
-
-.tab[aria-selected='true'] .tabIcon {
-  fill: currentColor;
-}
-
-/* Only the sparkle reads well filled; the sliders and the die keep their outline. */
-.tab:not(:first-child) .tabIcon {
-  fill: none;
 }
 
 .body {
