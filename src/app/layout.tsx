@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import type { ReactNode } from 'react'
+import { Footer } from '../components/Footer/Footer'
+import { Header } from '../components/Header/Header'
 import '@fontsource-variable/onest'
 import '@fontsource/caveat/600.css'
 import './globals.css'
@@ -26,7 +28,12 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ru">
-      <body>{children}</body>
+      {/* Each page renders its own `main`; the footer sits at the bottom of short pages. */}
+      <body className="flex min-h-dvh flex-col">
+        <Header />
+        {children}
+        <Footer />
+      </body>
     </html>
   )
 }

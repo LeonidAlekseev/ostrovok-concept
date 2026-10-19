@@ -1,13 +1,12 @@
+'use client'
+
 import { useCallback, useState } from 'react'
+import Link from 'next/link'
 import { Bell, Heart, Menu, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
-type Panel = 'favorites' | 'notifications' | 'menu'
-
-interface Props {
-  onStartSearch: () => void
-}
+type Panel = 'notifications' | 'menu'
 
 // Blue on the lime hero; the white glaze replaces ghost's grey hover there.
 const iconButton =
@@ -21,12 +20,13 @@ const panelTitleClass = 'm-0 mb-1.5 text-base font-[650]'
 const panelTextClass = 'm-0 mb-3.5 text-sm leading-[1.45] text-muted-foreground'
 
 const menuLinks = [
-  { href: '#search', label: 'Поиск отелей' },
-  { href: '#ideas', label: 'Популярные направления' },
-  { href: '#explore', label: 'Исследуйте мир' },
+  { href: '/#search', label: 'Поиск отелей' },
+  { href: '/trips', label: 'Мои поездки' },
+  { href: '/favorites', label: 'Избранное' },
+  { href: '/help', label: 'Поддержка' },
 ]
 
-export function Header({ onStartSearch }: Props) {
+export function Header() {
   const [open, setOpen] = useState<Panel | null>(null)
   const close = useCallback(() => setOpen(null), [])
 
@@ -49,26 +49,13 @@ export function Header({ onStartSearch }: Props) {
         </a>
 
         <div className="relative flex items-center gap-[clamp(0px,1vw,14px)]">
-          <Popover {...panelProps('favorites')}>
-            <PopoverTrigger
-              render={<Button variant="ghost" size="icon" className={iconButton} aria-label="Избранное" />}
-            >
-              <Heart className="size-6.5" fill="currentColor" strokeWidth={2} aria-hidden />
-            </PopoverTrigger>
-            <PopoverContent align="end" sideOffset={10} aria-label={panelTitle.favorites} className={panelClass}>
-              <p className={panelTitleClass}>Избранное пока пусто</p>
-              <p className={panelTextClass}>Сохраняйте понравившиеся отели, чтобы вернуться к ним позже.</p>
-              <Button
-                className="w-full"
-                onClick={() => {
-                  close()
-                  onStartSearch()
-                }}
-              >
-                Найти отель
-              </Button>
-            </PopoverContent>
-          </Popover>
+          <Link
+            href="/favorites"
+            className={buttonVariants({ variant: 'ghost', size: 'icon', className: iconButton })}
+            aria-label="Избранное"
+          >
+            <Heart className="size-6.5" fill="currentColor" strokeWidth={2} aria-hidden />
+          </Link>
 
           <Popover {...panelProps('notifications')}>
             <PopoverTrigger
@@ -107,13 +94,13 @@ export function Header({ onStartSearch }: Props) {
                 <ul className="-m-1.5">
                   {menuLinks.map((link) => (
                     <li key={link.href}>
-                      <a
+                      <Link
                         className="block rounded-md p-3 font-[550] text-foreground no-underline hover:bg-muted hover:text-primary"
                         href={link.href}
                         onClick={close}
                       >
                         {link.label}
-                      </a>
+                      </Link>
                     </li>
                   ))}
                 </ul>
@@ -127,7 +114,6 @@ export function Header({ onStartSearch }: Props) {
 }
 
 const panelTitle: Record<Panel, string> = {
-  favorites: 'Избранное',
   notifications: 'Уведомления',
   menu: 'Меню',
 }
