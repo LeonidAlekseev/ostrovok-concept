@@ -69,9 +69,7 @@ export function Header({ onStartSearch }: Props) {
 
           <Popover {...panelProps('notifications')}>
             <PopoverTrigger
-              render={
-                <Button variant="ghost" size="icon" className={iconButton} aria-label="Уведомления" />
-              }
+              render={<Button variant="ghost" size="icon" className={iconButton} aria-label="Уведомления" />}
             >
               <Bell className="size-6.25" fill="currentColor" strokeWidth={2} aria-hidden />
             </PopoverTrigger>

@@ -83,18 +83,18 @@ export function RandomSearch({ onPreview }: Props) {
           </div>
         </div>
 
-        <Label className='mb-2 text-base leading-[normal] font-semibold' htmlFor={nameId}>
+        <Label className="mb-2 text-base leading-[normal] font-semibold" htmlFor={nameId}>
           Как вас зовут?
         </Label>
         <Input
           ref={nameRef}
           id={nameId}
-          className='mb-4 h-[clamp(48px,12.4vw,56px)] bg-card px-4 text-base focus-visible:ring-ring/10 sm:text-lg md:text-lg'
+          className="mb-4 h-[clamp(48px,12.4vw,56px)] bg-card px-4 text-base focus-visible:ring-ring/10 sm:text-lg md:text-lg"
           aria-invalid={nameInvalid || undefined}
           value={name}
           maxLength={24}
-          autoComplete='given-name'
-          placeholder='Ваше имя'
+          autoComplete="given-name"
+          placeholder="Ваше имя"
           onChange={(e) => setName(e.target.value)}
         />
         <FieldError className={styles.nameError}>{nameInvalid && error}</FieldError>
@@ -125,11 +125,11 @@ export function RandomSearch({ onPreview }: Props) {
         <FieldError className={styles.error}>{!nameInvalid && error}</FieldError>
 
         <Button
-          type='submit'
-          size='lg'
+          type="submit"
+          size="lg"
           className={`${styles.spin} h-[clamp(52px,13.6vw,60px)] gap-2.5 bg-(image:--decor-spin-gradient) text-[clamp(17px,4.6vw,19px)] shadow-(--decor-spin-shadow)`}
         >
-          <Dices className='size-6' aria-hidden />
+          <Dices className="size-6" aria-hidden />
           Крутить барабан
         </Button>
       </form>
@@ -163,18 +163,18 @@ export function RandomSearch({ onPreview }: Props) {
           <span className={styles.playerName}>{name.trim()}</span>
           <span className={styles.playerHint}>{sign.name}</span>
         </span>
-        <Button variant='secondary' size='sm' shape='pill' className={styles.edit} onClick={() => setEditing(true)}>
-          <PencilLine className='size-4' aria-hidden />
+        <Button variant="secondary" size="sm" shape="pill" className={styles.edit} onClick={() => setEditing(true)}>
+          <PencilLine className="size-4" aria-hidden />
           Изменить
         </Button>
       </div>
 
       <SlotMachine key={round.id} fortune={fortune} spinning={!landed} onLanded={onLanded} />
 
-      <div aria-live='polite'>
+      <div aria-live="polite">
         {landed && (
           <Card
-            role='article'
+            role="article"
             className={`${styles.ticket} gap-0 rounded-2xl bg-(image:--decor-ticket-gradient) py-0 text-primary-foreground shadow-(--decor-ticket-shadow)`}
           >
             <Confetti />
@@ -188,7 +188,7 @@ export function RandomSearch({ onPreview }: Props) {
             <p className={styles.ticketMeta}>
               <span className={styles.ticketStars} aria-label={`${fortune.hotel.stars} звезды`}>
                 {Array.from({ length: fortune.hotel.stars }, (_, i) => (
-                  <Star key={i} fill='currentColor' strokeWidth={0} aria-hidden />
+                  <Star key={i} fill="currentColor" strokeWidth={0} aria-hidden />
                 ))}
               </span>
               <span className={styles.ticketRating}>{fortune.hotel.rating.toFixed(1)}</span>
@@ -201,17 +201,23 @@ export function RandomSearch({ onPreview }: Props) {
       </div>
 
       <div className={styles.actions}>
-        <Button size='lg' className='h-12.5 px-3 text-base' onClick={share} disabled={!landed}>
+        <Button size="lg" className="h-12.5 px-3 text-base" onClick={share} disabled={!landed}>
           <Share2 aria-hidden />
           Поделиться
         </Button>
-        <Button variant='secondary' size='lg' className='h-12.5 px-3 text-base' onClick={() => spin()} disabled={!landed}>
+        <Button
+          variant="secondary"
+          size="lg"
+          className="h-12.5 px-3 text-base"
+          onClick={() => spin()}
+          disabled={!landed}
+        >
           <RotateCcw aria-hidden />
           Ещё раз
         </Button>
       </div>
       {shareNote && (
-        <p className={styles.shareNote} role='status'>
+        <p className={styles.shareNote} role="status">
           {shareNote}
         </p>
       )}
@@ -279,7 +285,7 @@ function SlotMachine({ fortune, spinning, onLanded }: { fortune: Fortune; spinni
           </div>
         ))}
       </div>
-      <p className='visually-hidden' role='status'>
+      <p className="visually-hidden" role="status">
         {spinning ? 'Барабан крутится…' : `Выпало: ${fortune.city.name}, ${fortune.hotel.name}, ${fortune.mood}`}
       </p>
     </div>
