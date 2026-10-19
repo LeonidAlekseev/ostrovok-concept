@@ -24,7 +24,7 @@ export function StatsPanel({ ref }: { ref: Ref<StatsPanelHandle> }) {
   if (!mounted) return null
   return createPortal(
     <details
-      className="fixed right-2 bottom-2 z-2147483647 max-w-[calc(100vw-16px)] rounded-sm bg-(--decor-black)/78 px-2 py-1 font-mono text-[11px]/[1.4] text-(--decor-stats)"
+      className="fixed right-2 bottom-2 z-2147483647 max-w-[calc(100vw-16px)] rounded-sm bg-(--decor-black)/78 px-2 py-1 font-[ui-monospace,SFMono-Regular,Menlo,monospace] text-[11px]/[1.4] text-(--decor-stats)"
       open={open}
       onToggle={(e) => {
         setOpen(e.currentTarget.open)
