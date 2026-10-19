@@ -40,8 +40,9 @@ export function DateField({ checkIn, checkOut, error, onChange }: Props) {
   }
 
   const today = todayIso()
-  const label = formatDateRange(checkIn, checkOut)
-  const nights = nightsBetween(checkIn, checkOut)
+  const hasDates = Boolean(checkIn && checkOut)
+  const label = hasDates ? formatDateRange(checkIn, checkOut) : ''
+  const nights = hasDates ? nightsBetween(checkIn, checkOut) : 0
 
   return (
     <div className={`${styles.fieldWrap} ${styles.areaDates}`}>

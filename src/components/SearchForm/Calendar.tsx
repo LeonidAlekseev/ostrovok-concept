@@ -21,8 +21,10 @@ const monthKey = (iso: IsoDate) => {
 
 /** Two-month range calendar (one month on small screens) with roving-focus keyboard navigation. */
 export function Calendar({ start, end, min, max, onPick }: Props) {
-  const [view, setView] = useState(() => monthKey(start))
-  const [focused, setFocused] = useState(start)
+  // Roving focus starts on the first selectable day when `start` is before `min` (e.g. a past check-in).
+  const first = start < min ? min : start
+  const [view, setView] = useState(() => monthKey(first))
+  const [focused, setFocused] = useState(first)
   const [hover, setHover] = useState<IsoDate | null>(null)
   const gridRef = useRef<HTMLDivElement>(null)
   const moveFocus = useRef(true)
