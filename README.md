@@ -123,9 +123,8 @@ Tailwind CSS v4 (через `@tailwindcss/postcss`, `postcss.config.mjs`) и sha
 
 Шапка (`src/components/Header`) и подвал (`src/components/Footer`) рендерятся в
 `src/app/layout.tsx` на каждой странице; страница сама рендерит свой `main`. Сейчас есть `/`,
-`/search` (результаты поиска), `/hotels/<id>`, `/hotels/<id>/rooms`, `/booking`, `/booking/confirmation`, `/login`, `/register` и страница 404 (`src/app/not-found.tsx`). Шапка и подвал уже ссылаются на разделы, которые
-добавляют следующие changes: `/favorites`, `/trips`, `/help`, `/legal/terms`, `/legal/privacy`,
-`/legal/cookies`. Все маршруты пререндерятся статически.
+`/search` (результаты поиска), `/hotels/<id>`, `/hotels/<id>/rooms`, `/booking`, `/booking/confirmation`, `/login`, `/register`, `/help`, `/legal/terms`, `/legal/privacy`, `/legal/cookies` и страница 404 (`src/app/not-found.tsx`). Шапка и подвал уже ссылаются на разделы, которые
+добавляют следующие changes: `/favorites`, `/trips`. Все маршруты пререндерятся статически.
 
 ### Каталог
 
@@ -216,6 +215,19 @@ Tailwind CSS v4 (через `@tailwindcss/postcss`, `postcss.config.mjs`) и sha
 
 В шапке гость видит «Войти» (так же до гидрации), вошедший — кнопку с именем и меню «Мои поездки»,
 «Избранное», «Выйти» (`src/components/Header/UserMenu.tsx`).
+
+### Поддержка и юридические страницы
+
+`/help` (`src/components/HelpPage`): вопросы из `src/data/faq.ts` (20 вопросов, 4 категории) в
+аккордеоне shadcn (`ui/accordion`). Поиск (`filterFaq` в `src/lib/faq.ts`) ищет по вопросу и
+ответу без учёта регистра и «ё/е»; без совпадений — «Ничего не нашлось» и ссылка на форму.
+`/help#<id вопроса>` раскрывает вопрос и прокручивает к нему. Форма обращения (имя, email,
+сообщение; номер бронирования необязателен) только проверяет поля и показывает «Обращение
+отправлено (демо)»: данные не отправляются и не сохраняются.
+
+`/legal/terms`, `/legal/privacy`, `/legal/cookies`: тексты-шаблоны лежат в `src/data/legal.ts`,
+разметку даёт общий `src/components/LegalPage` (дата обновления, демо-пометка, оглавление по
+`h2` с якорями). Страница cookie перечисляет ключи `ostrovok:v1:*`. Все страницы статические.
 
 ### Состояние в браузере
 
