@@ -18,7 +18,6 @@ import {
 import { formatDateRange, todayIso } from '../../lib/dates'
 import { countRu, formatPrice, guestsLabel } from '../../lib/format'
 import { RobotAvatar } from './RobotAvatar'
-import styles from './AssistantSearch.module.css'
 
 interface Message {
   from: 'agent' | 'user'
@@ -176,7 +175,7 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
                 {[0, 0.15, 0.3].map((delay) => (
                   <span
                     key={delay}
-                    className={`${styles.dot} size-[7px] rounded-full bg-muted-foreground`}
+                    className="size-[7px] animate-typing-dot rounded-full bg-muted-foreground"
                     style={{ animationDelay: `${delay}s` }}
                   />
                 ))}

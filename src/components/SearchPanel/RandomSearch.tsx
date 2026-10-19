@@ -19,7 +19,6 @@ import {
   type Fortune,
   type ZodiacSign,
 } from '../../lib/fortune'
-import styles from './RandomSearch.module.css'
 
 interface Props {
   onPreview: (destination: Destination) => void
@@ -36,7 +35,7 @@ const hotelNames = bestHotels.map((h) => h.name)
 const CONFETTI = [1, 2, 3, 4, 5].map((n) => `var(--decor-confetti-${n})`)
 // Text presentation: the emoji variants of the zodiac glyphs ignore the selected colour.
 // A highlight sweeps across the spin button now and then, inviting a pull (the button clips it); the keyframes
-// are in the module, the transform stays a plain property so they animate from it.
+// are in globals.css, the transform stays a plain property so they animate from it.
 const shineSweep =
   "after:absolute after:inset-0 after:[transform:translateX(-100%)] after:[background:linear-gradient(100deg,transparent_30%,color-mix(in_srgb,var(--decor-light)_35%,transparent)_50%,transparent_70%)] after:content-['']"
 // Curved-glass shading: symbols darken as they roll over the top and bottom edges.
@@ -145,7 +144,7 @@ export function RandomSearch({ onPreview }: Props) {
         <Button
           type="submit"
           size="lg"
-          className={`${styles.shine} ${shineSweep} relative mt-4.5 overflow-hidden h-[clamp(52px,13.6vw,60px)] gap-2.5 bg-(image:--decor-spin-gradient) text-[clamp(17px,4.6vw,19px)] shadow-(--decor-spin-shadow)`}
+          className={`after:animate-slot-shine ${shineSweep} relative mt-4.5 overflow-hidden h-[clamp(52px,13.6vw,60px)] gap-2.5 bg-(image:--decor-spin-gradient) text-[clamp(17px,4.6vw,19px)] shadow-(--decor-spin-shadow)`}
         >
           <Dices className="size-6" aria-hidden />
           Крутить барабан
@@ -288,13 +287,13 @@ function SlotMachine({ fortune, spinning, onLanded }: { fortune: Fortune; spinni
   return (
     <div className={`${machineBody} relative mr-5.5 rounded-2xl px-3 pt-4.5 pb-3.5 [--h:clamp(52px,14vw,64px)]`}>
       <div
-        className={`${spinning ? styles.pull : ''} absolute top-[26%] -right-5 h-[46%] w-2 origin-bottom rounded-sm bg-[linear-gradient(90deg,var(--decor-lever-dark),var(--decor-lever-light),var(--decor-lever-dark))]`}
+        className={`${spinning ? 'animate-slot-pull' : ''} absolute top-[26%] -right-5 h-[46%] w-2 origin-bottom rounded-sm bg-[linear-gradient(90deg,var(--decor-lever-dark),var(--decor-lever-light),var(--decor-lever-dark))]`}
         aria-hidden
       >
         <span className="absolute -top-3.5 left-1/2 size-5.5 [translate:-50%_0] rounded-full bg-[radial-gradient(circle_at_35%_30%,var(--decor-knob-light),var(--decor-knob)_55%,var(--decor-knob-dark))] [box-shadow:0_3px_6px_color-mix(in_srgb,var(--decor-black)_25%,transparent)]" />
       </div>
       <div
-        className={`${spinning ? styles.chase : styles.blink} ${bulbs} absolute top-1.5 right-4 left-4 h-1.5 opacity-85`}
+        className={`${spinning ? 'animate-slot-chase' : 'animate-slot-blink'} ${bulbs} absolute top-1.5 right-4 left-4 h-1.5 opacity-85`}
         aria-hidden
       />
       <div className="grid grid-cols-3 gap-2" aria-hidden>
@@ -304,7 +303,7 @@ function SlotMachine({ fortune, spinning, onLanded }: { fortune: Fortune; spinni
               {['Город', 'Отель', 'Настроение'][i]}
             </span>
             <div
-              className={`${spinning ? '' : styles.win} ${windowShade} relative h-(--h) overflow-hidden rounded-lg bg-card [box-shadow:inset_0_0_0_2px_color-mix(in_srgb,var(--decor-gold)_60%,transparent)]`}
+              className={`${spinning ? '' : 'animate-slot-win'} ${windowShade} relative h-(--h) overflow-hidden rounded-lg bg-card [box-shadow:inset_0_0_0_2px_color-mix(in_srgb,var(--decor-gold)_60%,transparent)]`}
             >
               <ul
                 className={`transition-transform duration-(--d) ease-[cubic-bezier(0.12,0.8,0.22,1.04)] ${spinning ? 'blur-[0.4px]' : ''}`}
@@ -343,7 +342,7 @@ function Confetti() {
       '--x': `${(Math.random() - 0.5) * 520}px`,
       '--y': `${-120 - Math.random() * 220}px`,
       '--r': `${(Math.random() - 0.5) * 1080}deg`,
-      '--delay': `${Math.random() * 120}ms`,
+      animationDelay: `${Math.random() * 120}ms`,
       background: CONFETTI[i % CONFETTI.length],
     })),
   )
@@ -352,7 +351,7 @@ function Confetti() {
       {pieces.map((style, i) => (
         <span
           key={i}
-          className={`${styles.piece} absolute opacity-0 ${i % 3 === 2 ? 'size-2.5 rounded-full' : 'h-3 w-2'}`}
+          className={`absolute animate-confetti opacity-0 ${i % 3 === 2 ? 'size-2.5 rounded-full' : 'h-3 w-2'}`}
           style={style as CSSProperties}
         />
       ))}

@@ -2,12 +2,12 @@
 
 ## 1. Базовые замеры
 
-- [ ] 1.1 `npm run build`, записать размер CSS (сырой и gzip −9) в proposal.md, раздел «Замеры»; проверка: числа записаны.
-- [ ] 1.2 Снять скриншоты состояний из design.md; проверка: файлы в `/tmp/reduce-globe-css-screenshots/before`.
+- [x] 1.1 `npm run build`, записать размер CSS (сырой и gzip −9) в proposal.md, раздел «Замеры»; проверка: числа записаны.
+- [x] 1.2 Снять скриншоты состояний из design.md; проверка: файлы в `/tmp/reduce-globe-css-screenshots/before`.
 
 ## 2. Анимации и модули
 
-- [ ] 2.1 `@keyframes` из `AssistantSearch.module.css` и `RandomSearch.module.css` в `@theme`, запуск утилитами `animate-*`, оба модуля удалены; проверка: `npm run build` проходит, скриншоты совпадают в пределах отклонений.
+- [x] 2.1 `@keyframes` из `AssistantSearch.module.css` и `RandomSearch.module.css` в `@theme`, запуск утилитами `animate-*`, оба модуля удалены; проверка: `npm run build` проходит, скриншоты совпадают в пределах отклонений.
 - [ ] 2.2 `Hero` на утилиты и `@theme`, `Hero.module.css` удалён; проверка: как в 2.1.
 - [ ] 2.3 Убрать `static` у `@theme`; проверка: проверка `static` из design.md, скриншоты совпадают.
 
