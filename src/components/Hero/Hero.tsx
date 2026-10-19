@@ -384,7 +384,11 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
                 else pinRefs.current.delete(d.id)
               }}
               type="button"
-              className={`${styles.pin} ${isHub ? styles.pinHub : ''}`}
+              className={`${styles.pin} absolute top-0 left-0 touch-none will-change-transform ${
+                isHub
+                  ? `${styles.pinHub} z-3 h-10 w-[30px] md:h-[58px] md:w-11`
+                  : 'z-2 h-6 w-[18px] md:h-[35px] md:w-[26px]'
+              } group`}
               style={{ ...positionStyle(point), '--o': depthOpacity(point.depth).toFixed(3) } as CSSProperties}
               data-hidden={point.depth <= 0.05 || undefined}
               aria-label={`${d.name}, ${d.country} — выбрать направление`}
@@ -393,7 +397,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
               {...pauseHandlers}
             >
               <PinIcon />
-              <span className={styles.pinTooltip} aria-hidden>
+              <span className={`${styles.pinTooltip} ${isHub ? '' : styles.pinTooltipShown}`} aria-hidden>
                 {d.name}
               </span>
             </button>
@@ -476,7 +480,11 @@ function describeStats(frames: FrameWindow, renderer: GlobeRenderer) {
 
 function PinIcon() {
   return (
-    <svg className={styles.pinIcon} viewBox="0 0 24 32" aria-hidden>
+    <svg
+      className="relative block size-full drop-shadow-[0_0_4px_color-mix(in_srgb,var(--decor-light)_90%,transparent)]"
+      viewBox="0 0 24 32"
+      aria-hidden
+    >
       <path
         d="M12 1.2C6.04 1.2 1.2 5.9 1.2 11.7c0 7.6 9.2 17.6 10 18.5a1.1 1.1 0 0 0 1.6 0c.8-.9 10-10.9 10-18.5C22.8 5.9 17.96 1.2 12 1.2Z"
         fill="currentColor"
