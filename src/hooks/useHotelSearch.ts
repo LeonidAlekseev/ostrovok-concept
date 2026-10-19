@@ -65,26 +65,30 @@ export function useHotelSearch() {
     setErrors((e) => withoutKey(e, 'guests'))
   }, [])
 
-  const run = useCallback(async (q: SearchQuery): Promise<SearchErrors> => {
-    const found = validateSearch(q, todayIso())
-    setErrors(found)
-    const target = resolveTarget(q.destination)
-    if (Object.keys(found).length > 0 || !target) return found
+  const run = useCallback(
+    async (q: SearchQuery): Promise<SearchErrors> => {
+      // Same `today` snapshot the form used for its start dates; todayIso() only while that snapshot is empty.
+      const found = validateSearch(q, today || todayIso())
+      setErrors(found)
+      const target = resolveTarget(q.destination)
+      if (Object.keys(found).length > 0 || !target) return found
 
-    abortRef.current?.abort()
-    const controller = new AbortController()
-    abortRef.current = controller
-    setStatus({ state: 'loading' })
-    try {
-      const result = await runDemoSearch(q, target, controller.signal)
-      window.history.replaceState(null, '', `?${result.params}`)
-      setStatus({ state: 'done', result })
-    } catch (error) {
-      if (controller.signal.aborted) return found
-      setStatus({ state: 'error', message: error instanceof Error ? error.message : 'Не удалось выполнить поиск' })
-    }
-    return found
-  }, [])
+      abortRef.current?.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
+      setStatus({ state: 'loading' })
+      try {
+        const result = await runDemoSearch(q, target, controller.signal)
+        window.history.replaceState(null, '', `?${result.params}`)
+        setStatus({ state: 'done', result })
+      } catch (error) {
+        if (controller.signal.aborted) return found
+        setStatus({ state: 'error', message: error instanceof Error ? error.message : 'Не удалось выполнить поиск' })
+      }
+      return found
+    },
+    [today],
+  )
 
   /** Returns validation errors so the caller can move focus to the first invalid field. */
   const submit = useCallback(() => run(query), [run, query])
