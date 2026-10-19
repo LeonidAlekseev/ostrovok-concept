@@ -109,16 +109,16 @@ describe('validateSearch', () => {
     )
   })
 
-  it('reports impossible guest counts with a generic message', () => {
-    // Not described in manual-search spec: only "rooms > adults" has a scenario there.
+  it('reports guest counts outside GUEST_LIMITS', () => {
     expect(check({ guests: { adults: 0, children: 0, rooms: 0 } }).guests).toBe('Проверьте количество гостей')
     expect(check({ guests: { adults: 2, children: -1, rooms: 1 } }).guests).toBe('Проверьте количество гостей')
   })
 
-  it('does not check the upper guest limits', () => {
-    // Current behaviour: GUEST_LIMITS maximums (adults 10, children 6, rooms 5) are enforced
-    // only by the steppers, not by validateSearch.
-    expect(check({ guests: { adults: 11, children: 7, rooms: 6 } })).toEqual({})
+  it('checks the upper guest limits', () => {
+    expect(check({ guests: { adults: 11, children: 0, rooms: 1 } }).guests).toBe('Проверьте количество гостей')
+    expect(check({ guests: { adults: 2, children: 7, rooms: 1 } }).guests).toBe('Проверьте количество гостей')
+    expect(check({ guests: { adults: 10, children: 0, rooms: 6 } }).guests).toBe('Проверьте количество гостей')
+    expect(check({ guests: { adults: 10, children: 6, rooms: 5 } })).toEqual({})
   })
 
   it('reports several fields at once', () => {
