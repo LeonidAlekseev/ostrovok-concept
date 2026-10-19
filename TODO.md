@@ -5,18 +5,12 @@
 
 ## В работе
 
-Этап 1 (план — planning PR от 2026-10-19, согласован пользователем):
+Этап 2:
 
-- [ ] CI: отменять только прогоны `pull_request`, actions по SHA, команды проверок в README —
-      `tune-ci-workflow` — в работе.
-- [ ] `run` валидирует даты по снимку `today` формы, тест на `replaceState` —
-      `fix-search-today-snapshot` — в работе.
-- [ ] CSS-модули `SearchForm`, `SearchPanel`, `RandomSearch`, `AssistantSearch` на Tailwind, политика
-      `translate`/`scale`/`shadow` в README — `reduce-search-css` — в работе.
-- [ ] `shadcn` в `devDependencies`, уязвимости `npm audit` — `move-shadcn-dev-dependency` — в работе.
-
-Этап 2 (согласован, старт после merge `reduce-search-css`): остаток CSS `Hero`, `@theme` без
-`static`, политика утилит во всех компонентах — `reduce-globe-css`.
+- [ ] Свой CSS на Tailwind во всех компонентах: `Hero`, анимации `RandomSearch` и `AssistantSearch` в
+      `@theme`, модули удалены, `@theme` без `static`, стандартные утилиты для
+      `translate`/`scale`/`rotate`/`shadow` — `reduce-globe-css` — в работе. Обновлён по решению
+      пользователя 2026-10-19: порог размера CSS отменён.
 
 ## Ожидает согласования
 
@@ -29,7 +23,13 @@
 
 ## Предложения
 
-Нет.
+- [ ] 7 уязвимостей high в dev-дереве: `braces` (GHSA-vfj7-8cjw-p6xm, исправленной версии нет) →
+      `micromatch` → `fast-glob` → CLI `shadcn` — источник: `package.json` (`move-shadcn-dev-dependency`)
+      — в продакшен-зависимостях 0 после #25; дождаться исправления `braces` или заменить CLI — лёгкий
+      — нет.
+- [ ] Скрипт съёмки и сравнения скриншотов (Chromium, pixelmatch) пересоздаётся в `/tmp` каждым
+      исполнителем — источник: `reduce-search-css` — оформить в `scripts/` без коммита изображений —
+      лёгкий — нет.
 
 ## Выполнено
 
@@ -68,6 +68,18 @@
 - [x] Скриншоты `openspec/**/screenshots/` вычищены из истории `main` и `dev` (`git filter-repo`, force
       push пользователем; pack 18,18 → 4,42 МБ), удалены 8 слитых веток PR #14–#21; SHA в TODO и
       архиве changes заменены на новые — решение пользователя, без PR — 2026-10-19.
+
+- [x] CI: отмена устаревших прогонов только для `pull_request`, actions по SHA `v4.4.0`, команды
+      проверок в README — `tune-ci-workflow` — #23 — 2026-10-19.
+- [x] `run` валидирует даты по снимку `today` формы, тесты на смену дня и `replaceState` —
+      `fix-search-today-snapshot` — #24 — 2026-10-19.
+- [x] `shadcn` перенесён в `devDependencies`, `npm audit --omit=dev` 7 high → 0 —
+      `move-shadcn-dev-dependency` — #25 — 2026-10-19.
+- [x] Модули `SearchForm` и `SearchPanel` удалены, `RandomSearch` и `AssistantSearch` сведены к
+      `@keyframes`, правило `translate`/`scale`/`shadow` в README — `reduce-search-css` — #26 —
+      2026-10-19. CSS 92 896 → 97 752 байт (+5,2 %), gzip 18 743 → 19 202 (+2,4 %); рост принят
+      решением пользователя.
+- [x] План этапа 2026-10-19-2, скриншоты вне репозитория (`.gitignore`) — #22 — 2026-10-19.
 
 ## Отклонено/неактуально
 
