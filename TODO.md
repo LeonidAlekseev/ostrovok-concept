@@ -5,27 +5,11 @@
 
 ## В работе
 
-Этап 1 — не более двух исполнителей одновременно, очередь: `add-ci-checks` и `reduce-hero-css`,
-затем `fix-search-dates-effect`, затем `reduce-page-css`.
-
-- [ ] **CI в GitHub Actions.** lint, typecheck, тесты и `format:check` на каждый PR в `dev` и `main`.
-      — change `add-ci-checks` — статус: в работе — ветка `add-ci-checks` — PR: —.
-- [ ] **Сократить кастомный CSS `Hero`.** `Hero.module.css` (544 строки): перенести раскладку, текст,
-      карточку места и статистику на Tailwind; эффекты глобуса и пинов оставить в модуле. — change
-      `reduce-hero-css` — статус: в работе — ветка `reduce-hero-css` — PR: —.
-- [ ] **Предупреждение lint в `useHotelSearch`.** `src/hooks/useHotelSearch.ts:43` —
-      `react(set-state-in-effect)`. Стартовые даты вычислять при рендере, «сегодня» читать через
-      `useSyncExternalStore` с серверным снимком. — change `fix-search-dates-effect` — статус: в
-      очереди этапа 1 — ветка `fix-search-dates-effect` — PR: —.
-- [ ] **Сократить кастомный CSS страницы.** `HomePage`, `DestinationCard`, `TravelBanner`,
-      `ui/SmartImage` — на Tailwind, проверка скриншотами. — change `reduce-page-css` — статус: в
-      очереди этапа 1 — ветка `reduce-page-css` — PR: —.
-
-Этап 2 — после merge `reduce-hero-css` и `reduce-page-css`:
+Этап 2:
 
 - [ ] **Сжать таблицы `cn`.** Пакет `cn` ≈ 25,7 КБ сырых в чанке главной. Компилировать таблицы под
       классы проекта через `cn build` / `withCn`; внедрять при выигрыше от 2 КБ gzip. — change
-      `compile-cn-tables` — статус: согласован, ждёт этапа 2 — ветка: — — PR: —.
+      `compile-cn-tables` — статус: в работе — ветка `compile-cn-tables` — PR: —.
 
 ## Ожидает согласования
 
@@ -38,7 +22,33 @@
 
 ## Предложения
 
-Нет.
+- [ ] `concurrency` с `cancel-in-progress: true` отменяет и прогоны на push в `main` и `dev` —
+      источник: `.github/workflows/ci.yml:11` (`add-ci-checks`) — после merge без проверки остаётся
+      только последний push; отменять только прогоны `pull_request` — лёгкий — нет.
+- [ ] Закрепить `actions/checkout` и `actions/setup-node` по SHA — источник:
+      `.github/workflows/ci.yml:20`, `.github/workflows/ci.yml:22` (`add-ci-checks`) — защита от
+      подмены тега стороннего action — лёгкий — нет.
+- [ ] Добавить `npm test` и `npm run format:check` в список команд раздела «Запуск» — источник:
+      `README.md:15` (`add-ci-checks`) — список локальных команд неполон — лёгкий — нет.
+- [ ] `run` валидирует даты по `todayIso()`, а форма — по снимку `today` из `useSyncExternalStore` —
+      источник: `src/hooks/useHotelSearch.ts:69` (`fix-search-dates-effect`) — после полуночи на
+      открытой вкладке стартовые даты и валидация могут разойтись; передавать в `run` тот же снимок —
+      лёгкий — нет.
+- [ ] `window.history.replaceState` внутри хука без теста — источник:
+      `src/hooks/useHotelSearch.ts:80` (`fix-search-dates-effect`) — побочный эффект не покрыт;
+      добавить тест на запись параметров в URL — лёгкий — нет.
+- [ ] Перевести оставшиеся CSS-модули (`Hero` — только эффекты глобуса, `SearchForm`,
+      `SearchPanel`, `RandomSearch`, `AssistantSearch`) и после этого убрать `static` у `@theme` —
+      источник: `src/app/globals.css:137` (`reduce-page-css`), `src/components/Hero/Hero.module.css:1`
+      (`reduce-hero-css`) — `static` нужен только для чтения токенов из модулей и тянет в сборку
+      неиспользуемые токены; учесть критерий «gzip CSS растёт не больше чем на 2 %» — средний — нет.
+- [ ] Единая политика для `translate`/`scale`/`shadow`: arbitrary properties или стандартные
+      утилиты с `@property` — источник: `reduce-page-css` (стандартные утилиты давали +5 925 байт
+      CSS) — сейчас подходы смешаны — лёгкий — связано с предыдущим пунктом.
+- [ ] 7 уязвимостей high в `npm audit` (`braces` → `micromatch` → `fast-glob`, через CLI `shadcn` в
+      `dependencies`) — источник: `package.json` (`reduce-page-css`) — в клиентский бандл не попадает,
+      из пакета используется только `shadcn/tailwind.css`; проверить перенос в `devDependencies` и
+      обновление `shadcn` — лёгкий — нет.
 
 ## Выполнено
 
@@ -62,6 +72,17 @@
       Tailwind, `globals.css` очищен — `reduce-custom-css` — #11 — 2026-10-19.
 - [x] `validateSearch` проверяет пределы гостей из `GUEST_LIMITS` — #12 — 2026-10-19.
 - [x] TODO разделён на «Запланировано» и «Сделано» — #13 — 2026-10-19.
+- [x] CI в GitHub Actions: lint, typecheck, тесты и `format:check` — `add-ci-checks` — #15 —
+      2026-10-19.
+- [x] Предупреждение lint `set-state-in-effect` в `useHotelSearch`: «сегодня» через
+      `useSyncExternalStore`, стартовые даты при рендере — `fix-search-dates-effect` — #16 —
+      2026-10-19.
+- [x] Кастомный CSS `HomePage`, `DestinationCard`, `TravelBanner`, `ui/SmartImage` на Tailwind, четыре
+      модуля удалены — `reduce-page-css` — #18 — 2026-10-19.
+- [x] Кастомный CSS `Hero` на Tailwind: модуль 544 → 387 строк, эффекты глобуса остались в модуле —
+      `reduce-hero-css` — #17 — 2026-10-19. Итог этапа на `d495b35`: CSS 92 896 байт (+3,2 %), gzip
+      18 743 (+1,9 %) при принятом критерии «gzip растёт не больше чем на 2 %».
+- [x] План этапа 1 и changes — #14 — 2026-10-19.
 - [x] Удалены 13 смерженных удалённых веток PR #1–#13 — решение пользователя, без PR — 2026-10-19.
 
 ## Отклонено/неактуально
