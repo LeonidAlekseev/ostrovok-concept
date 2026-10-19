@@ -1,9 +1,14 @@
 import { useRef, useState } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useHotelSearch } from '../../hooks/useHotelSearch'
 import { SearchPanel, type SearchMode } from './SearchPanel'
+
+const push = vi.fn()
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
+
+afterEach(() => push.mockClear())
 
 function Harness() {
   const [mode, setMode] = useState<SearchMode>('assistant')
@@ -48,4 +53,40 @@ describe('SearchPanel tabs', () => {
     expect(screen.getByRole('combobox', { name: 'Направление' })).toBe(destination)
     expect((destination as HTMLInputElement).value).toBe('Сочи')
   })
+})
+
+// manual-search, Requirement: Демо-поиск и результаты
+describe('SearchPanel manual search', () => {
+  it('opens the results page of the chosen city', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+
+    await user.click(screen.getByRole('tab', { name: 'Вручную' }))
+    await user.type(screen.getByRole('combobox', { name: 'Направление' }), 'Прага')
+    await user.keyboard('{Escape}')
+    await user.click(screen.getByRole('button', { name: /Найти отель/ }))
+
+    expect(push).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/search\?destination=prague&checkin=[\d-]+&checkout=[\d-]+&adults=2&rooms=1$/),
+    )
+    // The results block under the form is gone: results live on /search.
+    expect(screen.queryByText('Ищем варианты…')).toBeNull()
+  })
+})
+
+// assistant-search, Requirement: План поездки, Scenario: Выбор варианта
+describe('SearchPanel assistant plan', () => {
+  it('opens the results page of the option with its dates and guests', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+
+    await user.type(screen.getByLabelText('Опишите поездку'), 'Хочу на море в октябре вдвоём, спокойно{Enter}')
+    const [option] = await screen.findAllByRole('button', { name: /₽/ }, { timeout: 3000 })
+    await user.click(option)
+
+    expect(push).toHaveBeenCalledTimes(1)
+    expect(push.mock.calls[0][0]).toMatch(
+      /^\/search\?destination=[a-z-]+&checkin=[\d-]+&checkout=[\d-]+&adults=2&rooms=1$/,
+    )
+  }, 10_000)
 })

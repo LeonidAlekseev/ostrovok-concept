@@ -1,5 +1,5 @@
 import { destinations, scenarios, type Destination, type Scenario, type ScenarioId } from '../data/destinations'
-import { fromIso, nightsBetween, toIso, type IsoDate } from './dates'
+import { addDays, fromIso, nightsBetween, toIso, type IsoDate } from './dates'
 
 export const GUEST_LIMITS = {
   adults: { min: 1, max: 10 },
@@ -8,6 +8,8 @@ export const GUEST_LIMITS = {
 } as const
 
 export const MAX_NIGHTS = 30
+
+export const DEFAULT_GUESTS: Guests = { adults: 2, children: 0, rooms: 1 }
 
 export interface Guests {
   adults: number
@@ -28,6 +30,13 @@ export type SearchTarget =
   { kind: 'destination'; destination: Destination } | { kind: 'scenario'; scenario: ScenarioId; title: string }
 
 export type SearchErrors = Partial<Record<'destination' | 'dates' | 'guests', string>>
+
+/** Empty dates default to tomorrow and the night after. Nothing is filled until `today` is known. */
+export function withStartDates(query: SearchQuery, today: IsoDate): SearchQuery {
+  if (!today) return query
+  const checkIn = query.checkIn || addDays(today, 1)
+  return { ...query, checkIn, checkOut: query.checkOut || addDays(checkIn, 1) }
+}
 
 const normalize = (s: string) => s.trim().toLocaleLowerCase('ru').replace(/ё/g, 'е')
 
@@ -128,48 +137,23 @@ export function toSearchParams(query: SearchQuery, target: SearchTarget): URLSea
   return setStayParams(params, query)
 }
 
-export interface SearchResultItem {
-  destination: Destination
-  /** Demo estimate for the whole stay and all rooms, ₽. */
-  totalFrom: number
-}
-
-export interface SearchResult {
-  query: SearchQuery
-  target: SearchTarget
-  params: URLSearchParams
-  nights: number
-  items: SearchResultItem[]
-}
-
 /**
- * Demo search: there is no backend, so matches come from the local catalogue
- * and prices are rough "from" estimates. Nothing is booked.
+ * The query written by `toSearchParams`, as the form holds it: the destination or scenario id
+ * becomes its name, missing dates stay empty (see `withStartDates`) and guests default to
+ * `DEFAULT_GUESTS` without dates. An unknown id becomes an empty destination; malformed guest
+ * counts are kept (NaN) for `validateSearch` to report.
  */
-export async function runDemoSearch(
-  query: SearchQuery,
-  target: SearchTarget,
-  signal?: AbortSignal,
-): Promise<SearchResult> {
-  await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(resolve, 700)
-    signal?.addEventListener('abort', () => {
-      clearTimeout(timer)
-      reject(new DOMException('Aborted', 'AbortError'))
-    })
-  })
-  const nights = nightsBetween(query.checkIn, query.checkOut)
-  const matches =
-    target.kind === 'destination'
-      ? [target.destination]
-      : destinations.filter((d) => d.scenarios.includes(target.scenario))
+export function fromSearchParams(params: Pick<URLSearchParams, 'get'>): SearchQuery {
+  const destinationId = params.get('destination')
+  const scenarioId = params.get('scenario')
+  const destination = destinationId
+    ? destinations.find((d) => d.id === destinationId)?.name
+    : scenarios.find((s) => s.id === scenarioId)?.title
+  const stay = parseStayParams(params)
   return {
-    query,
-    target,
-    params: toSearchParams(query, target),
-    nights,
-    items: matches
-      .map((destination) => ({ destination, totalFrom: destination.priceFrom * nights * query.guests.rooms }))
-      .sort((a, b) => a.totalFrom - b.totalFrom),
+    destination: destination ?? '',
+    checkIn: stay?.checkIn ?? '',
+    checkOut: stay?.checkOut ?? '',
+    guests: stay?.guests ?? DEFAULT_GUESTS,
   }
 }

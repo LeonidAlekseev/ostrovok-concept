@@ -274,7 +274,7 @@ function PlanView({ plan, onChoose }: { plan: Plan; onChoose: Props['onChoose'] 
             <button
               type="button"
               className="flex w-full items-center gap-2.5 rounded-lg border border-border bg-card py-2.5 pr-2 pl-3 text-left transition-[border-color,box-shadow] duration-200 hover:border-primary hover:shadow-[0_4px_14px_color-mix(in_srgb,var(--primary)_12%,transparent)] focus-visible:border-primary focus-visible:shadow-[0_4px_14px_color-mix(in_srgb,var(--primary)_12%,transparent)]"
-              onClick={() => void onChoose({ ...plan.query, destination: destination.name })}
+              onClick={() => onChoose({ ...plan.query, destination: destination.name })}
             >
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-[650]">

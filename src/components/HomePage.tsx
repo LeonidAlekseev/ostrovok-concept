@@ -51,9 +51,13 @@ export function HomePage() {
 
   const chooseFromAssistant = useCallback(
     (query: Parameters<typeof searchFor>[0]) => {
-      openManual()
-      document.getElementById('search')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      return searchFor(query)
+      const found = searchFor(query)
+      // A valid choice opens the results page; otherwise the manual form shows what to fix.
+      if (Object.keys(found).length > 0) {
+        openManual()
+        document.getElementById('search')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+      return found
     },
     [openManual, searchFor],
   )
