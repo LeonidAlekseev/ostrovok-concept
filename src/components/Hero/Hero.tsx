@@ -410,11 +410,14 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
           {...pauseHandlers}
         >
           {/* Re-keyed per hotel so every new one plays the entrance animation. */}
-          <span key={`${hotel.destinationId}/${hotel.name}`} className={styles.placeContent}>
+          <span
+            key={`${hotel.destinationId}/${hotel.name}`}
+            className={`flex items-center gap-[clamp(7px,2vw,12px)] ${styles.placeContent}`}
+          >
             <span className={styles.placeIcon} aria-hidden>
               <BedDouble />
             </span>
-            <span className={styles.placeText}>
+            <span className="flex min-w-0 flex-col gap-(--text-gap) leading-[1.25]">
               {/* Line height 1.25 and no vertical padding: the picture is sized from the three text lines. */}
               <Badge
                 variant="success"
@@ -422,17 +425,22 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
               >
                 Новый отель · {destination.name}
               </Badge>
-              <span className={styles.placeName}>{hotel.name}</span>
-              <span className={styles.placeMeta}>
-                <span className={styles.placeStars} aria-hidden>
+              <span className="text-(length:--name-size) font-[650]">{hotel.name}</span>
+              <span className="flex h-[calc(1.25*var(--meta-size))] items-center gap-1.5">
+                <span className="flex text-(--decor-star) [&_svg]:h-auto [&_svg]:w-[clamp(9px,2.5vw,12px)]" aria-hidden>
                   {Array.from({ length: hotel.stars }, (_, i) => (
                     <Star key={i} fill="currentColor" strokeWidth={0} />
                   ))}
                 </span>
-                <span className={styles.placePrice}>от {formatPrice(hotel.priceFrom)}/ночь</span>
+                <span className="text-(length:--meta-size) whitespace-nowrap text-muted-foreground">
+                  от {formatPrice(hotel.priceFrom)}/ночь
+                </span>
               </span>
             </span>
-            <ChevronRight className={styles.placeChevron} aria-hidden />
+            <ChevronRight
+              className="ml-[clamp(0px,1vw,14px)] w-[clamp(14px,3.8vw,18px)] flex-none text-muted-foreground"
+              aria-hidden
+            />
           </span>
         </button>
       </div>

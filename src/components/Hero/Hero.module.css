@@ -345,9 +345,6 @@
 }
 
 .placeContent {
-  display: flex;
-  align-items: center;
-  gap: clamp(7px, 2vw, 12px);
   animation: cardIn 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -366,49 +363,6 @@
 .placeIcon svg {
   width: 48%;
   height: auto;
-}
-
-.placeText {
-  display: flex;
-  flex-direction: column;
-  gap: var(--text-gap);
-  min-width: 0;
-  line-height: 1.25;
-}
-
-.placeName {
-  font-size: var(--name-size);
-  font-weight: 650;
-}
-
-.placeMeta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: calc(1.25 * var(--meta-size));
-}
-
-.placeStars {
-  display: flex;
-  color: var(--decor-star);
-}
-
-.placeStars svg {
-  width: clamp(9px, 2.5vw, 12px);
-  height: auto;
-}
-
-.placePrice {
-  color: var(--muted-foreground);
-  font-size: var(--meta-size);
-  white-space: nowrap;
-}
-
-.placeChevron {
-  flex: none;
-  width: clamp(14px, 3.8vw, 18px);
-  margin-left: clamp(0px, 1vw, 14px);
-  color: var(--muted-foreground);
 }
 
 @keyframes cardIn {
