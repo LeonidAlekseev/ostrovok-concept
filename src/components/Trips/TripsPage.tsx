@@ -1,0 +1,74 @@
+'use client'
+
+import Link from 'next/link'
+import { buttonVariants } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useBookings } from '@/hooks/useStore'
+import { todayIso } from '@/lib/dates'
+import { tripsIn, type TripTab } from '@/lib/trips'
+import { TripCard } from './TripCard'
+import { pageClass, TripsGate } from './TripsGate'
+
+const TABS: { value: TripTab; label: string; empty: string }[] = [
+  { value: 'upcoming', label: 'Предстоящие', empty: 'Предстоящих поездок пока нет' },
+  { value: 'past', label: 'Завершённые', empty: 'Завершённых поездок пока нет' },
+  { value: 'cancelled', label: 'Отменённые', empty: 'Отменённых бронирований нет' },
+]
+
+function Trips() {
+  const bookings = useBookings()
+  const today = todayIso()
+  return (
+    <>
+      <h1 className="text-title font-bold tracking-[-0.02em]">Мои поездки</h1>
+      <Tabs defaultValue="upcoming">
+        <TabsList className="mb-4 flex gap-1 border-b border-border">
+          {TABS.map(({ value, label }) => (
+            <TabsTrigger
+              key={value}
+              value={value}
+              className="-mb-px cursor-pointer border-b-2 border-transparent px-3 py-2 font-medium text-muted-foreground data-active:border-primary data-active:text-foreground"
+            >
+              {label} ({tripsIn(bookings, value, today).length})
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        {TABS.map(({ value, empty }) => {
+          const list = tripsIn(bookings, value, today)
+          return (
+            <TabsContent key={value} value={value}>
+              {list.length === 0 ? (
+                <div className="flex flex-col items-start gap-3">
+                  <p className="text-muted-foreground">{empty}</p>
+                  <Link className={buttonVariants()} href="/">
+                    Найти отель
+                  </Link>
+                </div>
+              ) : (
+                <ul className="flex flex-col gap-3">
+                  {list.map((booking) => (
+                    <TripCard key={booking.id} booking={booking} tab={value} />
+                  ))}
+                </ul>
+              )}
+            </TabsContent>
+          )
+        })}
+      </Tabs>
+      <p className="text-sm text-muted-foreground">
+        Бронирования демонстрационные: они не привязаны к аккаунту и показываются все, что сделаны в этом браузере.
+      </p>
+    </>
+  )
+}
+
+/** `/trips`: the bookings of this browser in three tabs. */
+export function TripsPage() {
+  return (
+    <main className={pageClass}>
+      <TripsGate next="/trips">
+        <Trips />
+      </TripsGate>
+    </main>
+  )
+}
