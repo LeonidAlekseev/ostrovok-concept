@@ -1,8 +1,7 @@
-import { useCallback, useId, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Bell, Heart, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { useDismiss } from '@/hooks/useDismiss'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import styles from './Header.module.css'
 
 type Panel = 'favorites' | 'notifications' | 'menu'
@@ -23,16 +22,12 @@ const menuLinks = [
 
 export function Header({ onStartSearch }: Props) {
   const [open, setOpen] = useState<Panel | null>(null)
-  const actionsRef = useRef<HTMLDivElement>(null)
-  const panelId = useId()
   const close = useCallback(() => setOpen(null), [])
-  useDismiss(actionsRef, open !== null, close)
 
-  const toggle = (panel: Panel) => setOpen((current) => (current === panel ? null : panel))
-  const buttonProps = (panel: Panel) => ({
-    'aria-expanded': open === panel,
-    'aria-controls': open === panel ? panelId : undefined,
-    onClick: () => toggle(panel),
+  // Only one panel is open at a time: a panel closing never closes a sibling that already opened.
+  const panelProps = (panel: Panel) => ({
+    open: open === panel,
+    onOpenChange: (next: boolean) => setOpen((current) => (next ? panel : current === panel ? null : current)),
   })
 
   return (
@@ -42,79 +37,91 @@ export function Header({ onStartSearch }: Props) {
           Островок!
         </a>
 
-        <div className={styles.actions} ref={actionsRef}>
-          <Button variant="ghost" size="icon" className={iconButton} aria-label="Избранное" {...buttonProps('favorites')}>
-            <Heart className="size-6.5" fill="currentColor" strokeWidth={2} aria-hidden />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={iconButton}
-            aria-label="Уведомления"
-            {...buttonProps('notifications')}
-          >
-            <Bell className="size-6.25" fill="currentColor" strokeWidth={2} aria-hidden />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={iconButton}
-            aria-label={open === 'menu' ? 'Закрыть меню' : 'Открыть меню'}
-            {...buttonProps('menu')}
-          >
-            {open === 'menu' ? (
-              <X className="size-7" strokeWidth={2.8} aria-hidden />
-            ) : (
-              <Menu className="size-7" strokeWidth={2.8} aria-hidden />
-            )}
-          </Button>
-
-          {open && (
-            <Card
-              className={`${styles.panel} gap-0 p-4.5 shadow-(--shadow-popover)`}
-              id={panelId}
-              role="dialog"
-              aria-label={panelTitle[open]}
+        <div className={styles.actions}>
+          <Popover {...panelProps('favorites')}>
+            <PopoverTrigger
+              render={<Button variant="ghost" size="icon" className={iconButton} aria-label="Избранное" />}
             >
-              {open === 'favorites' && (
-                <>
-                  <p className={styles.panelTitle}>Избранное пока пусто</p>
-                  <p className={styles.panelText}>Сохраняйте понравившиеся отели, чтобы вернуться к ним позже.</p>
-                  <Button
-                    className="w-full"
-                    onClick={() => {
-                      close()
-                      onStartSearch()
-                    }}
-                  >
-                    Найти отель
-                  </Button>
-                </>
+              <Heart className="size-6.5" fill="currentColor" strokeWidth={2} aria-hidden />
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              sideOffset={10}
+              aria-label={panelTitle.favorites}
+              className={`${styles.panel} gap-0 p-4.5 shadow-(--shadow-popover)`}
+            >
+              <p className={styles.panelTitle}>Избранное пока пусто</p>
+              <p className={styles.panelText}>Сохраняйте понравившиеся отели, чтобы вернуться к ним позже.</p>
+              <Button
+                className="w-full"
+                onClick={() => {
+                  close()
+                  onStartSearch()
+                }}
+              >
+                Найти отель
+              </Button>
+            </PopoverContent>
+          </Popover>
+
+          <Popover {...panelProps('notifications')}>
+            <PopoverTrigger
+              render={
+                <Button variant="ghost" size="icon" className={iconButton} aria-label="Уведомления" />
+              }
+            >
+              <Bell className="size-6.25" fill="currentColor" strokeWidth={2} aria-hidden />
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              sideOffset={10}
+              aria-label={panelTitle.notifications}
+              className={`${styles.panel} gap-0 p-4.5 shadow-(--shadow-popover)`}
+            >
+              <p className={styles.panelTitle}>Новых уведомлений нет</p>
+              <p className={styles.panelText}>Здесь появятся изменения цен и статусы бронирований.</p>
+              <Button className="w-full" onClick={close}>
+                Понятно
+              </Button>
+            </PopoverContent>
+          </Popover>
+
+          <Popover {...panelProps('menu')}>
+            <PopoverTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={iconButton}
+                  aria-label={open === 'menu' ? 'Закрыть меню' : 'Открыть меню'}
+                />
+              }
+            >
+              {open === 'menu' ? (
+                <X className="size-7" strokeWidth={2.8} aria-hidden />
+              ) : (
+                <Menu className="size-7" strokeWidth={2.8} aria-hidden />
               )}
-              {open === 'notifications' && (
-                <>
-                  <p className={styles.panelTitle}>Новых уведомлений нет</p>
-                  <p className={styles.panelText}>Здесь появятся изменения цен и статусы бронирований.</p>
-                  <Button className="w-full" onClick={close}>
-                    Понятно
-                  </Button>
-                </>
-              )}
-              {open === 'menu' && (
-                <nav aria-label="Основное меню">
-                  <ul className={styles.menuList}>
-                    {menuLinks.map((link) => (
-                      <li key={link.href}>
-                        <a className={styles.menuLink} href={link.href} onClick={close}>
-                          {link.label}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </nav>
-              )}
-            </Card>
-          )}
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              sideOffset={10}
+              aria-label={panelTitle.menu}
+              className={`${styles.panel} gap-0 p-4.5 shadow-(--shadow-popover)`}
+            >
+              <nav aria-label="Основное меню">
+                <ul className={styles.menuList}>
+                  {menuLinks.map((link) => (
+                    <li key={link.href}>
+                      <a className={styles.menuLink} href={link.href} onClick={close}>
+                        {link.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
     </header>

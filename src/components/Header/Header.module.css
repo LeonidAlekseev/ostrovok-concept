@@ -32,10 +32,8 @@
   gap: clamp(0px, 1vw, 14px);
 }
 
+/* Placement comes from the popover (portaled, aligned to its trigger); only the size and the entrance are here. */
 .panel {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
   width: min(300px, calc(100vw - 2 * var(--page-x)));
   animation: pop 0.18s ease-out;
 }

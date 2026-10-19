@@ -17,8 +17,12 @@ function PopoverContent({
 }: PopoverPrimitive.Popup.Props & Pick<PopoverPrimitive.Positioner.Props, 'align' | 'sideOffset'>) {
   return (
     <PopoverPrimitive.Portal>
-      <PopoverPrimitive.Positioner align={align} sideOffset={sideOffset}>
-        <PopoverPrimitive.Popup data-slot="popover-content" className={cn(className)} {...props} />
+      <PopoverPrimitive.Positioner align={align} sideOffset={sideOffset} className="isolate z-50">
+        <PopoverPrimitive.Popup
+          data-slot="popover-content"
+          className={cn('flex flex-col rounded-xl bg-card text-card-foreground outline-none', className)}
+          {...props}
+        />
       </PopoverPrimitive.Positioner>
     </PopoverPrimitive.Portal>
   )
