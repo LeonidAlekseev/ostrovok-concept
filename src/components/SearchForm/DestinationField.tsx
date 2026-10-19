@@ -65,7 +65,7 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
         <ComboboxInputGroup className="relative">
           <label className={fieldBox(Boolean(error))}>
             <MapPin className="shrink-0 text-brand-foreground" size={22} strokeWidth={1.8} aria-hidden />
-            <span className="visually-hidden">Направление</span>
+            <span className="sr-only">Направление</span>
             <ComboboxInput
               ref={inputRef}
               // Input's text styles; the bordered box is the label's fieldBox.
