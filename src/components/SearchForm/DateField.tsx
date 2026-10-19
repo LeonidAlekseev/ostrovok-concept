@@ -1,8 +1,8 @@
-import { useCallback, useId, useRef, useState } from 'react'
+import { useId, useState } from 'react'
 import { CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/field'
-import { useDismiss } from '@/hooks/useDismiss'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { addDays, formatDateRange, nightsBetween, todayIso, type IsoDate } from '../../lib/dates'
 import { countRu } from '../../lib/format'
 import { MAX_NIGHTS } from '../../lib/search'
@@ -22,16 +22,13 @@ export function DateField({ checkIn, checkOut, error, onChange }: Props) {
   const [open, setOpen] = useState(false)
   // Check-in picked, check-out pending. Discarded if the popover closes midway.
   const [draftStart, setDraftStart] = useState<IsoDate | null>(null)
-  const rootRef = useRef<HTMLDivElement>(null)
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const popoverId = useId()
   const errorId = useId()
 
-  const close = useCallback(() => {
-    setOpen(false)
-    setDraftStart(null)
-  }, [])
-  useDismiss(rootRef, open, close)
+  const onOpenChange = (next: boolean) => {
+    setOpen(next)
+    if (!next) setDraftStart(null)
+  }
+  const close = () => onOpenChange(false)
 
   const pick = (day: IsoDate) => {
     if (draftStart === null || day <= draftStart) {
@@ -40,7 +37,6 @@ export function DateField({ checkIn, checkOut, error, onChange }: Props) {
     }
     onChange(draftStart, day)
     close()
-    triggerRef.current?.focus()
   }
 
   const today = todayIso()
@@ -48,30 +44,28 @@ export function DateField({ checkIn, checkOut, error, onChange }: Props) {
   const nights = nightsBetween(checkIn, checkOut)
 
   return (
-    <div className={`${styles.fieldWrap} ${styles.areaDates}`} ref={rootRef}>
-      <button
-        ref={triggerRef}
-        type="button"
-        className={`${styles.field} ${styles.fieldButton} ${error ? styles.fieldInvalid : ''}`}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls={open ? popoverId : undefined}
-        aria-label={`Даты поездки: ${label}, ${countRu(nights, nightForms)}`}
-        aria-describedby={error ? errorId : undefined}
-        onClick={() => (open ? close() : setOpen(true))}
-      >
-        <CalendarDays className={styles.fieldIcon} size={22} strokeWidth={1.8} aria-hidden />
-        <span className={styles.value} title={label}>
-          {label}
-        </span>
-      </button>
+    <div className={`${styles.fieldWrap} ${styles.areaDates}`}>
+      <Popover open={open} onOpenChange={onOpenChange}>
+        <PopoverTrigger
+          className={`${styles.field} ${styles.fieldButton} ${error ? styles.fieldInvalid : ''}`}
+          aria-label={`Даты поездки: ${label}, ${countRu(nights, nightForms)}`}
+          aria-describedby={error ? errorId : undefined}
+        >
+          <CalendarDays className={styles.fieldIcon} size={22} strokeWidth={1.8} aria-hidden />
+          <span className={styles.value} title={label}>
+            {label}
+          </span>
+        </PopoverTrigger>
 
-      {open && (
-        <div
-          className={`${styles.popover} ${styles.popoverSurface} ${styles.datesPopover}`}
-          id={popoverId}
-          role="dialog"
+        <PopoverContent
+          align="start"
+          sideOffset={8}
+          // Stays under the field and lets the page scroll, as it did before the popover moved to Base UI.
+          collisionAvoidance={{ side: 'none' }}
+          // The calendar focuses its own selected day; the popover must not move focus to the month arrow.
+          initialFocus={false}
           aria-label="Выбор дат заезда и выезда"
+          className={`${styles.popoverSurface} ${styles.datesPopover}`}
         >
           <p className={styles.popoverHint} aria-live="polite">
             {draftStart ? 'Выберите дату выезда' : 'Выберите дату заезда'}
@@ -89,8 +83,8 @@ export function DateField({ checkIn, checkOut, error, onChange }: Props) {
             </span>
             <Button onClick={close}>{draftStart ? 'Отмена' : 'Готово'}</Button>
           </div>
-        </div>
-      )}
+        </PopoverContent>
+      </Popover>
       {/* Not an alert: the error is announced through aria-describedby when focus moves to the field. */}
       <FieldError className={styles.error} id={errorId} role={undefined}>
         {error}

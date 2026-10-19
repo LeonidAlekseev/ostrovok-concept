@@ -1,8 +1,18 @@
 import { Popover as PopoverPrimitive } from '@base-ui/react/popover'
 import { cn } from 'cn'
 
-function Popover(props: PopoverPrimitive.Root.Props) {
-  return <PopoverPrimitive.Root data-slot="popover" {...props} />
+// Focus leaving the popover does not close it: as before, only a press outside or Escape does.
+function Popover({ onOpenChange, ...props }: PopoverPrimitive.Root.Props) {
+  return (
+    <PopoverPrimitive.Root
+      data-slot="popover"
+      onOpenChange={(open, details) => {
+        if (!open && details.reason === 'focus-out') return
+        onOpenChange?.(open, details)
+      }}
+      {...props}
+    />
+  )
 }
 
 function PopoverTrigger({ className, ...props }: PopoverPrimitive.Trigger.Props) {
