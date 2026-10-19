@@ -1,7 +1,7 @@
 # rate-selection Specification
 
 ## Purpose
-TBD - created by archiving change add-hotel-pages. Update Purpose after archive.
+Выбор номера и тарифа: цена, питание, условия отмены и оплаты, переход к оформлению по контракту предложения.
 
 ## Requirements
 

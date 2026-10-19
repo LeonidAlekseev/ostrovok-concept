@@ -1,7 +1,7 @@
 # hotel-page Specification
 
 ## Purpose
-TBD - created by archiving change add-hotel-pages. Update Purpose after archive.
+Страница отеля кликабельного прототипа: шапка, галерея, даты и гости, номера и отзывы на демо-каталоге.
 
 ## Requirements
 
