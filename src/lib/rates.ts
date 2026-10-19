@@ -4,7 +4,11 @@ import { freeCancellationUntil, offerTotal } from './offer'
 import type { Guests, Stay } from './search'
 
 /** Free cancellation until `until`, or `null`: non-refundable, or the free period is already over. */
-export function cancellationDeadline(rate: Rate, checkIn: IsoDate, today: IsoDate): IsoDate | null {
+export function cancellationDeadline(
+  rate: Pick<Rate, 'cancellation'>,
+  checkIn: IsoDate,
+  today: IsoDate,
+): IsoDate | null {
   const until = freeCancellationUntil(rate, checkIn)
   return until !== null && until >= today ? until : null
 }
