@@ -42,42 +42,6 @@
   pointer-events: none;
 }
 
-.copy {
-  position: relative;
-  z-index: 4;
-  width: fit-content;
-  padding: calc(var(--header-height) + clamp(18px, 5vw, 48px)) var(--page-x) 0 calc(var(--page-x) + 8px);
-  pointer-events: none;
-}
-
-.title {
-  margin: 0;
-  font-size: var(--text-display);
-  font-weight: 800;
-  letter-spacing: -0.035em;
-  line-height: 1.02;
-}
-
-.titleAccent {
-  display: block;
-  color: var(--primary);
-}
-
-.hint {
-  position: relative;
-  z-index: 4;
-  width: 7em;
-  margin: clamp(32px, 9vw, 64px) 0 0 calc(var(--page-x) + 4px);
-  color: var(--primary);
-  font-family: var(--font-hand);
-  font-size: clamp(17px, 4.6vw, 27px);
-  font-weight: 600;
-  line-height: 1.05;
-  transform: rotate(-10deg);
-  transform-origin: left top;
-  pointer-events: none;
-}
-
 /* ---------- Globe ---------- */
 
 .globe {
@@ -235,22 +199,10 @@
 .pin {
   --pin-scale: 1;
 
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 2;
-  width: 18px;
-  height: 24px;
-  padding: 0;
   color: var(--primary);
-  background: none;
-  border: 0;
   border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
   opacity: var(--o, 1);
   transform: translate(calc(var(--x) * var(--unit) - 50%), calc(var(--y) * var(--unit) - 100%)) scale(var(--pin-scale));
-  will-change: transform;
-  /* Like the globe's disc: a swipe that starts on a pin must not pull the page to refresh. */
-  touch-action: none;
   transition:
     --pin-scale 0.6s cubic-bezier(0.22, 1, 0.36, 1),
     width 0.7s cubic-bezier(0.22, 1, 0.36, 1),
@@ -286,12 +238,6 @@
   color: var(--decor-pin-selected);
 }
 
-.pinHub {
-  z-index: 3;
-  width: 30px;
-  height: 40px;
-}
-
 .pinHub::before {
   width: 42px;
   animation: hubPulse 2.4s ease-in-out infinite;
@@ -305,14 +251,7 @@
   );
 }
 
-.pinIcon {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 100%;
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--decor-light) 90%, transparent));
-}
-
+/* The hub pin carries the featured card, so it shows no tooltip. */
 .pinTooltip {
   position: absolute;
   bottom: calc(100% + 6px);
@@ -333,8 +272,8 @@
   pointer-events: none;
 }
 
-.pin:not(.pinHub):hover .pinTooltip,
-.pin:not(.pinHub):focus-visible .pinTooltip {
+.pin:hover .pinTooltipShown,
+.pin:focus-visible .pinTooltipShown {
   opacity: 1;
   transform: translate(-50%, 0);
 }
@@ -381,9 +320,6 @@
 }
 
 .placeContent {
-  display: flex;
-  align-items: center;
-  gap: clamp(7px, 2vw, 12px);
   animation: cardIn 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -402,80 +338,6 @@
 .placeIcon svg {
   width: 48%;
   height: auto;
-}
-
-.placeText {
-  display: flex;
-  flex-direction: column;
-  gap: var(--text-gap);
-  min-width: 0;
-  line-height: 1.25;
-}
-
-.placeName {
-  font-size: var(--name-size);
-  font-weight: 650;
-}
-
-.placeMeta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: calc(1.25 * var(--meta-size));
-}
-
-.placeStars {
-  display: flex;
-  color: var(--decor-star);
-}
-
-.placeStars svg {
-  width: clamp(9px, 2.5vw, 12px);
-  height: auto;
-}
-
-.placePrice {
-  color: var(--muted-foreground);
-  font-size: var(--meta-size);
-  white-space: nowrap;
-}
-
-.placeChevron {
-  flex: none;
-  width: clamp(14px, 3.8vw, 18px);
-  margin-left: clamp(0px, 1vw, 14px);
-  color: var(--muted-foreground);
-}
-
-/* Technical overlay, outside production only; mounted on <body>. */
-.stats {
-  position: fixed;
-  right: 8px;
-  bottom: 8px;
-  z-index: 2147483647;
-  max-width: calc(100vw - 16px);
-  padding: 4px 8px;
-  color: var(--decor-stats);
-  font:
-    11px/1.4 ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
-  background: color-mix(in srgb, var(--decor-black) 78%, transparent);
-  border-radius: var(--radius-sm);
-}
-
-.stats summary {
-  cursor: pointer;
-  user-select: none;
-}
-
-.stats pre {
-  margin: 4px 0 2px;
-  overflow: hidden;
-  font: inherit;
-  white-space: pre;
-  text-overflow: ellipsis;
 }
 
 @keyframes cardIn {
@@ -514,25 +376,6 @@
     --globe-x: 64%;
 
     height: calc(var(--globe-top) + var(--globe-size) * 0.62);
-  }
-
-  .copy {
-    margin-left: max(0px, (100% - var(--page-max)) / 2);
-    padding-top: calc(var(--header-height) + clamp(56px, 8vw, 96px));
-  }
-
-  .hint {
-    margin-left: calc(max(0px, (100% - var(--page-max)) / 2) + var(--page-x) + 8px);
-  }
-
-  .pin {
-    width: 26px;
-    height: 35px;
-  }
-
-  .pinHub {
-    width: 44px;
-    height: 58px;
   }
 }
 

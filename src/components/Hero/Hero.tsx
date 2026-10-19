@@ -330,13 +330,20 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
 
   return (
     <section ref={heroRef} className={styles.hero} aria-labelledby="hero-title">
-      <div ref={copyRef} className={styles.copy}>
-        <h1 id="hero-title" className={styles.title}>
-          Найди свой <span className={styles.titleAccent}>уголок</span>
+      <div
+        ref={copyRef}
+        className="pointer-events-none relative z-4 w-fit pt-[calc(var(--header-height)+clamp(18px,5vw,48px))] pr-(--page-x) pl-[calc(var(--page-x)+8px)] md:ml-[max(0px,(100%-var(--page-max))/2)] md:pt-[calc(var(--header-height)+clamp(56px,8vw,96px))]"
+      >
+        <h1 id="hero-title" className="text-(length:--text-display) leading-[1.02] font-extrabold tracking-[-0.035em]">
+          Найди свой <span className="block text-primary">уголок</span>
         </h1>
       </div>
 
-      <p ref={hintRef} className={styles.hint} aria-hidden>
+      <p
+        ref={hintRef}
+        className="pointer-events-none relative z-4 mt-[clamp(32px,9vw,64px)] ml-[calc(var(--page-x)+4px)] w-[7em] origin-top-left -rotate-10 font-hand text-[clamp(17px,4.6vw,27px)]/[1.05] font-semibold text-primary md:ml-[calc(max(0px,(100%-var(--page-max))/2)+var(--page-x)+8px)]"
+        aria-hidden
+      >
         Вращай глобус — воплощай мечту
       </p>
 
@@ -377,7 +384,11 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
                 else pinRefs.current.delete(d.id)
               }}
               type="button"
-              className={`${styles.pin} ${isHub ? styles.pinHub : ''}`}
+              className={`${styles.pin} absolute top-0 left-0 touch-none will-change-transform ${
+                isHub
+                  ? `${styles.pinHub} z-3 h-10 w-[30px] md:h-[58px] md:w-11`
+                  : 'z-2 h-6 w-[18px] md:h-[35px] md:w-[26px]'
+              } group`}
               style={{ ...positionStyle(point), '--o': depthOpacity(point.depth).toFixed(3) } as CSSProperties}
               data-hidden={point.depth <= 0.05 || undefined}
               aria-label={`${d.name}, ${d.country} — выбрать направление`}
@@ -386,7 +397,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
               {...pauseHandlers}
             >
               <PinIcon />
-              <span className={styles.pinTooltip} aria-hidden>
+              <span className={`${styles.pinTooltip} ${isHub ? '' : styles.pinTooltipShown}`} aria-hidden>
                 {d.name}
               </span>
             </button>
@@ -403,11 +414,14 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
           {...pauseHandlers}
         >
           {/* Re-keyed per hotel so every new one plays the entrance animation. */}
-          <span key={`${hotel.destinationId}/${hotel.name}`} className={styles.placeContent}>
+          <span
+            key={`${hotel.destinationId}/${hotel.name}`}
+            className={`flex items-center gap-[clamp(7px,2vw,12px)] ${styles.placeContent}`}
+          >
             <span className={styles.placeIcon} aria-hidden>
               <BedDouble />
             </span>
-            <span className={styles.placeText}>
+            <span className="flex min-w-0 flex-col gap-(--text-gap) leading-[1.25]">
               {/* Line height 1.25 and no vertical padding: the picture is sized from the three text lines. */}
               <Badge
                 variant="success"
@@ -415,17 +429,22 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
               >
                 Новый отель · {destination.name}
               </Badge>
-              <span className={styles.placeName}>{hotel.name}</span>
-              <span className={styles.placeMeta}>
-                <span className={styles.placeStars} aria-hidden>
+              <span className="text-(length:--name-size) font-[650]">{hotel.name}</span>
+              <span className="flex h-[calc(1.25*var(--meta-size))] items-center gap-1.5">
+                <span className="flex text-(--decor-star) [&_svg]:h-auto [&_svg]:w-[clamp(9px,2.5vw,12px)]" aria-hidden>
                   {Array.from({ length: hotel.stars }, (_, i) => (
                     <Star key={i} fill="currentColor" strokeWidth={0} />
                   ))}
                 </span>
-                <span className={styles.placePrice}>от {formatPrice(hotel.priceFrom)}/ночь</span>
+                <span className="text-(length:--meta-size) whitespace-nowrap text-muted-foreground">
+                  от {formatPrice(hotel.priceFrom)}/ночь
+                </span>
               </span>
             </span>
-            <ChevronRight className={styles.placeChevron} aria-hidden />
+            <ChevronRight
+              className="ml-[clamp(0px,1vw,14px)] w-[clamp(14px,3.8vw,18px)] flex-none text-muted-foreground"
+              aria-hidden
+            />
           </span>
         </button>
       </div>
@@ -461,7 +480,11 @@ function describeStats(frames: FrameWindow, renderer: GlobeRenderer) {
 
 function PinIcon() {
   return (
-    <svg className={styles.pinIcon} viewBox="0 0 24 32" aria-hidden>
+    <svg
+      className="relative block size-full drop-shadow-[0_0_4px_color-mix(in_srgb,var(--decor-light)_90%,transparent)]"
+      viewBox="0 0 24 32"
+      aria-hidden
+    >
       <path
         d="M12 1.2C6.04 1.2 1.2 5.9 1.2 11.7c0 7.6 9.2 17.6 10 18.5a1.1 1.1 0 0 0 1.6 0c.8-.9 10-10.9 10-18.5C22.8 5.9 17.96 1.2 12 1.2Z"
         fill="currentColor"
