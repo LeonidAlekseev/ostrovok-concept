@@ -14,7 +14,7 @@
 ## 3. Проверка спецификации
 
 - [x] 3.1 Выполнить `openspec validate fix-default-search-dates --strict` и убедиться, что проходит без ошибок.
-- [ ] 3.2 Пройти сценарии из `specs/manual-search/spec.md` вручную в браузере и зафиксировать результат в описании PR.
+- [x] 3.2 Пройти сценарии из `specs/manual-search/spec.md` вручную в браузере и зафиксировать результат в описании PR.
 
 ## Workflow follow-up
 
