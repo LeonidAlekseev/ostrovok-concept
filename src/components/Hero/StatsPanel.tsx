@@ -1,6 +1,5 @@
 import { useImperativeHandle, useState, useSyncExternalStore, type Ref } from 'react'
 import { createPortal } from 'react-dom'
-import styles from './Hero.module.css'
 
 export interface StatsPanelHandle {
   show(summary: string, details: string): void
@@ -25,7 +24,7 @@ export function StatsPanel({ ref }: { ref: Ref<StatsPanelHandle> }) {
   if (!mounted) return null
   return createPortal(
     <details
-      className={styles.stats}
+      className="fixed right-2 bottom-2 z-2147483647 max-w-[calc(100vw-16px)] rounded-sm bg-(--decor-black)/78 px-2 py-1 font-mono text-[11px]/[1.4] text-(--decor-stats)"
       open={open}
       onToggle={(e) => {
         setOpen(e.currentTarget.open)
@@ -33,8 +32,10 @@ export function StatsPanel({ ref }: { ref: Ref<StatsPanelHandle> }) {
       }}
       aria-hidden
     >
-      <summary>{text.summary}</summary>
-      {text.details && <pre>{text.details}</pre>}
+      <summary className="cursor-pointer select-none">{text.summary}</summary>
+      {text.details && (
+        <pre className="mt-1 mb-0.5 overflow-hidden [font:inherit] text-ellipsis whitespace-pre">{text.details}</pre>
+      )}
     </details>,
     document.body,
   )
