@@ -23,3 +23,13 @@
 
 - `src/components/HomePage.tsx`, новый компонент секции, отбор подборок из каталога.
 - Зависит от `add-search-results-page` (общий `HomePage`) и `add-hotel-pages` (ссылки на отели).
+
+## Замер JS главной
+
+JS-чанки, на которые ссылается пререндеренный HTML `/` (`npm run build`, gzip -9), на одной базе `origin/dev`:
+
+| | Чанков | gzip, байт |
+|---|---|---|
+| До (`origin/dev`) | 14 | 304 118 |
+| После (`add-home-collections`) | 15 | 306 373 |
+| Разница | +1 | +2 255 (+0,74 %) |
