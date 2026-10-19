@@ -330,13 +330,20 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
 
   return (
     <section ref={heroRef} className={styles.hero} aria-labelledby="hero-title">
-      <div ref={copyRef} className={styles.copy}>
-        <h1 id="hero-title" className={styles.title}>
-          Найди свой <span className={styles.titleAccent}>уголок</span>
+      <div
+        ref={copyRef}
+        className="pointer-events-none relative z-4 w-fit pt-[calc(var(--header-height)+clamp(18px,5vw,48px))] pr-(--page-x) pl-[calc(var(--page-x)+8px)] md:ml-[max(0px,(100%-var(--page-max))/2)] md:pt-[calc(var(--header-height)+clamp(56px,8vw,96px))]"
+      >
+        <h1 id="hero-title" className="text-(length:--text-display) leading-[1.02] font-extrabold tracking-[-0.035em]">
+          Найди свой <span className="block text-primary">уголок</span>
         </h1>
       </div>
 
-      <p ref={hintRef} className={styles.hint} aria-hidden>
+      <p
+        ref={hintRef}
+        className="pointer-events-none relative z-4 mt-[clamp(32px,9vw,64px)] ml-[calc(var(--page-x)+4px)] w-[7em] origin-top-left -rotate-10 font-hand text-[clamp(17px,4.6vw,27px)]/[1.05] font-semibold text-primary md:ml-[calc(max(0px,(100%-var(--page-max))/2)+var(--page-x)+8px)]"
+        aria-hidden
+      >
         Вращай глобус — воплощай мечту
       </p>
 
