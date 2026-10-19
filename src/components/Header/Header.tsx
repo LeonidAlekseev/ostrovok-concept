@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Bell, Heart, Menu, X } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { UserMenu } from './UserMenu'
 
 type Panel = 'notifications' | 'menu'
 
@@ -49,6 +50,8 @@ export function Header() {
         </a>
 
         <div className="relative flex items-center gap-[clamp(0px,1vw,14px)]">
+          <UserMenu buttonClass={`${iconButton} font-[650]`} />
+
           <Link
             href="/favorites"
             className={buttonVariants({ variant: 'ghost', size: 'icon', className: iconButton })}

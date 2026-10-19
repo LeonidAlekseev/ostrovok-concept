@@ -1,7 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { signIn } from '@/lib/auth'
+import { favoritesStore, sessionStore } from '@/lib/storage'
 import { Header } from './Header'
+
+beforeEach(() => window.localStorage.clear())
 
 const setup = () => {
   const user = userEvent.setup()
@@ -78,5 +82,29 @@ describe('Header', () => {
     ])
     await user.click(screen.getByRole('link', { name: 'Мои поездки' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Меню' })).toBeNull())
+  })
+
+  it('shows "Войти" to a guest, linked to /login', () => {
+    setup()
+    expect(screen.getByRole('link', { name: 'Войти' }).getAttribute('href')).toBe('/login')
+  })
+
+  it('shows the name and the account menu once signed in, and "Выйти" ends the session only', async () => {
+    favoritesStore.set(['h1'])
+    signIn('anna@example.com')
+    const user = setup()
+    expect(screen.queryByRole('link', { name: 'Войти' })).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: /anna/ }))
+    const nav = screen.getByRole('navigation', { name: 'Аккаунт' })
+    expect([...nav.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
+      ['Мои поездки', '/trips'],
+      ['Избранное', '/favorites'],
+    ])
+
+    await user.click(screen.getByRole('button', { name: 'Выйти' }))
+    expect(sessionStore.get()).toBeNull()
+    expect(favoritesStore.get()).toEqual(['h1'])
+    expect(await screen.findByRole('link', { name: 'Войти' })).toBeTruthy()
   })
 })
