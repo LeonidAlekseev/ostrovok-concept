@@ -14,6 +14,8 @@ npm run build      # production-сборка (страница преренде�
 npm run start      # запуск собранной версии
 npm run lint
 npm run typecheck
+npm test
+npm run format:check
 ```
 
 CI (GitHub Actions, `.github/workflows/ci.yml`) на каждый PR и push в `dev` и `main` запускает
