@@ -1,8 +1,10 @@
 import { act, renderHook } from '@testing-library/react'
 import { renderToString } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { SearchErrors } from '../lib/search'
 import { useHotelSearch } from './useHotelSearch'
+
+const push = vi.fn()
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
 
 const NOW = new Date(2026, 9, 19, 12)
 
@@ -13,6 +15,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+  push.mockClear()
 })
 
 describe('useHotelSearch start dates', () => {
@@ -44,47 +47,22 @@ describe('useHotelSearch start dates', () => {
   })
 })
 
+// manual-search, Requirement: Демо-поиск и результаты
 describe('useHotelSearch submit', () => {
-  const DEMO_SEARCH_MS = 700
-
-  /** Starts a search inside act and keeps its promise, so the test decides when the demo search finishes. */
-  function start(search: () => Promise<SearchErrors>) {
-    let pending!: Promise<SearchErrors>
-    act(() => {
-      pending = search()
-    })
-    return pending
-  }
-
-  /** Lets the demo search finish and returns the validation errors the search resolved with. */
-  async function settle(pending: Promise<unknown>) {
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(DEMO_SEARCH_MS)
-    })
-    return pending
-  }
-
-  beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
-    vi.setSystemTime(NOW)
-    vi.spyOn(window.history, 'replaceState')
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  it('keeps the default start dates valid when the clock passes midnight after mounting', async () => {
+  it('keeps the default start dates valid when the clock passes midnight after mounting', () => {
     const { result } = renderHook(() => useHotelSearch())
     act(() => result.current.setDestination('Прага'))
 
     vi.setSystemTime(new Date(2026, 9, 20, 12))
-    const pending = start(() => result.current.submit())
+    let errors = {}
+    act(() => {
+      errors = result.current.submit()
+    })
 
-    expect(await settle(pending)).toEqual({})
+    expect(errors).toEqual({})
   })
 
-  it('validates check-in against the same day the form started from', async () => {
+  it('validates check-in against the same day the form started from', () => {
     const { result } = renderHook(() => useHotelSearch())
     act(() => {
       result.current.setDestination('Прага')
@@ -92,58 +70,69 @@ describe('useHotelSearch submit', () => {
     })
 
     vi.setSystemTime(new Date(2026, 9, 20, 12))
-    const pending = start(() => result.current.submit())
+    let errors = {}
+    act(() => {
+      errors = result.current.submit()
+    })
 
-    expect(await settle(pending)).toEqual({})
+    expect(errors).toEqual({})
   })
 
-  it('writes the search params into the URL after a successful search', async () => {
+  it('opens the results page with the query in the URL', () => {
     const { result } = renderHook(() => useHotelSearch())
     act(() => result.current.setDestination('Прага'))
 
-    await settle(start(() => result.current.submit()))
+    act(() => {
+      result.current.submit()
+    })
 
-    expect(window.history.replaceState).toHaveBeenCalledTimes(1)
-    expect(window.history.replaceState).toHaveBeenCalledWith(
-      null,
-      '',
-      '?destination=prague&checkin=2026-10-20&checkout=2026-10-21&adults=2&rooms=1',
+    expect(push).toHaveBeenCalledTimes(1)
+    expect(push).toHaveBeenCalledWith(
+      '/search?destination=prague&checkin=2026-10-20&checkout=2026-10-21&adults=2&rooms=1',
     )
-    expect(result.current.status.state).toBe('done')
   })
 
-  it('leaves the URL alone when validation fails', async () => {
+  it('opens the results page of a scenario with its id', () => {
     const { result } = renderHook(() => useHotelSearch())
 
-    let errors!: SearchErrors
-    await act(async () => {
-      errors = await result.current.submit()
+    act(() => {
+      result.current.searchFor({
+        destination: 'У моря',
+        checkIn: '2026-10-20',
+        checkOut: '2026-10-23',
+        guests: { adults: 2, children: 1, rooms: 1 },
+      })
+    })
+
+    expect(push).toHaveBeenCalledWith(
+      '/search?scenario=sea&checkin=2026-10-20&checkout=2026-10-23&adults=2&children=1&rooms=1',
+    )
+    expect(result.current.query.destination).toBe('У моря')
+  })
+
+  it('stays on the page and returns the errors when validation fails', () => {
+    const { result } = renderHook(() => useHotelSearch())
+
+    let errors: ReturnType<typeof result.current.submit> = {}
+    act(() => {
+      errors = result.current.submit()
     })
 
     expect(errors.destination).toBeDefined()
-    expect(window.history.replaceState).not.toHaveBeenCalled()
+    expect(result.current.errors.destination).toBe(errors.destination)
+    expect(push).not.toHaveBeenCalled()
   })
 
-  it('writes the URL only for the last search when an earlier one is aborted', async () => {
-    const { result } = renderHook(() => useHotelSearch())
-    act(() => result.current.setDestination('Прага'))
-    const first = start(() => result.current.submit())
-
-    const second = start(() =>
-      result.current.searchFor({
-        destination: 'Париж',
-        checkIn: '2026-10-20',
-        checkOut: '2026-10-21',
-        guests: { adults: 2, children: 0, rooms: 1 },
+  it('starts from the given query and errors', () => {
+    const { result } = renderHook(() =>
+      useHotelSearch({
+        query: { destination: '', checkIn: '', checkOut: '', guests: { adults: 1, children: 0, rooms: 1 } },
+        errors: { destination: 'Укажите, куда вы хотите поехать' },
       }),
     )
-    await settle(Promise.all([first, second]))
 
-    expect(window.history.replaceState).toHaveBeenCalledTimes(1)
-    expect(window.history.replaceState).toHaveBeenCalledWith(
-      null,
-      '',
-      '?destination=paris&checkin=2026-10-20&checkout=2026-10-21&adults=2&rooms=1',
-    )
+    expect(result.current.query.guests.adults).toBe(1)
+    expect(result.current.query.checkIn).toBe('2026-10-20')
+    expect(result.current.errors.destination).toBe('Укажите, куда вы хотите поехать')
   })
 })
