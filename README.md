@@ -62,8 +62,10 @@ Vercel определяет проект как Next.js без дополнит�
 Гибрид: Tailwind CSS v4 (через `@tailwindcss/postcss`, `postcss.config.mjs`) и CSS Modules.
 Примитивы интерфейса — компоненты shadcn/ui на Base UI в `src/components/ui/` (настройки CLI —
 `components.json`, добавить компонент: `npx shadcn@latest add <имя>`); там же лежат свои
-примитивы вроде `SmartImage`. Доменные части (глобус, слот-машина, hero, карточки направлений)
-стилизуются своими `*.module.css`.
+примитивы вроде `SmartImage`. Раскладка страницы (`HomePage`), карточки направлений и баннер
+написаны утилитами Tailwind; там, где готовой утилиты нет, берётся произвольное свойство
+(`[box-shadow:…]`, `[translate:…]`). Крупные доменные части (hero с глобусом, панель поиска,
+слот-машина) стилизуются своими `*.module.css`.
 
 Все токены описаны в `src/app/globals.css` слоями:
 

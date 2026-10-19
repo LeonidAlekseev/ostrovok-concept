@@ -1,6 +1,5 @@
 import { ArrowRight } from 'lucide-react'
 import { SmartImage } from '../ui/SmartImage'
-import styles from './DestinationCard.module.css'
 
 interface Props {
   title: string
@@ -16,18 +15,33 @@ export function DestinationCard({ title, image, alt, price, selected = false, on
   return (
     <button
       type="button"
-      className={styles.card}
+      className="group relative isolate block aspect-[1.12] w-full snap-start overflow-hidden rounded-[clamp(14px,3.6vw,22px)] border-0 bg-brand-foreground p-0 text-left text-primary-foreground [box-shadow:var(--shadow-card)] [transition:translate_.25s_ease,box-shadow_.25s_ease] hover:[translate:0_-3px] hover:[box-shadow:0_14px_30px_color-mix(in_srgb,var(--shadow-color)_20%,transparent)] aria-pressed:[box-shadow:0_0_0_3px_var(--primary),0_10px_24px_color-mix(in_srgb,var(--primary)_25%,transparent)] lg:aspect-[1.4]"
       aria-pressed={selected}
       aria-label={`${title}, от ${price} — подставить в поиск`}
       onClick={onSelect}
     >
-      <SmartImage className={styles.image} src={image} alt={alt} loading="lazy" width={900} height={783} />
-      <span className={styles.shade} aria-hidden />
-      <span className={styles.text}>
-        <span className={styles.title}>{title}</span>
-        <span className={styles.price}>от {price}</span>
+      <SmartImage
+        className="absolute inset-0 size-full object-cover [transition:scale_.5s_ease] group-hover:[scale:1.05]"
+        src={image}
+        alt={alt}
+        loading="lazy"
+        width={900}
+        height={783}
+      />
+      <span
+        className="absolute inset-0 [background:linear-gradient(180deg,transparent_42%,color-mix(in_srgb,var(--shadow-color)_62%,transparent)_100%)]"
+        aria-hidden
+      />
+      <span className="absolute right-[calc(clamp(24px,6.2vw,44px)+clamp(8px,2.6vw,26px))] bottom-[clamp(9px,2.6vw,20px)] left-[clamp(8px,2.6vw,22px)] flex flex-col gap-0.5 [text-shadow:0_1px_8px_color-mix(in_srgb,var(--decor-black)_35%,transparent)]">
+        <span className="text-[clamp(12px,3.15vw,24px)] leading-[1.15] font-[550] tracking-[-0.01em]">{title}</span>
+        <span className="text-[clamp(11px,2.8vw,18px)] whitespace-nowrap text-[color-mix(in_srgb,var(--decor-light)_85%,transparent)]">
+          от {price}
+        </span>
       </span>
-      <span className={styles.arrow} aria-hidden>
+      <span
+        className="absolute right-[clamp(6px,2vw,18px)] bottom-[clamp(6px,2vw,18px)] grid size-[clamp(24px,6.2vw,44px)] place-items-center rounded-full bg-card text-brand-foreground [box-shadow:0_4px_12px_color-mix(in_srgb,var(--decor-black)_18%,transparent)] [transition:translate_.25s_ease,background-color_.25s,color_.25s] group-hover:[translate:2px_0] group-hover:bg-primary group-hover:text-primary-foreground group-aria-pressed:bg-primary group-aria-pressed:text-primary-foreground [&_svg]:size-[62%]"
+        aria-hidden
+      >
         <ArrowRight size={20} strokeWidth={2.2} />
       </span>
     </button>
