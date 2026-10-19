@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { addDays, formatLongDate, fromIso, monthGrid, monthTitle, toIso, type IsoDate } from '../../lib/dates'
-import styles from './SearchForm.module.css'
 
 interface Props {
   start: IsoDate
@@ -69,12 +68,13 @@ export function Calendar({ start, end, min, max, onPick }: Props) {
   }
 
   return (
-    <div className={styles.calendar}>
-      <div className={styles.calendarNav}>
+    <div className="relative">
+      {/* The nav strip lets clicks through to the month title; the arrows take them back. */}
+      <div className="pointer-events-none absolute top-0.5 right-0 left-0 flex justify-between">
         <Button
           variant="ghost"
           size="icon-sm"
-          className={styles.calendarArrow}
+          className="pointer-events-auto"
           aria-label="Предыдущий месяц"
           disabled={view <= monthKey(min)}
           onClick={() => shiftView(-1)}
@@ -84,30 +84,35 @@ export function Calendar({ start, end, min, max, onPick }: Props) {
         <Button
           variant="ghost"
           size="icon-sm"
-          className={styles.calendarArrow}
+          className="pointer-events-auto"
           aria-label="Следующий месяц"
           onClick={() => shiftView(1)}
         >
           <ChevronRight aria-hidden />
         </Button>
       </div>
-      <div className={styles.months} ref={gridRef} onKeyDown={onKeyDown} onPointerLeave={() => setHover(null)}>
+      <div
+        className="grid gap-5 md:grid-cols-2"
+        ref={gridRef}
+        onKeyDown={onKeyDown}
+        onPointerLeave={() => setHover(null)}
+      >
         {[view, view + 1].map((key, index) => {
           const year = Math.floor(key / 12)
           const month = key % 12
           return (
-            <div key={key} className={`${styles.month} ${index === 1 ? styles.monthSecond : ''}`}>
+            <div key={key} className={index === 1 ? 'hidden md:block' : undefined}>
               <p className="m-0 pt-2.5 pb-2 text-center text-base font-[650] first-letter:uppercase">
                 {monthTitle.format(new Date(year, month, 1))}
               </p>
-              <div className={styles.weekdays} aria-hidden>
+              <div className="grid grid-cols-7" aria-hidden>
                 {weekdays.map((w) => (
                   <span className="py-1 text-center text-xs text-muted-foreground" key={w}>
                     {w}
                   </span>
                 ))}
               </div>
-              <div className={styles.days} role="group" aria-label={monthTitle.format(new Date(year, month, 1))}>
+              <div className="grid grid-cols-7" role="group" aria-label={monthTitle.format(new Date(year, month, 1))}>
                 {monthGrid(year, month).map((iso, i) =>
                   iso === null ? (
                     <span key={`pad-${i}`} />
