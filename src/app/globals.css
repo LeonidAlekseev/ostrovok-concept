@@ -8,7 +8,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /* Tokens come in three layers: brand values -> semantic roles -> Tailwind theme (@theme inline).
-   Components and CSS Modules read the roles; the brand layer is referenced only here. */
+   Components read the roles; the brand layer is referenced only here. */
 
 :root {
   /* Brand palette. */
@@ -59,7 +59,7 @@
 
   --radius: 12px;
 
-  /* Shadows. --shadow-color tints every shadow and shading in the modules. */
+  /* Shadows. --shadow-color tints every shadow and shading in the components. */
   --shadow-color: var(--brand-navy);
   --shadow-soft: 0 12px 40px color-mix(in srgb, var(--shadow-color) 12%, transparent);
   --shadow-card: 0 6px 18px color-mix(in srgb, var(--shadow-color) 12%, transparent);
@@ -134,8 +134,8 @@
   --header-height: clamp(60px, 15vw, 72px);
 }
 
-/* static: CSS Modules read these at run time, where Tailwind cannot see the usage. */
-@theme static {
+/* Not static: Tailwind emits only the variables that utilities and var() in the CSS use. */
+@theme {
   /* lg is the layout's desktop step; xl equals --page-max. */
   --breakpoint-xs: 375px;
   --breakpoint-sm: 640px;
@@ -150,18 +150,6 @@
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 12px);
   --radius-full: 9999px;
-  /* Type scale: Tailwind's defaults, declared here so the modules can read them. */
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-base: 1rem;
-  --text-lg: 1.125rem;
-  --text-xl: 1.25rem;
-  --text-2xl: 1.5rem;
-  --text-3xl: 1.875rem;
-  --text-4xl: 2.25rem;
-  --text-5xl: 3rem;
-  --text-6xl: 3.75rem;
-  --text-7xl: 4.5rem;
   /* Fluid headings, one per role: the hero title, section titles, titles inside the search panel. */
   --text-display: clamp(32px, 9vw, 72px);
   --text-title: clamp(17px, 4.6vw, 30px);
@@ -290,7 +278,7 @@
   html {
     overflow-x: clip;
     font-family: var(--font-sans);
-    /* Preflight sets 1.5; the modules are laid out for the browser default. */
+    /* Preflight sets 1.5; the components are laid out for the browser default. */
     line-height: normal;
     color: var(--foreground);
     /* Shows only where Safari uncovers the page edge (its toolbars collapsing): match the content
