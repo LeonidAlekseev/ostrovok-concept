@@ -25,13 +25,14 @@ export const viewport: Viewport = {
   themeColor: '#a5e87b',
 }
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({ children, modal }: { children: ReactNode; modal: ReactNode }) {
   return (
     <html lang="ru">
       {/* Each page renders its own `main`; the footer sits at the bottom of short pages. */}
       <body className="flex min-h-dvh flex-col">
         <Header />
         {children}
+        {modal}
         <Footer />
       </body>
     </html>
