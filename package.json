@@ -7,14 +7,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "prelint": "npm run cn:build",
     "lint": "oxlint",
-    "cn:build": "cn build -o src/lib/cn-tables.ts -q",
-    "pretypecheck": "npm run cn:build",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "pretest": "npm run cn:build",
     "test": "vitest run"
   },
   "dependencies": {

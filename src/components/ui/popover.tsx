@@ -1,5 +1,5 @@
 import { Popover as PopoverPrimitive } from '@base-ui/react/popover'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 
 // Focus leaving the popover does not close it: as before, only a press outside or Escape does.
 function Popover({ onOpenChange, ...props }: PopoverPrimitive.Root.Props) {

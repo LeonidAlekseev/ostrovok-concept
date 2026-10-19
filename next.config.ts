@@ -1,4 +1,3 @@
-import { withCn } from 'cn/next'
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
@@ -16,5 +15,4 @@ const nextConfig: NextConfig = {
   },
 }
 
-// Compiles cn merge tables to the classes used in src; keep options in sync with the cn:build script.
-export default withCn(nextConfig, { out: 'src/lib/cn-tables.ts' })
+export default nextConfig
