@@ -1,4 +1,4 @@
-import { useId, useMemo, type RefObject } from 'react'
+import { useId, useMemo, useRef, type RefObject } from 'react'
 import { MapPin, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/field'
@@ -30,6 +30,7 @@ interface Option {
 
 export function DestinationField({ value, error, inputRef, onChange }: Props) {
   const errorId = useId()
+  const fieldRef = useRef<HTMLDivElement>(null)
 
   // The suggestions are computed from the typed text here, so Base UI must not filter them again.
   const options = useMemo<Option[]>(() => {
@@ -45,7 +46,7 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
   }, [value])
 
   return (
-    <div className={`${styles.fieldWrap} ${styles.areaDestination}`}>
+    <div className={`${styles.fieldWrap} ${styles.areaDestination}`} ref={fieldRef}>
       {/* The text is the destination: a picked suggestion fills it in. */}
       <Combobox
         items={options}
@@ -93,6 +94,7 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
         </ComboboxInputGroup>
 
         <ComboboxContent
+          container={fieldRef}
           align="start"
           sideOffset={8}
           // Stays under the field and lets the page scroll, as it did before the list moved to Base UI.

@@ -121,14 +121,7 @@
 
 /* ---------- Popovers ---------- */
 
-/* Legacy absolute placement under the field. Portaled popovers take only .popoverSurface. */
-.popover {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 30;
-}
-
+/* Surface only: placement comes from the Base UI popover (see components/ui/popover.tsx). */
 .popoverSurface {
   margin: 0;
   padding: 8px;

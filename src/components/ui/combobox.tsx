@@ -19,11 +19,15 @@ function ComboboxContent({
   align = 'start',
   sideOffset = 8,
   collisionAvoidance,
+  container,
   ...props
 }: ComboboxPrimitive.Popup.Props &
-  Pick<ComboboxPrimitive.Positioner.Props, 'align' | 'sideOffset' | 'collisionAvoidance'>) {
+  Pick<ComboboxPrimitive.Positioner.Props, 'align' | 'sideOffset' | 'collisionAvoidance'> & {
+    /** Where the list mounts. Base UI hides everything outside the portal container from assistive tech while open. */
+    container?: ComboboxPrimitive.Portal.Props['container']
+  }) {
   return (
-    <ComboboxPrimitive.Portal>
+    <ComboboxPrimitive.Portal container={container}>
       <ComboboxPrimitive.Positioner
         align={align}
         sideOffset={sideOffset}
