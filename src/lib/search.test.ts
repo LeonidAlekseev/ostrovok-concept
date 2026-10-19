@@ -1,0 +1,117 @@
+import { describe, expect, it } from 'vitest'
+import { destinations } from '../data/destinations'
+import { resolveTarget, suggestDestinations, validateSearch, type SearchQuery } from './search'
+
+const ids = (list: { id: string }[]) => list.map((d) => d.id)
+
+describe('resolveTarget', () => {
+  it('returns null for empty text', () => {
+    expect(resolveTarget('   ')).toBeNull()
+  })
+
+  it('finds a destination by its exact name ignoring case, outer spaces and ё/е', () => {
+    expect(resolveTarget('  пРАГА ')).toMatchObject({ kind: 'destination', destination: { id: 'prague' } })
+    expect(resolveTarget('Хёльсинки')).toMatchObject({ kind: 'destination', destination: { id: 'helsinki' } })
+  })
+
+  it('finds a scenario by its exact title', () => {
+    expect(resolveTarget('у моря')).toEqual({ kind: 'scenario', scenario: 'sea', title: 'У моря' })
+  })
+
+  it('does not resolve partial names or countries', () => {
+    expect(resolveTarget('Праг')).toBeNull()
+    expect(resolveTarget('Чехия')).toBeNull()
+  })
+})
+
+describe('suggestDestinations', () => {
+  it('suggests globe destinations for empty input', () => {
+    const expected = destinations.filter((d) => d.onGlobe).slice(0, 6)
+    expect(suggestDestinations('  ')).toEqual(expected)
+    expect(ids(suggestDestinations(''))).toEqual(['prague', 'london', 'oslo', 'helsinki', 'rome', 'madrid'])
+  })
+
+  it('suggests the scenario destinations when the text is a scenario title', () => {
+    const sea = destinations.filter((d) => d.scenarios.includes('sea')).slice(0, 6)
+    expect(suggestDestinations('  У МОРЯ ')).toEqual(sea)
+  })
+
+  it('puts matches by name or country start before matches inside the text', () => {
+    // "ис" starts "Испания" (Madrid, Barcelona) and "Исландия" (Reykjavik), and occurs inside the others.
+    expect(ids(suggestDestinations('ис'))).toEqual(['madrid', 'barcelona', 'reykjavik', 'lisbon', 'tbilisi'])
+  })
+
+  it('matches by country', () => {
+    expect(ids(suggestDestinations('сша'))).toEqual(['new-york', 'miami', 'los-angeles', 'honolulu'])
+  })
+
+  it('limits the number of suggestions', () => {
+    expect(suggestDestinations('а')).toHaveLength(6)
+    expect(suggestDestinations('а', 2)).toHaveLength(2)
+  })
+
+  it('returns nothing when no destination matches', () => {
+    expect(suggestDestinations('zzz')).toEqual([])
+  })
+})
+
+describe('validateSearch', () => {
+  const today = '2026-10-19'
+  const valid: SearchQuery = {
+    destination: 'Прага',
+    checkIn: '2026-10-20',
+    checkOut: '2026-10-21',
+    guests: { adults: 2, children: 0, rooms: 1 },
+  }
+  const check = (patch: Partial<SearchQuery>) => validateSearch({ ...valid, ...patch }, today)
+
+  it('accepts a valid query, including a scenario and check-in today', () => {
+    expect(check({})).toEqual({})
+    expect(check({ destination: 'У моря', checkIn: today })).toEqual({})
+  })
+
+  it('reports an empty destination', () => {
+    expect(check({ destination: '  ' }).destination).toBe('Укажите, куда вы хотите поехать')
+  })
+
+  it('reports a destination that is not in the catalogue', () => {
+    expect(check({ destination: 'Атлантида' }).destination).toBe('Выберите направление из списка подсказок')
+  })
+
+  it('reports check-in in the past before any other date error', () => {
+    expect(check({ checkIn: '2026-10-18', checkOut: '2026-10-18' }).dates).toBe('Дата заезда уже прошла')
+  })
+
+  it('reports check-out that is not later than check-in', () => {
+    expect(check({ checkOut: '2026-10-20' }).dates).toBe('Дата выезда должна быть позже даты заезда')
+  })
+
+  it('allows 30 nights and reports more than 30', () => {
+    expect(check({ checkOut: '2026-11-19' }).dates).toBeUndefined()
+    expect(check({ checkOut: '2026-11-20' }).dates).toBe('Максимальный срок проживания — 30 ночей')
+  })
+
+  it('reports more rooms than adults', () => {
+    expect(check({ guests: { adults: 1, children: 0, rooms: 2 } }).guests).toBe(
+      'В каждом номере должен быть хотя бы один взрослый',
+    )
+  })
+
+  it('reports impossible guest counts with a generic message', () => {
+    // Not described in manual-search spec: only "rooms > adults" has a scenario there.
+    expect(check({ guests: { adults: 0, children: 0, rooms: 0 } }).guests).toBe('Проверьте количество гостей')
+    expect(check({ guests: { adults: 2, children: -1, rooms: 1 } }).guests).toBe('Проверьте количество гостей')
+  })
+
+  it('does not check the upper guest limits', () => {
+    // Current behaviour: GUEST_LIMITS maximums (adults 10, children 6, rooms 5) are enforced
+    // only by the steppers, not by validateSearch.
+    expect(check({ guests: { adults: 11, children: 7, rooms: 6 } })).toEqual({})
+  })
+
+  it('reports several fields at once', () => {
+    expect(
+      Object.keys(check({ destination: '', checkOut: valid.checkIn, guests: { adults: 1, children: 0, rooms: 2 } })),
+    ).toEqual(['destination', 'dates', 'guests'])
+  })
+})
