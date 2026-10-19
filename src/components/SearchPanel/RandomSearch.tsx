@@ -318,7 +318,7 @@ function SlotMachine({ fortune, spinning, onLanded }: { fortune: Fortune; spinni
           </div>
         ))}
       </div>
-      <p className="visually-hidden" role="status">
+      <p className="sr-only" role="status">
         {spinning ? 'Барабан крутится…' : `Выпало: ${fortune.city.name}, ${fortune.hotel.name}, ${fortune.mood}`}
       </p>
     </div>

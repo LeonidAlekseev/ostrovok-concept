@@ -1,4 +1,5 @@
-@import 'tailwindcss';
+/* Classes are scanned in src only: the docs and OpenSpec notes would otherwise add utilities nobody uses. */
+@import 'tailwindcss' source('../');
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 
@@ -237,18 +238,6 @@
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
-}
-
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -187,7 +187,7 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
         onSubmit={onSubmit}
       >
         <Sparkles className="size-[clamp(22px,6vw,28px)] flex-none fill-current text-primary" aria-hidden />
-        <label htmlFor={inputId} className="visually-hidden">
+        <label htmlFor={inputId} className="sr-only">
           Опишите поездку
         </label>
         {/* The composer draws the box and the focus state; the textarea is bare inside it. */}
