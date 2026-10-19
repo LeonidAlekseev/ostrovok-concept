@@ -32,7 +32,7 @@ export const OFFER_NOT_FOUND = 'Предложение не найдено'
 export const offerTotal = (pricePerNight: number, nights: number, rooms: number) => pricePerNight * nights * rooms
 
 /** The last day free cancellation applies, or `null` for a non-refundable rate. */
-export const freeCancellationUntil = (rate: Rate, checkIn: IsoDate): IsoDate | null =>
+export const freeCancellationUntil = (rate: Pick<Rate, 'cancellation'>, checkIn: IsoDate): IsoDate | null =>
   rate.cancellation.kind === 'free' ? addDays(checkIn, -rate.cancellation.daysBefore) : null
 
 export function toOfferParams({ hotelId, roomId, rateId, ...stay }: OfferSelection): URLSearchParams {
