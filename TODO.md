@@ -5,23 +5,7 @@
 
 ## В работе
 
-Этап 2:
-
-- [ ] Свой CSS на Tailwind во всех компонентах: `Hero`, анимации `RandomSearch` и `AssistantSearch` в
-      `@theme`, модули удалены, `@theme` без `static`, стандартные утилиты для
-      `translate`/`scale`/`rotate`/`shadow` — `reduce-globe-css` — в работе. Обновлён по решению
-      пользователя 2026-10-19: порог размера CSS отменён.
-
-Шаблоны основных страниц — кликабельный прототип на демо-данных (план согласован пользователем
-2026-10-19; вход — модальное окно и страница, карта — MapLibre + OSM, поиск ведёт на `/search`, без
-Zustand). Не больше двух исполнителей одновременно:
-
-- [ ] Этап 1: `add-prototype-foundation` — старт после merge `reduce-globe-css`.
-- [ ] Этап 2: `add-search-results-page`, `add-hotel-pages` — после этапа 1.
-- [ ] Этап 3: `add-booking-checkout`, `add-auth-pages` — после этапа 1.
-- [ ] Этап 4: `add-account-pages` (после `add-booking-checkout` и `add-auth-pages`),
-      `add-help-and-legal-pages` (после этапа 1).
-- [ ] Этап 5: `add-home-collections` — после `add-search-results-page` и `add-hotel-pages`.
+Нет.
 
 ## Ожидает согласования
 
@@ -41,6 +25,49 @@ Zustand). Не больше двух исполнителей одновреме
 - [ ] Скрипт съёмки и сравнения скриншотов (Chromium, pixelmatch) пересоздаётся в `/tmp` каждым
       исполнителем — источник: `reduce-search-css` — оформить в `scripts/` без коммита изображений —
       лёгкий — нет.
+
+- [ ] Перевести на стандартные утилиты остатки произвольных свойств: `transform: translateY(…)` в
+      `style` ленты барабана и `[transition:…]` — источник: `src/components/SearchPanel/RandomSearch.tsx:316`,
+      `src/components/SearchForm/GuestsField.tsx:49`, `src/components/DestinationCard/DestinationCard.tsx:18`
+      (`reduce-globe-css`) — правило утилит README не покрывает `style` и `transition` — лёгкий — нет.
+- [ ] Единое поведение наведения на тач-устройствах: `Hero` использует `[&:hover]`, остальные — `hover:`
+      (только при `(hover: hover)`) — источник: `src/components/Hero/Hero.tsx:90`,
+      `src/components/DestinationCard/DestinationCard.tsx:42` (`reduce-globe-css`) — выбрать вариант,
+      записать в README; при `[&:hover]` — `@custom-variant` вместо `!` — лёгкий — решение пользователя.
+- [ ] Анимация раскрытия аккордеона: из `ui/accordion` убраны `animate-accordion-*`, keyframes нет —
+      источник: `src/components/ui/accordion.tsx` (`add-help-and-legal-pages`) — добавить
+      `--animate-accordion-*` в `@theme` — лёгкий — нет.
+- [ ] 404 и ошибка предложения на оформлении ведут на `/#search` как временная замена `/search` —
+      источник: `src/app/not-found.tsx`, `src/components/BookingPage/BookingPage.tsx`
+      (`add-prototype-foundation`, `add-booking-checkout`) — оставить или вести на поиск с главной;
+      `/search` без направления показывает форму с ошибкой — лёгкий — нет.
+- [ ] Дубли хелперов: `cancellationText` против `cancellationLabel`, `decimal` против `formatRating`,
+      `DEFAULT_GUESTS` в `useStay` — источник: `src/components/RatesPage/RoomRates.tsx:15`,
+      `src/components/SearchResultsPage/HotelCard.tsx:14`, `src/components/StayBar/useStay.ts:9` — свести
+      к общим функциям `src/lib/*` — лёгкий — нет.
+- [ ] Общий компонент деталей бронирования для подтверждения и «Моих поездок» — источник:
+      `src/components/BookingConfirmation/ConfirmationPage.tsx:14` (`add-account-pages`) — списки строк
+      почти совпадают — лёгкий — нет.
+- [ ] Вариант `destructive` у `ui/button` для подтверждения отмены — источник:
+      `src/components/ui/button.tsx:10` (`add-account-pages`) — сейчас отмена в основном стиле — лёгкий —
+      нет.
+- [ ] Демо-вход по email даёт имя без фамилии, а оформление требует фамилию — источник:
+      `src/components/Auth/AuthForm.tsx` (`add-account-pages`) — запрашивать фамилию при входе или
+      принимать одно имя — лёгкий — решение пользователя.
+- [ ] «Избранное» в шапке дважды: иконка и пункт меню пользователя — источник:
+      `src/components/Header/Header.tsx` (`add-auth-pages`) — оставить одно — лёгкий — решение
+      пользователя.
+- [ ] Подпись `PhotoPlaceholder` не помещается в плитку 96×64 в сводке заказа — источник:
+      `src/components/ui/PhotoPlaceholder.tsx` (`add-booking-checkout`) — `truncate` или скрывать подпись
+      — лёгкий — нет.
+- [ ] Шум jsdom «Not implemented: navigation to another Document» в `npm test` — источник:
+      `src/test/setup.ts` (`add-booking-checkout`) — перехватывать клики по ссылкам в setup — лёгкий —
+      нет.
+- [ ] Turbopack копирует в `.next/static/media` около 5 МБ `.mjs` из `maplibre-gl/dist` (грузится только
+      воркер) — источник: `add-search-results-page` — растёт размер деплоя; проверить исключение — лёгкий
+      — нет.
+- [ ] Устаревший комментарий про фон `html` после появления подвала — источник:
+      `src/app/globals.css:282` (`add-prototype-foundation`) — уточнить — лёгкий — нет.
 
 ## Выполнено
 
@@ -76,6 +103,26 @@ Zustand). Не больше двух исполнителей одновреме
       18 743 (+1,9 %) при принятом критерии «gzip растёт не больше чем на 2 %».
 - [x] План этапа 1 и changes — #14 — 2026-10-19.
 - [x] Удалены 13 смерженных удалённых веток PR #1–#13 — решение пользователя, без PR — 2026-10-19.
+- [x] Свой CSS на Tailwind во всех компонентах: модулей нет, анимации в `@theme`, `@theme` без
+      `static`, стандартные утилиты для `translate`/`scale`/`rotate`/`shadow` — `reduce-globe-css` — #29
+      — 2026-10-19. CSS 97 752 → 111 912 байт (+14,5 %), gzip 19 202 → 20 295 (+5,7 %); порог отменён
+      пользователем.
+- [x] Итог этапа 1 и обновлённый `reduce-globe-css` — #27 — 2026-10-19.
+- [x] План шаблонов основных страниц — #28 — 2026-10-19.
+- [x] Основа прототипа: каркас (шапка, подвал, 404), каталог отелей, хранилища в `localStorage`,
+      контракт предложения, кнопка избранного — `add-prototype-foundation` — #30 — 2026-10-19.
+- [x] Страница отеля и выбор тарифа (`/hotels/<id>`, `/hotels/<id>/rooms`) — `add-hotel-pages` — #31 —
+      2026-10-19.
+- [x] Оформление и подтверждение бронирования (`/booking`, `/booking/confirmation`) —
+      `add-booking-checkout` — #32 — 2026-10-19.
+- [x] Результаты поиска `/search`: список, фильтры, сортировка, карта MapLibre; поиск с главной ведёт
+      на `/search` — `add-search-results-page` — #33 — 2026-10-19.
+- [x] Вход и регистрация: модальное окно и страницы `/login`, `/register`, меню пользователя —
+      `add-auth-pages` — #34 — 2026-10-19.
+- [x] Мои поездки, детали бронирования (изменение, отмена), избранное — `add-account-pages` — #35 —
+      2026-10-19.
+- [x] Поддержка и FAQ, юридические страницы — `add-help-and-legal-pages` — #36 — 2026-10-19.
+- [x] Подборки отелей на главной — `add-home-collections` — #37 — 2026-10-19.
 - [x] Скриншоты `openspec/**/screenshots/` вычищены из истории `main` и `dev` (`git filter-repo`, force
       push пользователем; pack 18,18 → 4,42 МБ), удалены 8 слитых веток PR #14–#21; SHA в TODO и
       архиве changes заменены на новые — решение пользователя, без PR — 2026-10-19.
