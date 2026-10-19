@@ -1,6 +1,6 @@
 import { useState, type ImgHTMLAttributes } from 'react'
 import { ImageOff } from 'lucide-react'
-import styles from './SmartImage.module.css'
+import { cn } from 'cn'
 
 type Props = ImgHTMLAttributes<HTMLImageElement> & { alt: string }
 
@@ -10,7 +10,10 @@ export function SmartImage({ className, alt, ...rest }: Props) {
   if (failed) {
     return (
       <span
-        className={`${styles.fallback} ${className ?? ''}`}
+        className={cn(
+          'grid place-items-center bg-linear-135 from-(--decor-photo-from) to-(--decor-photo-to) text-(--decor-light)/70',
+          className,
+        )}
         {...(alt ? { role: 'img', 'aria-label': alt } : { 'aria-hidden': true })}
       >
         <ImageOff aria-hidden size={22} strokeWidth={1.6} />
