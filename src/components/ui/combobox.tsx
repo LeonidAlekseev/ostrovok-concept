@@ -9,15 +9,27 @@ function ComboboxInput({ className, ...props }: ComboboxPrimitive.Input.Props) {
   return <ComboboxPrimitive.Input data-slot="combobox-input" className={cn(className)} {...props} />
 }
 
+// The group is the anchor of the list: the list takes the group's width (--anchor-width).
+function ComboboxInputGroup({ className, ...props }: ComboboxPrimitive.InputGroup.Props) {
+  return <ComboboxPrimitive.InputGroup data-slot="combobox-input-group" className={cn(className)} {...props} />
+}
+
 function ComboboxContent({
   className,
   align = 'start',
   sideOffset = 8,
+  collisionAvoidance,
   ...props
-}: ComboboxPrimitive.Popup.Props & Pick<ComboboxPrimitive.Positioner.Props, 'align' | 'sideOffset'>) {
+}: ComboboxPrimitive.Popup.Props &
+  Pick<ComboboxPrimitive.Positioner.Props, 'align' | 'sideOffset' | 'collisionAvoidance'>) {
   return (
     <ComboboxPrimitive.Portal>
-      <ComboboxPrimitive.Positioner align={align} sideOffset={sideOffset}>
+      <ComboboxPrimitive.Positioner
+        align={align}
+        sideOffset={sideOffset}
+        collisionAvoidance={collisionAvoidance}
+        className="isolate z-50"
+      >
         <ComboboxPrimitive.Popup data-slot="combobox-content" className={cn(className)} {...props} />
       </ComboboxPrimitive.Positioner>
     </ComboboxPrimitive.Portal>
@@ -32,4 +44,4 @@ function ComboboxItem({ className, ...props }: ComboboxPrimitive.Item.Props) {
   return <ComboboxPrimitive.Item data-slot="combobox-item" className={cn(className)} {...props} />
 }
 
-export { Combobox, ComboboxInput, ComboboxContent, ComboboxList, ComboboxItem }
+export { Combobox, ComboboxInput, ComboboxInputGroup, ComboboxContent, ComboboxList, ComboboxItem }
