@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { destinations } from '../data/destinations'
-import { findScenario, resolveTarget, suggestDestinations, validateSearch, type SearchQuery } from './search'
+import {
+  findScenario,
+  fromSearchParams,
+  resolveTarget,
+  suggestDestinations,
+  toSearchParams,
+  validateSearch,
+  withStartDates,
+  type SearchQuery,
+} from './search'
 
 const ids = (list: { id: string }[]) => list.map((d) => d.id)
 
@@ -125,5 +134,56 @@ describe('validateSearch', () => {
     expect(
       Object.keys(check({ destination: '', checkOut: valid.checkIn, guests: { adults: 1, children: 0, rooms: 2 } })),
     ).toEqual(['destination', 'dates', 'guests'])
+  })
+})
+
+describe('fromSearchParams', () => {
+  const query: SearchQuery = {
+    destination: 'Прага',
+    checkIn: '2026-10-20',
+    checkOut: '2026-10-23',
+    guests: { adults: 3, children: 1, rooms: 2 },
+  }
+
+  it('reads back what toSearchParams wrote, for a city and a scenario', () => {
+    expect(fromSearchParams(toSearchParams(query, resolveTarget('Прага')!))).toEqual(query)
+    const sea = { ...query, destination: 'У моря' }
+    expect(fromSearchParams(toSearchParams(sea, resolveTarget('У моря')!))).toEqual(sea)
+  })
+
+  it('leaves an unknown or missing destination and missing dates empty, with default guests', () => {
+    expect(fromSearchParams(new URLSearchParams('destination=atlantis'))).toEqual({
+      destination: '',
+      checkIn: '',
+      checkOut: '',
+      guests: { adults: 2, children: 0, rooms: 1 },
+    })
+  })
+
+  it('keeps malformed guest counts for validation to report', () => {
+    const read = fromSearchParams(
+      new URLSearchParams('destination=prague&checkin=2026-10-20&checkout=2026-10-21&adults=x&rooms=1'),
+    )
+    expect(read.guests.adults).toBeNaN()
+    expect(validateSearch(read, '2026-10-19').guests).toBe('Проверьте количество гостей')
+  })
+})
+
+describe('withStartDates', () => {
+  const empty: SearchQuery = {
+    destination: '',
+    checkIn: '',
+    checkOut: '',
+    guests: { adults: 2, children: 0, rooms: 1 },
+  }
+
+  it('fills empty dates with tomorrow and the night after', () => {
+    expect(withStartDates(empty, '2026-10-19')).toMatchObject({ checkIn: '2026-10-20', checkOut: '2026-10-21' })
+  })
+
+  it('keeps chosen dates and waits for today to be known', () => {
+    const chosen = { ...empty, checkIn: '2026-11-01', checkOut: '2026-11-04' }
+    expect(withStartDates(chosen, '2026-10-19')).toEqual(chosen)
+    expect(withStartDates(empty, '')).toBe(empty)
   })
 })

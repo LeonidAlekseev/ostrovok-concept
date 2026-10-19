@@ -1,0 +1,151 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fullHotelsIn, type Hotel } from './catalog'
+import {
+  applyFilters,
+  countFilters,
+  DEMO_SEARCH_MS,
+  NO_FILTERS,
+  parseFilters,
+  runDemoSearch,
+  setFilterParams,
+  type Filters,
+} from './results'
+import { resolveTarget, type SearchQuery } from './search'
+
+const query: SearchQuery = {
+  destination: 'Прага',
+  checkIn: '2026-10-20',
+  checkOut: '2026-10-23',
+  guests: { adults: 2, children: 0, rooms: 1 },
+}
+const filters = (patch: Partial<Filters>): Filters => ({ ...NO_FILTERS, ...patch })
+const prague = fullHotelsIn('prague')
+
+describe('runDemoSearch', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('returns the hotels of a city after the demo delay', async () => {
+    const pending = runDemoSearch(query, resolveTarget('Прага')!)
+    await vi.advanceTimersByTimeAsync(DEMO_SEARCH_MS)
+    const result = await pending
+    expect(result.nights).toBe(3)
+    expect(result.hotels.length).toBeGreaterThanOrEqual(6)
+    expect(result.hotels.every((h) => h.destinationId === 'prague')).toBe(true)
+  })
+
+  it('returns the hotels of every destination of a scenario', async () => {
+    const pending = runDemoSearch({ ...query, destination: 'У моря' }, resolveTarget('У моря')!)
+    await vi.advanceTimersByTimeAsync(DEMO_SEARCH_MS)
+    const { hotels } = await pending
+    expect(new Set(hotels.map((h) => h.destinationId)).size).toBeGreaterThan(1)
+  })
+
+  it('rejects with AbortError when aborted', async () => {
+    const controller = new AbortController()
+    const pending = runDemoSearch(query, resolveTarget('Прага')!, controller.signal)
+    controller.abort()
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+  })
+})
+
+describe('parseFilters and setFilterParams', () => {
+  it('reads the filters it wrote, keeping the query parameters', () => {
+    const set = filters({
+      priceMin: 5000,
+      priceMax: 20000,
+      stars: [5, 4],
+      rating: 8,
+      meals: ['breakfast', 'all-inclusive'],
+      freeCancel: true,
+      sort: 'price_asc',
+    })
+    const params = setFilterParams(new URLSearchParams('destination=prague'), set)
+    expect(params.toString()).toBe(
+      'destination=prague&price_min=5000&price_max=20000&stars=5%2C4&rating=8&meal=breakfast%2Call-inclusive&free_cancel=1&sort=price_asc',
+    )
+    expect(parseFilters(params)).toEqual(set)
+  })
+
+  it('writes nothing for no filters and the default sorting, and clears old values', () => {
+    const params = setFilterParams(new URLSearchParams('destination=prague&stars=5&sort=rating'), NO_FILTERS)
+    expect(params.toString()).toBe('destination=prague')
+  })
+
+  it('ignores unknown and malformed values', () => {
+    expect(
+      parseFilters(
+        new URLSearchParams('price_min=abc&price_max=-5&stars=7,5,x&rating=5&meal=snacks&free_cancel=yes&sort=cheap'),
+      ),
+    ).toEqual(filters({ stars: [5] }))
+  })
+
+  it('counts the filters set, without the sorting', () => {
+    expect(countFilters(filters({ sort: 'rating' }))).toBe(0)
+    expect(countFilters(filters({ priceMin: 1, priceMax: 2, stars: [5, 4], freeCancel: true }))).toBe(3)
+  })
+})
+
+describe('applyFilters', () => {
+  const ids = (hotels: Hotel[]) => hotels.map((h) => h.id).sort()
+
+  it('keeps every hotel without filters', () => {
+    expect(ids(applyFilters(prague, NO_FILTERS).map((i) => i.hotel))).toEqual(ids(prague))
+  })
+
+  it('shows each hotel with its cheapest rate', () => {
+    for (const { hotel, rate } of applyFilters(prague, NO_FILTERS)) expect(rate.pricePerNight).toBe(hotel.priceFrom)
+  })
+
+  it('filters by stars and minimal rating', () => {
+    const fiveStars = applyFilters(prague, filters({ stars: [5] }))
+    expect(fiveStars.length).toBeGreaterThan(0)
+    expect(fiveStars.every((i) => i.hotel.stars === 5)).toBe(true)
+    expect(applyFilters(prague, filters({ rating: 9 })).every((i) => i.hotel.rating >= 9)).toBe(true)
+  })
+
+  it('picks the cheapest rate with the chosen meal and free cancellation', () => {
+    const items = applyFilters(prague, filters({ meals: ['breakfast'], freeCancel: true }))
+    for (const { hotel, rate } of items) {
+      expect(rate.meal).toBe('breakfast')
+      expect(rate.cancellation.kind).toBe('free')
+      const cheapest = Math.min(
+        ...hotel.rooms
+          .flatMap((r) => r.rates)
+          .filter((r) => r.meal === 'breakfast' && r.cancellation.kind === 'free')
+          .map((r) => r.pricePerNight),
+      )
+      expect(rate.pricePerNight).toBe(cheapest)
+    }
+  })
+
+  it('filters by the price per night of the shown rate', () => {
+    const prices = applyFilters(prague, NO_FILTERS).map((i) => i.rate.pricePerNight)
+    const [low, high] = [Math.min(...prices), Math.max(...prices)]
+    const items = applyFilters(prague, filters({ priceMin: low + 1, priceMax: high - 1 }))
+    expect(items.every((i) => i.rate.pricePerNight > low && i.rate.pricePerNight < high)).toBe(true)
+    expect(items.length).toBeLessThan(prices.length)
+  })
+
+  it('returns nothing when no hotel meets the filters', () => {
+    expect(applyFilters(prague, filters({ priceMax: 1 }))).toEqual([])
+  })
+
+  it('sorts by popularity, price and rating', () => {
+    const sorted = (f: Filters, key: (i: ReturnType<typeof applyFilters>[number]) => number) =>
+      applyFilters(prague, f).map(key)
+    const desc = (list: number[]) => [...list].sort((a, b) => b - a)
+    const reviews = sorted(NO_FILTERS, (i) => i.hotel.reviewCount)
+    expect(reviews).toEqual(desc(reviews))
+    const asc = sorted(filters({ sort: 'price_asc' }), (i) => i.rate.pricePerNight)
+    expect(asc).toEqual([...asc].sort((a, b) => a - b))
+    const priceDesc = sorted(filters({ sort: 'price_desc' }), (i) => i.rate.pricePerNight)
+    expect(priceDesc).toEqual(desc(priceDesc))
+    const ratings = sorted(filters({ sort: 'rating' }), (i) => i.hotel.rating)
+    expect(ratings).toEqual(desc(ratings))
+  })
+})
