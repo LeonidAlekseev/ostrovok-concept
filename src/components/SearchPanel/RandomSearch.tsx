@@ -282,7 +282,7 @@ function SlotMachine({ fortune, spinning, onLanded }: { fortune: Fortune; spinni
         className={`${styles.lever} absolute top-[26%] -right-5 h-[46%] w-2 origin-bottom rounded-sm bg-[linear-gradient(90deg,var(--decor-lever-dark),var(--decor-lever-light),var(--decor-lever-dark))]`}
         aria-hidden
       >
-        <span className="absolute -top-3.5 left-1/2 size-5.5 -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_35%_30%,var(--decor-knob-light),var(--decor-knob)_55%,var(--decor-knob-dark))] shadow-[0_3px_6px_color-mix(in_srgb,var(--decor-black)_25%,transparent)]" />
+        <span className="absolute -top-3.5 left-1/2 size-5.5 -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_35%_30%,var(--decor-knob-light),var(--decor-knob)_55%,var(--decor-knob-dark))] [box-shadow:0_3px_6px_color-mix(in_srgb,var(--decor-black)_25%,transparent)]" />
       </div>
       <div className={`${styles.lights} absolute top-1.5 right-4 left-4 h-1.5 opacity-85`} aria-hidden />
       <div className="grid grid-cols-3 gap-2" aria-hidden>
@@ -292,7 +292,7 @@ function SlotMachine({ fortune, spinning, onLanded }: { fortune: Fortune; spinni
               {['Город', 'Отель', 'Настроение'][i]}
             </span>
             <div
-              className={`${styles.window} relative h-(--h) overflow-hidden rounded-lg bg-card shadow-[inset_0_0_0_2px_color-mix(in_srgb,var(--decor-gold)_60%,transparent)]`}
+              className={`${styles.window} relative h-(--h) overflow-hidden rounded-lg bg-card [box-shadow:inset_0_0_0_2px_color-mix(in_srgb,var(--decor-gold)_60%,transparent)]`}
             >
               <ul
                 className={`transition-transform duration-(--d) ease-[cubic-bezier(0.12,0.8,0.22,1.04)] ${spinning ? 'blur-[0.4px]' : ''}`}

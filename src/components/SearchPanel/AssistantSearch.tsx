@@ -183,7 +183,7 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
       )}
 
       <form
-        className="relative flex items-center gap-[clamp(10px,2.6vw,16px)] rounded-[clamp(16px,4vw,20px)] border border-border bg-card p-[clamp(10px,2.6vw,14px)] pl-[clamp(14px,3.6vw,22px)] transition-[border-color,box-shadow] duration-200 focus-within:border-primary focus-within:shadow-[0_0_0_3px_color-mix(in_srgb,var(--ring)_10%,transparent)]"
+        className="relative flex items-center gap-[clamp(10px,2.6vw,16px)] rounded-[clamp(16px,4vw,20px)] border border-border bg-card p-[clamp(10px,2.6vw,14px)] pl-[clamp(14px,3.6vw,22px)] transition-[border-color,box-shadow] duration-200 focus-within:border-primary focus-within:[box-shadow:0_0_0_3px_color-mix(in_srgb,var(--ring)_10%,transparent)]"
         onSubmit={onSubmit}
       >
         <Sparkles className="size-[clamp(22px,6vw,28px)] flex-none fill-current text-primary" aria-hidden />
@@ -270,7 +270,7 @@ function PlanView({ plan, onChoose }: { plan: Plan; onChoose: Props['onChoose'] 
           <li key={destination.id}>
             <button
               type="button"
-              className="flex w-full items-center gap-2.5 rounded-lg border border-border bg-card py-2.5 pr-2 pl-3 text-left transition-[border-color,box-shadow] duration-200 hover:border-primary hover:shadow-[0_4px_14px_color-mix(in_srgb,var(--primary)_12%,transparent)] focus-visible:border-primary focus-visible:shadow-[0_4px_14px_color-mix(in_srgb,var(--primary)_12%,transparent)]"
+              className="flex w-full items-center gap-2.5 rounded-lg border border-border bg-card py-2.5 pr-2 pl-3 text-left transition-[border-color,box-shadow] duration-200 hover:border-primary hover:[box-shadow:0_4px_14px_color-mix(in_srgb,var(--primary)_12%,transparent)] focus-visible:border-primary focus-visible:[box-shadow:0_4px_14px_color-mix(in_srgb,var(--primary)_12%,transparent)]"
               onClick={() => void onChoose({ ...plan.query, destination: destination.name })}
             >
               <span className="min-w-0 flex-1">

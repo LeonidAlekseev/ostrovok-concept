@@ -46,7 +46,7 @@ export function SearchPanel({ mode, onModeChange, search, destinationRef, submit
           <TabsTrigger
             key={modeId}
             value={modeId}
-            className={`group flex h-[clamp(44px,12vw,58px)] min-w-0 items-center justify-center gap-[clamp(6px,1.8vw,12px)] px-[clamp(6px,2vw,18px)] text-[clamp(13px,3.8vw,18px)] whitespace-nowrap max-sm:h-14 max-sm:flex-col max-sm:gap-0.5 max-sm:text-sm/[normal] rounded-full border-0 bg-(--decor-light)/45 font-medium text-brand-foreground transition-[background-color,color,box-shadow] hover:bg-card data-active:bg-card data-active:font-[650] data-active:text-primary data-active:shadow-[0_6px_18px_color-mix(in_srgb,var(--shadow-color)_8%,transparent)]`}
+            className={`group flex h-[clamp(44px,12vw,58px)] min-w-0 items-center justify-center gap-[clamp(6px,1.8vw,12px)] px-[clamp(6px,2vw,18px)] text-[clamp(13px,3.8vw,18px)] whitespace-nowrap max-sm:h-14 max-sm:flex-col max-sm:gap-0.5 max-sm:text-sm/[normal] rounded-full border-0 bg-(--decor-light)/45 font-medium text-brand-foreground transition-[background-color,color,box-shadow] hover:bg-card data-active:bg-card data-active:font-[650] data-active:text-primary data-active:[box-shadow:0_6px_18px_color-mix(in_srgb,var(--shadow-color)_8%,transparent)]`}
           >
             {/* Only the sparkle reads well filled; the sliders and the die keep their outline. */}
             <Icon
