@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { addDays, todayIso } from '../lib/dates'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { addDays, todayIso, type IsoDate } from '../lib/dates'
 import {
   resolveTarget,
   runDemoSearch,
@@ -22,7 +22,9 @@ function withoutKey(errors: SearchErrors, key: keyof SearchErrors): SearchErrors
   return next
 }
 
-// Dates stay empty during prerender and hydration so server and client markup match; the effect below fills them.
+const subscribeNever = () => () => {}
+
+// Dates the user has not picked yet stay empty; withStartDates fills them from today.
 const initialQuery: SearchQuery = {
   destination: '',
   checkIn: '',
@@ -30,31 +32,36 @@ const initialQuery: SearchQuery = {
   guests: { adults: 2, children: 0, rooms: 1 },
 }
 
+/** Empty dates default to tomorrow and the night after. Nothing is filled until `today` is known. */
+function withStartDates(q: SearchQuery, today: IsoDate): SearchQuery {
+  if (!today) return q
+  const checkIn = q.checkIn || addDays(today, 1)
+  return { ...q, checkIn, checkOut: q.checkOut || addDays(checkIn, 1) }
+}
+
 export function useHotelSearch() {
-  const [query, setQuery] = useState<SearchQuery>(initialQuery)
+  // Empty on the server and during hydration, so prerendered and hydrated markup match.
+  const today = useSyncExternalStore(subscribeNever, todayIso, () => '')
+  const [chosen, setChosen] = useState<SearchQuery>(initialQuery)
+  const query = useMemo(() => withStartDates(chosen, today), [chosen, today])
   const [errors, setErrors] = useState<SearchErrors>({})
   const [status, setStatus] = useState<SearchStatus>({ state: 'idle' })
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
-  useEffect(() => {
-    const checkIn = addDays(todayIso(), 1)
-    setQuery((q) => ({ ...q, checkIn, checkOut: addDays(checkIn, 1) }))
-  }, [])
-
   const setDestination = useCallback((destination: string) => {
-    setQuery((q) => ({ ...q, destination }))
+    setChosen((q) => ({ ...q, destination }))
     setErrors((e) => withoutKey(e, 'destination'))
   }, [])
 
   const setDates = useCallback((checkIn: string, checkOut: string) => {
-    setQuery((q) => ({ ...q, checkIn, checkOut }))
+    setChosen((q) => ({ ...q, checkIn, checkOut }))
     setErrors((e) => withoutKey(e, 'dates'))
   }, [])
 
   const setGuests = useCallback((guests: Guests) => {
-    setQuery((q) => ({ ...q, guests }))
+    setChosen((q) => ({ ...q, guests }))
     setErrors((e) => withoutKey(e, 'guests'))
   }, [])
 
@@ -85,7 +92,7 @@ export function useHotelSearch() {
   /** Fills the whole form at once (e.g. from the assistant) and searches. */
   const searchFor = useCallback(
     (q: SearchQuery) => {
-      setQuery(q)
+      setChosen(q)
       return run(q)
     },
     [run],
