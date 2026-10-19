@@ -58,6 +58,8 @@ export function suggestDestinations(text: string, limit = 6): Destination[] {
   return [...starts, ...contains].slice(0, limit)
 }
 
+const inLimits = (n: number, { min, max }: { min: number; max: number }) => Number.isInteger(n) && n >= min && n <= max
+
 export function validateSearch(query: SearchQuery, today: IsoDate): SearchErrors {
   const errors: SearchErrors = {}
   if (!query.destination.trim()) {
@@ -73,7 +75,12 @@ export function validateSearch(query: SearchQuery, today: IsoDate): SearchErrors
 
   const { adults, children, rooms } = query.guests
   if (rooms > adults) errors.guests = 'В каждом номере должен быть хотя бы один взрослый'
-  else if (adults < GUEST_LIMITS.adults.min || children < 0 || rooms < 1) errors.guests = 'Проверьте количество гостей'
+  else if (
+    !inLimits(adults, GUEST_LIMITS.adults) ||
+    !inLimits(children, GUEST_LIMITS.children) ||
+    !inLimits(rooms, GUEST_LIMITS.rooms)
+  )
+    errors.guests = 'Проверьте количество гостей'
   return errors
 }
 
