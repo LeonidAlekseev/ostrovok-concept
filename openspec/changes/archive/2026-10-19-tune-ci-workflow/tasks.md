@@ -11,4 +11,4 @@
 
 ## 3. Проверки
 
-- [ ] 3.1 `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check` проходят; проверка `CI / checks` в PR зелёная.
+- [x] 3.1 `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check` проходят; проверка `CI / checks` в PR зелёная.
