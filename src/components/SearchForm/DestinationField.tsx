@@ -13,7 +13,6 @@ import {
 import { formatPrice } from '../../lib/format'
 import { findScenario, suggestDestinations } from '../../lib/search'
 import { fieldBox } from './fieldBox'
-import styles from './SearchForm.module.css'
 
 interface Props {
   value: string
@@ -46,7 +45,7 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
   }, [value])
 
   return (
-    <div className={`${styles.areaDestination} relative min-w-0`} ref={fieldRef}>
+    <div className="relative col-span-full min-w-0 lg:col-auto" ref={fieldRef}>
       {/* The text is the destination: a picked suggestion fills it in. */}
       <Combobox
         items={options}

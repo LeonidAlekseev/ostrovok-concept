@@ -6,7 +6,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { countRu, guestsLabel } from '../../lib/format'
 import { GUEST_LIMITS, type Guests } from '../../lib/search'
 import { fieldBox } from './fieldBox'
-import styles from './SearchForm.module.css'
 
 interface Props {
   value: Guests
@@ -34,7 +33,7 @@ export function GuestsField({ value, error, onChange }: Props) {
   }
 
   return (
-    <div className={`${styles.areaGuests} relative min-w-0`}>
+    <div className="relative min-w-0">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
           className={`group ${fieldBox(Boolean(error))}`}

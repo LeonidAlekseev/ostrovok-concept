@@ -8,7 +8,6 @@ import { countRu } from '../../lib/format'
 import { MAX_NIGHTS } from '../../lib/search'
 import { Calendar } from './Calendar'
 import { fieldBox } from './fieldBox'
-import styles from './SearchForm.module.css'
 
 interface Props {
   checkIn: IsoDate
@@ -46,7 +45,7 @@ export function DateField({ checkIn, checkOut, error, onChange }: Props) {
   const nights = hasDates ? nightsBetween(checkIn, checkOut) : 0
 
   return (
-    <div className={`${styles.areaDates} relative min-w-0`}>
+    <div className="relative min-w-0">
       <Popover open={open} onOpenChange={onOpenChange}>
         <PopoverTrigger
           className={`${fieldBox(Boolean(error))}`}
