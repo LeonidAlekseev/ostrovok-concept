@@ -24,6 +24,14 @@
 
 **Порядок:** панель статистики, текстовый блок и подсказка, карточка места, пины. Каждая группа — отдельный коммит.
 
+**Решения по спорным правилам** (принятые при реализации):
+
+- Остались в модуле: `.hero` (переменные размера глобуса, градиентный фон, `::after`), все слои глобуса (`.globe`, `.atmosphere`, `.earth`, `.canvas`, `.rim`, `.sun`, `.cityGlow`, `.routes*`), `.pin` (переменные позиции, `@property --pin-scale`, `transform`, `transition`, `::before`, `:hover`/`:focus-visible`/`[aria-pressed]`), `.pinHub::before` (анимация `hubPulse`), `.pinTooltip` и `.pinTooltipShown`, `.placeCard` (переменные размеров, `transform` от `--x`/`--y`/`--card-lift`, `:hover`, медиазапрос), `.placeIcon` (расчётные `width` и `border-radius` от переменных карточки), `.placeContent` (только `animation: cardIn`, `@keyframes` в модуле хешируются, из Tailwind на них не сослаться).
+- Тултип пина не переносился: вариант на `group-[:hover]:` и `group-focus-visible:` с arbitrary-значениями добавлял около 500 байт сырого CSS при большем объёме разметки, чем правило. `group-hover:` в Tailwind v4 оборачивается в `@media (hover: hover)`, а оригинальное правило работает и на сенсорных экранах.
+- `z-index` пина вынесен в утилиты (`z-2`, хаб — `z-3`): правила модуля вне слоёв перебивают утилиты, поэтому `z-index: 3` у `[aria-pressed='true']` остался в модуле и по-прежнему побеждает.
+- Панель статистики: шрифт задан `font-[ui-monospace,SFMono-Regular,Menlo,monospace]`, а не `font-mono`, чтобы стек совпадал с оригиналом.
+- Подсказка вращается через `-rotate-10` (свойство `rotate`), а не `transform: rotate(-10deg)`: результат тот же, `transform-origin` сохранён (`origin-top-left`).
+
 ## Risks / Trade-offs
 
 - [Скриншоты глобуса нестабильны] → Если кадры canvas различаются между прогонами без изменений, сравнивать маску без canvas и записать это в proposal.md.
