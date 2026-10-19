@@ -2,19 +2,19 @@
 
 ## 1. Базовая линия
 
-- [ ] 1.1 Снять эталонные скриншоты составных виджетов до изменений на ширинах 375, 768 и 1280 px (вкладки способа поиска, открытые поповеры дат и гостей, открытая панель шапки, список подсказок направления, сетка знаков зодиака) во временную папку вне git; убедиться, что `npm run typecheck`, `npm run lint`, `npm run build` проходят на текущем коде
-- [ ] 1.2 Записать текущее клавиатурное поведение каждого виджета по сценариям `specs/composite-widgets` и отметить расхождения, которые spec объявляет намеренными (radiogroup)
+- [x] 1.1 Снять эталонные скриншоты составных виджетов до изменений на ширинах 375, 768 и 1280 px (вкладки способа поиска, открытые поповеры дат и гостей, открытая панель шапки, список подсказок направления, сетка знаков зодиака) во временную папку вне git; убедиться, что `npm run typecheck`, `npm run lint`, `npm run build` проходят на текущем коде
+- [x] 1.2 Записать текущее клавиатурное поведение каждого виджета по сценариям `specs/composite-widgets` и отметить расхождения, которые spec объявляет намеренными (radiogroup)
 
 ## 2. Обёртки в `ui/`
 
-- [ ] 2.1 Создать `src/components/ui/tabs.tsx` по шаблону shadcn на Base UI (`Tabs`, `TabsList`, `TabsTrigger`, `TabsContent`) с классами через `cn()`; проверить `npm run typecheck`
-- [ ] 2.2 Создать `src/components/ui/radio-group.tsx` (`RadioGroup`, `RadioGroupItem`) по тому же шаблону
-- [ ] 2.3 Создать `src/components/ui/popover.tsx` (`Popover`, `PopoverTrigger`, `PopoverContent`) поверх Base UI Popover
-- [ ] 2.4 Создать `src/components/ui/combobox.tsx` поверх Base UI Combobox (поле, список, пункты) с классами системы
+- [x] 2.1 Создать `src/components/ui/tabs.tsx` по шаблону shadcn на Base UI (`Tabs`, `TabsList`, `TabsTrigger`, `TabsContent`) с классами через `cn()`; проверить `npm run typecheck`
+- [x] 2.2 Создать `src/components/ui/radio-group.tsx` (`RadioGroup`, `RadioGroupItem`) по тому же шаблону
+- [x] 2.3 Создать `src/components/ui/popover.tsx` (`Popover`, `PopoverTrigger`, `PopoverContent`) поверх Base UI Popover
+- [x] 2.4 Создать `src/components/ui/combobox.tsx` поверх Base UI Combobox (поле, список, пункты) с классами системы
 
 ## 3. Перевод виджетов (по одному коммиту на виджет)
 
-- [ ] 3.1 `SearchPanel`: перевести вкладки на `Tabs`, сохранить `mode` в родителе через `value`/`onValueChange`, подпись «Способ поиска» на список; удалить `tabRefs` и ручной `onKeyDown`; проверить сценарии «Переключение стрелками» и «Переход к крайним вкладкам»
+- [x] 3.1 `SearchPanel`: перевести вкладки на `Tabs`, сохранить `mode` в родителе через `value`/`onValueChange`, подпись «Способ поиска» на список; удалить `tabRefs` и ручной `onKeyDown`; проверить сценарии «Переключение стрелками» и «Переход к крайним вкладкам»
 - [ ] 3.2 `RandomSearch`: перевести сетку знаков на `RadioGroup`; проверить сценарии «Выбор стрелками» и «Один выбранный знак», сверить подписи и `legend`
 - [ ] 3.3 `Header`: перевести панели меню и поиска на `Popover` с контролируемым `open` по панели; проверить «Переключение панелей» и «Закрытие по Escape»
 - [ ] 3.4 `GuestsField`: перевести поповер на `Popover`; проверить «Изменение количества», «Граница значения» и возврат фокуса
