@@ -17,6 +17,6 @@
 
 ## 4. Итог
 
-- [ ] 4.1 Повторить сборку и скриншоты, записать размеры и результат pixelmatch в proposal.md; проверка: числа записаны, в репозитории нет файлов скриншотов.
-- [ ] 4.2 Обновить раздел «Стили» README; проверка: README соответствует коду, `find src -name '*.module.css'` пуст.
-- [ ] 4.3 `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check`, `npm run build` проходят.
+- [x] 4.1 Повторить сборку и скриншоты, записать размеры и результат pixelmatch в proposal.md; проверка: числа записаны, в репозитории нет файлов скриншотов.
+- [x] 4.2 Обновить раздел «Стили» README; проверка: README соответствует коду, `find src -name '*.module.css'` пуст.
+- [x] 4.3 `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check`, `npm run build` проходят.
