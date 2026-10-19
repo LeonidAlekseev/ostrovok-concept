@@ -175,7 +175,8 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
         ctx.beginPath()
         for (let i = 0; i < dots.length; i += 3) {
           project(dots, i, q)
-          if (q.depth >= depth && q.depth < until && q.y < visible + side) ctx.rect(q.x - side / 2, q.y - side / 2, side, side)
+          if (q.depth >= depth && q.depth < until && q.y < visible + side)
+            ctx.rect(q.x - side / 2, q.y - side / 2, side, side)
         }
         ctx.globalAlpha = alpha
         ctx.fill()

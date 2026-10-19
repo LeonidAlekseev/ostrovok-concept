@@ -118,7 +118,9 @@ export function Calendar({ start, end, min, max, onPick }: Props) {
                       data-date={iso}
                       // Selected edges are aria-pressed; the days between them are the range.
                       className={`h-10 border-0 p-0 text-sm enabled:hover:bg-secondary disabled:text-(--decor-disabled) aria-pressed:bg-primary aria-pressed:font-semibold aria-pressed:text-primary-foreground aria-pressed:enabled:hover:bg-primary ${
-                        rangeEnd && iso > start && iso < rangeEnd ? 'rounded-none bg-secondary' : 'rounded-md bg-transparent'
+                        rangeEnd && iso > start && iso < rangeEnd
+                          ? 'rounded-none bg-secondary'
+                          : 'rounded-md bg-transparent'
                       }`}
                       tabIndex={iso === focused ? 0 : -1}
                       disabled={isDisabled(iso)}

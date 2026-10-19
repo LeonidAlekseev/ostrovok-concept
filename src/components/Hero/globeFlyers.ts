@@ -13,7 +13,11 @@ export interface Flyer {
   rerouted: boolean
 }
 
-const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+const cross = (a: Vec3, b: Vec3): Vec3 => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0],
+]
 
 const normalize = (v: Vec3): Vec3 => {
   const l = Math.hypot(v[0], v[1], v[2]) || 1
