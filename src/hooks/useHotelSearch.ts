@@ -1,20 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { addDays, todayIso, type IsoDate } from '../lib/dates'
+import { useCallback, useMemo, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { todayIso } from '../lib/dates'
 import {
+  DEFAULT_GUESTS,
   resolveTarget,
-  runDemoSearch,
+  toSearchParams,
   validateSearch,
+  withStartDates,
   type Guests,
   type SearchErrors,
   type SearchQuery,
-  type SearchResult,
 } from '../lib/search'
-
-export type SearchStatus =
-  | { state: 'idle' }
-  | { state: 'loading' }
-  | { state: 'done'; result: SearchResult }
-  | { state: 'error'; message: string }
+import { useToday } from './useToday'
 
 function withoutKey(errors: SearchErrors, key: keyof SearchErrors): SearchErrors {
   const next = { ...errors }
@@ -22,33 +19,25 @@ function withoutKey(errors: SearchErrors, key: keyof SearchErrors): SearchErrors
   return next
 }
 
-const subscribeNever = () => () => {}
-
 // Dates the user has not picked yet stay empty; withStartDates fills them from today.
-const initialQuery: SearchQuery = {
-  destination: '',
-  checkIn: '',
-  checkOut: '',
-  guests: { adults: 2, children: 0, rooms: 1 },
+const initialQuery: SearchQuery = { destination: '', checkIn: '', checkOut: '', guests: DEFAULT_GUESTS }
+
+interface Options {
+  /** Starting form values, e.g. the query of the results page. */
+  query?: SearchQuery
+  /** Errors to show right away, e.g. for an invalid query in the URL. */
+  errors?: SearchErrors
 }
 
-/** Empty dates default to tomorrow and the night after. Nothing is filled until `today` is known. */
-function withStartDates(q: SearchQuery, today: IsoDate): SearchQuery {
-  if (!today) return q
-  const checkIn = q.checkIn || addDays(today, 1)
-  return { ...q, checkIn, checkOut: q.checkOut || addDays(checkIn, 1) }
-}
-
-export function useHotelSearch() {
-  // Empty on the server and during hydration, so prerendered and hydrated markup match.
-  const today = useSyncExternalStore(subscribeNever, todayIso, () => '')
-  const [chosen, setChosen] = useState<SearchQuery>(initialQuery)
+/** Form state of the search; a valid search opens the results page `/search?…`. */
+export function useHotelSearch({ query: startQuery = initialQuery, errors: startErrors = {} }: Options = {}) {
+  const router = useRouter()
+  const today = useToday()
+  const [chosen, setChosen] = useState<SearchQuery>(startQuery)
   const query = useMemo(() => withStartDates(chosen, today), [chosen, today])
-  const [errors, setErrors] = useState<SearchErrors>({})
-  const [status, setStatus] = useState<SearchStatus>({ state: 'idle' })
-  const abortRef = useRef<AbortController | null>(null)
-
-  useEffect(() => () => abortRef.current?.abort(), [])
+  const [errors, setErrors] = useState<SearchErrors>(startErrors)
+  // True while the results page is loading after a valid search.
+  const [pending, startTransition] = useTransition()
 
   const setDestination = useCallback((destination: string) => {
     setChosen((q) => ({ ...q, destination }))
@@ -66,28 +55,16 @@ export function useHotelSearch() {
   }, [])
 
   const run = useCallback(
-    async (q: SearchQuery): Promise<SearchErrors> => {
+    (q: SearchQuery): SearchErrors => {
       // Same `today` snapshot the form used for its start dates; todayIso() only while that snapshot is empty.
       const found = validateSearch(q, today || todayIso())
       setErrors(found)
       const target = resolveTarget(q.destination)
-      if (Object.keys(found).length > 0 || !target) return found
-
-      abortRef.current?.abort()
-      const controller = new AbortController()
-      abortRef.current = controller
-      setStatus({ state: 'loading' })
-      try {
-        const result = await runDemoSearch(q, target, controller.signal)
-        window.history.replaceState(null, '', `?${result.params}`)
-        setStatus({ state: 'done', result })
-      } catch (error) {
-        if (controller.signal.aborted) return found
-        setStatus({ state: 'error', message: error instanceof Error ? error.message : 'Не удалось выполнить поиск' })
-      }
+      if (Object.keys(found).length === 0 && target)
+        startTransition(() => router.push(`/search?${toSearchParams(q, target)}`))
       return found
     },
-    [today],
+    [today, router],
   )
 
   /** Returns validation errors so the caller can move focus to the first invalid field. */
@@ -102,7 +79,7 @@ export function useHotelSearch() {
     [run],
   )
 
-  return { query, errors, status, setDestination, setDates, setGuests, submit, searchFor }
+  return { query, errors, pending, setDestination, setDates, setGuests, submit, searchFor }
 }
 
 export type HotelSearch = ReturnType<typeof useHotelSearch>

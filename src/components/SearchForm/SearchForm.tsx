@@ -5,7 +5,6 @@ import type { HotelSearch } from '@/hooks/useHotelSearch'
 import { DateField } from './DateField'
 import { DestinationField } from './DestinationField'
 import { GuestsField } from './GuestsField'
-import { SearchResults } from './SearchResults'
 
 interface Props {
   search: HotelSearch
@@ -14,13 +13,12 @@ interface Props {
 }
 
 export function SearchForm({ search, destinationRef, submitRef }: Props) {
-  const { query, errors, status, setDestination, setDates, setGuests, submit } = search
+  const { query, errors, pending, setDestination, setDates, setGuests, submit } = search
   const formRef = useRef<HTMLFormElement>(null)
-  const loading = status.state === 'loading'
 
-  const onSubmit = async (event: FormEvent) => {
+  const onSubmit = (event: FormEvent) => {
     event.preventDefault()
-    const found = await submit()
+    const found = submit()
     if (found.destination) destinationRef.current?.focus()
     else if (found.dates || found.guests) formRef.current?.querySelector<HTMLElement>('[aria-describedby]')?.focus()
   }
@@ -42,17 +40,16 @@ export function SearchForm({ search, destinationRef, submitRef }: Props) {
           size="lg"
           className="col-span-full h-[clamp(50px,12.8vw,56px)] gap-3 lg:col-auto lg:h-15"
           type="submit"
-          aria-busy={loading}
+          aria-busy={pending}
         >
           Найти отель
-          {loading ? (
+          {pending ? (
             <LoaderCircle className="size-6 animate-[spin_0.9s_linear_infinite]" aria-hidden />
           ) : (
             <ArrowRight className="size-6.5" strokeWidth={2} aria-hidden />
           )}
         </Button>
       </div>
-      <SearchResults status={status} />
     </form>
   )
 }

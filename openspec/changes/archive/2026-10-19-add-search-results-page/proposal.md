@@ -29,3 +29,20 @@
 - `src/hooks/useHotelSearch.ts`, `src/components/SearchForm/{SearchForm,SearchResults}.tsx`, `src/components/SearchPanel/AssistantSearch.tsx`, `src/lib/search.ts`.
 - `package.json`, `package-lock.json`: `maplibre-gl`.
 - Зависит от `add-prototype-foundation`.
+
+## Замер JS
+
+Методика как в `add-prototype-foundation`: `npm run build`; берутся все `<script src>` чанки из `.next/server/app/<страница>.html`; для каждого размер в байтах и `gzip -9 -c | wc -c`; значения суммируются. Код карты в HTML не входит: он подгружается динамическим импортом, его чанки сняты по сетевым запросам headless Chromium на `/search` после загрузки карты.
+
+| | Чанков | Сырой, Б | gzip -9, Б |
+| --- | --- | --- | --- |
+| `/` до (`bb74be9`, `dev` с `add-hotel-pages` и `add-booking-checkout`) | 12 | 920 942 | 301 010 |
+| `/` после (ветка после `git merge origin/dev`) | 13 | 921 995 | 302 467 |
+| Разница `/` | +1 | +1 053 (+0,1 %) | +1 457 (+0,5 %) |
+| `/search`, начальная загрузка | 13 | 874 919 | 285 760 |
+| `/search`, чанк карты (`maplibre-gl` и компонент) | 1 | 1 051 396 | 286 352 |
+| `/search`, воркер MapLibre | 1 | 518 806 | 147 886 |
+
+До слияния с `dev` разница главной против основы (`165fe6c`: 9 чанков, 909 739 / 295 784 Б) была +3 чанка, +9 365 / +5 018 Б — после слияния разница уменьшилась; разбор по чанкам не делался.
+
+Прирост главной — `next/navigation` (`useRouter` в `useHotelSearch`) и общие с `/search` чанки формы поиска; блок результатов и демо-поиск с главной ушли. MapLibre на главной не загружается. На узких экранах чанк карты и воркер загружаются только после переключения на «Карта».

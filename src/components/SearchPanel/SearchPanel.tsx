@@ -35,7 +35,7 @@ interface Props {
   submitRef: RefObject<HTMLButtonElement | null>
   /** Shows a destination on the globe without leaving the current mode. */
   onPreview: (destination: Destination) => void
-  /** Opens the assistant's choice in the manual form and searches. */
+  /** Searches for the assistant's choice: opens the results page. */
   onChoose: HotelSearch['searchFor']
 }
 
