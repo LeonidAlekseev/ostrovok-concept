@@ -66,7 +66,7 @@ export function DateField({ checkIn, checkOut, error, onChange }: Props) {
           // The calendar focuses its own selected day; the popover must not move focus to the month arrow.
           initialFocus={false}
           aria-label="Выбор дат заезда и выезда"
-          className={`m-0 w-[min(330px,calc(100vw-2*var(--page-x)-8px))] p-2 md:w-155 animate-in fade-in slide-in-from-top-1 animation-duration-160 ease-out shadow-(--shadow-popover)`}
+          className={`m-0 w-[min(330px,calc(100vw-2*var(--page-x)-8px))] p-2 md:w-155 animate-in fade-in slide-in-from-top-1 animation-duration-160 ease-out [box-shadow:var(--shadow-popover)]`}
         >
           <p className="mx-2 mt-1 mb-0 text-sm text-muted-foreground" aria-live="polite">
             {draftStart ? 'Выберите дату выезда' : 'Выберите дату заезда'}

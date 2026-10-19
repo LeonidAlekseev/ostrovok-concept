@@ -99,7 +99,7 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
           sideOffset={8}
           // Stays under the field and lets the page scroll, as it did before the list moved to Base UI.
           collisionAvoidance={{ side: 'none' }}
-          className={`m-0 max-h-80 w-(--anchor-width) overflow-y-auto animate-in fade-in slide-in-from-top-1 animation-duration-160 ease-out rounded-xl bg-card p-2 shadow-(--shadow-popover)`}
+          className={`m-0 max-h-80 w-(--anchor-width) overflow-y-auto animate-in fade-in slide-in-from-top-1 animation-duration-160 ease-out rounded-xl bg-card p-2 [box-shadow:var(--shadow-popover)]`}
         >
           <ComboboxList aria-label="Подходящие направления">
             {options.map((option) => (

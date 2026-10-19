@@ -196,7 +196,7 @@ export function RandomSearch({ onPreview }: Props) {
         {landed && (
           <Card
             role="article"
-            className={`relative gap-0 rounded-2xl bg-(image:--decor-ticket-gradient) px-4.5 pt-4.5 pb-4 text-primary-foreground animate-in fade-in zoom-in-96 slide-in-from-bottom-[10px] animation-duration-600 ease-[cubic-bezier(0.2,1.4,0.4,1)] shadow-(--decor-ticket-shadow)`}
+            className={`relative gap-0 rounded-2xl bg-(image:--decor-ticket-gradient) px-4.5 pt-4.5 pb-4 text-primary-foreground animate-in fade-in zoom-in-96 slide-in-from-bottom-[10px] animation-duration-600 ease-[cubic-bezier(0.2,1.4,0.4,1)] [box-shadow:var(--decor-ticket-shadow)]`}
           >
             <Confetti />
             <p className="text-sm/[normal] font-semibold tracking-[0.06em] uppercase opacity-85">
@@ -291,7 +291,7 @@ function SlotMachine({ fortune, spinning, onLanded }: { fortune: Fortune; spinni
         className={`${spinning ? styles.pull : ''} absolute top-[26%] -right-5 h-[46%] w-2 origin-bottom rounded-sm bg-[linear-gradient(90deg,var(--decor-lever-dark),var(--decor-lever-light),var(--decor-lever-dark))]`}
         aria-hidden
       >
-        <span className="absolute -top-3.5 left-1/2 size-5.5 -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_35%_30%,var(--decor-knob-light),var(--decor-knob)_55%,var(--decor-knob-dark))] [box-shadow:0_3px_6px_color-mix(in_srgb,var(--decor-black)_25%,transparent)]" />
+        <span className="absolute -top-3.5 left-1/2 size-5.5 [translate:-50%_0] rounded-full bg-[radial-gradient(circle_at_35%_30%,var(--decor-knob-light),var(--decor-knob)_55%,var(--decor-knob-dark))] [box-shadow:0_3px_6px_color-mix(in_srgb,var(--decor-black)_25%,transparent)]" />
       </div>
       <div
         className={`${spinning ? styles.chase : styles.blink} ${bulbs} absolute top-1.5 right-4 left-4 h-1.5 opacity-85`}

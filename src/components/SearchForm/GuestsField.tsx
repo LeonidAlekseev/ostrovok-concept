@@ -46,7 +46,7 @@ export function GuestsField({ value, error, onChange }: Props) {
           </span>
           <ChevronDown
             // The glyph has built-in side bearings; -mr-1 pulls it towards the edge.
-            className={`-mr-1 ml-auto flex-none text-brand-foreground transition-transform duration-200 group-data-popup-open:rotate-180`}
+            className={`-mr-1 ml-auto flex-none text-brand-foreground [transition:rotate_200ms_cubic-bezier(0.4,0,0.2,1)] group-data-popup-open:[rotate:180deg]`}
             size={22}
             aria-hidden
           />
@@ -58,7 +58,7 @@ export function GuestsField({ value, error, onChange }: Props) {
           // Stays under the field and lets the page scroll, as it did before the popover moved to Base UI.
           collisionAvoidance={{ side: 'none' }}
           aria-label="Гости и номера"
-          className={`m-0 w-[min(310px,calc(100vw-2*var(--page-x)-8px))] p-3 animate-in fade-in slide-in-from-top-1 animation-duration-160 ease-out shadow-(--shadow-popover)`}
+          className={`m-0 w-[min(310px,calc(100vw-2*var(--page-x)-8px))] p-3 animate-in fade-in slide-in-from-top-1 animation-duration-160 ease-out [box-shadow:var(--shadow-popover)]`}
         >
           {rows.map((row) => (
             <div className="flex items-center justify-between gap-3 px-1 py-2" key={row.key}>

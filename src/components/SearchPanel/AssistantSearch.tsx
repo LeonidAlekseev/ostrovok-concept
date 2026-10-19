@@ -212,7 +212,7 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
         <Button
           type="submit"
           size="icon"
-          className="size-[clamp(48px,13vw,64px)] flex-none shadow-(--shadow-primary)"
+          className="size-[clamp(48px,13vw,64px)] flex-none [box-shadow:var(--shadow-primary)]"
           aria-label="Отправить"
           disabled={!text.trim() || thinking}
         >
