@@ -63,9 +63,19 @@ Vercel определяет проект как Next.js без дополнит�
 Примитивы интерфейса — компоненты shadcn/ui на Base UI в `src/components/ui/` (настройки CLI —
 `components.json`, добавить компонент: `npx shadcn@latest add <имя>`); там же лежат свои
 примитивы вроде `SmartImage`. Раскладка страницы (`HomePage`), карточки направлений и баннер
-написаны утилитами Tailwind; там, где готовой утилиты нет, берётся произвольное свойство
-(`[box-shadow:…]`, `[translate:…]`). Крупные доменные части (hero с глобусом, панель поиска,
-слот-машина) стилизуются своими `*.module.css`.
+написаны утилитами Tailwind; панель поиска, форма и поля, ассистент и слот-машина тоже.
+CSS-модулей три: `Hero/Hero.module.css` (глобус) и остатки `SearchPanel/RandomSearch.module.css`
+(`@keyframes` слот-машины и конфетти с классами запуска) и `SearchPanel/AssistantSearch.module.css`
+(`@keyframes` точек набора). Модуль нужен только там, где утилитами не выразить `@keyframes`.
+
+`translate`, `scale`, `box-shadow`: стандартная утилита (`-translate-x-1/2`, `scale-105`,
+`shadow-lg`), если она не добавляет в сборку новых `@property` и fallback-блоков; иначе
+произвольное свойство (`[translate:-50%_0]`, `[scale:1.05]`, `[box-shadow:var(--shadow-card)]`).
+Утилиты `translate-*`, `scale-*`, `rotate-*` и `shadow-*` тянут `@property`, поэтому в коде
+используются произвольные свойства. Исключение: класс `shadow-(--…)` на примитиве `ui/`, где
+`cn()` должен заменить собственную тень примитива (`shadow-(--decor-spin-shadow)` на `Button`
+`lg`). Если анимация из модуля двигает `transform`, базовое положение задаётся тоже через
+`[transform:…]`, а не `translate`.
 
 Все токены описаны в `src/app/globals.css` слоями:
 
