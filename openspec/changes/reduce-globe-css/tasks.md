@@ -8,7 +8,7 @@
 ## 2. Анимации и модули
 
 - [x] 2.1 `@keyframes` из `AssistantSearch.module.css` и `RandomSearch.module.css` в `@theme`, запуск утилитами `animate-*`, оба модуля удалены; проверка: `npm run build` проходит, скриншоты совпадают в пределах отклонений.
-- [ ] 2.2 `Hero` на утилиты и `@theme`, `Hero.module.css` удалён; проверка: как в 2.1.
+- [x] 2.2 `Hero` на утилиты и `@theme`, `Hero.module.css` удалён; проверка: как в 2.1.
 - [ ] 2.3 Убрать `static` у `@theme`; проверка: проверка `static` из design.md, скриншоты совпадают.
 
 ## 3. Правило утилит

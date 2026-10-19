@@ -180,6 +180,8 @@
   --animate-slot-win: slot-win 0.9s ease-out;
   /* A confetti piece flies up to --x/--y, turning by --r, and falls out of sight. */
   --animate-confetti: confetti 1.6s cubic-bezier(0.2, 0.7, 0.4, 1) forwards;
+  /* The glow under the hub pin on the globe breathes. */
+  --animate-hub-pulse: hub-pulse 2.4s ease-in-out infinite;
 
   @keyframes typing-dot {
     0%,
@@ -239,6 +241,13 @@
     100% {
       opacity: 0;
       transform: translate(calc(var(--x) * 1.15), calc(var(--y) + 260px)) rotate(var(--r));
+    }
+  }
+
+  @keyframes hub-pulse {
+    50% {
+      opacity: 0.55;
+      scale: 1.25;
     }
   }
 }
