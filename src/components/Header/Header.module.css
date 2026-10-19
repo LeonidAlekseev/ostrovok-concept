@@ -38,37 +38,10 @@
   animation: pop 0.18s ease-out;
 }
 
-.panelTitle {
-  margin: 0 0 6px;
-  font-size: var(--text-base);
-  font-weight: 650;
-}
-
-.panelText {
-  margin: 0 0 14px;
-  color: var(--muted-foreground);
-  font-size: var(--text-sm);
-  line-height: 1.45;
-}
-
 .menuList {
   margin: -6px;
   padding: 0;
   list-style: none;
-}
-
-.menuLink {
-  display: block;
-  padding: 12px;
-  color: var(--foreground);
-  font-weight: 550;
-  text-decoration: none;
-  border-radius: var(--radius-md);
-}
-
-.menuLink:hover {
-  color: var(--primary);
-  background: var(--muted);
 }
 
 @keyframes pop {

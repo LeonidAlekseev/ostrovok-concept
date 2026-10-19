@@ -5,6 +5,7 @@ import { FieldError } from '@/components/ui/field'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { countRu, guestsLabel } from '../../lib/format'
 import { GUEST_LIMITS, type Guests } from '../../lib/search'
+import { fieldBox } from './fieldBox'
 import styles from './SearchForm.module.css'
 
 interface Props {
@@ -36,15 +37,19 @@ export function GuestsField({ value, error, onChange }: Props) {
     <div className={`${styles.fieldWrap} ${styles.areaGuests}`}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
-          className={`${styles.field} ${styles.fieldButton} ${error ? styles.fieldInvalid : ''}`}
+          className={`group ${styles.field} ${fieldBox(Boolean(error))}`}
           aria-label={`Гости: ${guestsLabel(value)}${value.rooms === 1 ? ', 1 номер' : ''}`}
           aria-describedby={error ? errorId : undefined}
         >
-          <User className={styles.fieldIcon} size={22} strokeWidth={1.8} aria-hidden />
+          <User className="shrink-0 text-brand-foreground" size={22} strokeWidth={1.8} aria-hidden />
           <span className={styles.value} title={guestsLabel(value)}>
             {guestsLabel(value)}
           </span>
-          <ChevronDown className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`} size={22} aria-hidden />
+          <ChevronDown
+            className={`${styles.chevron} text-brand-foreground transition-transform duration-200 group-data-popup-open:rotate-180`}
+            size={22}
+            aria-hidden
+          />
         </PopoverTrigger>
 
         <PopoverContent
@@ -53,13 +58,14 @@ export function GuestsField({ value, error, onChange }: Props) {
           // Stays under the field and lets the page scroll, as it did before the popover moved to Base UI.
           collisionAvoidance={{ side: 'none' }}
           aria-label="Гости и номера"
-          className={`${styles.popoverSurface} ${styles.guestsPopover}`}
+          className={`${styles.popoverSurface} ${styles.guestsPopover} m-0 p-3 shadow-(--shadow-popover)`}
         >
           {rows.map((row) => (
             <div className={styles.stepperRow} key={row.key}>
               <span>
-                <span className={styles.stepperTitle}>{row.title}</span>
-                <span className={styles.stepperHint}>{row.hint}</span>
+                <span className="block font-semibold">{row.title}</span>
+                {/* A step below the other hints: "не больше, чем взрослых" must stay on one line on phones. */}
+                <span className="block text-xs text-muted-foreground">{row.hint}</span>
               </span>
               <span className={styles.stepper}>
                 <Button
@@ -72,7 +78,7 @@ export function GuestsField({ value, error, onChange }: Props) {
                   <Minus className="size-4.5" aria-hidden />
                 </Button>
                 <output
-                  className={styles.stepperValue}
+                  className="min-w-6 text-center font-semibold"
                   aria-live="polite"
                   aria-label={countRu(value[row.key], row.forms)}
                 >

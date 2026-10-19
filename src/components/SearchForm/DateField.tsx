@@ -7,6 +7,7 @@ import { addDays, formatDateRange, nightsBetween, todayIso, type IsoDate } from 
 import { countRu } from '../../lib/format'
 import { MAX_NIGHTS } from '../../lib/search'
 import { Calendar } from './Calendar'
+import { fieldBox } from './fieldBox'
 import styles from './SearchForm.module.css'
 
 interface Props {
@@ -48,11 +49,11 @@ export function DateField({ checkIn, checkOut, error, onChange }: Props) {
     <div className={`${styles.fieldWrap} ${styles.areaDates}`}>
       <Popover open={open} onOpenChange={onOpenChange}>
         <PopoverTrigger
-          className={`${styles.field} ${styles.fieldButton} ${error ? styles.fieldInvalid : ''}`}
+          className={`${styles.field} ${fieldBox(Boolean(error))}`}
           aria-label={`Даты поездки: ${label}, ${countRu(nights, nightForms)}`}
           aria-describedby={error ? errorId : undefined}
         >
-          <CalendarDays className={styles.fieldIcon} size={22} strokeWidth={1.8} aria-hidden />
+          <CalendarDays className="shrink-0 text-brand-foreground" size={22} strokeWidth={1.8} aria-hidden />
           <span className={styles.value} title={label}>
             {label}
           </span>
@@ -66,9 +67,9 @@ export function DateField({ checkIn, checkOut, error, onChange }: Props) {
           // The calendar focuses its own selected day; the popover must not move focus to the month arrow.
           initialFocus={false}
           aria-label="Выбор дат заезда и выезда"
-          className={`${styles.popoverSurface} ${styles.datesPopover}`}
+          className={`${styles.popoverSurface} ${styles.datesPopover} m-0 p-2 shadow-(--shadow-popover)`}
         >
-          <p className={styles.popoverHint} aria-live="polite">
+          <p className="mx-2 mt-1 mb-0 text-sm text-muted-foreground" aria-live="polite">
             {draftStart ? 'Выберите дату выезда' : 'Выберите дату заезда'}
           </p>
           <Calendar
@@ -78,8 +79,8 @@ export function DateField({ checkIn, checkOut, error, onChange }: Props) {
             max={draftStart ? addDays(draftStart, MAX_NIGHTS) : undefined}
             onPick={pick}
           />
-          <div className={styles.popoverFooter}>
-            <span className={styles.popoverSummary}>
+          <div className="flex items-center justify-between gap-3 border-t border-border px-2 pt-2.5 pb-1">
+            <span className="text-sm font-[550]">
               {draftStart ? formatDateRange(draftStart, null) : `${label} · ${countRu(nights, nightForms)}`}
             </span>
             <Button onClick={close}>{draftStart ? 'Отмена' : 'Готово'}</Button>

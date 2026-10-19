@@ -14,6 +14,9 @@ interface Props {
 const iconButton =
   'text-primary hover:bg-card/35 hover:text-primary-hover aria-expanded:bg-card/35 aria-expanded:text-primary-hover'
 
+const panelTitleClass = 'm-0 mb-1.5 text-base font-[650]'
+const panelTextClass = 'm-0 mb-3.5 text-sm leading-[1.45] text-muted-foreground'
+
 const menuLinks = [
   { href: '#search', label: 'Поиск отелей' },
   { href: '#ideas', label: 'Популярные направления' },
@@ -50,8 +53,8 @@ export function Header({ onStartSearch }: Props) {
               aria-label={panelTitle.favorites}
               className={`${styles.panel} gap-0 p-4.5 shadow-(--shadow-popover)`}
             >
-              <p className={styles.panelTitle}>Избранное пока пусто</p>
-              <p className={styles.panelText}>Сохраняйте понравившиеся отели, чтобы вернуться к ним позже.</p>
+              <p className={panelTitleClass}>Избранное пока пусто</p>
+              <p className={panelTextClass}>Сохраняйте понравившиеся отели, чтобы вернуться к ним позже.</p>
               <Button
                 className="w-full"
                 onClick={() => {
@@ -78,8 +81,8 @@ export function Header({ onStartSearch }: Props) {
               aria-label={panelTitle.notifications}
               className={`${styles.panel} gap-0 p-4.5 shadow-(--shadow-popover)`}
             >
-              <p className={styles.panelTitle}>Новых уведомлений нет</p>
-              <p className={styles.panelText}>Здесь появятся изменения цен и статусы бронирований.</p>
+              <p className={panelTitleClass}>Новых уведомлений нет</p>
+              <p className={panelTextClass}>Здесь появятся изменения цен и статусы бронирований.</p>
               <Button className="w-full" onClick={close}>
                 Понятно
               </Button>
@@ -113,7 +116,11 @@ export function Header({ onStartSearch }: Props) {
                 <ul className={styles.menuList}>
                   {menuLinks.map((link) => (
                     <li key={link.href}>
-                      <a className={styles.menuLink} href={link.href} onClick={close}>
+                      <a
+                        className="block rounded-md p-3 font-[550] text-foreground no-underline hover:bg-muted hover:text-primary"
+                        href={link.href}
+                        onClick={close}
+                      >
                         {link.label}
                       </a>
                     </li>

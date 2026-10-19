@@ -13,6 +13,7 @@ import {
 import { scenarios } from '@/data/destinations'
 import { formatPrice } from '../../lib/format'
 import { suggestDestinations } from '../../lib/search'
+import { fieldBox } from './fieldBox'
 import styles from './SearchForm.module.css'
 
 interface Props {
@@ -63,12 +64,12 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
         openOnInputClick
       >
         <ComboboxInputGroup className={styles.fieldRow}>
-          <label className={`${styles.field} ${error ? styles.fieldInvalid : ''}`}>
-            <MapPin className={styles.fieldIcon} size={22} strokeWidth={1.8} aria-hidden />
+          <label className={`${styles.field} ${fieldBox(Boolean(error))}`}>
+            <MapPin className="shrink-0 text-brand-foreground" size={22} strokeWidth={1.8} aria-hidden />
             <span className="visually-hidden">Направление</span>
             <ComboboxInput
               ref={inputRef}
-              // Input's text styles; the bordered box is the shared .field, moved with the combobox later.
+              // Input's text styles; the bordered box is the label's fieldBox.
               className="h-full min-w-0 flex-1 bg-transparent pr-14 text-base outline-none placeholder:text-muted-foreground sm:text-lg"
               placeholder="Куда отправимся?"
               autoComplete="off"
@@ -99,15 +100,19 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
           sideOffset={8}
           // Stays under the field and lets the page scroll, as it did before the list moved to Base UI.
           collisionAvoidance={{ side: 'none' }}
-          className={`${styles.popoverSurface} ${styles.suggestions} w-(--anchor-width)`}
+          className={`${styles.popoverSurface} ${styles.suggestions} m-0 w-(--anchor-width) rounded-xl bg-card p-2 shadow-(--shadow-popover)`}
         >
           <ComboboxList aria-label="Подходящие направления">
             {options.map((option) => (
-              <ComboboxItem key={option.id} value={option} className={styles.option}>
-                <MapPin className={styles.optionIcon} size={18} aria-hidden />
+              <ComboboxItem
+                key={option.id}
+                value={option}
+                className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 data-highlighted:bg-muted"
+              >
+                <MapPin className="shrink-0 text-primary" size={18} aria-hidden />
                 <span>
-                  <span className={styles.optionLabel}>{option.label}</span>
-                  <span className={styles.optionHint}>{option.hint}</span>
+                  <span className="block font-semibold">{option.label}</span>
+                  <span className="block text-sm font-normal text-muted-foreground">{option.hint}</span>
                 </span>
               </ComboboxItem>
             ))}
