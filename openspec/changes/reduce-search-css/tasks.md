@@ -2,8 +2,8 @@
 
 ## 1. Базовые замеры
 
-- [ ] 1.1 `npm run build`, записать размер CSS (сырой и gzip −9) в proposal.md, раздел «Замеры»; проверка: числа записаны.
-- [ ] 1.2 Снять скриншоты состояний из design.md; проверка: файлы в `/tmp/reduce-search-css-screenshots/before`.
+- [x] 1.1 `npm run build`, записать размер CSS (сырой и gzip −9) в proposal.md, раздел «Замеры»; проверка: числа записаны.
+- [x] 1.2 Снять скриншоты состояний из design.md; проверка: файлы в `/tmp/reduce-search-css-screenshots/before`.
 
 ## 2. Перевод компонентов
 
