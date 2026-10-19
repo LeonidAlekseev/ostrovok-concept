@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card'
 import { FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import type { Destination } from '@/data/destinations'
 import { formatPrice } from '../../lib/format'
 import {
@@ -100,23 +101,21 @@ export function RandomSearch({ onPreview }: Props) {
 
         <fieldset className={styles.signs}>
           <legend className={styles.label}>Кто вы по знаку зодиака?</legend>
-          <div className={styles.signGrid} role='radiogroup'>
+          {/* Arrow keys move the choice inside the group; one Tab stop for the whole grid. */}
+          <RadioGroup
+            className={styles.signGrid}
+            value={sign?.id ?? null}
+            onValueChange={(id) => setSign(zodiac.find((z) => z.id === id) ?? null)}
+          >
             {zodiac.map((z) => (
-              <button
-                key={z.id}
-                type='button'
-                role='radio'
-                aria-checked={sign?.id === z.id}
-                className={styles.sign}
-                onClick={() => setSign(z)}
-              >
+              <RadioGroupItem key={z.id} value={z.id} className={styles.sign}>
                 <span className={styles.signSymbol} aria-hidden>
                   {z.symbol}
                 </span>
                 {z.name}
-              </button>
+              </RadioGroupItem>
             ))}
-          </div>
+          </RadioGroup>
         </fieldset>
 
         <FieldError className={styles.error}>{!nameInvalid && error}</FieldError>
