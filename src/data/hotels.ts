@@ -1,15 +1,18 @@
-/** Demo feed of recently added hotels, spotlighted one by one on the hero globe. */
-export interface NewHotel {
+/**
+ * Hand-picked "recently added" hotels: the hero globe spotlights them one by one. The catalogue
+ * (src/lib/catalog.ts) builds full hotels from these seeds and generates the rest of each city.
+ */
+export interface HotelSeed {
   destinationId: string
   name: string
   stars: 1 | 2 | 3 | 4 | 5
   /** Guest rating, 0…10. */
   rating: number
-  /** Demo price per night, ₽. */
+  /** Demo price per night of the cheapest rate, ₽. */
   priceFrom: number
 }
 
-export const newHotels: NewHotel[] = [
+export const newHotelSeeds: HotelSeed[] = [
   { destinationId: 'prague', name: 'Old Town Lantern', stars: 4, rating: 9.1, priceFrom: 7400 },
   { destinationId: 'prague', name: 'Vltava Loft Rooms', stars: 3, rating: 8.8, priceFrom: 6900 },
   { destinationId: 'prague', name: 'Mala Strana Residence', stars: 5, rating: 9.4, priceFrom: 12800 },

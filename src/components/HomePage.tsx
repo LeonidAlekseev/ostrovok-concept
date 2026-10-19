@@ -5,12 +5,11 @@ import { flushSync } from 'react-dom'
 import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { destinations, FEATURED_DESTINATION_ID, scenarios, type Destination } from '@/data/destinations'
-import { newHotels } from '../data/hotels'
+import { newHotels } from '../lib/catalog'
 import { useHotelSearch } from '../hooks/useHotelSearch'
 import { formatPrice } from '../lib/format'
 import { resolveTarget } from '../lib/search'
 import { DestinationCard } from './DestinationCard/DestinationCard'
-import { Header } from './Header/Header'
 import { Hero } from './Hero/Hero'
 import { SearchPanel, type SearchMode } from './SearchPanel/SearchPanel'
 import { TravelBanner } from './TravelBanner/TravelBanner'
@@ -63,71 +62,68 @@ export function HomePage() {
   const selectedDestinationId = target?.kind === 'destination' ? target.destination.id : null
   const selectedScenarioId = target?.kind === 'scenario' ? target.scenario : null
 
+  // The hero starts under the transparent header of the layout, hence the negative top margin.
   return (
-    <>
-      <Header onStartSearch={startSearch} />
-      {/* The hero starts under the transparent header, hence the negative top margin. */}
-      <main className="-mt-(--header-height) bg-background pb-[clamp(24px,6vw,56px)]">
-        <Hero
-          markers={globeDestinations}
-          hotels={newHotels}
-          featured={featured}
-          selectedId={selectedDestinationId}
-          onSelect={(d: Destination) => applyToSearch(d.name)}
-        />
+    <main className="-mt-(--header-height) bg-background pb-[clamp(24px,6vw,56px)]">
+      <Hero
+        markers={globeDestinations}
+        hotels={newHotels}
+        featured={featured}
+        selectedId={selectedDestinationId}
+        onSelect={(d: Destination) => applyToSearch(d.name)}
+      />
 
-        <div className="mx-auto flex max-w-(--page-max) flex-col gap-[clamp(10px,3vw,24px)] px-(--page-x)">
-          <section
-            id="search"
-            className="relative z-10 -mt-[clamp(120px,31vw,150px)] scroll-mt-4 md:-mt-24 lg:-mt-21"
-            aria-label="Поиск отелей"
-          >
-            <SearchPanel
-              mode={mode}
-              onModeChange={setMode}
-              search={search}
-              destinationRef={destinationRef}
-              submitRef={submitRef}
-              onPreview={(d) => setDestination(d.name)}
-              onChoose={chooseFromAssistant}
-            />
-          </section>
+      <div className="mx-auto flex max-w-(--page-max) flex-col gap-[clamp(10px,3vw,24px)] px-(--page-x)">
+        <section
+          id="search"
+          className="relative z-10 -mt-[clamp(120px,31vw,150px)] scroll-mt-4 md:-mt-24 lg:-mt-21"
+          aria-label="Поиск отелей"
+        >
+          <SearchPanel
+            mode={mode}
+            onModeChange={setMode}
+            search={search}
+            destinationRef={destinationRef}
+            submitRef={submitRef}
+            onPreview={(d) => setDestination(d.name)}
+            onChoose={chooseFromAssistant}
+          />
+        </section>
 
-          <section id="ideas" aria-labelledby="ideas-title">
-            <div className="mt-[clamp(8px,2vw,16px)] mb-[clamp(10px,2.6vw,18px)] flex items-baseline justify-between gap-3">
-              <h2 id="ideas-title" className="text-title font-bold tracking-[-0.02em]">
-                Популярные направления
-              </h2>
-              <Button
-                variant="link"
-                className={`flex-none gap-1 py-1 text-[clamp(13px,3.6vw,18px)] font-medium hover:[&_svg]:translate-x-0.5 [&_svg]:transition-transform`}
-                onClick={startSearch}
-              >
-                Смотреть все
-                <ArrowRight className="size-4.5" aria-hidden />
-              </Button>
-            </div>
-            {/* overflow-x: auto clips vertically too, so the padding leaves room for the hover shadow and the
+        <section id="ideas" aria-labelledby="ideas-title">
+          <div className="mt-[clamp(8px,2vw,16px)] mb-[clamp(10px,2.6vw,18px)] flex items-baseline justify-between gap-3">
+            <h2 id="ideas-title" className="text-title font-bold tracking-[-0.02em]">
+              Популярные направления
+            </h2>
+            <Button
+              variant="link"
+              className={`flex-none gap-1 py-1 text-[clamp(13px,3.6vw,18px)] font-medium hover:[&_svg]:translate-x-0.5 [&_svg]:transition-transform`}
+              onClick={startSearch}
+            >
+              Смотреть все
+              <ArrowRight className="size-4.5" aria-hidden />
+            </Button>
+          </div>
+          {/* overflow-x: auto clips vertically too, so the padding leaves room for the hover shadow and the
                 selection ring (about 20px above, 44px below); negative margins keep the layout unchanged. */}
-            <ul className="-mx-(--page-x) -mt-3.5 -mb-9.5 grid snap-x snap-mandatory list-none scroll-px-(--page-x) grid-cols-[repeat(3,minmax(100px,1fr))] gap-[clamp(8px,2.2vw,20px)] overflow-x-auto px-(--page-x) pt-5 pb-11 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {scenarios.map((scenario) => (
-                <li key={scenario.id}>
-                  <DestinationCard
-                    title={scenario.title}
-                    image={scenario.image}
-                    alt={scenario.alt}
-                    price={scenarioPrices.get(scenario.id)!}
-                    selected={selectedScenarioId === scenario.id}
-                    onSelect={() => applyToSearch(scenario.title)}
-                  />
-                </li>
-              ))}
-            </ul>
-          </section>
+          <ul className="-mx-(--page-x) -mt-3.5 -mb-9.5 grid snap-x snap-mandatory list-none scroll-px-(--page-x) grid-cols-[repeat(3,minmax(100px,1fr))] gap-[clamp(8px,2.2vw,20px)] overflow-x-auto px-(--page-x) pt-5 pb-11 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {scenarios.map((scenario) => (
+              <li key={scenario.id}>
+                <DestinationCard
+                  title={scenario.title}
+                  image={scenario.image}
+                  alt={scenario.alt}
+                  price={scenarioPrices.get(scenario.id)!}
+                  selected={selectedScenarioId === scenario.id}
+                  onSelect={() => applyToSearch(scenario.title)}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
 
-          <TravelBanner />
-        </div>
-      </main>
-    </>
+        <TravelBanner />
+      </div>
+    </main>
   )
 }

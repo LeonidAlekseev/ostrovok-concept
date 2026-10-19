@@ -1,12 +1,12 @@
 import type { Destination } from '../../data/destinations'
-import type { NewHotel } from '../../data/hotels'
+import type { HotelSummary } from '../../lib/catalog'
 import { projectToGlobe, type GlobePoint, type GlobeView } from '../../lib/globe'
 import { arc, routePath } from './globeGeometry'
 
 /** A recently added hotel highlighted on the globe, with flight routes arriving at its city. */
 export interface Spotlight {
   destination: Destination
-  hotel: NewHotel
+  hotel: HotelSummary
   /** Cities the routes start from. */
   sources: Destination[]
 }
@@ -39,13 +39,13 @@ export function sceneAt(markers: Destination[], spotlight: Spotlight, view: Glob
 }
 
 /** Cycles through each city's hotels so consecutive visits show different ones. */
-export function createHotelFeed(hotels: NewHotel[]) {
-  const byCity = new Map<string, NewHotel[]>()
+export function createHotelFeed(hotels: HotelSummary[]) {
+  const byCity = new Map<string, HotelSummary[]>()
   for (const hotel of hotels) byCity.set(hotel.destinationId, [...(byCity.get(hotel.destinationId) ?? []), hotel])
   const cursor = new Map<string, number>()
   return {
     has: (destinationId: string) => byCity.has(destinationId),
-    next(destinationId: string): NewHotel | undefined {
+    next(destinationId: string): HotelSummary | undefined {
       const list = byCity.get(destinationId)
       if (!list) return undefined
       const i = cursor.get(destinationId) ?? 0

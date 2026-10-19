@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { BedDouble, ChevronRight, Star } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import type { Destination } from '@/data/destinations'
-import type { NewHotel } from '../../data/hotels'
+import type { HotelSummary } from '../../lib/catalog'
 import { GLOBE_CENTER, viewPlacing, type GlobeView } from '../../lib/globe'
 import { appEnv, isProduction } from '../../lib/env'
 import { formatPrice } from '../../lib/format'
@@ -13,7 +13,7 @@ import { StatsPanel, type StatsPanelHandle } from './StatsPanel'
 
 interface Props {
   markers: Destination[]
-  hotels: NewHotel[]
+  hotels: HotelSummary[]
   /** City spotlighted first (and in the server-rendered page). */
   featured: Destination
   selectedId: string | null
