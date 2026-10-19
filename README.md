@@ -61,40 +61,42 @@ Vercel определяет проект как Next.js без дополнит�
 
 ## Стили
 
-Гибрид: Tailwind CSS v4 (через `@tailwindcss/postcss`, `postcss.config.mjs`) и CSS Modules.
+Tailwind CSS v4 (через `@tailwindcss/postcss`, `postcss.config.mjs`) и shadcn/ui, своих CSS-модулей нет.
 Примитивы интерфейса — компоненты shadcn/ui на Base UI в `src/components/ui/` (настройки CLI —
 `components.json`, добавить компонент: `npx shadcn@latest add <имя>`); там же лежат свои
-примитивы вроде `SmartImage`. Раскладка страницы (`HomePage`), карточки направлений и баннер
-написаны утилитами Tailwind; панель поиска, форма и поля, ассистент и слот-машина тоже.
-CSS-модулей три: `Hero/Hero.module.css` (глобус) и остатки `SearchPanel/RandomSearch.module.css`
-(`@keyframes` слот-машины и конфетти с классами запуска) и `SearchPanel/AssistantSearch.module.css`
-(`@keyframes` точек набора). Модуль нужен только там, где утилитами не выразить `@keyframes`.
+примитивы вроде `SmartImage`. Все компоненты — раскладка страницы (`HomePage`), шапка, hero с
+глобусом, карточки направлений, баннер, панель поиска, форма и поля, ассистент и слот-машина —
+написаны утилитами Tailwind. Значения, которые меняются по элементам или кадрам (координаты пинов
+`--x`/`--y`, размеры сцены `--globe-*`), — CSS-переменные в `style` или в произвольных свойствах
+(`[--globe-x:88%]`), их читают утилиты: `translate-x-[calc(var(--x)_*_var(--unit)_-_50%)]`.
 
-`translate`, `scale`, `box-shadow`: стандартная утилита (`-translate-x-1/2`, `scale-105`,
-`shadow-lg`), если она не добавляет в сборку новых `@property` и fallback-блоков; иначе
-произвольное свойство (`[translate:-50%_0]`, `[scale:1.05]`, `[box-shadow:var(--shadow-card)]`).
-Утилиты `translate-*`, `scale-*`, `rotate-*` и `shadow-*` тянут `@property`, поэтому в коде
-используются произвольные свойства. Исключение: класс `shadow-(--…)` на примитиве `ui/`, где
-`cn()` должен заменить собственную тень примитива (`shadow-(--decor-spin-shadow)` на `Button`
-`lg`). Если анимация из модуля двигает `transform`, базовое положение задаётся тоже через
-`[transform:…]`, а не `translate`.
+Анимации компонентов объявлены в `@theme` в `src/app/globals.css`: переменная
+`--animate-<имя>` и `@keyframes <имя>` внутри `@theme`, запуск — классом `animate-<имя>`
+(`animate-slot-shine`, `animate-typing-dot`, `before:animate-hub-pulse`). Задержка, своя у
+каждого элемента, — `animation-delay` в `style`. Появление элементов — утилиты `tw-animate-css`
+(`animate-in`, `fade-in`, `zoom-in-*`, `slide-in-from-*`).
+
+`translate`, `scale`, `rotate`, `box-shadow`: стандартные утилиты Tailwind (`-translate-x-1/2`,
+`hover:-translate-y-[3px]`, `scale-105`, `rotate-10`, `shadow-[…]`, `shadow-(--shadow-card)`,
+`inset-shadow-[…]`); произвольное свойство (`[transform:…]`) — только когда утилиты нет. Если
+`@keyframes` двигают элемент, они меняют то же свойство, что задаёт утилита (`translate`, `scale`),
+а не `transform`. Тень, которую анимация `box-shadow` должна плавно продолжить, ставится тем
+слоем Tailwind, на месте которого она в `@keyframes` (`inset-shadow-*` для внутренней обводки).
+Примитивы `src/components/ui/*` генерирует CLI shadcn, правило к ним не применяется.
 
 Все токены описаны в `src/app/globals.css` слоями:
 
 1. **Бренд** — `--brand-*`, сырые значения палитры. На них ссылается только `globals.css`.
 2. **Роли** — `--background`, `--foreground`, `--primary`, `--primary-hover`, `--secondary`,
    `--muted`, `--muted-foreground`, `--border`, `--ring`, `--destructive`, `--brand` (лайм),
-   `--success` и другие. Их читают и Tailwind-классы, и модули: `var(--primary)`.
+   `--success` и другие. Их читают Tailwind-классы и произвольные значения: `var(--primary)`.
    Прозрачные варианты строятся через `color-mix(in srgb, var(--роль) 12%, transparent)`.
 3. **Тени и декор** — `--shadow-soft`, `--shadow-card`, `--shadow-popover`, `--shadow-color` и
    `--decor-*` для иллюстраций, стекла, слот-машины и конфетти. Литералы цветов вне
    `globals.css` не пишутся (кроме `themeColor` в `layout.tsx` и canvas глобуса).
 4. **Тема Tailwind** — `@theme` / `@theme inline` превращает роли в классы `bg-primary`,
-   `text-muted-foreground`, `border-border`.
-
-Правило: один элемент стилизуется **либо** утилитами Tailwind, **либо** модулем. Класс из
-модуля на примитиве из `ui/` допустим только для раскладки (`grid-area`, `margin`, `width`), не
-для цвета и состояний: модули не входят в CSS-слои и перебивают утилиты, а `cn()` их не видит.
+   `text-muted-foreground`, `border-border`. `@theme` без `static`: в сборку попадают только
+   токены, которые используют утилиты или `var()` в CSS.
 
 Примитивы в `src/components/ui/`:
 

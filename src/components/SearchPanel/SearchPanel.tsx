@@ -12,7 +12,7 @@ const glassFill =
   '[background:linear-gradient(135deg,color-mix(in_srgb,var(--decor-light)_50%,transparent),color-mix(in_srgb,var(--success-soft)_22%,transparent)_55%,color-mix(in_srgb,var(--decor-light)_32%,transparent))]'
 const glassBlur = '[backdrop-filter:blur(22px)_saturate(180%)]'
 const glassRim =
-  '[box-shadow:inset_0_1px_0_color-mix(in_srgb,var(--decor-light)_90%,transparent),inset_0_-1px_0_color-mix(in_srgb,var(--decor-light)_35%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--decor-light)_35%,transparent),inset_0_0_24px_color-mix(in_srgb,var(--decor-light)_25%,transparent),0_20px_50px_color-mix(in_srgb,var(--shadow-color)_14%,transparent),0_2px_6px_color-mix(in_srgb,var(--shadow-color)_4%,transparent)]'
+  'shadow-[inset_0_1px_0_color-mix(in_srgb,var(--decor-light)_90%,transparent),inset_0_-1px_0_color-mix(in_srgb,var(--decor-light)_35%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--decor-light)_35%,transparent),inset_0_0_24px_color-mix(in_srgb,var(--decor-light)_25%,transparent),0_20px_50px_color-mix(in_srgb,var(--shadow-color)_14%,transparent),0_2px_6px_color-mix(in_srgb,var(--shadow-color)_4%,transparent)]'
 // Specular highlight along the top-left edge, painted under the content (the panel is a stacking context).
 const glassSheen =
   "before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:rounded-[inherit] before:content-[''] before:[background:radial-gradient(120%_60%_at_0%_0%,color-mix(in_srgb,var(--decor-light)_55%,transparent),transparent_55%),radial-gradient(80%_50%_at_100%_100%,color-mix(in_srgb,var(--decor-light)_20%,transparent),transparent_60%)]"
@@ -57,7 +57,7 @@ export function SearchPanel({ mode, onModeChange, search, destinationRef, submit
           <TabsTrigger
             key={modeId}
             value={modeId}
-            className={`group flex h-[clamp(44px,12vw,58px)] min-w-0 items-center justify-center gap-[clamp(6px,1.8vw,12px)] px-[clamp(6px,2vw,18px)] text-[clamp(13px,3.8vw,18px)] whitespace-nowrap max-sm:h-14 max-sm:flex-col max-sm:gap-0.5 max-sm:text-sm/[normal] rounded-full border-0 bg-(--decor-light)/45 font-medium text-brand-foreground transition-[background-color,color,box-shadow] hover:bg-card data-active:bg-card data-active:font-[650] data-active:text-primary data-active:[box-shadow:0_6px_18px_color-mix(in_srgb,var(--shadow-color)_8%,transparent)]`}
+            className={`group flex h-[clamp(44px,12vw,58px)] min-w-0 items-center justify-center gap-[clamp(6px,1.8vw,12px)] px-[clamp(6px,2vw,18px)] text-[clamp(13px,3.8vw,18px)] whitespace-nowrap max-sm:h-14 max-sm:flex-col max-sm:gap-0.5 max-sm:text-sm/[normal] rounded-full border-0 bg-(--decor-light)/45 font-medium text-brand-foreground transition-[background-color,color,box-shadow] hover:bg-card data-active:bg-card data-active:font-[650] data-active:text-primary data-active:shadow-[0_6px_18px_color-mix(in_srgb,var(--shadow-color)_8%,transparent)]`}
           >
             {/* Only the sparkle reads well filled; the sliders and the die keep their outline. */}
             <Icon

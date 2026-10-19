@@ -10,7 +10,6 @@ import { createFrameMeter, type FrameWindow } from './globePerformance'
 import { createGlobeRenderer, type GlobeRenderer } from './globeRenderer'
 import { createHotelFeed, depthOpacity, pickSpotlightCity, sceneAt, type Scene, type Spotlight } from './globeScene'
 import { StatsPanel, type StatsPanelHandle } from './StatsPanel'
-import styles from './Hero.module.css'
 
 interface Props {
   markers: Destination[]
@@ -51,6 +50,69 @@ const ROUTE_FADE_MS = 1000
 const ROUTE_DELAY_MS = 200
 /** Routes to the first spotlight, matching the reference composition. */
 const initialSourceIds = ['london', 'lisbon', 'tbilisi']
+
+// Hover states use [&:hover], not hover:, which Tailwind limits to (hover: hover): on phones a tap on a pin
+// still shows its tooltip and lifts the card.
+const hero = [
+  // The sphere is much larger than the viewport: it rises from the lower right behind the title.
+  // Offsets include the transparent header laid over the top of the hero.
+  '[--globe-size:clamp(540px,144vw,640px)] [--globe-top:calc(var(--header-height)+clamp(24px,8vw,40px))] [--globe-x:88%]',
+  'md:[--globe-size:clamp(760px,76vw,980px)] md:[--globe-top:calc(var(--header-height)+32px)] md:[--globe-x:64%]',
+  'relative isolate h-[calc(var(--globe-top)+var(--globe-size)*0.76)] overflow-hidden text-brand-foreground md:h-[calc(var(--globe-top)+var(--globe-size)*0.62)]',
+  'bg-brand bg-[radial-gradient(ellipse_60%_45%_at_85%_30%,color-mix(in_srgb,var(--decor-glow)_75%,transparent),transparent_70%)]',
+  // A long press on the globe must not start selecting the title or the hint (iOS) or open the callout.
+  'select-none [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none]',
+  // Fade the bottom of the scene into the page behind the search form.
+  "after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:z-3 after:h-[30%] after:bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_0%,transparent)_0%,color-mix(in_srgb,var(--decor-haze)_80%,transparent)_60%,var(--background)_100%)] after:content-['']",
+].join(' ')
+const earth =
+  // Translucent glassy sphere: the dots and lines on top carry the geography.
+  'relative size-full rounded-full bg-[radial-gradient(circle_at_65%_15%,color-mix(in_srgb,var(--decor-light)_45%,transparent),transparent_40%),radial-gradient(circle_at_50%_50%,color-mix(in_srgb,var(--decor-light)_12%,transparent)_50%,color-mix(in_srgb,var(--decor-light)_50%,transparent)_100%)]'
+const sun = [
+  // The glare sits exactly on the limb, at this angle from the globe's centre (clockwise from 3 o'clock).
+  // The globe overflows a phone's screen sideways: there the glare stays on the visible part of the limb.
+  '[--sun-angle:-50deg] max-md:[--sun-angle:-112deg]',
+  'pointer-events-none absolute top-[calc(50%_+_50%_*_sin(var(--sun-angle)))] left-[calc(50%_+_50%_*_cos(var(--sun-angle)))] aspect-square w-[26%] -translate-1/2 mix-blend-screen',
+  'bg-[radial-gradient(circle,color-mix(in_srgb,var(--decor-light)_95%,transparent)_0_3%,color-mix(in_srgb,var(--decor-glow-soft)_60%,transparent)_9%,color-mix(in_srgb,var(--decor-glow)_20%,transparent)_30%,transparent_62%)]',
+].join(' ')
+// Markers are placed by --x/--y, percent of the globe box: --unit is 1% of it.
+const cityGlow =
+  'pointer-events-none absolute top-0 left-0 aspect-[1.3] w-[16%] translate-x-[calc(var(--x)_*_var(--unit)_-_50%)] translate-y-[calc(var(--y)_*_var(--unit)_-_50%)] bg-[radial-gradient(ellipse,color-mix(in_srgb,var(--decor-light)_70%,transparent)_0%,color-mix(in_srgb,var(--decor-glow-soft)_30%,transparent)_35%,transparent_70%)] opacity-[var(--o,1)] mix-blend-screen'
+const routeStroke = 'fill-none [stroke-linecap:round] [vector-effect:non-scaling-stroke]'
+const pin = [
+  'group absolute top-0 left-0 touch-none rounded-[50%_50%_50%_50%/40%_40%_60%_60%] text-primary opacity-[var(--o,1)] will-change-[translate,scale] data-hidden:invisible',
+  'translate-x-[calc(var(--x)_*_var(--unit)_-_50%)] translate-y-[calc(var(--y)_*_var(--unit)_-_100%)]',
+  // The translate is rewritten every frame; the scale eases on its own.
+  '[transition:scale_0.6s_cubic-bezier(0.22,1,0.36,1),width_0.7s_cubic-bezier(0.22,1,0.36,1),height_0.7s_cubic-bezier(0.22,1,0.36,1),color_0.4s_ease]',
+  'focus-visible:scale-115 [&:hover]:scale-115',
+  // The selected pin grows and darkens; the globe turns it to the middle and stops. The ! keeps its scale over the
+  // hover one, whose arbitrary variant comes later in the CSS.
+  'aria-pressed:z-3 aria-pressed:scale-145! aria-pressed:text-(--decor-pin-selected)',
+  "before:absolute before:left-1/2 before:-translate-x-1/2 before:content-['']",
+].join(' ')
+const pinShadow =
+  'before:-bottom-1 before:h-[7px] before:w-4 before:bg-[radial-gradient(ellipse,color-mix(in_srgb,var(--decor-light)_95%,transparent),transparent_70%)]'
+const hubShadow =
+  'before:-bottom-2 before:h-4 before:w-[42px] before:animate-hub-pulse before:bg-[radial-gradient(ellipse,color-mix(in_srgb,var(--decor-light)_95%,transparent),color-mix(in_srgb,var(--decor-glow-soft)_45%,transparent)_45%,transparent_72%)] motion-reduce:before:animate-none'
+const pinTooltip =
+  'pointer-events-none absolute bottom-[calc(100%_+_6px)] left-1/2 -translate-x-1/2 translate-y-1 rounded-sm bg-card px-2 py-1 text-xs/[normal] font-semibold whitespace-nowrap text-foreground opacity-0 shadow-(--shadow-soft) transition-[opacity,translate] duration-150 ease-[ease]'
+// The hub pin carries the featured card, so it shows no tooltip.
+const pinTooltipShown =
+  'group-focus-visible:translate-y-0 group-focus-visible:opacity-100 [.group:hover_&]:translate-y-0 [.group:hover_&]:opacity-100'
+const placeCard = [
+  '[--card-dx:22px] [--card-dy:calc(-100%_-_12px)] [--card-lift:0px]',
+  // Not enough room to the right of the pin on phones, and the title is above it: hang the card below.
+  'max-md:[--card-dx:-50%] max-md:[--card-dy:12px]',
+  // Inset of the picture, the same on every side; its size equals the text block's height.
+  '[--card-pad:clamp(5px,1.4vw,7px)] [--badge-size:clamp(9px,2.5vw,12px)] [--name-size:clamp(13px,3.5vw,17px)] [--meta-size:clamp(10px,2.75vw,13px)] [--text-gap:2px]',
+  'absolute top-0 left-0 z-5 w-max rounded-[clamp(10px,3vw,14px)] border-0 bg-card py-(--card-pad) pr-[calc(var(--card-pad)_+_4px)] pl-(--card-pad) text-left text-foreground',
+  'translate-x-[calc(var(--x)_*_var(--unit)_+_var(--card-dx))] translate-y-[calc(var(--y)_*_var(--unit)_+_var(--card-dy)_-_var(--card-lift))] touch-none opacity-[var(--o,1)] will-change-transform',
+  'shadow-[0_14px_34px_color-mix(in_srgb,var(--decor-hotel-shadow)_25%,transparent)] transition-shadow duration-200 ease-[ease]',
+  '[&:hover]:shadow-[0_18px_40px_color-mix(in_srgb,var(--decor-hotel-shadow)_32%,transparent)] [&:hover]:[--card-lift:4px]',
+].join(' ')
+const placeIcon =
+  // Concentric with the card's corner.
+  'grid aspect-square w-[calc(1.25_*_(var(--badge-size)_+_var(--name-size)_+_var(--meta-size))_+_2_*_var(--text-gap))] flex-none place-items-center rounded-[calc(clamp(10px,3vw,14px)_-_var(--card-pad)_+_2px)] bg-[linear-gradient(135deg,var(--decor-hotel-from),var(--decor-hotel-to))] text-primary-foreground [&_svg]:h-auto [&_svg]:w-[48%]'
 
 export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props) {
   const [feed] = useState(() => createHotelFeed(hotels))
@@ -329,7 +391,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
   const { hotel, destination } = spotlight
 
   return (
-    <section ref={heroRef} className={styles.hero} aria-labelledby="hero-title">
+    <section ref={heroRef} className={hero} aria-labelledby="hero-title">
       <div
         ref={copyRef}
         className="pointer-events-none relative z-4 w-fit pt-[calc(var(--header-height)+clamp(18px,5vw,48px))] pr-(--page-x) pl-[calc(var(--page-x)+8px)] md:ml-[max(0px,(100%-var(--page-max))/2)] md:pt-[calc(var(--header-height)+clamp(56px,8vw,96px))]"
@@ -347,28 +409,59 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
         Вращай глобус — воплощай мечту
       </p>
 
-      <div ref={globeRef} className={styles.globe}>
-        <div className={styles.atmosphere} aria-hidden />
-        <div className={styles.earth} aria-hidden />
-        <canvas ref={canvasRef} className={`${styles.canvas} ${spinning ? styles.canvasShown : ''}`} aria-hidden />
-        <div className={styles.rim} aria-hidden />
-        <div className={styles.sun} aria-hidden />
-        <div ref={glowRef} className={styles.cityGlow} style={positionStyle(initialScene.hub)} aria-hidden />
+      {/* No z-index or transform: the globe makes no stacking context of its own, so the hotel card can rise
+          above the hint while the pins stay under the faded bottom. No container query units for --unit: Safari
+          turns a query container into its own stacking layer, trapping the hotel card under the hint. */}
+      <div
+        ref={globeRef}
+        className="absolute top-(--globe-top) left-[calc(var(--globe-x)_-_var(--globe-size)/2)] aspect-square w-(--globe-size) [--unit:calc(var(--globe-size)/100)]"
+      >
+        <div
+          className="absolute inset-0 rounded-full shadow-[0_0_0_1.5px_color-mix(in_srgb,var(--decor-light)_60%,transparent),0_0_24px_6px_color-mix(in_srgb,var(--decor-glow-soft)_70%,transparent),0_0_80px_24px_color-mix(in_srgb,var(--decor-glow)_55%,transparent)]"
+          aria-hidden
+        />
+        <div className={earth} aria-hidden />
+        {/* Only the disc itself can be grabbed; on it, swipes in any direction turn the globe. */}
+        <canvas
+          ref={canvasRef}
+          className={`absolute inset-0 size-full touch-none transition-opacity duration-600 ease-[ease] [clip-path:circle(50%)] data-dragging:cursor-grabbing ${spinning ? 'cursor-grab opacity-100' : 'opacity-0'}`}
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute inset-0 rounded-full shadow-[inset_0_0_30px_6px_color-mix(in_srgb,var(--decor-rim)_55%,transparent)]"
+          aria-hidden
+        />
+        <div className={sun} aria-hidden />
+        <div ref={glowRef} className={cityGlow} style={positionStyle(initialScene.hub)} aria-hidden />
 
-        <svg className={styles.routes} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
+        <svg
+          className="pointer-events-none absolute inset-0 size-full overflow-visible"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          aria-hidden
+        >
           {initialScene.routes.map((route, i) => (
             <g
               key={i}
               ref={(el) => {
                 routeRefs.current[i] = el
               }}
-              className={styles.routeGroup}
+              className="transition-opacity duration-400 ease-[ease]"
               style={{ opacity: route.opacity }}
             >
               {/* Two wide translucent strokes fake the glow: a blur filter would re-run on every frame. */}
-              <path className={styles.routeHalo} d={route.d} />
-              <path className={styles.routeGlow} d={route.d} />
-              <path className={styles.route} d={route.d} />
+              <path
+                className={`${routeStroke} stroke-[color-mix(in_srgb,var(--decor-light)_12%,transparent)] stroke-10`}
+                d={route.d}
+              />
+              <path
+                className={`${routeStroke} stroke-[color-mix(in_srgb,var(--decor-light)_30%,transparent)] stroke-4`}
+                d={route.d}
+              />
+              <path
+                className={`${routeStroke} stroke-[color-mix(in_srgb,var(--decor-light)_95%,transparent)] stroke-[1.3]`}
+                d={route.d}
+              />
             </g>
           ))}
         </svg>
@@ -384,11 +477,11 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
                 else pinRefs.current.delete(d.id)
               }}
               type="button"
-              className={`${styles.pin} absolute top-0 left-0 touch-none will-change-transform ${
+              className={`${pin} ${
                 isHub
-                  ? `${styles.pinHub} z-3 h-10 w-[30px] md:h-[58px] md:w-11`
-                  : 'z-2 h-6 w-[18px] md:h-[35px] md:w-[26px]'
-              } group`}
+                  ? `${hubShadow} z-3 h-10 w-[30px] md:h-[58px] md:w-11`
+                  : `${pinShadow} z-2 h-6 w-[18px] md:h-[35px] md:w-[26px]`
+              }`}
               style={{ ...positionStyle(point), '--o': depthOpacity(point.depth).toFixed(3) } as CSSProperties}
               data-hidden={point.depth <= 0.05 || undefined}
               aria-label={`${d.name}, ${d.country} — выбрать направление`}
@@ -397,7 +490,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
               {...pauseHandlers}
             >
               <PinIcon />
-              <span className={`${styles.pinTooltip} ${isHub ? '' : styles.pinTooltipShown}`} aria-hidden>
+              <span className={`${pinTooltip} ${isHub ? '' : pinTooltipShown}`} aria-hidden>
                 {d.name}
               </span>
             </button>
@@ -407,7 +500,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
         <button
           ref={cardRef}
           type="button"
-          className={styles.placeCard}
+          className={placeCard}
           style={positionStyle(initialScene.hub)}
           aria-label={`Новый отель ${hotel.name}, ${destination.name}, от ${formatPrice(hotel.priceFrom)} за ночь — выбрать направление`}
           onClick={() => onSelect(destination)}
@@ -416,9 +509,9 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
           {/* Re-keyed per hotel so every new one plays the entrance animation. */}
           <span
             key={`${hotel.destinationId}/${hotel.name}`}
-            className={`flex items-center gap-[clamp(7px,2vw,12px)] ${styles.placeContent}`}
+            className="flex animate-in items-center gap-[clamp(7px,2vw,12px)] animation-duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] fade-in zoom-in-97 slide-in-from-bottom-2 motion-reduce:animate-none"
           >
-            <span className={styles.placeIcon} aria-hidden>
+            <span className={placeIcon} aria-hidden>
               <BedDouble />
             </span>
             <span className="flex min-w-0 flex-col gap-(--text-gap) leading-[1.25]">

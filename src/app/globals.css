@@ -8,7 +8,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /* Tokens come in three layers: brand values -> semantic roles -> Tailwind theme (@theme inline).
-   Components and CSS Modules read the roles; the brand layer is referenced only here. */
+   Components read the roles; the brand layer is referenced only here. */
 
 :root {
   /* Brand palette. */
@@ -59,7 +59,7 @@
 
   --radius: 12px;
 
-  /* Shadows. --shadow-color tints every shadow and shading in the modules. */
+  /* Shadows. --shadow-color tints every shadow and shading in the components. */
   --shadow-color: var(--brand-navy);
   --shadow-soft: 0 12px 40px color-mix(in srgb, var(--shadow-color) 12%, transparent);
   --shadow-card: 0 6px 18px color-mix(in srgb, var(--shadow-color) 12%, transparent);
@@ -134,8 +134,8 @@
   --header-height: clamp(60px, 15vw, 72px);
 }
 
-/* static: CSS Modules read these at run time, where Tailwind cannot see the usage. */
-@theme static {
+/* Not static: Tailwind emits only the variables that utilities and var() in the CSS use. */
+@theme {
   /* lg is the layout's desktop step; xl equals --page-max. */
   --breakpoint-xs: 375px;
   --breakpoint-sm: 640px;
@@ -150,22 +150,94 @@
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 12px);
   --radius-full: 9999px;
-  /* Type scale: Tailwind's defaults, declared here so the modules can read them. */
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-base: 1rem;
-  --text-lg: 1.125rem;
-  --text-xl: 1.25rem;
-  --text-2xl: 1.5rem;
-  --text-3xl: 1.875rem;
-  --text-4xl: 2.25rem;
-  --text-5xl: 3rem;
-  --text-6xl: 3.75rem;
-  --text-7xl: 4.5rem;
   /* Fluid headings, one per role: the hero title, section titles, titles inside the search panel. */
   --text-display: clamp(32px, 9vw, 72px);
   --text-title: clamp(17px, 4.6vw, 30px);
   --text-heading: clamp(17px, 4.6vw, 24px);
+
+  /* Animations of the components, started by animate-<name> classes. Per-element delays are inline
+     animation-delay styles. */
+  /* The assistant's typing indicator: three dots bouncing in turn. */
+  --animate-typing-dot: typing-dot 1s ease-in-out infinite;
+  /* The slot machine: a highlight across the spin button, the bulbs chasing while the reels spin and
+     blinking when they stop, the lever pulled, the windows flashing gold on a win. */
+  --animate-slot-shine: slot-shine 2.8s ease-in-out infinite;
+  --animate-slot-chase: slot-chase 0.4s linear infinite;
+  --animate-slot-blink: slot-blink 0.5s steps(2) 6;
+  --animate-slot-pull: slot-pull 0.7s ease-in-out;
+  --animate-slot-win: slot-win 0.9s ease-out;
+  /* A confetti piece flies up to --x/--y, turning by --r, and falls out of sight. */
+  --animate-confetti: confetti 1.6s cubic-bezier(0.2, 0.7, 0.4, 1) forwards;
+  /* The glow under the hub pin on the globe breathes. */
+  --animate-hub-pulse: hub-pulse 2.4s ease-in-out infinite;
+
+  @keyframes typing-dot {
+    0%,
+    80%,
+    100% {
+      opacity: 0.35;
+      transform: translateY(0);
+    }
+    40% {
+      opacity: 1;
+      transform: translateY(-3px);
+    }
+  }
+
+  @keyframes slot-shine {
+    60%,
+    100% {
+      translate: 100%;
+    }
+  }
+
+  @keyframes slot-chase {
+    to {
+      background-position-x: 16px;
+    }
+  }
+
+  @keyframes slot-blink {
+    to {
+      opacity: 0.2;
+    }
+  }
+
+  @keyframes slot-pull {
+    45% {
+      transform: scaleY(-0.6);
+    }
+  }
+
+  @keyframes slot-win {
+    30% {
+      box-shadow:
+        inset 0 0 0 3px var(--decor-gold),
+        0 0 18px color-mix(in srgb, var(--decor-gold) 90%, transparent);
+    }
+  }
+
+  @keyframes confetti {
+    0% {
+      opacity: 1;
+      transform: translate(0, 0) rotate(0);
+    }
+    55% {
+      opacity: 1;
+      transform: translate(var(--x), var(--y)) rotate(calc(var(--r) / 2));
+    }
+    100% {
+      opacity: 0;
+      transform: translate(calc(var(--x) * 1.15), calc(var(--y) + 260px)) rotate(var(--r));
+    }
+  }
+
+  @keyframes hub-pulse {
+    50% {
+      opacity: 0.55;
+      scale: 1.25;
+    }
+  }
 }
 
 @theme inline {
@@ -206,7 +278,7 @@
   html {
     overflow-x: clip;
     font-family: var(--font-sans);
-    /* Preflight sets 1.5; the modules are laid out for the browser default. */
+    /* Preflight sets 1.5; the components are laid out for the browser default. */
     line-height: normal;
     color: var(--foreground);
     /* Shows only where Safari uncovers the page edge (its toolbars collapsing): match the content
