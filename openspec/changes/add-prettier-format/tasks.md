@@ -2,7 +2,7 @@
 
 ## 1. Подключение Prettier
 
-- [ ] 1.1 Установить `prettier` как devDependency; добавить скрипты `format` (`prettier --write .`) и `format:check` (`prettier --check .`) в `package.json`; проверка: `npm run format:check` запускается и находит нарушения до форматирования.
+- [x] 1.1 Установить `prettier` как devDependency; добавить скрипты `format` (`prettier --write .`) и `format:check` (`prettier --check .`) в `package.json`; проверка: `npm run format:check` запускается и находит нарушения до форматирования.
 
 ## 2. Форматирование проекта
 
