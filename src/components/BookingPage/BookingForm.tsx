@@ -27,6 +27,16 @@ import { saveBooking } from '@/lib/storage'
 export const PROCESSING_MS = 1000
 
 /** Splits the session name into first and last name; "Анна Петрова" → Анна / Петрова. */
+/** Focuses the field with this id; a checkbox's id is on its hidden input, so its visible box gets the focus. */
+function focusField(id: string) {
+  const element = document.getElementById(id)
+  const target =
+    element instanceof HTMLInputElement && element.type === 'checkbox'
+      ? element.parentElement?.querySelector<HTMLElement>('[role=checkbox]')
+      : element
+  target?.focus()
+}
+
 const splitName = (name: string) => {
   const [first = '', ...rest] = name.trim().split(/\s+/)
   return { firstName: first, lastName: rest.join(' ') }
@@ -66,7 +76,7 @@ export function BookingForm({ offer }: { offer: Offer }) {
     setErrors(found)
     const first = Object.keys(found)[0]
     if (first) {
-      document.getElementById(first)?.focus()
+      focusField(first)
       return
     }
     setProcessing(true)

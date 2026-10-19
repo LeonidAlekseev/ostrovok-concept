@@ -69,6 +69,18 @@ describe('BookingPage form', () => {
     expect(nav.replace).not.toHaveBeenCalled()
   })
 
+  it('focuses the consent box when it is the only error', async () => {
+    nav.query = offerQuery(hotelRate.id)
+    render(<BookingPage />)
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Имя'), 'Анна')
+    await user.type(screen.getByLabelText('Фамилия'), 'Петрова')
+    await user.type(screen.getByLabelText('Email'), 'anna@example.com')
+    await user.type(screen.getByLabelText('Телефон'), '+7 900 123-45-67')
+    await user.click(screen.getByRole('button', { name: 'Забронировать' }))
+    expect(document.activeElement).toBe(screen.getByRole('checkbox'))
+  })
+
   it('asks for the main guest of every room', () => {
     nav.query = offerQuery(hotelRate.id, 2)
     render(<BookingPage />)
