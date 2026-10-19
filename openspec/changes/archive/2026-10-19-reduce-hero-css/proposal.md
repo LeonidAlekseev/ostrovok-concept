@@ -54,4 +54,4 @@
 - `hubPulse` на `.pinHub::before`: имя `hubPulse`, 2,4 s, `infinite`; четыре замера с шагом 600 мс дают opacity 0,57–0,99 и масштаб 1,01–1,24 до и после.
 - Hover и focus на пине: `--pin-scale` 1 → ~1,08–1,13 через 150 мс → 1,15 через 1 с, после ухода курсора 1; тултип 0 → 1 → 0. До и после совпадает, `transition-property` начинается с `--pin-scale`.
 
-После `git merge origin/dev` (`b959341`): сырой CSS 90 914 байт, gzip −9 18 364 байт, `Hero.module.css` 387 строк, то есть без изменений.
+После `git merge origin/dev` (`5ba72bd`): сырой CSS 90 914 байт, gzip −9 18 364 байт, `Hero.module.css` 387 строк, то есть без изменений.

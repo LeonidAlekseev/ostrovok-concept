@@ -5,7 +5,18 @@
 
 ## В работе
 
-Нет.
+Этап 1 (план — planning PR от 2026-10-19, согласован пользователем):
+
+- [ ] CI: отменять только прогоны `pull_request`, actions по SHA, команды проверок в README —
+      `tune-ci-workflow` — в работе.
+- [ ] `run` валидирует даты по снимку `today` формы, тест на `replaceState` —
+      `fix-search-today-snapshot` — в работе.
+- [ ] CSS-модули `SearchForm`, `SearchPanel`, `RandomSearch`, `AssistantSearch` на Tailwind, политика
+      `translate`/`scale`/`shadow` в README — `reduce-search-css` — в работе.
+- [ ] `shadcn` в `devDependencies`, уязвимости `npm audit` — `move-shadcn-dev-dependency` — в работе.
+
+Этап 2 (согласован, старт после merge `reduce-search-css`): остаток CSS `Hero`, `@theme` без
+`static`, политика утилит во всех компонентах — `reduce-globe-css`.
 
 ## Ожидает согласования
 
@@ -18,33 +29,7 @@
 
 ## Предложения
 
-- [ ] `concurrency` с `cancel-in-progress: true` отменяет и прогоны на push в `main` и `dev` —
-      источник: `.github/workflows/ci.yml:11` (`add-ci-checks`) — после merge без проверки остаётся
-      только последний push; отменять только прогоны `pull_request` — лёгкий — нет.
-- [ ] Закрепить `actions/checkout` и `actions/setup-node` по SHA — источник:
-      `.github/workflows/ci.yml:20`, `.github/workflows/ci.yml:22` (`add-ci-checks`) — защита от
-      подмены тега стороннего action — лёгкий — нет.
-- [ ] Добавить `npm test` и `npm run format:check` в список команд раздела «Запуск» — источник:
-      `README.md:15` (`add-ci-checks`) — список локальных команд неполон — лёгкий — нет.
-- [ ] `run` валидирует даты по `todayIso()`, а форма — по снимку `today` из `useSyncExternalStore` —
-      источник: `src/hooks/useHotelSearch.ts:69` (`fix-search-dates-effect`) — после полуночи на
-      открытой вкладке стартовые даты и валидация могут разойтись; передавать в `run` тот же снимок —
-      лёгкий — нет.
-- [ ] `window.history.replaceState` внутри хука без теста — источник:
-      `src/hooks/useHotelSearch.ts:80` (`fix-search-dates-effect`) — побочный эффект не покрыт;
-      добавить тест на запись параметров в URL — лёгкий — нет.
-- [ ] Перевести оставшиеся CSS-модули (`Hero` — только эффекты глобуса, `SearchForm`,
-      `SearchPanel`, `RandomSearch`, `AssistantSearch`) и после этого убрать `static` у `@theme` —
-      источник: `src/app/globals.css:137` (`reduce-page-css`), `src/components/Hero/Hero.module.css:1`
-      (`reduce-hero-css`) — `static` нужен только для чтения токенов из модулей и тянет в сборку
-      неиспользуемые токены; учесть критерий «gzip CSS растёт не больше чем на 2 %» — средний — нет.
-- [ ] Единая политика для `translate`/`scale`/`shadow`: arbitrary properties или стандартные
-      утилиты с `@property` — источник: `reduce-page-css` (стандартные утилиты давали +5 925 байт
-      CSS) — сейчас подходы смешаны — лёгкий — связано с предыдущим пунктом.
-- [ ] 7 уязвимостей high в `npm audit` (`braces` → `micromatch` → `fast-glob`, через CLI `shadcn` в
-      `dependencies`) — источник: `package.json` (`reduce-page-css`) — в клиентский бандл не попадает,
-      из пакета используется только `shadcn/tailwind.css`; проверить перенос в `devDependencies` и
-      обновление `shadcn` — лёгкий — нет.
+Нет.
 
 ## Выполнено
 
@@ -76,17 +61,20 @@
 - [x] Кастомный CSS `HomePage`, `DestinationCard`, `TravelBanner`, `ui/SmartImage` на Tailwind, четыре
       модуля удалены — `reduce-page-css` — #18 — 2026-10-19.
 - [x] Кастомный CSS `Hero` на Tailwind: модуль 544 → 387 строк, эффекты глобуса остались в модуле —
-      `reduce-hero-css` — #17 — 2026-10-19. Итог этапа на `d495b35`: CSS 92 896 байт (+3,2 %), gzip
+      `reduce-hero-css` — #17 — 2026-10-19. Итог этапа на `5c7bb24`: CSS 92 896 байт (+3,2 %), gzip
       18 743 (+1,9 %) при принятом критерии «gzip растёт не больше чем на 2 %».
 - [x] План этапа 1 и changes — #14 — 2026-10-19.
 - [x] Удалены 13 смерженных удалённых веток PR #1–#13 — решение пользователя, без PR — 2026-10-19.
+- [x] Скриншоты `openspec/**/screenshots/` вычищены из истории `main` и `dev` (`git filter-repo`, force
+      push пользователем; pack 18,18 → 4,42 МБ), удалены 8 слитых веток PR #14–#21; SHA в TODO и
+      архиве changes заменены на новые — решение пользователя, без PR — 2026-10-19.
 
 ## Отклонено/неактуально
 
 - **Серверные компоненты главной.** Выигрыш меньше 1 КБ gzip из 235 КБ JS (оценка
   `evaluate-server-components`, #10). Тема закрыта решением пользователя — 2026-10-19.
 - **Сжать таблицы `cn` через `cn build` / `withCn`.** Выигрыш JS главной 1 996 Б gzip (5 686 Б
-  сырых) меньше согласованного порога 2 КБ; код откачен, реализация — коммит `59efbe4` в истории
+  сырых) меньше согласованного порога 2 КБ; код откачен, реализация — коммит `c76a830` в истории
   `dev` — `compile-cn-tables` — #20 — 2026-10-19.
 - **Ленивая загрузка неактивных вкладок поиска.** Вкладки перестали бы сохранять введённое
   (`keepMounted`). Не делать — решение пользователя — 2026-10-19.
