@@ -1,6 +1,15 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import type { Hotel } from './catalog'
 import { cancelBooking, cancellationFee, tripsIn, tripTab } from './trips'
 import type { Booking } from './storage'
+
+// A booked rate at 7 000 ₽ a night; the other ids are not in the catalogue.
+vi.mock('./catalog', async (importOriginal) => {
+  const catalog = await importOriginal<typeof import('./catalog')>()
+  const rate = { id: 'rate-7000', pricePerNight: 7000 }
+  const hotel = { id: 'hotel-7000', rooms: [{ id: 'room-7000', rates: [rate] }] } as unknown as Hotel
+  return { ...catalog, getHotel: (id: string) => (id === hotel.id ? hotel : catalog.getHotel(id)) }
+})
 
 const base: Booking = {
   id: 'OS-AAAAAA',
@@ -45,6 +54,25 @@ describe('cancellationFee', () => {
   })
   it('is the first night after the free period', () => {
     expect(cancellationFee(base, '2026-11-09')).toBe(10000)
+  })
+  // trips: the first night of the booked rate, at the weekend price from Friday, for every room
+  describe('at the price of the booked rate', () => {
+    const booked = { ...base, hotelId: 'hotel-7000', roomId: 'room-7000', rateId: 'rate-7000' }
+    const stay = (checkIn: string, checkOut: string, rooms = 1) => ({
+      ...booked,
+      checkIn,
+      checkOut,
+      guests: { adults: 2, children: 0, rooms },
+    })
+    it('takes the weekend price for a Friday check-in', () => {
+      expect(cancellationFee({ ...stay('2026-11-06', '2026-11-08'), total: 16_200 }, '2026-11-05')).toBe(8100)
+    })
+    it('takes the weekday price for a Thursday check-in', () => {
+      expect(cancellationFee({ ...stay('2026-11-05', '2026-11-07'), total: 15_100 }, '2026-11-04')).toBe(7000)
+    })
+    it('counts every room', () => {
+      expect(cancellationFee({ ...stay('2026-11-06', '2026-11-08', 2), total: 32_400 }, '2026-11-05')).toBe(16_200)
+    })
   })
   it('is the whole amount for a non-refundable rate', () => {
     expect(cancellationFee({ ...base, cancellation: { kind: 'non-refundable' } }, '2026-10-19')).toBe(20000)

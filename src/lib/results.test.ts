@@ -10,6 +10,7 @@ import {
   setFilterParams,
   type Filters,
 } from './results'
+import { nightPrice, stayTotal } from './offer'
 import { resolveTarget, type SearchQuery } from './search'
 
 const query: SearchQuery = {
@@ -147,5 +148,32 @@ describe('applyFilters', () => {
     expect(priceDesc).toEqual(desc(priceDesc))
     const ratings = sorted(filters({ sort: 'rating' }), (i) => i.hotel.rating)
     expect(ratings).toEqual(desc(ratings))
+  })
+
+  // search-results-page, Requirement: Цена в фильтре и сортировке
+  describe('with a stay', () => {
+    const weekend: SearchQuery = { ...query, checkIn: '2026-10-23', checkOut: '2026-10-25' }
+    const twoRooms: SearchQuery = { ...weekend, guests: { adults: 2, children: 0, rooms: 2 } }
+
+    it('prices each hotel for the stay and rooms', () => {
+      for (const { rate, price } of applyFilters(prague, NO_FILTERS, twoRooms))
+        expect(price).toBe(stayTotal(rate.pricePerNight, twoRooms.checkIn, twoRooms.checkOut, 2))
+      for (const { rate, price } of applyFilters(prague, NO_FILTERS)) expect(price).toBe(rate.pricePerNight)
+    })
+
+    it('filters by the average night over the stay', () => {
+      const weekday = Math.max(...applyFilters(prague, NO_FILTERS).map((i) => i.rate.pricePerNight))
+      expect(applyFilters(prague, filters({ priceMax: weekday }))).toHaveLength(prague.length)
+      const kept = applyFilters(prague, filters({ priceMax: weekday }), twoRooms)
+      expect(kept.every((i) => nightPrice(i.rate.pricePerNight, weekend.checkIn) <= weekday)).toBe(true)
+      expect(kept.length).toBeLessThan(prague.length)
+    })
+
+    it('sorts by the offer price for the stay', () => {
+      const asc = applyFilters(prague, filters({ sort: 'price_asc' }), twoRooms).map((i) => i.price)
+      expect(asc).toEqual([...asc].sort((a, b) => a - b))
+      const desc = applyFilters(prague, filters({ sort: 'price_desc' }), twoRooms).map((i) => i.price)
+      expect(desc).toEqual([...desc].sort((a, b) => b - a))
+    })
   })
 })

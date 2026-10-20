@@ -1,7 +1,8 @@
 import { destinations, type Destination } from '../data/destinations'
 import { fullHotelsIn, getDestination, MEAL_LABEL, type Hotel, type Meal, type Rate, type Room } from './catalog'
 import { nightsBetween } from './dates'
-import type { SearchQuery, SearchTarget } from './search'
+import { averageNight, stayTotal } from './offer'
+import type { SearchQuery, SearchTarget, Stay } from './search'
 
 /**
  * Search results page: the demo search over the hotel catalogue, and the filters and sorting the
@@ -60,7 +61,7 @@ export const RATING_OPTIONS = [9, 8, 7, 6] as const
 export const MEAL_OPTIONS = Object.keys(MEAL_LABEL) as Meal[]
 
 export interface Filters {
-  /** Price per night of one room, ₽; `null` is no bound. */
+  /** Price per night of one room, ₽, averaged over the stay; `null` is no bound. */
   priceMin: number | null
   priceMax: number | null
   /** Empty: any. */
@@ -131,38 +132,50 @@ export interface ResultItem {
   /** The cheapest rate that meets the meal and cancellation filters, and its room. */
   room: Room
   rate: Rate
+  /** The offer price for the stay and all rooms; without a stay, the weekday price per night. */
+  price: number
 }
 
 const rateMatches = (rate: Rate, f: Filters) =>
   (f.meals.length === 0 || f.meals.includes(rate.meal)) && (!f.freeCancel || rate.cancellation.kind === 'free')
 
-function bestRate(hotel: Hotel, f: Filters): { room: Room; rate: Rate } | null {
-  let best: { room: Room; rate: Rate } | null = null
+type Best = Pick<ResultItem, 'room' | 'rate' | 'price'>
+
+function bestRate(hotel: Hotel, f: Filters, stay: Stay | null): Best | null {
+  let best: Best | null = null
   for (const room of hotel.rooms)
-    for (const rate of room.rates)
-      if (rateMatches(rate, f) && (!best || rate.pricePerNight < best.rate.pricePerNight)) best = { room, rate }
+    for (const rate of room.rates) {
+      if (!rateMatches(rate, f)) continue
+      const price = stay
+        ? stayTotal(rate.pricePerNight, stay.checkIn, stay.checkOut, stay.guests.rooms)
+        : rate.pricePerNight
+      if (!best || price < best.price) best = { room, rate, price }
+    }
   return best
 }
 
 const compare: Record<Sort, (a: ResultItem, b: ResultItem) => number> = {
   popular: (a, b) => b.hotel.reviewCount - a.hotel.reviewCount || b.hotel.rating - a.hotel.rating,
-  price_asc: (a, b) => a.rate.pricePerNight - b.rate.pricePerNight,
-  price_desc: (a, b) => b.rate.pricePerNight - a.rate.pricePerNight,
+  price_asc: (a, b) => a.price - b.price,
+  price_desc: (a, b) => b.price - a.price,
   rating: (a, b) => b.hotel.rating - a.hotel.rating || b.hotel.reviewCount - a.hotel.reviewCount,
 }
 
 /**
- * Hotels that meet the filters, sorted. Each hotel is shown with its cheapest rate among those with
- * the chosen meals and cancellation; the price filter and the price sorting use that rate.
+ * Hotels that meet the filters, sorted. Each hotel is shown with its cheapest rate for the stay among
+ * those with the chosen meals and cancellation; the price filter takes its average night, the price
+ * sorting its offer price. Without a stay both use the weekday price per night.
  */
-export function applyFilters(hotels: Hotel[], f: Filters): ResultItem[] {
+export function applyFilters(hotels: Hotel[], f: Filters, stay: Stay | null = null): ResultItem[] {
   const items: ResultItem[] = []
   for (const hotel of hotels) {
     if (f.stars.length && !f.stars.includes(hotel.stars)) continue
     if (f.rating !== null && hotel.rating < f.rating) continue
-    const best = bestRate(hotel, f)
+    const best = bestRate(hotel, f, stay)
     if (!best) continue
-    const price = best.rate.pricePerNight
+    const price = stay
+      ? averageNight(best.price, nightsBetween(stay.checkIn, stay.checkOut), stay.guests.rooms)
+      : best.price
     if ((f.priceMin !== null && price < f.priceMin) || (f.priceMax !== null && price > f.priceMax)) continue
     items.push({ hotel, destination: getDestination(hotel.destinationId)!, ...best })
   }

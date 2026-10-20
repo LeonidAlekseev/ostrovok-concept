@@ -1,6 +1,7 @@
+import { findRate, findRoom, getHotel } from './catalog'
 import { nightsBetween, type IsoDate } from './dates'
 import { formatPrice } from './format'
-import { freeCancellationUntil } from './offer'
+import { freeCancellationUntil, nightPrice } from './offer'
 import type { Booking } from './storage'
 
 export type TripTab = 'upcoming' | 'past' | 'cancelled'
@@ -17,18 +18,30 @@ export function tripsIn(bookings: Booking[], tab: TripTab, today: IsoDate): Book
   return list.sort((a, b) => (tab === 'upcoming' ? 1 : -1) * a.checkIn.localeCompare(b.checkIn))
 }
 
+type FeeBooking = Pick<
+  Booking,
+  'hotelId' | 'roomId' | 'rateId' | 'cancellation' | 'checkIn' | 'checkOut' | 'guests' | 'total'
+>
+
+/** The first night of the stay for all rooms, ₽, at the price of the booked rate. */
+function firstNight(booking: FeeBooking): number {
+  const hotel = getHotel(booking.hotelId)
+  const room = hotel && findRoom(hotel, booking.roomId)
+  const rate = room && findRate(room, booking.rateId)
+  // A rate no longer in the catalogue: an average night of the paid total.
+  if (!rate) return Math.round(booking.total / nightsBetween(booking.checkIn, booking.checkOut))
+  return nightPrice(rate.pricePerNight, booking.checkIn) * booking.guests.rooms
+}
+
 /**
  * What cancelling at `today` withholds, ₽: nothing up to the last free day, the first night after it,
  * everything for a non-refundable rate.
  */
-export function cancellationFee(
-  booking: Pick<Booking, 'cancellation' | 'checkIn' | 'checkOut' | 'total'>,
-  today: IsoDate,
-) {
+export function cancellationFee(booking: FeeBooking, today: IsoDate) {
   const until = freeCancellationUntil(booking, booking.checkIn)
   if (until === null) return booking.total
   if (until >= today) return 0
-  return Math.round(booking.total / nightsBetween(booking.checkIn, booking.checkOut))
+  return firstNight(booking)
 }
 
 export function cancelBooking(booking: Booking, now: Date, today: IsoDate): Booking {

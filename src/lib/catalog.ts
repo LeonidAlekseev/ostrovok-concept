@@ -149,7 +149,7 @@ function seeded(key: string) {
   return { next, int, pick, sample }
 }
 
-const roundUp100 = (value: number) => Math.ceil(value / 100) * 100
+export const roundUp100 = (value: number) => Math.ceil(value / 100) * 100
 const round1 = (value: number) => Math.round(value * 10) / 10
 
 // ---------------------------------------------------------------------------------------------

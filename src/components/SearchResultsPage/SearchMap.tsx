@@ -23,7 +23,7 @@ export const ATTRIBUTION_SHOWN_MS = 5000
 
 export interface MapHotel {
   hotel: Hotel
-  /** The price of the result card: the cheapest rate for the nights and rooms of the query, ₽. */
+  /** The price of the result card: the cheapest rate for the stay and rooms of the query, ₽. */
   price: number
 }
 

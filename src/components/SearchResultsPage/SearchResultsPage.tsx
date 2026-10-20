@@ -12,7 +12,6 @@ import { useToday } from '../../hooks/useToday'
 import { getHotel } from '../../lib/catalog'
 import { formatDateRange, nightsBetween } from '../../lib/dates'
 import { countRu, guestsLabel } from '../../lib/format'
-import { offerTotal } from '../../lib/offer'
 import {
   applyFilters,
   countFilters,
@@ -170,16 +169,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
 
   const nights = nightsBetween(query.checkIn, query.checkOut)
   const result = status.state === 'done' ? status.result : null
-  const items = useMemo(() => (result ? applyFilters(result.hotels, filters) : []), [result, filters])
-  // The markers show the price of the cards: the stay for the nights and rooms of the query.
-  const mapHotels = useMemo(
-    () =>
-      items.map(({ hotel, rate }) => ({
-        hotel,
-        price: offerTotal(rate.pricePerNight, nights, query.guests.rooms),
-      })),
-    [items, nights, query.guests.rooms],
-  )
+  const items = useMemo(() => (result ? applyFilters(result.hotels, filters, query) : []), [result, filters, query])
 
   /** Filters and sorting go to the URL without a new history entry. */
   const updateFilters = (next: Filters) => {
@@ -306,7 +296,6 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
                       <ResultTile
                         item={item}
                         stay={query}
-                        nights={nights}
                         active={item.hotel.id === activeId}
                         onActivate={setActiveId}
                       />
@@ -319,7 +308,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
             {(desktop || view === 'map') && (
               // `svh`: the phone address bar showing and hiding while scrolling does not resize the map.
               <div className="h-[70svh] overflow-hidden rounded-2xl shadow-(--shadow-card) lg:sticky lg:top-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-[calc(100svh-2rem)] xl:col-start-3">
-                <SearchMap hotels={mapHotels} activeId={activeId} onActivate={setActiveId} onOpen={openHotel} />
+                <SearchMap hotels={items} activeId={activeId} onActivate={setActiveId} onOpen={openHotel} />
               </div>
             )}
           </div>
