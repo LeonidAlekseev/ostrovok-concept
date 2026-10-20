@@ -69,6 +69,12 @@ export function formatDateRange(from: IsoDate, to: IsoDate | null): string {
   return `${a.getDate()} – ${b.getDate()} ${monthLabel(b)} ${year}`
 }
 
+/** "24 окт. — 25 окт.": the day and the short month of both ends, without the year. */
+export function formatShortRange(from: IsoDate, to: IsoDate): string {
+  const [a, b] = [fromIso(from), fromIso(to)]
+  return `${a.getDate()} ${monthLabel(a)} — ${b.getDate()} ${monthLabel(b)}`
+}
+
 /** Monday-first grid of a month; `null` cells pad the first week. */
 export function monthGrid(year: number, month: number): (IsoDate | null)[] {
   const first = new Date(year, month, 1)

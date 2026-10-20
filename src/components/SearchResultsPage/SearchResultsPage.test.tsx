@@ -170,7 +170,11 @@ describe('SearchResultsPage query', () => {
     await results()
 
     expect(screen.getByRole('heading', { level: 1, name: 'Прага, Чехия' })).toBeDefined()
-    expect(screen.getByText(/3 ночи · 2 гостя/)).toBeDefined()
+    // The card of the search: the destination and the dates; the nights and guests are in the form.
+    const card = screen.getByRole('button', { name: /^Прага, Чехия/ })
+    expect(card.textContent).toBe('Прага, Чехия20 окт. — 23 окт.')
+    expect(card.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByText(/3 ночи/)).toBeNull()
     expect(cards().length).toBeGreaterThanOrEqual(6)
   })
 
@@ -195,7 +199,9 @@ describe('SearchResultsPage query', () => {
     open(PRAGUE)
     await results()
 
-    await user.click(screen.getByRole('button', { name: 'Изменить поиск' }))
+    await user.click(screen.getByRole('button', { name: /^Прага, Чехия/ }))
+    expect(screen.getByRole('button', { name: /^Прага, Чехия/ }).getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('button', { name: /^Прага, Чехия/ }).getAttribute('aria-describedby')).toBeTruthy()
     const destination = screen.getByRole('combobox', { name: 'Направление' })
     expect((destination as HTMLInputElement).value).toBe('Прага')
     await user.clear(destination)
@@ -262,13 +268,13 @@ describe('SearchResultsPage hotel card', () => {
     }
   })
 
-  it('lists the hotels in one column up to 2xl and in two from 2xl', async () => {
+  it('lists the hotels in one column up to 3xl (1920 px) and in two from 3xl', async () => {
     open(PRAGUE)
     await results()
 
     const list = screen.getByRole('region', { name: 'Отели' }).querySelector('ul')!
-    expect(list.className).toMatch(/(^|\s)2xl:grid-cols-2(\s|$)/)
-    expect(list.className).not.toMatch(/(^|\s)(sm|md|lg|xl):grid-cols-/)
+    expect(list.className).toMatch(/(^|\s)3xl:grid-cols-2(\s|$)/)
+    expect(list.className).not.toMatch(/(^|\s)(sm|md|lg|xl|2xl):grid-cols-/)
   })
 })
 
@@ -276,7 +282,7 @@ describe('SearchResultsPage hotel card', () => {
 describe('SearchResultsPage filters', () => {
   it('filters by stars and sorts by price, writing both into the URL without new history entries', async () => {
     const user = userEvent.setup()
-    open(PRAGUE)
+    open(PRAGUE, { desktop: true })
     await results()
     const pushState = vi.spyOn(window.history, 'pushState')
 
@@ -292,7 +298,7 @@ describe('SearchResultsPage filters', () => {
   })
 
   it('restores the filters and the sorting from the URL', async () => {
-    open(`${PRAGUE}&stars=5,4&rating=8&free_cancel=1&sort=price_desc`)
+    open(`${PRAGUE}&stars=5,4&rating=8&free_cancel=1&sort=price_desc`, { desktop: true })
     await results()
 
     expect(screen.getByRole('checkbox', { name: '5 звёзд' }).getAttribute('aria-checked')).toBe('true')
@@ -307,7 +313,7 @@ describe('SearchResultsPage filters', () => {
 
   it('shows "Ничего не нашлось" and resets the filters', async () => {
     const user = userEvent.setup()
-    open(PRAGUE)
+    open(PRAGUE, { desktop: true })
     await results()
     const all = cardNames()
 
@@ -319,6 +325,91 @@ describe('SearchResultsPage filters', () => {
     await user.click(within(list).getByRole('button', { name: 'Сбросить фильтры' }))
     expect(cardNames()).toEqual(all)
     expect(window.location.search).not.toContain('price_max')
+  })
+})
+
+// search-results-page, Requirement: Строка поиска; Фильтры на телефоне
+describe('SearchResultsPage compact bar', () => {
+  const sheet = () => screen.getByRole('dialog', { name: 'Фильтры' })
+
+  it('shows the filters and map buttons on narrow screens only, hidden from lg', async () => {
+    open(PRAGUE)
+    await results()
+
+    for (const name of ['Фильтры', 'Карта']) {
+      const button = screen.getByRole('button', { name })
+      expect(button.className).toMatch(/(^|\s)lg:hidden(\s|$)/)
+    }
+    expect(screen.getByRole('heading', { level: 1 }).className).toContain('sr-only')
+  })
+
+  it('has no filter or map buttons and keeps the panels on desktop', async () => {
+    open(PRAGUE, { desktop: true })
+    await results()
+
+    expect(screen.getByRole('button', { name: 'Фильтры' }).className).toContain('lg:hidden')
+    const aside = screen.getByRole('complementary', { name: 'Фильтры' })
+    // The sorting is the first item of the side panel.
+    expect(aside.querySelector('select')).toBe(within(aside).getByLabelText('Сортировка'))
+    expect(aside.firstElementChild!.firstElementChild!.contains(within(aside).getByLabelText('Сортировка'))).toBe(true)
+  })
+
+  it('names the filters button with the number of enabled filters', async () => {
+    open(`${PRAGUE}&stars=5,4&free_cancel=1`)
+    await results()
+
+    const button = screen.getByRole('button', { name: 'Фильтры, включено 2' })
+    expect(button.textContent).toBe('2')
+  })
+
+  it('toggles between "Карта" and "Список" with the icon', async () => {
+    const user = userEvent.setup()
+    open(PRAGUE)
+    await results()
+
+    await user.click(screen.getByRole('button', { name: 'Карта' }))
+    expect(screen.queryByRole('button', { name: 'Карта' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Список' }))
+    expect(screen.getByRole('button', { name: 'Карта' })).toBeDefined()
+    expect(screen.getByRole('region', { name: 'Отели' }).className).not.toContain('hidden')
+  })
+
+  it('applies filters at once in the bottom sheet, sorting first, and closes with "Показать N отелей"', async () => {
+    const user = userEvent.setup()
+    open(PRAGUE)
+    await results()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    const pushState = vi.spyOn(window.history, 'pushState')
+
+    await user.click(screen.getByRole('button', { name: 'Фильтры' }))
+    const dialog = sheet()
+    expect(dialog.querySelector('select')).toBe(within(dialog).getByLabelText('Сортировка'))
+    await user.click(within(dialog).getByRole('checkbox', { name: '5 звёзд' }))
+
+    expect(window.location.search).toContain('stars=5')
+    expect(pushState).not.toHaveBeenCalled()
+    // The page behind the modal sheet is hidden from assistive technology.
+    const total = screen.queryAllByRole('article', { hidden: true }).length
+    expect(total).toBeGreaterThan(0)
+    const show = within(dialog).getByRole('button', { name: /^Показать \d+ отел/ })
+    expect(show.textContent).toBe(`Показать ${total} ${total === 1 ? 'отель' : total < 5 ? 'отеля' : 'отелей'}`)
+
+    await user.click(show)
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(screen.getByRole('button', { name: 'Фильтры, включено 1' })).toBeDefined()
+    for (const card of cards()) expect(within(card).getByLabelText('5 звёзд')).toBeDefined()
+  })
+
+  it('sorts from the bottom sheet', async () => {
+    const user = userEvent.setup()
+    open(PRAGUE)
+    await results()
+
+    await user.click(screen.getByRole('button', { name: 'Фильтры' }))
+    await user.selectOptions(within(sheet()).getByLabelText('Сортировка'), 'price_asc')
+
+    expect(window.location.search).toContain('sort=price_asc')
+    expect(prices()).toEqual([...prices()].sort((a, b) => a - b))
   })
 })
 
@@ -612,7 +703,7 @@ describe('SearchResultsPage hotel dialog', () => {
 
     expect(await screen.findByRole('dialog')).toBeDefined()
     // The page behind the modal dialog is hidden from assistive technology.
-    expect(screen.getByRole('button', { name: 'Карта', hidden: true }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Список', hidden: true })).toBeDefined()
   })
 })
 
@@ -681,7 +772,7 @@ describe('SearchResultsPage pages', () => {
 
   it('returns to the first page when the sorting changes', async () => {
     const user = userEvent.setup()
-    open(`${EUROPE}&page=2`)
+    open(`${EUROPE}&page=2`, { desktop: true })
     await results()
 
     await user.selectOptions(screen.getByRole('combobox', { name: 'Сортировка' }), 'price_asc')

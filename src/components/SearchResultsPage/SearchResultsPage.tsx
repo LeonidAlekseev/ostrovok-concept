@@ -3,15 +3,14 @@
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
-import { LoaderCircle, SlidersHorizontal } from 'lucide-react'
+import { List, LoaderCircle, MapPin, SlidersVertical } from 'lucide-react'
 import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { useHotelSearch } from '../../hooks/useHotelSearch'
 import { useToday } from '../../hooks/useToday'
 import { getHotel } from '../../lib/catalog'
-import { formatDateRange, nightsBetween } from '../../lib/dates'
-import { countRu, guestsLabel } from '../../lib/format'
+import { formatShortRange } from '../../lib/dates'
+import { countRu } from '../../lib/format'
 import {
   applyFilters,
   countFilters,
@@ -24,10 +23,8 @@ import {
   parsePage,
   runDemoSearch,
   setFilterParams,
-  SORTS,
   type Filters,
   type SearchResult,
-  type Sort,
 } from '../../lib/results'
 import {
   fromSearchParams,
@@ -40,6 +37,7 @@ import {
 } from '../../lib/search'
 import { SearchForm } from '../SearchForm/SearchForm'
 import { FiltersPanel } from './FiltersPanel'
+import { FiltersSheet } from './FiltersSheet'
 import { HotelDialog } from './HotelDialog'
 import { Pagination } from './Pagination'
 import { ResultTile } from './ResultTile'
@@ -159,7 +157,6 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
   // Whether the open hotel has its own history entry: closing then goes back to the results.
   const pushedHotel = useRef(false)
   const desktop = useDesktop()
-  const sortId = useId()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -173,7 +170,6 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
     return () => controller.abort()
   }, [query, target])
 
-  const nights = nightsBetween(query.checkIn, query.checkOut)
   const result = status.state === 'done' ? status.result : null
   const items = useMemo(() => (result ? applyFilters(result.hotels, filters, query) : []), [result, filters, query])
   const pages = pageCount(items.length)
@@ -232,19 +228,55 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
     target.kind === 'destination' ? `${target.destination.name}, ${target.destination.country}` : target.title
   const filterCount = countFilters(filters)
 
+  const editHintId = useId()
+  const iconButton = 'size-14 shrink-0 rounded-2xl p-0 lg:hidden'
+
   return (
     <main className={pageClass}>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-title font-bold tracking-[-0.02em]">{title}</h1>
-          <p className="text-muted-foreground">
-            {formatDateRange(query.checkIn, query.checkOut)} · {countRu(nights, ['ночь', 'ночи', 'ночей'])} ·{' '}
-            {guestsLabel(query.guests)}
-          </p>
-        </div>
-        <Button variant="outline" aria-expanded={editing} onClick={() => setEditing((on) => !on)}>
+      <h1 className="sr-only">{title}</h1>
+      <div className="flex items-stretch gap-2">
+        <button
+          type="button"
+          aria-expanded={editing}
+          aria-describedby={editHintId}
+          onClick={() => setEditing((on) => !on)}
+          className="flex min-h-14 min-w-0 flex-1 flex-col justify-center rounded-2xl bg-card px-4 text-left shadow-(--shadow-card) lg:max-w-md"
+        >
+          <span className="truncate font-medium text-primary">{title}</span>
+          <span className="truncate text-sm text-foreground">{formatShortRange(query.checkIn, query.checkOut)}</span>
+        </button>
+        <span id={editHintId} className="sr-only">
           Изменить поиск
-        </Button>
+        </span>
+        {result && (
+          <>
+            <Button
+              variant="outline"
+              className={cn(iconButton, 'relative')}
+              aria-haspopup="dialog"
+              aria-label={filterCount > 0 ? `Фильтры, включено ${filterCount}` : 'Фильтры'}
+              onClick={() => setFiltersOpen(true)}
+            >
+              <SlidersVertical aria-hidden />
+              {filterCount > 0 && (
+                <span
+                  aria-hidden
+                  className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
+                >
+                  {filterCount}
+                </span>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              className={iconButton}
+              onClick={() => setView((v) => (v === 'list' ? 'map' : 'list'))}
+              aria-label={view === 'list' ? 'Карта' : 'Список'}
+            >
+              {view === 'list' ? <MapPin aria-hidden /> : <List aria-hidden />}
+            </Button>
+          </>
+        )}
       </div>
       {editing && <EditSearch query={query} />}
 
@@ -260,53 +292,12 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
 
       {result && (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              className="lg:hidden"
-              aria-expanded={filtersOpen}
-              onClick={() => setFiltersOpen((open) => !open)}
-            >
-              <SlidersHorizontal aria-hidden />
-              Фильтры{filterCount > 0 && ` (${filterCount})`}
-            </Button>
-            <label htmlFor={sortId} className="sr-only">
-              Сортировка
-            </label>
-            <NativeSelect
-              id={sortId}
-              value={filters.sort}
-              onChange={(e) => updateFilters({ ...filters, sort: e.target.value as Sort })}
-            >
-              {Object.entries(SORTS).map(([value, label]) => (
-                <NativeSelectOption key={value} value={value}>
-                  {label}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-            <div className="ml-auto flex gap-1 rounded-full bg-muted p-1 lg:hidden" role="group" aria-label="Вид">
-              {(['list', 'map'] as const).map((v) => (
-                <Button
-                  key={v}
-                  size="sm"
-                  shape="pill"
-                  variant={view === v ? 'default' : 'ghost'}
-                  aria-pressed={view === v}
-                  onClick={() => setView(v)}
-                >
-                  {v === 'list' ? 'Список' : 'Карта'}
-                </Button>
-              ))}
-            </div>
-          </div>
-
           <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_minmax(0,1fr)]">
-            <aside
-              aria-label="Фильтры"
-              className={cn('lg:col-start-1 lg:row-start-1', !filtersOpen && 'max-lg:hidden')}
-            >
-              <FiltersPanel filters={filters} onChange={updateFilters} />
-            </aside>
+            {desktop && (
+              <aside aria-label="Фильтры" className="lg:col-start-1 lg:row-start-1">
+                <FiltersPanel filters={filters} onChange={updateFilters} />
+              </aside>
+            )}
 
             <section
               aria-label="Отели"
@@ -321,7 +312,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
                   <Button onClick={() => updateFilters({ ...NO_FILTERS, sort: filters.sort })}>Сбросить фильтры</Button>
                 </div>
               ) : (
-                <ul className="grid gap-3 2xl:grid-cols-2">
+                <ul className="grid gap-3 3xl:grid-cols-2">
                   {visible.map((item) => (
                     <li key={item.hotel.id}>
                       <ResultTile
@@ -346,6 +337,13 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
           </div>
         </>
       )}
+      <FiltersSheet
+        open={filtersOpen && !desktop}
+        onOpenChange={setFiltersOpen}
+        filters={filters}
+        onChange={updateFilters}
+        total={items.length}
+      />
       <HotelDialog hotel={hotelId ? getHotel(hotelId) : undefined} stay={query} onClose={closeHotel} />
     </main>
   )

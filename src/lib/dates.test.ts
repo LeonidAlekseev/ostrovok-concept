@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { addDays, formatDateRange, formatShortDay, fromIso, nightsBetween, todayIso, toIso, weekday } from './dates'
+import {
+  addDays,
+  formatDateRange,
+  formatShortDay,
+  formatShortRange,
+  fromIso,
+  nightsBetween,
+  todayIso,
+  toIso,
+  weekday,
+} from './dates'
 
 describe('toIso', () => {
   it('formats a local date as YYYY-MM-DD with zero padding', () => {
@@ -81,6 +91,13 @@ describe('formatDateRange', () => {
 
   it('shows an open end while check-out is not chosen', () => {
     expect(formatDateRange('2026-10-17', null)).toBe('17 окт. 2026 г. – …')
+  })
+})
+
+describe('formatShortRange', () => {
+  it('is the day and the short month of both ends', () => {
+    expect(formatShortRange('2026-10-24', '2026-10-25')).toBe('24 окт. — 25 окт.')
+    expect(formatShortRange('2026-10-30', '2026-11-02')).toBe('30 окт. — 2 нояб.')
   })
 })
 
