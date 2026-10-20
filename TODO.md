@@ -5,7 +5,17 @@
 
 ## В работе
 
-Нет.
+Доработки прототипа (решения пользователя 2026-10-20; не больше двух исполнителей одновременно, changes
+не пересекаются по файлам, кроме разных разделов README):
+
+- [ ] Наведение через `hover:`, остатки произвольных свойств на стандартных утилитах, анимация
+      аккордеона, комментарий `globals.css` — `unify-tailwind-utilities` — в работе.
+- [ ] Общие хелперы отмены и форматирования, `DEFAULT_GUESTS`, компонент `BookingDetails`, вариант
+      `destructive` у кнопки — `dedupe-booking-helpers` — в работе.
+- [ ] «Избранное» убрано из меню пользователя, подпись `PhotoPlaceholder` в маленькой плитке —
+      `polish-prototype-ui` — в работе.
+- [ ] Шум jsdom в тестах, лишние `.mjs` MapLibre в деплое, скрипт скриншотов в `scripts/` —
+      `tidy-dev-tooling` — в работе.
 
 ## Ожидает согласования
 
@@ -18,56 +28,17 @@
 
 ## Предложения
 
-- [ ] 7 уязвимостей high в dev-дереве: `braces` (GHSA-vfj7-8cjw-p6xm, исправленной версии нет) →
-      `micromatch` → `fast-glob` → CLI `shadcn` — источник: `package.json` (`move-shadcn-dev-dependency`)
-      — в продакшен-зависимостях 0 после #25; дождаться исправления `braces` или заменить CLI — лёгкий
-      — нет.
-- [ ] Скрипт съёмки и сравнения скриншотов (Chromium, pixelmatch) пересоздаётся в `/tmp` каждым
-      исполнителем — источник: `reduce-search-css` — оформить в `scripts/` без коммита изображений —
+- [ ] В jsdom клик по логотипу не закрыл открытую панель, нажатие вне шапки закрыло — источник:
+      `src/components/Header/Header.test.tsx:58` (`add-prototype-foundation`) — проверить в браузере,
+      закрывает ли нажатие на логотип панель — лёгкий — нет.
+- [ ] Лишний JSDoc рядом с `splitName` после выноса функции — источник:
+      `src/components/BookingPage/BookingForm.tsx:20` (`add-auth-pages`) — проверить, что комментарий у
+      своей функции — лёгкий — нет.
+- [ ] Около 50 ресурсов с ответом 404 в консоли при `next start` — источник: `add-auth-pages` — открыть
+      `/` с логом сети и найти отсутствующие файлы — лёгкий — нет.
+- [ ] Гостей нельзя прочитать из адреса без дат: `parseStayParams` возвращает `null` — источник:
+      `src/lib/search.ts:108` (`add-hotel-pages`) — добавить `parseGuestParams`, когда понадобится —
       лёгкий — нет.
-
-- [ ] Перевести на стандартные утилиты остатки произвольных свойств: `transform: translateY(…)` в
-      `style` ленты барабана и `[transition:…]` — источник: `src/components/SearchPanel/RandomSearch.tsx:316`,
-      `src/components/SearchForm/GuestsField.tsx:49`, `src/components/DestinationCard/DestinationCard.tsx:18`
-      (`reduce-globe-css`) — правило утилит README не покрывает `style` и `transition` — лёгкий — нет.
-- [ ] Единое поведение наведения на тач-устройствах: `Hero` использует `[&:hover]`, остальные — `hover:`
-      (только при `(hover: hover)`) — источник: `src/components/Hero/Hero.tsx:90`,
-      `src/components/DestinationCard/DestinationCard.tsx:42` (`reduce-globe-css`) — выбрать вариант,
-      записать в README; при `[&:hover]` — `@custom-variant` вместо `!` — лёгкий — решение пользователя.
-- [ ] Анимация раскрытия аккордеона: из `ui/accordion` убраны `animate-accordion-*`, keyframes нет —
-      источник: `src/components/ui/accordion.tsx` (`add-help-and-legal-pages`) — добавить
-      `--animate-accordion-*` в `@theme` — лёгкий — нет.
-- [ ] 404 и ошибка предложения на оформлении ведут на `/#search` как временная замена `/search` —
-      источник: `src/app/not-found.tsx`, `src/components/BookingPage/BookingPage.tsx`
-      (`add-prototype-foundation`, `add-booking-checkout`) — оставить или вести на поиск с главной;
-      `/search` без направления показывает форму с ошибкой — лёгкий — нет.
-- [ ] Дубли хелперов: `cancellationText` против `cancellationLabel`, `decimal` против `formatRating`,
-      `DEFAULT_GUESTS` в `useStay` — источник: `src/components/RatesPage/RoomRates.tsx:15`,
-      `src/components/SearchResultsPage/HotelCard.tsx:14`, `src/components/StayBar/useStay.ts:9` — свести
-      к общим функциям `src/lib/*` — лёгкий — нет.
-- [ ] Общий компонент деталей бронирования для подтверждения и «Моих поездок» — источник:
-      `src/components/BookingConfirmation/ConfirmationPage.tsx:14` (`add-account-pages`) — списки строк
-      почти совпадают — лёгкий — нет.
-- [ ] Вариант `destructive` у `ui/button` для подтверждения отмены — источник:
-      `src/components/ui/button.tsx:10` (`add-account-pages`) — сейчас отмена в основном стиле — лёгкий —
-      нет.
-- [ ] Демо-вход по email даёт имя без фамилии, а оформление требует фамилию — источник:
-      `src/components/Auth/AuthForm.tsx` (`add-account-pages`) — запрашивать фамилию при входе или
-      принимать одно имя — лёгкий — решение пользователя.
-- [ ] «Избранное» в шапке дважды: иконка и пункт меню пользователя — источник:
-      `src/components/Header/Header.tsx` (`add-auth-pages`) — оставить одно — лёгкий — решение
-      пользователя.
-- [ ] Подпись `PhotoPlaceholder` не помещается в плитку 96×64 в сводке заказа — источник:
-      `src/components/ui/PhotoPlaceholder.tsx` (`add-booking-checkout`) — `truncate` или скрывать подпись
-      — лёгкий — нет.
-- [ ] Шум jsdom «Not implemented: navigation to another Document» в `npm test` — источник:
-      `src/test/setup.ts` (`add-booking-checkout`) — перехватывать клики по ссылкам в setup — лёгкий —
-      нет.
-- [ ] Turbopack копирует в `.next/static/media` около 5 МБ `.mjs` из `maplibre-gl/dist` (грузится только
-      воркер) — источник: `add-search-results-page` — растёт размер деплоя; проверить исключение — лёгкий
-      — нет.
-- [ ] Устаревший комментарий про фон `html` после появления подвала — источник:
-      `src/app/globals.css:282` (`add-prototype-foundation`) — уточнить — лёгкий — нет.
 
 ## Выполнено
 
@@ -148,3 +119,10 @@
   `dev` — `compile-cn-tables` — #20 — 2026-10-19.
 - **Ленивая загрузка неактивных вкладок поиска.** Вкладки перестали бы сохранять введённое
   (`keepMounted`). Не делать — решение пользователя — 2026-10-19.
+- **Уязвимости high в dev-дереве через CLI `shadcn`** (`braces`, GHSA-vfj7-8cjw-p6xm). Исправленной
+  версии нет, в продакшен-зависимостях 0 после #25. Решение пользователя 2026-10-20: ждать исправления,
+  проверять при обновлениях.
+- **Демо-вход без фамилии.** Поле фамилии на оформлении остаётся пустым и обязательным. Решение
+  пользователя 2026-10-20.
+- **Ссылки 404 и «Предложение не найдено» на `/#search`.** Остаются: `/search` без направления
+  показывает только форму с ошибкой. Решение пользователя 2026-10-20.
