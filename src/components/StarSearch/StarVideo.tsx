@@ -11,6 +11,8 @@ type State =
   | { kind: 'ready'; file: File; url: string; shareable: boolean }
   | { kind: 'failed' }
 
+const RECORDING_NOTE = 'Не сворачивайте вкладку, пока идёт запись'
+const RESTARTED_NOTE = 'Запись прервалась — начали заново. Не сворачивайте вкладку'
 const buttonClass = 'h-12 px-3 text-base'
 
 /** The video of the reading: rendered on request, then sent through the share sheet or downloaded. */
@@ -18,8 +20,8 @@ export function StarVideo({ reading, name }: { reading: Reading; name: string })
   const [type] = useState(videoType)
   const [state, setState] = useState<State>({ kind: 'idle' })
   const [note, setNote] = useState('')
-  // The recording stands while the tab is hidden.
-  const [paused, setPaused] = useState(false)
+  // A hidden tab dropped the recording and it began again.
+  const [restarted, setRestarted] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
   const hotel = reading.hotels[0]
@@ -45,7 +47,7 @@ export function StarVideo({ reading, name }: { reading: Reading; name: string })
     const controller = new AbortController()
     abortRef.current = controller
     setNote('')
-    setPaused(false)
+    setRestarted(false)
     setState({ kind: 'rendering', progress: 0 })
     try {
       const file = await renderReadingVideo(reading, name, type, {
@@ -56,12 +58,11 @@ export function StarVideo({ reading, name }: { reading: Reading; name: string })
             const progress = Math.round(share * 100) / 100
             return prev.kind === 'rendering' && prev.progress !== progress ? { kind: 'rendering', progress } : prev
           }),
-        onPause: setPaused,
+        onRestart: () => setRestarted(true),
       })
       setState({ kind: 'ready', file, url: URL.createObjectURL(file), shareable: canShareFile(file) })
       setNote('Видео готово')
     } catch {
-      setPaused(false)
       if (controller.signal.aborted) {
         setState({ kind: 'idle' })
         setNote('Видео отменено')
@@ -183,11 +184,13 @@ export function StarVideo({ reading, name }: { reading: Reading; name: string })
       </div>
     )
 
+  const recording = type && state.kind === 'rendering'
+
   return (
     <div className="flex flex-col gap-2">
       {actions}
       <p className="min-h-5 text-center text-sm text-muted-foreground" role="status">
-        {paused ? 'Запись на паузе — вернитесь на вкладку' : note}
+        {recording ? (restarted ? RESTARTED_NOTE : RECORDING_NOTE) : note}
       </p>
     </div>
   )

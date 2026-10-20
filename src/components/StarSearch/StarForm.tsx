@@ -59,6 +59,7 @@ function validate(answers: StarAnswers, today: IsoDate): Errors {
   if (!answers.name.trim()) errors.name = 'Как вас зовут? Звёздам нужно знать, для кого гадать'
   if (!answers.birthDay || !answers.birthMonth) errors.birth = 'Укажите день и месяц рождения'
   else if (!birthOf(answers)) errors.birth = 'В этом месяце нет такого дня'
+  // The calendar offers no past day; this catches the midnight that passes while the form stays open.
   if (answers.checkIn && answers.checkIn < today) errors.checkIn = 'Дата заезда уже прошла'
   return errors
 }
@@ -173,6 +174,7 @@ export function StarForm({ answers, onChange, onSubmit, today, defaultCheckIn, n
         <p className="text-base font-semibold">Когда едем?</p>
         <DateField
           single
+          describedBy={`${id}-check-in-note`}
           triggerRef={checkInRef}
           checkIn={answers.checkIn || defaultCheckIn}
           checkOut={answers.checkIn || defaultCheckIn}
