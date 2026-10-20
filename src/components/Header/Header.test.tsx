@@ -1,6 +1,6 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { signIn } from '@/lib/auth'
 import { favoritesStore, sessionStore } from '@/lib/storage'
 import { Header } from './Header'
@@ -127,5 +127,67 @@ describe('Header', () => {
     expect(sessionStore.get()).toBeNull()
     expect(favoritesStore.get()).toEqual(['h1'])
     expect(await screen.findByRole('link', { name: 'Войти' })).toBeTruthy()
+  })
+})
+
+describe('Header on scroll', () => {
+  const scrollTo = (y: number) => {
+    Object.defineProperty(window, 'scrollY', { value: y, configurable: true })
+    act(() => {
+      window.dispatchEvent(new Event('scroll'))
+    })
+  }
+  const state = () => screen.getByRole('banner').getAttribute('data-sticky')
+  const frame = () => act(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
+  const stateAfter = (expected: string) => waitFor(() => expect(state()).toBe(expected))
+
+  afterEach(() => scrollTo(0))
+
+  it('scrolls with the page at the top, hides when fixed, shows on a scroll up far from the top', async () => {
+    setup()
+    expect(state()).toBe('docked')
+    scrollTo(2000)
+    await stateAfter('hidden')
+    scrollTo(1900)
+    await stateAfter('shown')
+    scrollTo(2000)
+    await stateAfter('hidden')
+  })
+
+  it('does not show on a scroll up closer than half a screen', async () => {
+    setup()
+    scrollTo(300)
+    await stateAfter('hidden')
+    scrollTo(200)
+    await frame()
+    expect(state()).toBe('hidden')
+  })
+
+  it('stays shown while the menu is open and while focus is inside', async () => {
+    const user = setup()
+    scrollTo(2000)
+    await frame()
+    scrollTo(1900)
+    await stateAfter('shown')
+    await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
+    scrollTo(2100)
+    await frame()
+    expect(state()).toBe('shown')
+    await user.keyboard('{Escape}')
+    screen.getByRole('link', { name: 'Избранное' }).focus()
+    scrollTo(2200)
+    await frame()
+    expect(state()).toBe('shown')
+    ;(document.activeElement as HTMLElement).blur()
+    await stateAfter('hidden')
+  })
+
+  it('publishes the offset of the shown header for the sticky blocks', async () => {
+    setup()
+    scrollTo(2000)
+    await frame()
+    scrollTo(1900)
+    await stateAfter('shown')
+    expect(document.documentElement.style.getPropertyValue('--sticky-header-offset')).toBe('var(--header-height)')
   })
 })

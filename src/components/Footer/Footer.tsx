@@ -12,8 +12,8 @@ const year = new Date().getFullYear()
 
 export function Footer() {
   return (
-    <footer className="border-t border-border">
-      <div className="mx-auto flex max-w-(--page-max) flex-col gap-4 px-(--page-x) py-[clamp(20px,4vw,32px)] text-sm text-muted-foreground">
+    <footer className="rounded-t-[clamp(20px,5vw,32px)] bg-chrome">
+      <div className="mx-auto flex max-w-(--page-max) flex-col gap-4 px-(--page-x) py-[clamp(20px,4vw,32px)] text-sm text-chrome-muted">
         <nav aria-label="Информация">
           <ul className="flex flex-wrap gap-x-6 gap-y-2">
             {links.map((link) => (
