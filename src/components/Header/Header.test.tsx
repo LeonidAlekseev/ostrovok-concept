@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { signIn } from '@/lib/auth'
@@ -91,18 +91,33 @@ describe('Header', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Меню' })).toBeNull())
   })
 
-  it('shows "Войти" to a guest, linked to /login', () => {
+  it('shows an account icon to a guest, linked to /login, without text', () => {
     setup()
-    expect(screen.getByRole('link', { name: 'Войти' }).getAttribute('href')).toBe('/login')
+    const login = screen.getByRole('link', { name: 'Войти' })
+    expect(login.getAttribute('href')).toBe('/login')
+    expect(login.textContent).toBe('')
   })
 
-  it('shows the name and the account menu once signed in, and "Выйти" ends the session only', async () => {
+  it('keeps the account icon between the notifications and the menu', () => {
+    setup()
+    const actions = [...screen.getByRole('banner').querySelectorAll('[aria-label]')].map((el) =>
+      el.getAttribute('aria-label'),
+    )
+    expect(actions).toEqual(['Островок! — на главную', 'Избранное', 'Уведомления', 'Войти', 'Открыть меню'])
+  })
+
+  it('shows the account icon, not the name, once signed in, and "Выйти" ends the session only', async () => {
     favoritesStore.set(['h1'])
     signIn('anna@example.com')
     const user = setup()
     expect(screen.queryByRole('link', { name: 'Войти' })).toBeNull()
+    const account = screen.getByRole('button', { name: 'Аккаунт: anna' })
+    expect(account.textContent).toBe('')
 
-    await user.click(screen.getByRole('button', { name: /anna/ }))
+    await user.click(account)
+    const dialog = screen.getByRole('dialog', { name: 'Аккаунт' })
+    expect(within(dialog).getByText('anna')).toBeTruthy()
+    expect(dialog.textContent).toContain('anna@example.com')
     const nav = screen.getByRole('navigation', { name: 'Аккаунт' })
     expect([...nav.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
       ['Мои поездки', '/trips'],
