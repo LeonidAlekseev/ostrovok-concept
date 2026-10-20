@@ -5,10 +5,23 @@ import { HotelHeader } from './HotelHeader'
 import { HotelStay } from './HotelStay'
 import { Reviews } from './Reviews'
 
-export function HotelPage({ hotel }: { hotel: Hotel }) {
+interface Props {
+  hotel: Hotel
+  /** Inside a dialog: no `main` landmark, and the hotel name is an `h2` with this id to label the dialog. */
+  titleId?: string
+}
+
+export function HotelPage({ hotel, titleId }: Props) {
+  const Root = titleId ? 'div' : 'main'
   return (
-    <main className="mx-auto flex w-full max-w-(--page-max) flex-1 flex-col gap-8 px-(--page-x) py-[clamp(20px,5vw,40px)]">
-      <HotelHeader hotel={hotel} />
+    <Root
+      className={
+        titleId
+          ? 'flex flex-col gap-8'
+          : 'mx-auto flex w-full max-w-(--page-max) flex-1 flex-col gap-8 px-(--page-x) py-[clamp(20px,5vw,40px)]'
+      }
+    >
+      <HotelHeader hotel={hotel} titleId={titleId} />
       <Gallery hotelName={hotel.name} photos={hotel.photos} />
       <section aria-labelledby="about-title" className="flex flex-col gap-3">
         <h2 id="about-title" className="text-heading font-bold">
@@ -23,6 +36,6 @@ export function HotelPage({ hotel }: { hotel: Hotel }) {
       </section>
       <HotelStay hotel={hotel} />
       <Reviews rating={hotel.rating} reviewCount={hotel.reviewCount} reviews={hotel.reviews} />
-    </main>
+    </Root>
   )
 }

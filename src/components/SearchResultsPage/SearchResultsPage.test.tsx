@@ -1,33 +1,104 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fullHotelsIn } from '../../lib/catalog'
 import { SearchResultsPage } from './SearchResultsPage'
 
-// The page reads the URL through Next's hooks; here they read jsdom's location.
+// The page reads the URL through Next's hooks; here they read jsdom's location and, like Next,
+// follow `pushState`, `replaceState` and "Назад".
 const push = vi.fn()
-vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(window.location.search),
-  useRouter: () => ({ push }),
-}))
+vi.mock('next/navigation', async () => {
+  const { useSyncExternalStore } = await import('react')
+  const subscribe = (onChange: () => void) => {
+    window.addEventListener('popstate', onChange)
+    window.addEventListener('test:urlchange', onChange)
+    return () => {
+      window.removeEventListener('popstate', onChange)
+      window.removeEventListener('test:urlchange', onChange)
+    }
+  }
+  return {
+    useSearchParams: () =>
+      new URLSearchParams(
+        useSyncExternalStore(
+          subscribe,
+          () => window.location.search,
+          () => '',
+        ),
+      ),
+    usePathname: () => window.location.pathname,
+    useRouter: () => ({ push, replace: vi.fn() }),
+  }
+})
+for (const method of ['pushState', 'replaceState'] as const) {
+  const native = window.history[method].bind(window.history)
+  window.history[method] = (...args: Parameters<History['pushState']>) => {
+    native(...args)
+    window.dispatchEvent(new Event('test:urlchange'))
+  }
+}
 
-// jsdom has no WebGL: a stand-in map that loads (or fails) on the next tick and places markers in its container.
-const mapMock = vi.hoisted(() => ({ fail: false }))
+// jsdom has no WebGL: a stand-in map that loads (or fails) on the next tick and places markers in its container,
+// with MapLibre's compact attribution: the "i" button toggles the shown text.
+const mapMock = vi.hoisted(() => ({
+  fail: false,
+  options: [] as unknown[],
+  last: null as { fire(type: string): void } | null,
+}))
 vi.mock('maplibre-gl', () => {
   type Handler = () => void
   class Map {
     container: HTMLElement
     handlers: Record<string, Handler[]> = {}
-    constructor({ container }: { container: HTMLElement }) {
-      this.container = container
-      setTimeout(() => this.handlers[mapMock.fail ? 'error' : 'load']?.forEach((h) => h()))
+    constructor(options: { container: HTMLElement }) {
+      this.container = options.container
+      mapMock.options.push(options)
+      mapMock.last = this
+      const attribution = document.createElement('details')
+      attribution.className = 'maplibregl-ctrl-attrib maplibregl-compact maplibregl-compact-show'
+      const button = document.createElement('summary')
+      button.className = 'maplibregl-ctrl-attrib-button'
+      button.addEventListener('click', () => attribution.classList.toggle('maplibregl-compact-show'))
+      attribution.append(button)
+      this.container.append(attribution)
+      setTimeout(() => this.fire(mapMock.fail ? 'error' : 'load'))
     }
     on(type: string, handler: Handler) {
       ;(this.handlers[type] ??= []).push(handler)
       return this
     }
+    once(type: string, handler: Handler) {
+      const once = () => {
+        this.handlers[type] = this.handlers[type].filter((h) => h !== once)
+        handler()
+      }
+      return this.on(type, once)
+    }
+    fire(type: string) {
+      this.handlers[type]?.forEach((h) => h())
+    }
+    getContainer() {
+      return this.container
+    }
     fitBounds() {}
-    resize() {}
     remove() {}
+  }
+  class Popup {
+    content: HTMLElement | null = null
+    setDOMContent(content: HTMLElement) {
+      this.content = content
+      return this
+    }
+    setLngLat() {
+      return this
+    }
+    addTo(map: Map) {
+      map.container.append(this.content!)
+      return this
+    }
+    remove() {
+      this.content?.remove()
+    }
   }
   class Marker {
     element: HTMLElement
@@ -50,7 +121,7 @@ vi.mock('maplibre-gl', () => {
       return this
     }
   }
-  return { Map, Marker, LngLatBounds, setWorkerUrl: () => {} }
+  return { Map, Marker, Popup, LngLatBounds, setWorkerUrl: () => {} }
 })
 
 const NOW = new Date(2026, 9, 19, 12)
@@ -77,15 +148,8 @@ const prices = () => cards().map((card) => Number(within(card).getByText(/^от 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(NOW)
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe() {}
-      disconnect() {}
-    },
-  )
-  Element.prototype.scrollIntoView = vi.fn()
   mapMock.fail = false
+  mapMock.options = []
 })
 
 afterEach(() => {
@@ -151,7 +215,7 @@ describe('SearchResultsPage hotel card', () => {
     expect(link.getAttribute('href')).toMatch(
       /^\/hotels\/prague-[a-z-]+\?checkin=2026-10-20&checkout=2026-10-23&adults=3&children=1&rooms=2$/,
     )
-    expect(within(card).getByText('за 3 ночи, 2 номера')).toBeDefined()
+    expect(within(card).queryByText(/за \d* ?ноч/)).toBeNull()
     expect(within(card).getByText(/км до центра/)).toBeDefined()
     expect(within(card).getByText(/\d+ отзыв/)).toBeDefined()
     expect(within(card).getByRole('button', { name: 'Добавить в избранное' })).toBeDefined()
@@ -167,6 +231,15 @@ describe('SearchResultsPage hotel card', () => {
       expect(within(top).getAllByRole('img')[0].className).toMatch(/\bw-full\b/)
       expect(within(top).queryByRole('heading')).toBeNull()
     }
+  })
+
+  it('lists the hotels in one column up to xl and in two from xl', async () => {
+    open(PRAGUE)
+    await results()
+
+    const list = screen.getByRole('region', { name: 'Отели' }).querySelector('ul')!
+    expect(list.className).toMatch(/(^|\s)xl:grid-cols-2(\s|$)/)
+    expect(list.className).not.toMatch(/(^|\s)(sm|md|lg):grid-cols-/)
   })
 })
 
@@ -220,30 +293,26 @@ describe('SearchResultsPage filters', () => {
   })
 })
 
-// search-results-page, Requirement: Карта результатов
+// search-results-page, Requirement: Карта результатов поиска
 describe('SearchResultsPage map', () => {
-  const markers = () => screen.findAllByRole('button', { name: /за ночь$/ }, { timeout: 3000 })
+  const markers = () => screen.findAllByRole('button', { name: /, от [\d\s]+₽$/ }, { timeout: 3000 })
+  const markerOf = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}, от `) })
 
-  it('shows a price marker per hotel next to the list on wide screens', async () => {
-    open(PRAGUE, { desktop: true })
+  it('shows a marker per hotel with the price of its card, without "за ночь"', async () => {
+    open(`destination=prague&checkin=2026-10-20&checkout=2026-10-23&adults=3&rooms=2`, { desktop: true })
     await results()
 
     expect(await markers()).toHaveLength(cards().length)
-  })
-
-  it('highlights and scrolls to the card of a clicked marker', async () => {
-    const user = userEvent.setup()
-    open(PRAGUE, { desktop: true })
-    await results()
-    const [, marker] = await markers()
-    const name = marker.getAttribute('aria-label')!.split(',')[0]
-
-    await user.click(marker)
-
-    const card = screen.getByRole('heading', { name }).closest('article')!
-    expect(card.hasAttribute('data-active')).toBe(true)
-    expect(marker.getAttribute('aria-pressed')).toBe('true')
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalled()
+    for (const card of cards()) {
+      const name = within(card).getByRole('heading').textContent!
+      const price = within(card).getByText(/^от /).textContent!.replace(/^от /, '')
+      const marker = markerOf(name)
+      expect(marker.textContent).toBe(price)
+      expect(marker.getAttribute('aria-label')).toBe(`${name}, от ${price}`)
+    }
+    // The price filter keeps "Цена за ночь"; the cards and the map show no period.
+    for (const name of ['Отели', 'Карта отелей'])
+      expect(within(screen.getByRole('region', { name })).queryByText(/за \d* ?ноч/)).toBeNull()
   })
 
   it('highlights the marker of a hovered card', async () => {
@@ -254,9 +323,7 @@ describe('SearchResultsPage map', () => {
 
     const card = cards()[0]
     await user.hover(card)
-    const name = within(card).getByRole('heading').textContent!
-    const marker = screen.getByRole('button', { name: new RegExp(`^${name}, .* за ночь$`) })
-    expect(marker.getAttribute('aria-pressed')).toBe('true')
+    expect(markerOf(within(card).getByRole('heading').textContent!).hasAttribute('data-active')).toBe(true)
   })
 
   it('switches between the list and the map on narrow screens', async () => {
@@ -268,11 +335,6 @@ describe('SearchResultsPage map', () => {
     await user.click(screen.getByRole('button', { name: 'Карта' }))
     expect(await markers()).toHaveLength(cards().length)
     expect(screen.getByRole('region', { name: 'Отели' }).className).toContain('max-lg:hidden')
-
-    // A marker brings the list back with its card highlighted.
-    await user.click((await markers())[0])
-    expect(screen.getByRole('region', { name: 'Отели' }).className).not.toContain('max-lg:hidden')
-    expect(screen.getByRole('button', { name: 'Список' }).getAttribute('aria-pressed')).toBe('true')
   })
 
   it('shows "Карта недоступна" when the map fails, and the list keeps working', async () => {
@@ -285,5 +347,189 @@ describe('SearchResultsPage map', () => {
     await user.click(screen.getByRole('checkbox', { name: '5 звёзд' }))
     await waitFor(() => expect(window.location.search).toContain('stars=5'))
     expect(cards().length).toBeGreaterThan(0)
+  })
+})
+
+// search-results-page, Requirement: Атрибуция карты
+describe('SearchResultsPage map attribution', () => {
+  const attribution = () => screen.getByRole('region', { name: 'Карта отелей' }).querySelector('details')!
+
+  it('asks MapLibre for the compact attribution and folds it 5 seconds after the map loads', async () => {
+    // Timers that also run on their own, so the search and the map load as usual.
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'], shouldAdvanceTime: true })
+    vi.setSystemTime(NOW)
+    open(PRAGUE, { desktop: true })
+    await results()
+    await screen.findAllByRole('button', { name: /, от / }, { timeout: 3000 })
+
+    expect(mapMock.options.at(-1)).toMatchObject({ attributionControl: { compact: true } })
+    expect(attribution().classList.contains('maplibregl-compact-show')).toBe(true)
+    await act(() => vi.advanceTimersByTimeAsync(4000))
+    expect(attribution().classList.contains('maplibregl-compact-show')).toBe(true)
+    await act(() => vi.advanceTimersByTimeAsync(1000))
+    expect(attribution().classList.contains('maplibregl-compact-show')).toBe(false)
+  })
+
+  it('folds the attribution on the first interaction with the map, and the "i" shows it again', async () => {
+    open(PRAGUE, { desktop: true })
+    await results()
+    const [marker] = await screen.findAllByRole('button', { name: /, от / }, { timeout: 3000 })
+    expect(attribution().classList.contains('maplibregl-compact-show')).toBe(true)
+
+    act(() => mapMock.last!.fire('mousedown'))
+    expect(attribution().classList.contains('maplibregl-compact-show')).toBe(false)
+    fireEvent.click(attribution().querySelector('summary')!)
+    expect(attribution().classList.contains('maplibregl-compact-show')).toBe(true)
+    // Only the first interaction folds it.
+    act(() => mapMock.last!.fire('mousedown'))
+    expect(attribution().classList.contains('maplibregl-compact-show')).toBe(true)
+    expect(marker).toBeDefined()
+  })
+})
+
+// search-results-page, Requirement: Краткая карточка на карте
+describe('SearchResultsPage map preview', () => {
+  const markers = () => screen.findAllByRole('button', { name: /, от / }, { timeout: 3000 })
+
+  it('shows the short card of a hovered marker and highlights its card in the list', async () => {
+    const user = userEvent.setup()
+    open(PRAGUE, { desktop: true })
+    await results()
+    const [, marker] = await markers()
+    const name = marker.getAttribute('aria-label')!.split(',')[0]
+    const map = screen.getByRole('region', { name: 'Карта отелей' })
+
+    await user.hover(marker)
+    const preview = document.getElementById(marker.getAttribute('aria-describedby')!)!
+    expect(map.contains(preview)).toBe(true)
+    expect(within(preview).getByText(name)).toBeDefined()
+    expect(within(preview).getByText(/^от /).textContent).toBe(`от ${marker.textContent}`)
+    expect(within(preview).getByRole('img', { name: /звезд|звёзд/ })).toBeDefined()
+    expect(within(preview).getByText('Оценка гостей')).toBeDefined()
+    expect(within(preview).getAllByRole('img').length).toBeGreaterThan(1)
+    expect(within(preview).queryByText(/за ночь|ноч/)).toBeNull()
+    expect(screen.getByRole('heading', { name }).closest('article')!.hasAttribute('data-active')).toBe(true)
+
+    await user.unhover(marker)
+    expect(marker.hasAttribute('aria-describedby')).toBe(false)
+    expect(map.contains(preview)).toBe(false)
+    expect(screen.getByRole('heading', { name }).closest('article')!.hasAttribute('data-active')).toBe(false)
+  })
+
+  it('shows the short card of a keyboard-focused marker and hides it on Esc', async () => {
+    const user = userEvent.setup()
+    open(PRAGUE, { desktop: true })
+    await results()
+    const [marker] = await markers()
+
+    // jsdom has no focus-visible heuristics: here every focused element shows its focus.
+    const matches = Element.prototype.matches
+    const focusVisible = vi.spyOn(Element.prototype, 'matches').mockImplementation(function (this: Element, selector) {
+      return selector === ':focus-visible' ? this === document.activeElement : matches.call(this, selector)
+    })
+
+    act(() => marker.focus())
+    expect(marker.getAttribute('aria-describedby')).toBeTruthy()
+    await user.keyboard('{Escape}')
+    expect(marker.hasAttribute('aria-describedby')).toBe(false)
+    focusVisible.mockRestore()
+  })
+})
+
+// search-results-page, Requirement: Окно отеля с карты
+describe('SearchResultsPage hotel dialog', () => {
+  const markers = () => screen.findAllByRole('button', { name: /, от / }, { timeout: 3000 })
+  const hotel = fullHotelsIn('prague')[0]
+
+  it('opens the hotel of a pressed marker in a dialog with the dates of the search, without scrolling the list', async () => {
+    const user = userEvent.setup()
+    open(PRAGUE, { desktop: true })
+    await results()
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    const [, marker] = await markers()
+    const name = marker.getAttribute('aria-label')!.split(',')[0]
+    const id = fullHotelsIn('prague').find((h) => h.name === name)!.id
+
+    await user.click(marker)
+
+    const dialog = await screen.findByRole('dialog', { name })
+    expect(new URLSearchParams(window.location.search).get('hotel')).toBe(id)
+    expect(within(dialog).getByRole('heading', { level: 2, name })).toBeDefined()
+    expect(within(dialog).queryByRole('main')).toBeNull()
+    expect(within(dialog).getByRole('heading', { name: 'Номера' })).toBeDefined()
+    expect(within(dialog).getByRole('link', { name: 'Открыть страницу отеля' }).getAttribute('href')).toBe(
+      `/hotels/${id}?${STAY}`,
+    )
+    // A room choice goes on with the dates of the search.
+    expect(
+      within(dialog)
+        .getAllByRole('link', { name: /^Выбрать: / })[0]
+        .getAttribute('href'),
+    ).toMatch(new RegExp(`^/hotels/${id}/rooms\\?${STAY}#`))
+    expect(scrollIntoView).not.toHaveBeenCalled()
+  })
+
+  it('closes on "Назад" and keeps the results', async () => {
+    const user = userEvent.setup()
+    open(PRAGUE, { desktop: true })
+    await results()
+    const before = cardNames()
+    const [marker] = await markers()
+
+    await user.click(marker)
+    expect(await screen.findByRole('dialog')).toBeDefined()
+    act(() => window.history.back())
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(window.location.search).not.toContain('hotel=')
+    expect(cardNames()).toEqual(before)
+  })
+
+  it('closes with "Закрыть"', async () => {
+    const user = userEvent.setup()
+    open(PRAGUE, { desktop: true })
+    await results()
+    await user.click((await markers())[0])
+
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Закрыть' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await waitFor(() => expect(window.location.search).not.toContain('hotel='))
+  })
+
+  it('opens the dialog right away from a link with the hotel, and closes it in place', async () => {
+    const user = userEvent.setup()
+    open(`${PRAGUE}&hotel=${hotel.id}`)
+    await results()
+
+    const dialog = await screen.findByRole('dialog', { name: hotel.name })
+    await user.click(within(dialog).getByRole('button', { name: 'Закрыть' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(window.location.search).toBe(`?${PRAGUE}`)
+    expect(cards().length).toBeGreaterThan(0)
+  })
+
+  it('ignores an unknown hotel id', async () => {
+    open(`${PRAGUE}&hotel=no-such-hotel`)
+    await results()
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(cards().length).toBeGreaterThan(0)
+  })
+
+  it('opens the dialog from a marker on narrow screens and stays on the map', async () => {
+    const user = userEvent.setup()
+    open(PRAGUE)
+    await results()
+    await user.click(screen.getByRole('button', { name: 'Карта' }))
+    const [marker] = await markers()
+
+    await user.click(marker)
+
+    expect(await screen.findByRole('dialog')).toBeDefined()
+    // The page behind the modal dialog is hidden from assistive technology.
+    expect(screen.getByRole('button', { name: 'Карта', hidden: true }).getAttribute('aria-pressed')).toBe('true')
   })
 })
