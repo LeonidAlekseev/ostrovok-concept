@@ -84,6 +84,11 @@ export const NO_FILTERS: Filters = {
   sort: 'popular',
 }
 
+/** Hotels on one page of the list. */
+export const PAGE_SIZE = 12
+/** The page of the list, `?page=2`; not a filter, but any change of the filters or sorting drops it. */
+export const PAGE_PARAM = 'page'
+
 export const FILTER_PARAMS = ['price_min', 'price_max', 'stars', 'rating', 'meal', 'free_cancel', 'sort'] as const
 
 const toPrice = (value: string | null) => (value && /^\d+$/.test(value) ? Number(value) : null)
@@ -105,9 +110,29 @@ export function parseFilters(params: Pick<URLSearchParams, 'get'>): Filters {
   }
 }
 
-/** Writes the filters that are set (and a sorting other than the default) over `params`. */
+export const pageCount = (total: number) => Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+/** Reads the page from the URL: the nearest existing one for a missing, malformed or out-of-range value. */
+export function parsePage(params: Pick<URLSearchParams, 'get'>, pages: number): number {
+  const value = Number(params.get(PAGE_PARAM))
+  return Number.isInteger(value) ? Math.min(Math.max(value, 1), pages) : 1
+}
+
+/** Page numbers to show: all up to 7, otherwise the first, the last and the current with its neighbours; `null` is a gap. */
+export function pageItems(page: number, pages: number): (number | null)[] {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1)
+  const shown = [...new Set([1, page - 1, page, page + 1, pages])]
+    .filter((n) => n >= 1 && n <= pages)
+    .sort((a, b) => a - b)
+  return shown.flatMap((n, i) => (i > 0 && n - shown[i - 1] > 1 ? [null, n] : [n]))
+}
+
+/**
+ * Writes the filters that are set (and a sorting other than the default) over `params`.
+ * Any change of them returns to the first page, so the page is dropped.
+ */
 export function setFilterParams(params: URLSearchParams, filters: Filters): URLSearchParams {
-  for (const name of FILTER_PARAMS) params.delete(name)
+  for (const name of [...FILTER_PARAMS, PAGE_PARAM]) params.delete(name)
   if (filters.priceMin !== null) params.set('price_min', String(filters.priceMin))
   if (filters.priceMax !== null) params.set('price_max', String(filters.priceMax))
   if (filters.stars.length) params.set('stars', filters.stars.join(','))

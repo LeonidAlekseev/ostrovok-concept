@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fullHotelsIn, MEAL_LABEL } from '../../lib/catalog'
@@ -613,5 +613,117 @@ describe('SearchResultsPage hotel dialog', () => {
     expect(await screen.findByRole('dialog')).toBeDefined()
     // The page behind the modal dialog is hidden from assistive technology.
     expect(screen.getByRole('button', { name: 'Карта', hidden: true }).getAttribute('aria-pressed')).toBe('true')
+  })
+})
+
+// search-results-page, Requirement: Страницы результатов
+describe('SearchResultsPage pages', () => {
+  const EUROPE = `scenario=europe&${STAY}`
+  const markers = () => screen.findAllByRole('button', { name: /, [\d\s]+₽$/ }, { timeout: 3000 })
+  const pagination = () => screen.getByRole('navigation', { name: 'Страницы результатов' })
+  const total = () => Number(screen.getByText(/^Найдено \d+/).textContent!.match(/\d+/)![0])
+
+  it('shows 12 hotels per page with the navigation, current page marked', async () => {
+    open(EUROPE)
+    await results()
+
+    expect(total()).toBeGreaterThan(12)
+    expect(cards()).toHaveLength(12)
+    expect(within(pagination()).getByRole('link', { name: 'Страница 1' }).getAttribute('aria-current')).toBe('page')
+    expect(within(pagination()).queryByRole('link', { name: 'Предыдущая страница' })).toBeNull()
+  })
+
+  it('moves to the second page with a new history entry, and "Назад" returns', async () => {
+    const user = userEvent.setup()
+    open(EUROPE)
+    await results()
+    const first = cardNames()
+    const length = window.history.length
+
+    await user.click(within(pagination()).getByRole('link', { name: 'Страница 2' }))
+
+    expect(window.location.search).toContain('page=2')
+    expect(window.history.length).toBe(length + 1)
+    expect(cardNames()).toHaveLength(Math.min(12, total() - 12))
+    expect(cardNames().some((name) => first.includes(name))).toBe(false)
+    expect(within(pagination()).getByRole('link', { name: 'Страница 2' }).getAttribute('aria-current')).toBe('page')
+
+    act(() => window.history.back())
+    await waitFor(() => expect(window.location.search).not.toContain('page='))
+    await waitFor(() => expect(cardNames()).toEqual(first))
+  })
+
+  it('focuses the results heading after the move', async () => {
+    const user = userEvent.setup()
+    open(EUROPE)
+    await results()
+
+    await user.click(within(pagination()).getByRole('link', { name: 'Следующая страница' }))
+
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: /^Найдено \d+/ })))
+  })
+
+  it('takes the nearest existing page for an invalid one', async () => {
+    open(`${EUROPE}&page=99`)
+    await results()
+    const last = Math.ceil(total() / 12)
+    expect(
+      within(pagination())
+        .getByRole('link', { name: `Страница ${last}` })
+        .getAttribute('aria-current'),
+    ).toBe('page')
+
+    cleanup()
+    open(`${EUROPE}&page=abc`)
+    await results()
+    expect(within(pagination()).getByRole('link', { name: 'Страница 1' }).getAttribute('aria-current')).toBe('page')
+  })
+
+  it('returns to the first page when the sorting changes', async () => {
+    const user = userEvent.setup()
+    open(`${EUROPE}&page=2`)
+    await results()
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Сортировка' }), 'price_asc')
+
+    expect(window.location.search).not.toContain('page=')
+    expect(window.location.search).toContain('sort=price_asc')
+    expect(within(pagination()).getByRole('link', { name: 'Страница 1' }).getAttribute('aria-current')).toBe('page')
+  })
+
+  it('hides the navigation for a single page', async () => {
+    open(PRAGUE)
+    await results()
+
+    expect(total()).toBeLessThanOrEqual(12)
+    expect(screen.queryByRole('navigation', { name: 'Страницы результатов' })).toBeNull()
+  })
+
+  it('keeps the page when a hotel dialog opens and closes', async () => {
+    const user = userEvent.setup()
+    open(`${EUROPE}&page=2`, { desktop: true })
+    await results()
+    const [marker] = await markers()
+
+    await user.click(marker)
+    expect(await screen.findByRole('dialog')).toBeDefined()
+    expect(window.location.search).toMatch(/page=2.*hotel=|hotel=.*page=2/)
+
+    act(() => window.history.back())
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(window.location.search).toContain('page=2')
+  })
+
+  it('shows markers of all hotels on the second page and highlights the marker of a hovered card', async () => {
+    const user = userEvent.setup()
+    open(`${EUROPE}&page=2`, { desktop: true })
+    await results()
+
+    await waitFor(async () => expect(await markers()).toHaveLength(total()))
+    expect(cards().length).toBeLessThan(total())
+    const card = cards()[0]
+    await user.hover(card)
+    const name = within(card).getByRole('heading').textContent!
+    expect(screen.getByRole('button', { name: new RegExp(`^${name}, `) }).hasAttribute('data-active')).toBe(true)
   })
 })
