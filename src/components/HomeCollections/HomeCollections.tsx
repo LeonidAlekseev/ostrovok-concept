@@ -38,6 +38,7 @@ export function HomeCollections() {
                   <HotelTile
                     hotel={hotel}
                     heading="h4"
+                    swipePhotos={false}
                     href={
                       stay ? `/hotels/${hotel.id}?${setStayParams(new URLSearchParams(), stay)}` : `/hotels/${hotel.id}`
                     }

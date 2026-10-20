@@ -19,6 +19,8 @@ interface Props extends Omit<ComponentProps<'article'>, 'children'> {
   freeCancellation?: boolean
   /** Heading level of the name, below the heading of the list. */
   heading?: 'h2' | 'h3' | 'h4'
+  /** Photos turn by the arrows only, so a swipe on them goes to a scrolling row around the card. */
+  swipePhotos?: boolean
 }
 
 /**
@@ -32,6 +34,7 @@ export function HotelTile({
   price = hotel.priceFrom,
   freeCancellation = hasFreeCancellation(hotel),
   heading: Heading = 'h3',
+  swipePhotos = true,
   className,
   ...props
 }: Props) {
@@ -44,7 +47,12 @@ export function HotelTile({
       )}
     >
       {/* Above the card link: the photos swipe and lead to the hotel themselves. */}
-      <PhotoCarousel photos={hotel.photos} href={href} className="@container z-10 aspect-[4/3] w-full rounded-xl">
+      <PhotoCarousel
+        photos={hotel.photos}
+        href={href}
+        swipe={swipePhotos}
+        className="@container z-10 aspect-[4/3] w-full rounded-xl"
+      >
         <PhotoBadges hotel={hotel} freeCancellation={freeCancellation} />
       </PhotoCarousel>
 

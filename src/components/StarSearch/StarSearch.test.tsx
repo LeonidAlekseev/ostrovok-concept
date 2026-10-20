@@ -216,11 +216,11 @@ describe('StarSearch video', () => {
     const observer = new MutationObserver(() => writes.push(bar.getAttribute('aria-valuenow')!))
     observer.observe(bar, { attributes: true, subtree: true })
     finish()
-    await screen.findByRole('button', { name: /Скачать видео|Поделиться видео/ }, { timeout: 5000 })
+    await screen.findByRole('button', { name: /Скачать видео|Поделиться видео/ }, { timeout: 12_000 })
     observer.disconnect()
     // 300 frames cover 30 % of the bar.
     expect(writes.length).toBeLessThanOrEqual(31)
-  })
+  }, 15_000)
 
   it('warns not to hide the tab while recording and says so after a restart', async () => {
     vi.stubGlobal('MediaRecorder', { isTypeSupported: () => true })

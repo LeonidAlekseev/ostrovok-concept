@@ -166,6 +166,7 @@
   --animate-orb-reveal: orb-reveal 2.5s ease-out both;
   /* The zodiac circle of the star search block turns once in two minutes. */
   --animate-zodiac-spin: zodiac-spin 120s linear infinite;
+  --animate-zodiac-unspin: zodiac-unspin 120s linear infinite;
   --animate-twinkle: twinkle 1.8s ease-in-out infinite;
   /* The glow under the hub pin on the globe breathes. */
   --animate-hub-pulse: hub-pulse 2.4s ease-in-out infinite;
@@ -232,6 +233,12 @@
   @keyframes zodiac-spin {
     to {
       rotate: 1turn;
+    }
+  }
+
+  @keyframes zodiac-unspin {
+    to {
+      rotate: -1turn;
     }
   }
 

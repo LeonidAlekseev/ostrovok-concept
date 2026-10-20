@@ -10,7 +10,12 @@ const polar = (angle: number, r: number) => [Math.sin(angle) * r, -Math.cos(angl
 export function ZodiacRing({ className }: { className?: string }) {
   return (
     <svg viewBox="-100 -100 200 200" aria-hidden className={cn('text-(--decor-gold)', className)}>
-      <g fill="none" stroke="currentColor" strokeWidth="0.5" className="origin-center motion-safe:animate-zodiac-spin">
+      <g
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="0.5"
+        className="origin-center [transform-box:fill-box] motion-safe:animate-zodiac-spin"
+      >
         <circle r="86" />
         <circle r="66" strokeOpacity="0.6" />
         {signs.map((sign, i) => {
@@ -20,9 +25,11 @@ export function ZodiacRing({ className }: { className?: string }) {
           return (
             <g key={sign}>
               <line x1={x1} y1={y1} x2={x2} y2={y2} strokeOpacity="0.7" />
+              {/* Turns back against the circle around its own centre, so the sign stays upright. */}
               <text
                 x={tx}
                 y={ty}
+                className="origin-center [transform-box:fill-box] motion-safe:animate-zodiac-unspin"
                 fill="currentColor"
                 stroke="none"
                 fontSize="10"

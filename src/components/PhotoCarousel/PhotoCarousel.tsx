@@ -18,21 +18,33 @@ interface Props {
   label?: string
   /** Size and shape of the carousel, e.g. an aspect ratio and a radius. */
   className?: string
+  /** Photos turn by the arrows only: the strip does not scroll under a finger, so a swipe goes to the parent. */
+  swipe?: boolean
   /** Badges laid over the photos; they let clicks and swipes through to the photo. */
   children?: ReactNode
 }
 
 const arrowClass =
-  'absolute top-[calc(50%-1.125rem)] text-foreground opacity-0 group-hover/carousel:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:hidden'
+  'absolute top-[calc(50%-1.125rem)] text-foreground opacity-0 group-hover/carousel:opacity-100 focus-visible:opacity-100'
 
 /**
  * Photos in a snapping strip: swiped on touch screens, turned by the arrows that show on hover and
  * focus elsewhere, with the "1 / N" counter in the bottom left corner.
  */
-export function PhotoCarousel({ photos, href, onOpen, label = 'Фото отеля', className, children }: Props) {
+export function PhotoCarousel({
+  photos,
+  href,
+  onOpen,
+  label = 'Фото отеля',
+  className,
+  swipe = true,
+  children,
+}: Props) {
   const strip = useRef<HTMLDivElement>(null)
   const [index, setIndex] = useState(0)
   const count = photos.length
+  // Without swipe there is no other way to turn a photo, so the arrows stay on touch screens.
+  const arrowTouchClass = swipe ? '[@media(hover:none)]:hidden' : '[@media(hover:none)]:opacity-100'
 
   // The arrows go round; the strip scrolls smoothly unless reduced motion is asked for (motion-safe).
   const go = (to: number) => {
@@ -47,7 +59,11 @@ export function PhotoCarousel({ photos, href, onOpen, label = 'Фото отел
         ref={strip}
         role="group"
         aria-label={label}
-        className="flex size-full snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] motion-safe:scroll-smooth [&::-webkit-scrollbar]:hidden"
+        className={cn(
+          'flex size-full snap-x snap-mandatory [scrollbar-width:none]',
+          swipe ? 'overflow-x-auto' : 'touch-pan-x overflow-x-hidden',
+          'motion-safe:scroll-smooth [&::-webkit-scrollbar]:hidden',
+        )}
         onScroll={(event) => {
           // Counted once the strip settles on a photo, so a smooth turn does not flicker through the others.
           const { scrollLeft, clientWidth } = event.currentTarget
@@ -95,7 +111,7 @@ export function PhotoCarousel({ photos, href, onOpen, label = 'Фото отел
             variant="outline"
             size="icon-sm"
             aria-label="Предыдущее фото"
-            className={cn(arrowClass, 'left-2')}
+            className={cn(arrowClass, arrowTouchClass, 'left-2')}
             onClick={() => go(index - 1)}
           >
             <ChevronLeft aria-hidden />
@@ -104,7 +120,7 @@ export function PhotoCarousel({ photos, href, onOpen, label = 'Фото отел
             variant="outline"
             size="icon-sm"
             aria-label="Следующее фото"
-            className={cn(arrowClass, 'right-2')}
+            className={cn(arrowClass, arrowTouchClass, 'right-2')}
             onClick={() => go(index + 1)}
           >
             <ChevronRight aria-hidden />
