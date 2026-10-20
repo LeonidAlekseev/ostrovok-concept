@@ -56,6 +56,8 @@ const hero = [
   // Offsets include the transparent header laid over the top of the hero.
   '[--globe-size:clamp(540px,144vw,640px)] [--globe-top:calc(var(--header-height)+clamp(24px,8vw,40px))] [--globe-x:88%]',
   'md:[--globe-size:clamp(760px,76vw,980px)] md:[--globe-top:calc(var(--header-height)+32px)] md:[--globe-x:64%]',
+  // Up to lg the hint sits on the globe's left limb: the globe moves right so the pins stay clear of it.
+  'md:max-lg:[--globe-x:84%]',
   'relative isolate h-[calc(var(--globe-top)+var(--globe-size)*0.76)] overflow-hidden text-brand-foreground md:h-[calc(var(--globe-top)+var(--globe-size)*0.62)]',
   'bg-brand bg-[radial-gradient(ellipse_60%_45%_at_85%_30%,color-mix(in_srgb,var(--decor-glow)_75%,transparent),transparent_70%)]',
   // A long press on the globe must not start selecting the title or the hint (iOS) or open the callout.
@@ -98,8 +100,8 @@ const pinTooltipShown =
   'group-focus-visible:translate-y-0 group-focus-visible:opacity-100 [.group:hover_&]:translate-y-0 [.group:hover_&]:opacity-100'
 const placeCard = [
   '[--card-dx:22px] [--card-dy:calc(-100%_-_12px)] [--card-lift:0px]',
-  // Not enough room to the right of the pin on phones, and the title is above it: hang the card below.
-  'max-md:[--card-dx:-50%] max-md:[--card-dy:12px]',
+  // Not enough room to the right of the pin up to lg (phones, and tablets with the globe moved right), and the title is above it: hang the card below.
+  'max-lg:[--card-dx:-50%] max-lg:[--card-dy:12px]',
   // Inset of the picture, the same on every side; its size equals the text block's height.
   '[--card-pad:clamp(5px,1.4vw,7px)] [--badge-size:clamp(9px,2.5vw,12px)] [--name-size:clamp(13px,3.5vw,17px)] [--meta-size:clamp(10px,2.75vw,13px)] [--text-gap:2px]',
   'absolute top-0 left-0 z-5 w-max rounded-[clamp(10px,3vw,14px)] border-0 bg-card py-(--card-pad) pr-[calc(var(--card-pad)_+_4px)] pl-(--card-pad) text-left text-foreground',
