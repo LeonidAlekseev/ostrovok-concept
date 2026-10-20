@@ -69,7 +69,7 @@ export function HotelTile({
         {children}
         <div className="mt-auto flex items-center gap-2 pt-1">
           <p className="mr-auto text-base/8 font-bold whitespace-nowrap">от {formatPrice(price)}</p>
-          <Badge className="bg-primary text-primary-foreground">
+          <Badge className="h-6 bg-primary text-sm text-primary-foreground">
             <span className="sr-only">Оценка гостей </span>
             {formatDecimal(hotel.rating)}
           </Badge>

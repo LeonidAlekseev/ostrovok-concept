@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { DateField } from '../SearchForm/DateField'
 import type { IsoDate } from '../../lib/dates'
 import { cuspOf, daysInMonth, sunSign, zodiac, type Company } from '../../lib/horoscope'
 
@@ -75,7 +76,7 @@ export function StarForm({ answers, onChange, onSubmit, today, defaultCheckIn, n
   const [errors, setErrors] = useState<Errors>({})
   const monthRef = useRef<HTMLSelectElement>(null)
   const dayRef = useRef<HTMLSelectElement>(null)
-  const checkInRef = useRef<HTMLInputElement>(null)
+  const checkInRef = useRef<HTMLButtonElement>(null)
   const id = useId()
   const set = (patch: Partial<StarAnswers>) => onChange({ ...answers, ...patch })
 
@@ -169,21 +170,15 @@ export function StarForm({ answers, onChange, onSubmit, today, defaultCheckIn, n
       </fieldset>
 
       <div className="flex flex-col gap-2">
-        <Label className="text-base font-semibold" htmlFor={`${id}-check-in`}>
-          Когда едем?
-        </Label>
-        <Input
-          ref={checkInRef}
-          id={`${id}-check-in`}
-          type="date"
-          className={fieldClass}
-          value={answers.checkIn || defaultCheckIn}
-          min={today}
-          aria-invalid={Boolean(errors.checkIn) || undefined}
-          aria-describedby={`${id}-check-in-note`}
-          onChange={(e) => set({ checkIn: e.target.value })}
+        <p className="text-base font-semibold">Когда едем?</p>
+        <DateField
+          single
+          triggerRef={checkInRef}
+          checkIn={answers.checkIn || defaultCheckIn}
+          checkOut={answers.checkIn || defaultCheckIn}
+          error={errors.checkIn}
+          onChange={(checkIn) => set({ checkIn })}
         />
-        <FieldError>{errors.checkIn}</FieldError>
         <p id={`${id}-check-in-note`} className="text-sm text-muted-foreground">
           Дата заезда, выезд — через 2 ночи
         </p>

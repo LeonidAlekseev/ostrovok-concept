@@ -5,12 +5,15 @@ import { HotelTile } from '@/components/HotelTile/HotelTile'
 import { buttonVariants } from '@/components/ui/button'
 import { useHydrated } from '@/hooks/useHydrated'
 import { useFavorites } from '@/hooks/useStore'
+import { useToday } from '@/hooks/useToday'
 import { getHotel } from '@/lib/catalog'
+import { setStayParams, startStay } from '@/lib/search'
 import { pageClass } from '@/components/Trips/TripsGate'
 
 function Favorites() {
   const hydrated = useHydrated()
   const hotels = useFavorites().flatMap((id) => getHotel(id) ?? [])
+  const stay = startStay(useToday())
 
   if (!hydrated) return <p className="text-muted-foreground">Загружаем избранное…</p>
   if (hotels.length === 0) {
@@ -28,8 +31,12 @@ function Favorites() {
     <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {hotels.map((hotel) => (
         <li key={hotel.id}>
-          {/* Unsetting the heart removes the hotel from this list. */}
-          <HotelTile hotel={hotel} heading="h2" href={`/hotels/${hotel.id}`} />
+          {/* Unsetting the heart removes the hotel from this list; without a date, the link has no stay. */}
+          <HotelTile
+            hotel={hotel}
+            heading="h2"
+            href={stay ? `/hotels/${hotel.id}?${setStayParams(new URLSearchParams(), stay)}` : `/hotels/${hotel.id}`}
+          />
         </li>
       ))}
     </ul>

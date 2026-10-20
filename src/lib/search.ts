@@ -38,6 +38,16 @@ export function withStartDates(query: SearchQuery, today: IsoDate): SearchQuery 
   return { ...query, checkIn, checkOut: query.checkOut || addDays(checkIn, 1) }
 }
 
+/** The stay of a link without a search: tomorrow and the day after, default guests. `null` until `today` is known. */
+export function startStay(today: IsoDate): Stay | null {
+  if (!today) return null
+  const { checkIn, checkOut, guests } = withStartDates(
+    { destination: '', checkIn: '', checkOut: '', guests: DEFAULT_GUESTS },
+    today,
+  )
+  return { checkIn, checkOut, guests }
+}
+
 export const normalize = (s: string) => s.trim().toLocaleLowerCase('ru').replace(/ё/g, 'е')
 
 export function findScenario(text: string): Scenario | undefined {
