@@ -58,3 +58,11 @@ export function useStay(hotel: Hotel): StayState {
 
   return { stay, error, guests, setStay }
 }
+
+/** Dates and guests held by the caller (the hotel dialog): the address is left alone. */
+export function useLocalStay(hotel: Hotel, stay: Stay, onChange: (next: Stay) => void): StayState {
+  const destination = getDestination(hotel.destinationId)!.name
+  const errors = validateSearch({ destination, ...stay }, todayIso())
+  const error = errors.dates ?? errors.guests
+  return { stay: error ? null : stay, error, guests: stay.guests, setStay: (next) => onChange({ ...stay, ...next }) }
+}
