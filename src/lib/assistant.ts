@@ -2,6 +2,7 @@ import { destinations, type Destination } from '../data/destinations'
 import { newHotels, type HotelSummary } from './catalog'
 import { addDays, fromIso, toIso, type IsoDate } from './dates'
 import { countRu, formatPrice } from './format'
+import { stayTotal } from './offer'
 import { MAX_NIGHTS, type Guests, type SearchQuery } from './search'
 
 /**
@@ -313,16 +314,18 @@ export function makePlan(brief: Brief, today: IsoDate): Plan {
   const pool = named ? [named] : candidatesFor(vibe, month)
   // Quiet and romantic trips get the best-rated hotel; active ones and tight budgets the cheaper good one.
   const preferCheap = brief.mood === 'active' || brief.party === 'friends'
+  const checkOut = addDays(checkIn, nights)
+  const total = (perNight: number) => stayTotal(perNight, checkIn, checkOut, guests.rooms)
   const options = pool
     .map((destination): AssistantOption => {
       const hotels = newHotels
         .filter((h) => h.destinationId === destination.id)
         .sort((a, b) => (preferCheap ? a.priceFrom - b.priceFrom : b.rating - a.rating))
-      const affordable = hotels.find((h) => !brief.budget || h.priceFrom * nights * guests.rooms <= brief.budget)
+      const affordable = hotels.find((h) => !brief.budget || total(h.priceFrom) <= brief.budget)
       const hotel = affordable ?? hotels[0]
       const perNight = hotel?.priceFrom ?? destination.priceFrom
-      const total = perNight * nights * guests.rooms
-      return { destination, hotel, perNight, total, fitsBudget: !brief.budget || total <= brief.budget }
+      const sum = total(perNight)
+      return { destination, hotel, perNight, total: sum, fitsBudget: !brief.budget || sum <= brief.budget }
     })
     .sort(
       (a, b) =>
@@ -337,7 +340,7 @@ export function makePlan(brief: Brief, today: IsoDate): Plan {
     emoji,
     atmosphere,
     why,
-    query: { checkIn, checkOut: addDays(checkIn, nights), guests },
+    query: { checkIn, checkOut, guests },
     nights,
     options,
     overBudget: options.length > 0 && !options.some((o) => o.fitsBudget),

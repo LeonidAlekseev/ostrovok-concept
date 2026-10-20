@@ -33,6 +33,17 @@ describe('PhotoCarousel', () => {
     }
   })
 
+  // home-page, Requirement: Фото в ленте подборок
+  it('without swipe, keeps the strip from scrolling by touch and shows the arrows on touch screens', () => {
+    render(<PhotoCarousel photos={photos} swipe={false} />)
+    expect(screen.getByRole('group').className).toMatch(/overflow-x-hidden/)
+    for (const name of ['Предыдущее фото', 'Следующее фото']) {
+      const className = screen.getByRole('button', { name }).className
+      expect(className).toMatch(/\[@media\(hover:none\)\]:opacity-100/)
+      expect(className).not.toMatch(/\[@media\(hover:none\)\]:hidden/)
+    }
+  })
+
   it('has no arrows for a single photo', () => {
     render(<PhotoCarousel photos={photos.slice(0, 1)} />)
     expect(screen.queryByRole('button')).toBeNull()

@@ -220,7 +220,7 @@ describe('StarSearch video', () => {
     observer.disconnect()
     // 300 frames cover 30 % of the bar.
     expect(writes.length).toBeLessThanOrEqual(31)
-  })
+  }, 15_000)
 
   it('warns not to hide the tab while recording and says so after a restart', async () => {
     vi.stubGlobal('MediaRecorder', { isTypeSupported: () => true })

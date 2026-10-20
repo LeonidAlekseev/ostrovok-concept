@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { stayTotal } from './offer'
 import { makePlan, mergeBrief, parseWish } from './assistant'
 
 describe('parseWish', () => {
@@ -109,7 +110,23 @@ describe('makePlan', () => {
     const fits = plan.options.map((o) => o.fitsBudget)
     expect(fits).toEqual([...fits].sort((a, b) => Number(b) - Number(a)))
     expect(fits[0]).toBe(true)
-    for (const o of plan.options) expect(o.total).toBe(o.perNight * plan.nights * plan.query.guests.rooms)
+    for (const o of plan.options)
+      expect(o.total).toBe(stayTotal(o.perNight, plan.query.checkIn, plan.query.checkOut, plan.query.guests.rooms))
+  })
+
+  // assistant-search, Requirement: Сумма поездки ассистента
+  it('prices the weekend nights higher and checks the budget by that sum', () => {
+    const brief = { destinationId: 'prague', when: 'soon' as const, party: 'couple' as const }
+    const { options, query } = makePlan(brief, today)
+    const [option] = options
+    // Check-in on Friday: Friday and Saturday cost more than two weekday nights.
+    expect(new Date(query.checkIn).getUTCDay()).toBe(5)
+    expect(option.total).toBeGreaterThan(option.perNight * 2)
+    // The weekday sum would fit this budget; with the weekend nights the hotel no longer does.
+    const budget = option.perNight * query.guests.rooms * 2
+    const tight = makePlan({ ...brief, budget }, today).options[0]
+    expect(tight.fitsBudget).toBe(tight.total <= budget)
+    if (tight.hotel?.id === option.hotel?.id) expect(tight.fitsBudget).toBe(false)
   })
 
   it('marks the plan over budget when no option fits', () => {
@@ -123,7 +140,7 @@ describe('makePlan', () => {
     expect(plan.options[0]).toMatchObject({
       destination: { id: 'prague' },
       perNight: 6900,
-      total: 27_600,
+      total: 32_000,
       fitsBudget: false,
     })
   })
