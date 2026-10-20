@@ -8,6 +8,8 @@ interface Props {
   end: IsoDate | null
   min: IsoDate
   max?: IsoDate
+  /** One month at every width, for a single date. */
+  single?: boolean
   onPick: (day: IsoDate) => void
 }
 
@@ -18,8 +20,8 @@ const monthKey = (iso: IsoDate) => {
   return d.getFullYear() * 12 + d.getMonth()
 }
 
-/** Two-month range calendar (one month on small screens) with roving-focus keyboard navigation. */
-export function Calendar({ start, end, min, max, onPick }: Props) {
+/** Two-month range calendar (one month on small screens or for a single date) with roving-focus keyboard navigation. */
+export function Calendar({ start, end, min, max, single, onPick }: Props) {
   // Roving focus starts on the first selectable day when `start` is before `min` (e.g. a past check-in).
   const first = start < min ? min : start
   const [view, setView] = useState(() => monthKey(first))
@@ -52,7 +54,7 @@ export function Calendar({ start, end, min, max, onPick }: Props) {
     const next = addDays(focused, step)
     if (next < min) return
     // Two months are visible from --breakpoint-md up; the second one is hidden by CSS below it.
-    const visible = window.matchMedia('(min-width: 768px)').matches ? 2 : 1
+    const visible = !single && window.matchMedia('(min-width: 768px)').matches ? 2 : 1
     const key = monthKey(next)
     if (key < view) setView(key)
     else if (key >= view + visible) setView(key - visible + 1)
@@ -92,12 +94,12 @@ export function Calendar({ start, end, min, max, onPick }: Props) {
         </Button>
       </div>
       <div
-        className="grid gap-5 md:grid-cols-2"
+        className={single ? 'grid' : 'grid gap-5 md:grid-cols-2'}
         ref={gridRef}
         onKeyDown={onKeyDown}
         onPointerLeave={() => setHover(null)}
       >
-        {[view, view + 1].map((key, index) => {
+        {(single ? [view] : [view, view + 1]).map((key, index) => {
           const year = Math.floor(key / 12)
           const month = key % 12
           return (

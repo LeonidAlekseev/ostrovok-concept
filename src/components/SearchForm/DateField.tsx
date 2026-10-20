@@ -15,13 +15,15 @@ interface Props {
   error?: string
   /** One date instead of a stay: a pick sets `checkIn` and `checkOut` alike and closes the calendar. */
   single?: boolean
+  /** Id of the text that explains the field, read after its label. */
+  describedBy?: string
   triggerRef?: Ref<HTMLButtonElement>
   onChange: (checkIn: IsoDate, checkOut: IsoDate) => void
 }
 
 const nightForms: [string, string, string] = ['ночь', 'ночи', 'ночей']
 
-export function DateField({ checkIn, checkOut, error, single, triggerRef, onChange }: Props) {
+export function DateField({ checkIn, checkOut, error, single, describedBy, triggerRef, onChange }: Props) {
   const [open, setOpen] = useState(false)
   // Check-in picked, check-out pending. Discarded if the popover closes midway.
   const [draftStart, setDraftStart] = useState<IsoDate | null>(null)
@@ -59,7 +61,7 @@ export function DateField({ checkIn, checkOut, error, single, triggerRef, onChan
           className={`${fieldBox(Boolean(error))}`}
           ref={triggerRef}
           aria-label={single ? `Дата заезда: ${label}` : `Даты поездки: ${label}, ${countRu(nights, nightForms)}`}
-          aria-describedby={error ? errorId : undefined}
+          aria-describedby={[describedBy, error && errorId].filter(Boolean).join(' ') || undefined}
         >
           <CalendarDays className="shrink-0 text-brand-foreground" size={22} strokeWidth={1.8} aria-hidden />
           <span className="truncate text-[clamp(13px,3.55vw,18px)] max-xs:text-sm/[normal]" title={label}>
@@ -75,7 +77,7 @@ export function DateField({ checkIn, checkOut, error, single, triggerRef, onChan
           // The calendar focuses its own selected day; the popover must not move focus to the month arrow.
           initialFocus={false}
           aria-label={single ? 'Выбор даты заезда' : 'Выбор дат заезда и выезда'}
-          className={`m-0 w-[min(330px,calc(100vw-2*var(--page-x)-8px))] p-2 md:w-155 animate-in fade-in slide-in-from-top-1 animation-duration-160 ease-out shadow-(--shadow-popover)`}
+          className={`m-0 w-[min(330px,calc(100vw-2*var(--page-x)-8px))] p-2 ${single ? '' : 'md:w-155'} animate-in fade-in slide-in-from-top-1 animation-duration-160 ease-out shadow-(--shadow-popover)`}
         >
           <p className="mx-2 mt-1 mb-0 text-sm text-muted-foreground" aria-live="polite">
             {draftStart ? 'Выберите дату выезда' : 'Выберите дату заезда'}
@@ -85,6 +87,7 @@ export function DateField({ checkIn, checkOut, error, single, triggerRef, onChan
             end={draftStart ? null : single ? checkIn : checkOut}
             min={today}
             max={draftStart ? addDays(draftStart, MAX_NIGHTS) : undefined}
+            single={single}
             onPick={pick}
           />
           <div className="flex items-center justify-between gap-3 border-t border-border px-2 pt-2.5 pb-1">

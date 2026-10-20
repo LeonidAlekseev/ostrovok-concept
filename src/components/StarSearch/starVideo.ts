@@ -193,9 +193,9 @@ export async function renderReadingVideo(
   type: string,
   {
     onProgress,
-    onPause,
+    onRestart,
     signal,
-  }: { onProgress: (share: number) => void; onPause: (paused: boolean) => void; signal: AbortSignal },
+  }: { onProgress: (share: number) => void; onRestart: () => void; signal: AbortSignal },
 ): Promise<File> {
   const canvas = document.createElement('canvas')
   canvas.width = VIDEO_WIDTH
@@ -208,7 +208,7 @@ export async function renderReadingVideo(
     durationMs: VIDEO_MS,
     draw: (t) => drawReadingFrame(ctx, reading, name, t, style),
     onProgress,
-    onPause,
+    onRestart,
     signal,
   })
   return new File([blob], `ostrovok-zvezdy.${extensionOf(type)}`, { type: blob.type || type })
