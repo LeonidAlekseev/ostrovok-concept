@@ -5,13 +5,10 @@ import { useState } from 'react'
 import { Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { MagicOrb } from './MagicOrb'
+import { ZodiacRing } from './ZodiacRing'
 
 // The window, the reading and the video load on the first click: the home page does not pay for them up front.
 const StarSearchDialog = dynamic(() => import('./StarSearchDialog').then((m) => m.StarSearchDialog), { ssr: false })
-
-// A sky of small stars behind the section.
-const starrySky =
-  '[background:radial-gradient(circle,color-mix(in_srgb,var(--decor-light)_70%,transparent)_0_1px,transparent_1.5px)_0_0/46px_46px,radial-gradient(circle,color-mix(in_srgb,var(--decor-gold)_60%,transparent)_0_1px,transparent_1.5px)_23px_17px/61px_61px,radial-gradient(120%_90%_at_85%_0%,color-mix(in_srgb,var(--decor-violet)_55%,transparent),transparent_60%),var(--decor-night)]'
 
 export function StarSearch() {
   const [open, setOpen] = useState(false)
@@ -22,30 +19,47 @@ export function StarSearch() {
     <section
       id="stars"
       aria-labelledby="stars-title"
-      className={`${starrySky} mt-[clamp(8px,2vw,16px)] grid scroll-mt-4 items-center gap-[clamp(16px,4vw,40px)] overflow-hidden rounded-[clamp(22px,5.6vw,30px)] px-[clamp(18px,5vw,56px)] py-[clamp(22px,5vw,48px)] text-primary-foreground sm:grid-cols-[auto_1fr]`}
+      className="relative isolate mt-[clamp(8px,2vw,16px)] flex scroll-mt-4 flex-col items-center gap-[clamp(14px,3vw,24px)] overflow-hidden rounded-[clamp(22px,5.6vw,30px)] bg-(--decor-night) px-[clamp(18px,5vw,56px)] py-[clamp(24px,5vw,48px)] text-center text-primary-foreground"
     >
-      <MagicOrb symbol="✦" className="mx-auto size-[clamp(128px,32vw,200px)]" />
-      <div className="flex flex-col items-start gap-3 max-sm:items-center max-sm:text-center">
-        <h2 id="stars-title" className="text-title font-bold tracking-[-0.02em]">
-          Поиск по звёздам
-        </h2>
-        <p className="max-w-[52ch] text-[clamp(14px,3.7vw,17px)] text-(--decor-light)/80">
-          Знак зодиака, Луна в день заезда и аспекты подскажут город и отель. Предсказание можно отправить друзьям
-          коротким видео.
-        </p>
-        <Button
-          size="lg"
-          shape="pill"
-          className="mt-1 gap-2.5 bg-(image:--decor-spin-gradient) shadow-(--decor-spin-shadow) hover:scale-[1.03]"
-          onClick={() => {
-            setOpened(true)
-            setOpen(true)
-          }}
-        >
-          <Sparkles className="size-5.5" aria-hidden />
-          Найти по звёздам
-        </Button>
+      {/* The sky of the owner: below the first screen, so it loads lazily. */}
+      <picture aria-hidden>
+        <source media="(min-width: 640px)" srcSet="/images/stars/sky.webp" />
+        <img
+          src="/images/stars/sky-mobile.webp"
+          alt=""
+          width={800}
+          height={656}
+          loading="lazy"
+          className="absolute inset-0 -z-10 size-full object-cover"
+        />
+      </picture>
+      <div className="relative size-[clamp(260px,64vw,400px)]">
+        <MagicOrb className="absolute inset-[22.5%]" />
+        <ZodiacRing className="absolute inset-0 size-full" />
       </div>
+      <h2
+        id="stars-title"
+        className="bg-(image:--decor-gold-gradient) bg-clip-text text-[clamp(30px,8.4vw,56px)]/[1.1] font-bold tracking-[-0.02em] text-transparent"
+      >
+        Поиск по звёздам
+      </h2>
+      <p className="max-w-[40ch] text-[clamp(15px,3.9vw,20px)] text-(--decor-light)">
+        Знак зодиака, <span className="text-(--decor-lavender)">Луна в день заезда</span> и аспекты{' '}
+        <span className="text-(--decor-lavender)">подскажут город и отель</span>. Предсказание можно отправить друзьям
+        коротким видео.
+      </p>
+      <Button
+        size="lg"
+        shape="pill"
+        className="mt-1 gap-2.5 border border-(--decor-gold) bg-(image:--decor-star-button) px-10 shadow-(--decor-spin-shadow) hover:scale-[1.03] hover:bg-(image:--decor-star-button)"
+        onClick={() => {
+          setOpened(true)
+          setOpen(true)
+        }}
+      >
+        <Sparkles className="size-5.5" aria-hidden />
+        Найти по звёздам
+      </Button>
       {opened && <StarSearchDialog open={open} onOpenChange={setOpen} />}
     </section>
   )

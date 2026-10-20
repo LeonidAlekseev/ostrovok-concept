@@ -51,6 +51,19 @@ describe('StarSearch section', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Поиск по звёздам' })
     await waitFor(() => expect(document.activeElement).toBe(within(dialog).getByLabelText('Как вас зовут?')))
   })
+
+  // star-search, Scenario: Меньше движения. The turn is gated by `motion-safe:`, so the circle stands still
+  // under `prefers-reduced-motion: reduce`; jsdom evaluates no media queries, hence the class is checked.
+  it('turns the zodiac circle only where motion is allowed', () => {
+    const { container } = render(<StarSearch />)
+    const ring = container.querySelector('#stars svg')!
+    expect(ring.getAttribute('aria-hidden')).toBe('true')
+    const turning = [...ring.querySelectorAll('g')].filter((g) =>
+      g.getAttribute('class')?.includes('animate-zodiac-spin'),
+    )
+    expect(turning).toHaveLength(1)
+    expect(turning[0].getAttribute('class')).toContain('motion-safe:animate-zodiac-spin')
+  })
 })
 
 // star-search, Requirement: Анкета
