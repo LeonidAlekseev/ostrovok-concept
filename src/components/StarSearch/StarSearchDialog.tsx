@@ -125,7 +125,7 @@ function StarReading({ symbol, onDone }: { symbol: string; onDone: () => void })
       className="grid place-items-center outline-none gap-5 rounded-2xl bg-(--decor-night) px-4 py-8 text-primary-foreground"
     >
       <MagicOrb symbol={symbol} active className="size-[clamp(160px,50vw,220px)]" />
-      <p className="font-hand text-[clamp(22px,6vw,28px)] font-semibold" aria-hidden>
+      <p className="font-hand text-[clamp(28px,7.5vw,35px)]" aria-hidden>
         Звёзды совещаются…
       </p>
     </div>
