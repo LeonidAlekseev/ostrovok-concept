@@ -400,7 +400,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
 
       <p
         ref={hintRef}
-        className="pointer-events-none relative z-4 mt-[clamp(32px,9vw,64px)] ml-[calc(var(--page-x)+4px)] w-[7em] origin-top-left -rotate-10 font-hand text-[clamp(17px,4.6vw,27px)]/[1.05] font-semibold text-primary md:ml-[calc(max(0px,(100%-var(--page-max))/2)+var(--page-x)+8px)]"
+        className="pointer-events-none relative z-4 mt-[clamp(32px,9vw,64px)] ml-[calc(var(--page-x)+4px)] w-[7em] origin-top-left -rotate-10 font-hand text-[clamp(21px,5.75vw,34px)]/[1.05] text-primary md:ml-[calc(max(0px,(100%-var(--page-max))/2)+var(--page-x)+8px)]"
         aria-hidden
       >
         Вращай глобус — воплощай мечту
