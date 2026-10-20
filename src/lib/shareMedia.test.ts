@@ -1,6 +1,16 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { canShareFile, downloadFile, extensionOf, recordCanvas, shareFile, shareText, videoType } from './shareMedia'
+import {
+  canShareFile,
+  canvasToFile,
+  downloadFile,
+  extensionOf,
+  recordCanvas,
+  shareFile,
+  shareText,
+  videoType,
+  wrapText,
+} from './shareMedia'
 
 const file = new File(['video'], 'ostrovok.mp4', { type: 'video/mp4' })
 
@@ -130,5 +140,35 @@ describe('sharing', () => {
     vi.stubGlobal('navigator', { clipboard: { writeText } })
     await expect(shareText({ title: 'T', text: 'X', url: 'https://x' })).resolves.toBe('copied')
     expect(writeText).toHaveBeenCalledWith('X https://x')
+  })
+})
+
+describe('wrapText', () => {
+  // Every character is 10px wide.
+  const ctx = { measureText: (text: string) => ({ width: text.length * 10 }) } as unknown as CanvasRenderingContext2D
+
+  it('breaks between words at the width', () => {
+    expect(wrapText(ctx, 'Тихий вечер у моря', 110)).toEqual(['Тихий вечер', 'у моря'])
+  })
+
+  it('keeps a word longer than the width on its own line', () => {
+    expect(wrapText(ctx, 'Достопримечательность рядом', 50)).toEqual(['Достопримечательность', 'рядом'])
+  })
+})
+
+describe('canvasToFile', () => {
+  const canvasWith = (blob: Blob | null) =>
+    ({
+      toBlob: (done: (blob: Blob | null) => void, type: string) => done(blob && new Blob([blob], { type })),
+    }) as unknown as HTMLCanvasElement
+
+  it('makes a PNG file of the canvas', async () => {
+    const file = await canvasToFile(canvasWith(new Blob(['png'])), 'ostrovok-vibe.png')
+    expect(file.name).toBe('ostrovok-vibe.png')
+    expect(file.type).toBe('image/png')
+  })
+
+  it('rejects when the canvas gives no image', async () => {
+    await expect(canvasToFile(canvasWith(null), 'x.png')).rejects.toThrow()
   })
 })

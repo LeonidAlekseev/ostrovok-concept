@@ -7,9 +7,9 @@ vi.mock('./Hero/Hero', () => ({ Hero: () => <h1>Найди свой уголок
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
 describe('HomePage', () => {
-  it('renders the sections in order: search, ideas, stars, collections, banner', () => {
+  it('renders the sections in order: search, ideas, vibe, stars, collections, banner', () => {
     const { container } = render(<HomePage />)
     const ids = Array.from(container.querySelectorAll('section[id]')).map((s) => s.id)
-    expect(ids).toEqual(['search', 'ideas', 'stars', 'collections', 'explore'])
+    expect(ids).toEqual(['search', 'ideas', 'vibe', 'stars', 'collections', 'explore'])
   })
 })

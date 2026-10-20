@@ -15,6 +15,7 @@ import { Hero } from './Hero/Hero'
 import { SearchPanel, type SearchMode } from './SearchPanel/SearchPanel'
 import { StarSearch } from './StarSearch/StarSearch'
 import { TravelBanner } from './TravelBanner/TravelBanner'
+import { VibeSearch } from './VibeSearch/VibeSearch'
 
 const featured = destinations.find((d) => d.id === FEATURED_DESTINATION_ID)!
 const globeDestinations = destinations.filter((d) => d.onGlobe)
@@ -127,6 +128,8 @@ export function HomePage() {
             ))}
           </ul>
         </section>
+
+        <VibeSearch />
 
         <StarSearch />
 

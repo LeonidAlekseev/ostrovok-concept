@@ -51,6 +51,30 @@ export function drawBrandFrame(
   return { top: 260 * unit, bottom: height - 240 * unit }
 }
 
+/** Breaks the text into lines no wider than `width` in the context's current font. */
+export function wrapText(ctx: CanvasRenderingContext2D, text: string, width: number): string[] {
+  const lines: string[] = []
+  let line = ''
+  for (const word of text.split(' ')) {
+    const next = line ? `${line} ${word}` : word
+    if (line && ctx.measureText(next).width > width) {
+      lines.push(line)
+      line = word
+    } else line = next
+  }
+  if (line) lines.push(line)
+  return lines
+}
+
+/** The canvas as a PNG file. */
+export const canvasToFile = (canvas: HTMLCanvasElement, name: string) =>
+  new Promise<File>((resolve, reject) =>
+    canvas.toBlob(
+      (blob) => (blob ? resolve(new File([blob], name, { type: 'image/png' })) : reject(new Error('Empty canvas'))),
+      'image/png',
+    ),
+  )
+
 interface RecordOptions {
   type: string
   durationMs: number
