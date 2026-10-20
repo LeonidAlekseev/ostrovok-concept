@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useId, useState, type ReactElement } from 'react'
 import { ChevronDown, Minus, Plus, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/field'
@@ -10,6 +10,8 @@ import { fieldBox } from './fieldBox'
 interface Props {
   value: Guests
   error?: string
+  /** A button of the caller's opens the picker instead of the field; it keeps the field's name. */
+  trigger?: ReactElement
   onChange: (value: Guests) => void
 }
 
@@ -19,7 +21,7 @@ const rows: { key: keyof Guests; title: string; hint: string; forms: [string, st
   { key: 'rooms', title: 'Номера', hint: 'не больше, чем взрослых', forms: ['номер', 'номера', 'номеров'] },
 ]
 
-export function GuestsField({ value, error, onChange }: Props) {
+export function GuestsField({ value, error, trigger, onChange }: Props) {
   const [open, setOpen] = useState(false)
   const errorId = useId()
 
@@ -32,25 +34,35 @@ export function GuestsField({ value, error, onChange }: Props) {
     onChange(next)
   }
 
+  const name = `Гости: ${guestsLabel(value)}${value.rooms === 1 ? ', 1 номер' : ''}`
+  const describedBy = error ? errorId : undefined
+
   return (
     <div className="relative min-w-0">
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger
-          className={`group ${fieldBox(Boolean(error))}`}
-          aria-label={`Гости: ${guestsLabel(value)}${value.rooms === 1 ? ', 1 номер' : ''}`}
-          aria-describedby={error ? errorId : undefined}
-        >
-          <User className="shrink-0 text-brand-foreground" size={22} strokeWidth={1.8} aria-hidden />
-          <span className="truncate text-[clamp(13px,3.55vw,18px)] max-xs:text-sm/[normal]" title={guestsLabel(value)}>
-            {guestsLabel(value)}
-          </span>
-          <ChevronDown
-            // The glyph has built-in side bearings; -mr-1 pulls it towards the edge.
-            className={`-mr-1 ml-auto flex-none text-brand-foreground transition-[rotate] duration-200 ease-in-out group-data-popup-open:rotate-180`}
-            size={22}
-            aria-hidden
-          />
-        </PopoverTrigger>
+        {trigger ? (
+          <PopoverTrigger render={trigger} aria-label={name} aria-describedby={describedBy} />
+        ) : (
+          <PopoverTrigger
+            className={`group ${fieldBox(Boolean(error))}`}
+            aria-label={name}
+            aria-describedby={describedBy}
+          >
+            <User className="shrink-0 text-brand-foreground" size={22} strokeWidth={1.8} aria-hidden />
+            <span
+              className="truncate text-[clamp(13px,3.55vw,18px)] max-xs:text-sm/[normal]"
+              title={guestsLabel(value)}
+            >
+              {guestsLabel(value)}
+            </span>
+            <ChevronDown
+              // The glyph has built-in side bearings; -mr-1 pulls it towards the edge.
+              className={`-mr-1 ml-auto flex-none text-brand-foreground transition-[rotate] duration-200 ease-in-out group-data-popup-open:rotate-180`}
+              size={22}
+              aria-hidden
+            />
+          </PopoverTrigger>
+        )}
 
         <PopoverContent
           align="end"

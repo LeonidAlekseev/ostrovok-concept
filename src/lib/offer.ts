@@ -1,5 +1,15 @@
 import type { Destination } from '../data/destinations'
-import { findRate, findRoom, getDestination, getHotel, roundUp100, type Hotel, type Rate, type Room } from './catalog'
+import {
+  cheapestRate,
+  findRate,
+  findRoom,
+  getDestination,
+  getHotel,
+  roundUp100,
+  type Hotel,
+  type Rate,
+  type Room,
+} from './catalog'
 import { addDays, nightsBetween, weekday, type IsoDate } from './dates'
 import { parseStayParams, setStayParams, validateSearch, type Stay } from './search'
 
@@ -44,6 +54,20 @@ export function stayTotal(pricePerNight: number, checkIn: IsoDate, checkOut: Iso
 
 /** The average price of a night of one room over the stay, to the rouble. */
 export const averageNight = (total: number, nights: number, rooms: number) => Math.round(total / rooms / nights)
+
+/** Days of check-in the price without dates looks through, starting today. */
+const PRICE_WINDOW_DAYS = 7
+
+/**
+ * The hotel's lowest price: its cheapest rate for the whole stay and all rooms, or, without dates,
+ * for one night of the stay's rooms, the cheapest of the check-ins today and the next six days.
+ */
+export function lowestPrice(hotel: Hotel, stay: Stay | null, rooms: number, today: IsoDate): number {
+  const { pricePerNight } = cheapestRate(hotel).rate
+  if (stay) return stayTotal(pricePerNight, stay.checkIn, stay.checkOut, stay.guests.rooms)
+  const nights = Array.from({ length: PRICE_WINDOW_DAYS }, (_, i) => nightPrice(pricePerNight, addDays(today, i)))
+  return Math.min(...nights) * rooms
+}
 
 /** The demo discount of the GURU price. */
 const GURU_DISCOUNT = 0.1

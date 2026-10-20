@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
 import type { Review } from '@/lib/catalog'
 import { formatLongDate } from '../../lib/dates'
@@ -13,14 +14,21 @@ interface Props {
   rating: number
   reviewCount: number
   reviews: Review[]
+  className?: string
 }
 
-export function Reviews({ rating, reviewCount, reviews }: Props) {
+/** The rating summary and the reviews; the rating of the hotel block leads here (`#reviews`). */
+export function Reviews({ rating, reviewCount, reviews, className }: Props) {
   const [visible, setVisible] = useState(PAGE)
   const distribution = scoreDistribution(reviews)
 
   return (
-    <section aria-labelledby="reviews-title" className="flex flex-col gap-4">
+    <section
+      id="reviews"
+      tabIndex={-1}
+      aria-labelledby="reviews-title"
+      className={cn('flex flex-col gap-4', className)}
+    >
       <h2 id="reviews-title" className="text-heading font-bold">
         Отзывы
       </h2>

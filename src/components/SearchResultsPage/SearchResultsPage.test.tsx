@@ -575,6 +575,24 @@ describe('SearchResultsPage hotel dialog', () => {
     expect(cardNames()).toEqual(before)
   })
 
+  // search-results-page, Requirement: Панель цены в окне отеля
+  it('keeps the price bar of the hotel page at the bottom of the scrolling dialog, with its dates and guests', async () => {
+    const user = userEvent.setup()
+    open(`${PRAGUE}&hotel=${hotel.id}`)
+    await results()
+    const dialog = await screen.findByRole('dialog', { name: hotel.name })
+    const bar = within(dialog).getByRole('region', { name: 'Цена' })
+
+    expect(bar.className).toContain('sticky')
+    expect(bar.className).toContain('bottom-0')
+    expect(bar.closest('.overflow-y-auto')).not.toBeNull()
+    expect(within(bar).getByText('за 3 ночи, для 2 гостей')).toBeDefined()
+    await user.click(within(dialog).getByRole('button', { name: /^Гости: / }))
+    await user.click(await screen.findByRole('button', { name: 'Взрослые: увеличить' }))
+    expect(within(bar).getByText('за 3 ночи, для 3 гостей')).toBeDefined()
+    expect(within(bar).getByRole('button', { name: 'Выбрать номер' })).toBeDefined()
+  })
+
   it('ignores an unknown hotel id', async () => {
     open(`${PRAGUE}&hotel=no-such-hotel`)
     await results()

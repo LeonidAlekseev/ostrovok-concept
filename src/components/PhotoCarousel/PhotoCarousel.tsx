@@ -10,8 +10,10 @@ import type { Photo } from '@/lib/catalog'
 
 interface Props {
   photos: Photo[]
-  /** Where a photo leads; the photos are plain pictures without it. */
+  /** Where a photo leads; the photos are plain pictures without it or `onOpen`. */
   href?: string
+  /** A photo is a button that opens it, e.g. in a full-screen viewer. */
+  onOpen?: (index: number) => void
   /** Name of the strip for screen readers. */
   label?: string
   /** Size and shape of the carousel, e.g. an aspect ratio and a radius. */
@@ -27,7 +29,7 @@ const arrowClass =
  * Photos in a snapping strip: swiped on touch screens, turned by the arrows that show on hover and
  * focus elsewhere, with the "1 / N" counter in the bottom left corner.
  */
-export function PhotoCarousel({ photos, href, label = 'Фото отеля', className, children }: Props) {
+export function PhotoCarousel({ photos, href, onOpen, label = 'Фото отеля', className, children }: Props) {
   const strip = useRef<HTMLDivElement>(null)
   const [index, setIndex] = useState(0)
   const count = photos.length
@@ -54,12 +56,22 @@ export function PhotoCarousel({ photos, href, label = 'Фото отеля', cla
           if (Math.abs(at - Math.round(at)) < 0.02) setIndex(Math.round(at))
         }}
       >
-        {photos.map((photo) =>
+        {photos.map((photo, i) =>
           href ? (
             // The hotel name is the link for the keyboard and screen readers; the photo only takes the click.
             <Link key={photo.id} href={href} tabIndex={-1} aria-hidden className="size-full shrink-0 snap-start">
               <PhotoPlaceholder photo={photo} className="size-full" />
             </Link>
+          ) : onOpen ? (
+            <button
+              key={photo.id}
+              type="button"
+              aria-label={`Открыть фото: ${photo.caption}`}
+              className="size-full shrink-0 snap-start"
+              onClick={() => onOpen(i)}
+            >
+              <PhotoPlaceholder photo={photo} className="size-full" />
+            </button>
           ) : (
             <PhotoPlaceholder key={photo.id} photo={photo} className="size-full shrink-0 snap-start" />
           ),
