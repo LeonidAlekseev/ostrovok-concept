@@ -1,13 +1,22 @@
 'use client'
 
-import { useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+  type CSSProperties,
+  type KeyboardEvent,
+} from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { useToday } from '../../hooks/useToday'
 import { DEFAULT_GUESTS, withStartDates, type Stay } from '../../lib/search'
-import { readVibe, VIBE_AXES, VIBE_STEPS, type Answer } from '../../lib/vibe'
+import { poleImage, readVibe, VIBE_AXES, VIBE_STEPS, type Answer } from '../../lib/vibe'
+import { SmartImage } from '../ui/SmartImage'
 import { VibeResult } from './VibeResult'
 
 interface Props {
@@ -15,9 +24,31 @@ interface Props {
   onOpenChange: (open: boolean) => void
 }
 
-// The inner side of each option is padded wider: the «vs» circle reaches 16px into it.
+// The inner side of each caption is padded wider: the «vs» circle reaches into the photo.
 const optionClass =
-  'flex min-h-28 items-center justify-center rounded-2xl p-3 text-center text-[clamp(19px,5vw,22px)]/[1.2] font-bold text-primary-foreground shadow-(--shadow-card) transition-transform hover:scale-[1.03] active:scale-[0.98] aria-checked:ring-4 aria-checked:ring-ring/60 aria-checked:ring-offset-2'
+  'relative aspect-[4/3] overflow-hidden rounded-2xl bg-muted text-left shadow-(--shadow-card) transition-transform hover:scale-[1.02] active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:scale-100 aria-checked:ring-4 aria-checked:ring-ring/60 aria-checked:ring-offset-2'
+
+interface OptionProps extends Omit<ComponentProps<'button'>, 'children'> {
+  image: string
+  label: string
+  step: number
+}
+
+/** A photo with the caption bottom left; the photo is decorative, the caption names the button. */
+function Option({ image, label, step, className, ...rest }: OptionProps) {
+  return (
+    <button type="button" role="radio" className={cn(optionClass, className)} {...rest}>
+      <SmartImage src={image} alt="" width={800} height={600} className="size-full object-cover" />
+      <span aria-hidden className="absolute inset-0 bg-(image:--decor-vibe-shade)" />
+      <span
+        key={step}
+        className="absolute inset-x-0 bottom-0 animate-vibe-in p-3 text-[clamp(16px,4.6vw,24px)]/[1.15] font-bold text-(--decor-light) sm:p-4"
+      >
+        {label}
+      </span>
+    </button>
+  )
+}
 
 export function VibeSearchDialog({ open, onOpenChange }: Props) {
   const today = useToday()
@@ -39,6 +70,11 @@ export function VibeSearchDialog({ open, onOpenChange }: Props) {
   }, [today])
 
   const axis = VIBE_AXES[step]
+  // The next pair's photos are fetched while this one is on screen.
+  useEffect(() => {
+    const next = VIBE_AXES[step + 1]
+    if (next) for (const side of [-1, 1] as const) new Image().src = poleImage(next.id, side)
+  }, [step])
   const choose = (answer: Answer) => {
     const next = [...answers]
     next[step] = answer
@@ -70,7 +106,7 @@ export function VibeSearchDialog({ open, onOpenChange }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         initialFocus={leftRef}
-        className="max-h-[calc(100dvh-2rem)] gap-5 overflow-y-auto p-[clamp(16px,4vw,24px)] sm:max-w-lg"
+        className="max-h-[calc(100dvh-2rem)] gap-5 overflow-y-auto p-[clamp(16px,4vw,24px)] sm:max-w-2xl"
       >
         <DialogHeader>
           <DialogTitle className="text-(length:--text-heading) font-bold">Поиск вайба</DialogTitle>
@@ -97,7 +133,7 @@ export function VibeSearchDialog({ open, onOpenChange }: Props) {
                 className="h-2 flex-1 overflow-hidden rounded-full bg-muted"
               >
                 <div
-                  className="h-full origin-left scale-x-(--progress) rounded-full bg-[image:var(--decor-vibe-calm)] transition-transform"
+                  className="h-full origin-left scale-x-(--progress) rounded-full bg-[image:var(--decor-vibe-progress)] transition-transform"
                   style={{ '--progress': (step + 1) / VIBE_STEPS } as CSSProperties}
                 />
               </div>
@@ -109,35 +145,29 @@ export function VibeSearchDialog({ open, onOpenChange }: Props) {
               className="relative grid grid-cols-2 gap-3"
               onKeyDown={arrow}
             >
-              <button
+              <Option
                 ref={leftRef}
-                type="button"
-                role="radio"
+                image={poleImage(axis.id, -1)}
+                label={axis.left}
+                step={step}
                 aria-checked={answers[step] === -1}
                 tabIndex={answers[step] === 1 ? -1 : 0}
-                className={cn(optionClass, 'pr-6 bg-(image:--decor-vibe-calm)')}
+                className="[&>span:last-child]:pr-5 sm:[&>span:last-child]:pr-7"
                 onClick={() => choose(-1)}
-              >
-                <span key={step} className="animate-vibe-in">
-                  {axis.left}
-                </span>
-              </button>
-              <button
+              />
+              <Option
                 ref={rightRef}
-                type="button"
-                role="radio"
+                image={poleImage(axis.id, 1)}
+                label={axis.right}
+                step={step}
                 aria-checked={answers[step] === 1}
                 tabIndex={answers[step] === 1 ? 0 : -1}
-                className={cn(optionClass, 'pl-6 bg-(image:--decor-vibe-loud)')}
+                className="[&>span:last-child]:pl-5 sm:[&>span:last-child]:pl-7"
                 onClick={() => choose(1)}
-              >
-                <span key={step} className="animate-vibe-in">
-                  {axis.right}
-                </span>
-              </button>
+              />
               <span
                 aria-hidden
-                className="pointer-events-none absolute top-1/2 left-1/2 grid size-11 -translate-1/2 place-items-center rounded-full bg-background text-sm font-extrabold shadow-(--shadow-card)"
+                className="pointer-events-none absolute top-1/2 left-1/2 grid size-11 -translate-1/2 place-items-center rounded-full bg-background text-sm sm:size-14 sm:text-base font-extrabold shadow-(--shadow-card)"
               >
                 vs
               </span>

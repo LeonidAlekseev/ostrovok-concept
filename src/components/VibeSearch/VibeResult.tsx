@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import type { Hotel } from '../../lib/catalog'
 import { setStayParams, type Stay } from '../../lib/search'
 import type { Vibe } from '../../lib/vibe'
+import { SmartImage } from '../ui/SmartImage'
 import { HotelTile } from '../HotelTile/HotelTile'
 import { VibeImage } from './VibeImage'
 
@@ -24,12 +25,16 @@ export function VibeResult({ vibe, stay, onRestart }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-2xl bg-[image:linear-gradient(100deg,var(--decor-vibe-calm-from),var(--decor-vibe-calm-to),var(--decor-vibe-loud-from),var(--decor-vibe-loud-to))] p-4 text-primary-foreground">
-        <p className="text-sm font-semibold opacity-90">Ваш вайб</p>
-        <h3 ref={headingRef} tabIndex={-1} className="text-[clamp(22px,6vw,28px)]/[1.2] font-extrabold outline-none">
-          {vibe.archetype.name}
-        </h3>
-        <p className="mt-1 text-[15px]">{vibe.archetype.description}</p>
+      <div className="relative aspect-video overflow-hidden rounded-2xl bg-muted shadow-(--shadow-card)">
+        <SmartImage src={vibe.archetype.image} alt="" width={800} height={600} className="size-full object-cover" />
+        <div className="absolute inset-0 bg-(image:--decor-vibe-shade)" aria-hidden />
+        <div className="absolute inset-x-0 bottom-0 p-4 text-(--decor-light)">
+          <p className="text-sm font-semibold opacity-90">Ваш вайб</p>
+          <h3 ref={headingRef} tabIndex={-1} className="text-[clamp(22px,6vw,32px)]/[1.2] font-extrabold outline-none">
+            {vibe.archetype.name}
+          </h3>
+          <p className="mt-1 text-[15px]">{vibe.archetype.description}</p>
+        </div>
       </div>
 
       <ul className="flex flex-col gap-2.5" aria-label="Статистика вайба">

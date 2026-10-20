@@ -114,6 +114,9 @@
   --decor-vibe-loud-to: #e8590c;
   --decor-vibe-calm: linear-gradient(135deg, var(--decor-vibe-calm-from), var(--decor-vibe-calm-to));
   --decor-vibe-loud: linear-gradient(135deg, var(--decor-vibe-loud-from), var(--decor-vibe-loud-to));
+  /* The «N из 7» bar fills blue to violet; the shade under the white captions of the vibe photos. */
+  --decor-vibe-progress: linear-gradient(90deg, var(--brand-blue), var(--decor-violet));
+  --decor-vibe-shade: linear-gradient(to top, color-mix(in srgb, var(--decor-night) 85%, transparent), transparent 65%);
   /* Assistant robot avatar. */
   --decor-robot-bg-from: #eef3ff;
   --decor-robot-bg-to: #d9e4ff;
