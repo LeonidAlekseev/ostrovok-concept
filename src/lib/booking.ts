@@ -1,6 +1,7 @@
-import type { Cancellation } from './catalog'
+import type { Cancellation, Rate } from './catalog'
 import { formatLongDate, fromIso, type IsoDate } from './dates'
 import { freeCancellationUntil, type Offer } from './offer'
+import { countRu } from './format'
 import { cancellationDeadline } from './rates'
 import type { Booking } from './storage'
 
@@ -161,8 +162,11 @@ export function newBookingId(): string {
 }
 
 /** The cancellation terms as they are at `today`: a free period that is already over is non-refundable. */
-export const effectiveCancellation = (offer: Offer, today: IsoDate): Cancellation =>
-  cancellationDeadline(offer.rate, offer.checkIn, today) ? offer.rate.cancellation : { kind: 'non-refundable' }
+export const effectiveCancellation = (
+  rate: Pick<Rate, 'cancellation'>,
+  checkIn: IsoDate,
+  today: IsoDate,
+): Cancellation => (cancellationDeadline(rate, checkIn, today) ? rate.cancellation : { kind: 'non-refundable' })
 
 /** The booking to store: only the last 4 digits of the card are kept. */
 export function createBooking(offer: Offer, values: BookingFormValues, id: string, now: Date, today: IsoDate): Booking {
@@ -186,12 +190,26 @@ export function createBooking(offer: Offer, values: BookingFormValues, id: strin
     payment,
     cardLast4: payment === 'now' ? cardDigits(values.card.number).slice(-4) : null,
     total: offer.total,
-    cancellation: effectiveCancellation(offer, today),
+    cancellation: effectiveCancellation(offer.rate, offer.checkIn, today),
   }
 }
 
-/** "Бесплатная отмена до 12 ноября 2026 г." or "Невозвратный тариф". */
-export function cancellationLabel(cancellation: Cancellation, checkIn: IsoDate): string {
-  const until = freeCancellationUntil({ cancellation }, checkIn)
-  return until ? `Бесплатная отмена до ${formatLongDate(until)}` : 'Невозвратный тариф'
+const shortDate = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' })
+
+/**
+ * The cancellation terms as text. With a `checkIn` the free period ends on a date:
+ * "Бесплатная отмена до 12 ноября 2026 г." (`short`: "до 12 ноября"); without one, for a rate before
+ * the dates are chosen: "Бесплатная отмена за 3 дня до заезда". Otherwise "Невозвратный тариф".
+ */
+export function cancellationLabel(
+  cancellation: Cancellation,
+  checkIn: IsoDate | null,
+  { short = false }: { short?: boolean } = {},
+): string {
+  if (cancellation.kind !== 'free') return 'Невозвратный тариф'
+  if (!checkIn) {
+    return `Бесплатная отмена за ${countRu(cancellation.daysBefore, ['день', 'дня', 'дней'])} до заезда`
+  }
+  const until = freeCancellationUntil({ cancellation }, checkIn)!
+  return `Бесплатная отмена до ${short ? shortDate.format(fromIso(until)) : formatLongDate(until)}`
 }

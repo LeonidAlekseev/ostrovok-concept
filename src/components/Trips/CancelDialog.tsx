@@ -28,7 +28,7 @@ export function CancelDialog({ booking }: { booking: Booking }) {
         <p className="text-lg font-bold">{feeLabel(fee)}</p>
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Оставить бронирование</DialogClose>
-          <Button onClick={() => saveBooking(cancelBooking(booking, new Date(), todayIso()))}>
+          <Button variant="destructive" onClick={() => saveBooking(cancelBooking(booking, new Date(), todayIso()))}>
             Подтвердить отмену
           </Button>
         </DialogFooter>

@@ -4,9 +4,14 @@ import { useCallback } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { addDays, todayIso } from '../../lib/dates'
 import { getDestination, type Hotel } from '../../lib/catalog'
-import { parseStayParams, setStayParams, validateSearch, type Guests, type Stay } from '../../lib/search'
-
-export const DEFAULT_GUESTS: Guests = { adults: 2, children: 0, rooms: 1 }
+import {
+  DEFAULT_GUESTS,
+  parseStayParams,
+  setStayParams,
+  validateSearch,
+  type Guests,
+  type Stay,
+} from '../../lib/search'
 
 export interface StayState {
   /** The valid stay from the address, or `null` while the dates are not chosen. */

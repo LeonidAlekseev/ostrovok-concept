@@ -158,5 +158,12 @@ describe('createBooking', () => {
   it('labels cancellation', () => {
     expect(cancellationLabel({ kind: 'non-refundable' }, stay.checkIn)).toBe('Невозвратный тариф')
     expect(cancellationLabel({ kind: 'free', daysBefore: 3 }, '2026-11-10')).toContain('7 ноября')
+    expect(cancellationLabel({ kind: 'free', daysBefore: 3 }, '2026-11-10')).toBe(
+      'Бесплатная отмена до суббота, 7 ноября 2026 г.',
+    )
+    expect(cancellationLabel({ kind: 'free', daysBefore: 3 }, '2026-11-10', { short: true })).toBe(
+      'Бесплатная отмена до 7 ноября',
+    )
+    expect(cancellationLabel({ kind: 'free', daysBefore: 3 }, null)).toBe('Бесплатная отмена за 3 дня до заезда')
   })
 })

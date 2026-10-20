@@ -4,7 +4,7 @@ import { cn } from 'cn'
 import { Badge } from '@/components/ui/badge'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import { MEAL_LABEL } from '../../lib/catalog'
-import { countRu, formatPrice } from '../../lib/format'
+import { countRu, formatDecimal, formatPrice } from '../../lib/format'
 import { offerTotal } from '../../lib/offer'
 import type { ResultItem } from '../../lib/results'
 import { setStayParams, type Stay } from '../../lib/search'
@@ -21,8 +21,6 @@ interface Props {
   active: boolean
   onActivate: (id: string | null) => void
 }
-
-const decimal = (value: number) => value.toFixed(1).replace('.', ',')
 
 /** A hotel in the results: the name links to the hotel page with the same dates and guests. */
 export function HotelCard({ id, item, stay, nights, showCity, active, onActivate }: Props) {
@@ -63,10 +61,10 @@ export function HotelCard({ id, item, stay, nights, showCity, active, onActivate
             ))}
           </span>
           {showCity && <span>{destination.name}</span>}
-          <span>{decimal(hotel.distanceKm)} км до центра</span>
+          <span>{formatDecimal(hotel.distanceKm)} км до центра</span>
         </p>
         <p className="flex items-center gap-2 text-sm/[normal]">
-          <Badge className="bg-primary text-primary-foreground">{decimal(hotel.rating)}</Badge>
+          <Badge className="bg-primary text-primary-foreground">{formatDecimal(hotel.rating)}</Badge>
           <span className="text-muted-foreground">{countRu(hotel.reviewCount, ['отзыв', 'отзыва', 'отзывов'])}</span>
         </p>
         <p className="flex flex-wrap gap-1.5">
