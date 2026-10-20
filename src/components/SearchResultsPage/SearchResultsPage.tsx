@@ -17,7 +17,11 @@ import {
   countFilters,
   FILTER_PARAMS,
   NO_FILTERS,
+  PAGE_PARAM,
+  PAGE_SIZE,
+  pageCount,
   parseFilters,
+  parsePage,
   runDemoSearch,
   setFilterParams,
   SORTS,
@@ -37,6 +41,7 @@ import {
 import { SearchForm } from '../SearchForm/SearchForm'
 import { FiltersPanel } from './FiltersPanel'
 import { HotelDialog } from './HotelDialog'
+import { Pagination } from './Pagination'
 import { ResultTile } from './ResultTile'
 import { MapUnavailable } from './MapUnavailable'
 
@@ -91,10 +96,10 @@ const useDesktop = () =>
 export function SearchResultsPage() {
   const params = useSearchParams()
   const today = useToday()
-  // The query part of the URL; the filters and the opened hotel change without a new search.
+  // The query part of the URL; the filters, the page and the opened hotel change without a new search.
   const request = useMemo(() => {
     const next = new URLSearchParams(params.toString())
-    for (const name of [...FILTER_PARAMS, HOTEL_PARAM]) next.delete(name)
+    for (const name of [...FILTER_PARAMS, PAGE_PARAM, HOTEL_PARAM]) next.delete(name)
     return next.toString()
   }, [params])
   const query = useMemo(() => withStartDates(fromSearchParams(new URLSearchParams(request)), today), [request, today])
@@ -144,6 +149,7 @@ interface ResultsProps {
 }
 
 function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
+  const params = useSearchParams()
   const [status, setStatus] = useState<Status>({ state: 'loading' })
   const [filters, setFilters] = useState(initialFilters)
   const [editing, setEditing] = useState(false)
@@ -170,6 +176,31 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
   const nights = nightsBetween(query.checkIn, query.checkOut)
   const result = status.state === 'done' ? status.result : null
   const items = useMemo(() => (result ? applyFilters(result.hotels, filters, query) : []), [result, filters, query])
+  const pages = pageCount(items.length)
+  const page = parsePage(params, pages)
+  const visible = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const resultsRef = useRef<HTMLHeadingElement>(null)
+
+  // After a move to another page the list starts in view and the screen reader lands on the results heading.
+  const shownPage = useRef(page)
+  useEffect(() => {
+    if (shownPage.current === page) return
+    shownPage.current = page
+    const heading = resultsRef.current
+    if (!heading) return
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    heading.scrollIntoView?.({ behavior: reduced ? 'auto' : 'smooth', block: 'start' })
+    heading.focus({ preventScroll: true })
+  }, [page])
+
+  const pageHref = (target: number) => {
+    const url = new URLSearchParams(params.toString())
+    if (target > 1) url.set(PAGE_PARAM, String(target))
+    else url.delete(PAGE_PARAM)
+    return `?${url}`
+  }
+  /** Moves to a page in a new history entry, so "Назад" returns to the previous one. */
+  const goToPage = (target: number) => window.history.pushState(null, '', pageHref(target))
 
   /** Filters and sorting go to the URL without a new history entry. */
   const updateFilters = (next: Filters) => {
@@ -221,9 +252,9 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
         {status.state === 'loading' && <Searching />}
         {status.state === 'error' && <p className="text-sm text-destructive">{status.message}</p>}
         {result && (
-          <p className="text-muted-foreground">
+          <h2 ref={resultsRef} tabIndex={-1} className="scroll-mt-4 text-muted-foreground outline-none">
             {items.length > 0 ? `Найдено ${countRu(items.length, ['отель', 'отеля', 'отелей'])}` : 'Ничего не нашлось'}
-          </p>
+          </h2>
         )}
       </div>
 
@@ -291,7 +322,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
                 </div>
               ) : (
                 <ul className="grid gap-3 2xl:grid-cols-2">
-                  {items.map((item) => (
+                  {visible.map((item) => (
                     <li key={item.hotel.id}>
                       <ResultTile
                         item={item}
@@ -303,6 +334,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
                   ))}
                 </ul>
               )}
+              <Pagination page={page} pages={pages} hrefFor={pageHref} onNavigate={goToPage} />
             </section>
 
             {(desktop || view === 'map') && (

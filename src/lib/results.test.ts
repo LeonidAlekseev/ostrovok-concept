@@ -5,7 +5,10 @@ import {
   countFilters,
   DEMO_SEARCH_MS,
   NO_FILTERS,
+  pageCount,
+  pageItems,
   parseFilters,
+  parsePage,
   runDemoSearch,
   setFilterParams,
   type Filters,
@@ -88,6 +91,28 @@ describe('parseFilters and setFilterParams', () => {
   it('counts the filters set, without the sorting', () => {
     expect(countFilters(filters({ sort: 'rating' }))).toBe(0)
     expect(countFilters(filters({ priceMin: 1, priceMax: 2, stars: [5, 4], freeCancel: true }))).toBe(3)
+  })
+})
+
+describe('pages', () => {
+  it('counts pages of 12, at least one', () => {
+    expect([0, 1, 12, 13, 30].map(pageCount)).toEqual([1, 1, 1, 2, 3])
+  })
+
+  it('reads the page, taking the nearest existing one for an invalid value', () => {
+    const page = (value: string, pages = 3) => parsePage(new URLSearchParams(value), pages)
+    expect(page('page=2')).toBe(2)
+    expect(page('')).toBe(1)
+    expect(page('page=abc')).toBe(1)
+    expect(page('page=1.5')).toBe(1)
+    expect(page('page=0')).toBe(1)
+    expect(page('page=-4')).toBe(1)
+    expect(page('page=9')).toBe(3)
+  })
+
+  it('drops the page when the filters or sorting are written, keeping the rest of the query', () => {
+    const params = setFilterParams(new URLSearchParams('destination=prague&page=2&hotel=h1'), filters({ stars: [5] }))
+    expect(params.toString()).toBe('destination=prague&hotel=h1&stars=5')
   })
 })
 
@@ -175,5 +200,15 @@ describe('applyFilters', () => {
       const desc = applyFilters(prague, filters({ sort: 'price_desc' }), twoRooms).map((i) => i.price)
       expect(desc).toEqual([...desc].sort((a, b) => b - a))
     })
+  })
+})
+
+describe('pageItems', () => {
+  it('lists every page up to seven, then the first, the last and the current with neighbours', () => {
+    expect(pageItems(2, 3)).toEqual([1, 2, 3])
+    expect(pageItems(1, 7)).toEqual([1, 2, 3, 4, 5, 6, 7])
+    expect(pageItems(1, 9)).toEqual([1, 2, null, 9])
+    expect(pageItems(5, 9)).toEqual([1, null, 4, 5, 6, null, 9])
+    expect(pageItems(8, 9)).toEqual([1, null, 7, 8, 9])
   })
 })
