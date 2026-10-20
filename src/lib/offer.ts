@@ -1,6 +1,6 @@
 import type { Destination } from '../data/destinations'
-import { findRate, findRoom, getDestination, getHotel, type Hotel, type Rate, type Room } from './catalog'
-import { addDays, nightsBetween, type IsoDate } from './dates'
+import { findRate, findRoom, getDestination, getHotel, roundUp100, type Hotel, type Rate, type Room } from './catalog'
+import { addDays, nightsBetween, weekday, type IsoDate } from './dates'
 import { parseStayParams, setStayParams, validateSearch, type Stay } from './search'
 
 /**
@@ -28,8 +28,22 @@ export type OfferResult = { ok: true; offer: Offer } | { ok: false; error: strin
 
 export const OFFER_NOT_FOUND = 'Предложение не найдено'
 
-/** Price of an offer: per night × nights × rooms. */
-export const offerTotal = (pricePerNight: number, nights: number, rooms: number) => pricePerNight * nights * rooms
+/** Friday and Saturday nights cost this much more than the weekday price of the rate. */
+const WEEKEND_MARKUP = 0.15
+
+/** Price of one room for the night starting on `date`: Friday and Saturday nights cost more, rounded up to 100 ₽. */
+export const nightPrice = (pricePerNight: number, date: IsoDate) =>
+  weekday(date) === 5 || weekday(date) === 6 ? roundUp100(pricePerNight * (1 + WEEKEND_MARKUP)) : pricePerNight
+
+/** Price of an offer: the nights from check-in to the night before check-out, × rooms. */
+export function stayTotal(pricePerNight: number, checkIn: IsoDate, checkOut: IsoDate, rooms: number): number {
+  let total = 0
+  for (let date = checkIn; date < checkOut; date = addDays(date, 1)) total += nightPrice(pricePerNight, date)
+  return total * rooms
+}
+
+/** The average price of a night of one room over the stay, to the rouble. */
+export const averageNight = (total: number, nights: number, rooms: number) => Math.round(total / rooms / nights)
 
 /** The demo discount of the GURU price. */
 const GURU_DISCOUNT = 0.1
@@ -74,7 +88,7 @@ export function parseOffer(params: Pick<URLSearchParams, 'get'>, today: IsoDate)
       rate,
       destination,
       nights,
-      total: offerTotal(rate.pricePerNight, nights, stay.guests.rooms),
+      total: stayTotal(rate.pricePerNight, stay.checkIn, stay.checkOut, stay.guests.rooms),
     },
   }
 }

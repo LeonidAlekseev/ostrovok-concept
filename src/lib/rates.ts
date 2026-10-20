@@ -1,6 +1,6 @@
 import type { Rate, Room } from './catalog'
 import { nightsBetween, type IsoDate } from './dates'
-import { freeCancellationUntil, offerTotal } from './offer'
+import { averageNight, freeCancellationUntil, stayTotal } from './offer'
 import type { Guests, Stay } from './search'
 
 /** Free cancellation until `until`, or `null`: non-refundable, or the free period is already over. */
@@ -24,12 +24,15 @@ export function unavailableReason(room: Room, guests: Guests): string | null {
 }
 
 export interface RatePrice {
+  /** The average night of one room over the stay; the weekday price until the dates are chosen. */
   perNight: number
   /** For the whole stay and all rooms; `null` until the dates are chosen. */
   total: number | null
 }
 
-export const ratePrice = (rate: Rate, stay: Stay | null): RatePrice => ({
-  perNight: rate.pricePerNight,
-  total: stay && offerTotal(rate.pricePerNight, nightsBetween(stay.checkIn, stay.checkOut), stay.guests.rooms),
-})
+export function ratePrice(rate: Rate, stay: Stay | null): RatePrice {
+  if (!stay) return { perNight: rate.pricePerNight, total: null }
+  const { checkIn, checkOut, guests } = stay
+  const total = stayTotal(rate.pricePerNight, checkIn, checkOut, guests.rooms)
+  return { perNight: averageNight(total, nightsBetween(checkIn, checkOut), guests.rooms), total }
+}

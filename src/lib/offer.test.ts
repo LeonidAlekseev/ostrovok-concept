@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { getHotel } from './catalog'
 import {
+  averageNight,
   freeCancellationUntil,
   guruPrice,
+  nightPrice,
   OFFER_NOT_FOUND,
-  offerTotal,
   parseOffer,
+  stayTotal,
   toOfferParams,
   type OfferSelection,
 } from './offer'
@@ -33,9 +35,37 @@ const parse = (overrides: Record<string, string | null>) => {
   return parseOffer(params, TODAY)
 }
 
-describe('offerTotal', () => {
-  it('multiplies the nightly price by nights and rooms', () => {
-    expect(offerTotal(7000, 2, 2)).toBe(28_000)
+// hotel-catalog, Requirement: Цена предложения
+describe('nightPrice', () => {
+  it('is the rate price from Sunday to Thursday', () => {
+    for (const date of ['2026-10-18', '2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22'])
+      expect(nightPrice(7000, date)).toBe(7000)
+  })
+  it('is 15 % more on Friday and Saturday, rounded up to 100 ₽', () => {
+    expect(nightPrice(7000, '2026-10-23')).toBe(8100)
+    expect(nightPrice(7000, '2026-10-24')).toBe(8100)
+    expect(nightPrice(6000, '2026-10-23')).toBe(6900)
+  })
+})
+
+describe('stayTotal', () => {
+  it('multiplies weekday nights by rooms', () => {
+    expect(stayTotal(7000, '2026-10-19', '2026-10-21', 2)).toBe(28_000)
+  })
+  it('sums Friday and Saturday nights at the weekend price', () => {
+    expect(stayTotal(7000, '2026-10-23', '2026-10-25', 1)).toBe(16_200)
+    expect(stayTotal(7000, '2026-10-22', '2026-10-24', 1)).toBe(15_100)
+    expect(stayTotal(7000, '2026-10-22', '2026-10-24', 3)).toBe(45_300)
+  })
+  it('crosses months and years', () => {
+    expect(stayTotal(7000, '2026-12-31', '2027-01-03', 1)).toBe(7000 + 8100 + 8100)
+  })
+})
+
+describe('averageNight', () => {
+  it('is the price of a night of one room, to the rouble', () => {
+    expect(averageNight(45_300, 2, 3)).toBe(7550)
+    expect(averageNight(23_200, 3, 1)).toBe(7733)
   })
 })
 
@@ -69,6 +99,12 @@ describe('parseOffer', () => {
   it('prices several rooms', () => {
     const result = parse({ adults: '2', rooms: '2' })
     expect(result.ok && result.offer.total).toBe(rate.pricePerNight * 2 * 2)
+  })
+
+  it('prices a Friday check-in at the weekend price', () => {
+    const result = parse({ checkin: '2026-11-06', checkout: '2026-11-08' })
+    expect(result.ok && result.offer.total).toBe(2 * nightPrice(rate.pricePerNight, '2026-11-06'))
+    expect(result.ok && result.offer.total).toBeGreaterThan(rate.pricePerNight * 2)
   })
 
   it('rejects an unknown hotel, room or rate', () => {

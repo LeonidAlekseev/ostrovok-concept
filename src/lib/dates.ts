@@ -23,6 +23,12 @@ export function nightsBetween(from: IsoDate, to: IsoDate): number {
   return Math.round((fromIso(to).getTime() - fromIso(from).getTime()) / 86_400_000)
 }
 
+/** Day of the week of `iso`, 0 for Sunday; computed in UTC so the browser time zone cannot shift it. */
+export function weekday(iso: IsoDate): number {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+}
+
 export function todayIso(): IsoDate {
   return toIso(new Date())
 }

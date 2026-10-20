@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { addDays, formatDateRange, fromIso, nightsBetween, todayIso, toIso } from './dates'
+import { addDays, formatDateRange, fromIso, nightsBetween, todayIso, toIso, weekday } from './dates'
 
 describe('toIso', () => {
   it('formats a local date as YYYY-MM-DD with zero padding', () => {
@@ -45,6 +45,12 @@ describe('nightsBetween', () => {
   it('returns zero or negative values when check-out is not later', () => {
     expect(nightsBetween('2026-10-17', '2026-10-17')).toBe(0)
     expect(nightsBetween('2026-10-18', '2026-10-17')).toBe(-1)
+  })
+})
+
+describe('weekday', () => {
+  it('is the day of the week of an ISO day, 0 for Sunday', () => {
+    expect(['2026-10-18', '2026-10-23', '2026-10-24', '2027-01-01'].map(weekday)).toEqual([0, 5, 6, 5])
   })
 })
 

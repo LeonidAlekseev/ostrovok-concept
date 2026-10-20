@@ -45,6 +45,11 @@ describe('ratePrice', () => {
     const stay = { checkIn: '2026-11-01', checkOut: '2026-11-04', guests: { adults: 2, children: 0, rooms: 2 } }
     expect(ratePrice(free3, stay).total).toBe(30000)
   })
+  // rate-selection, Requirement: Цена за ночь тарифа
+  it('is the average night of the stay with dates', () => {
+    const stay = { checkIn: '2026-10-22', checkOut: '2026-10-24', guests: { adults: 2, children: 0, rooms: 2 } }
+    expect(ratePrice({ ...free3, pricePerNight: 7000 }, stay)).toEqual({ perNight: 7550, total: 30200 })
+  })
 })
 
 describe('scoreDistribution', () => {
