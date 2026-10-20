@@ -18,7 +18,7 @@ const file = new File(['video'], 'ostrovok.mp4', { type: 'video/mp4' })
 class FakeRecorder {
   static supported: string[] = []
   static isTypeSupported = (type: string) => FakeRecorder.supported.includes(type)
-  state: 'inactive' | 'recording' | 'paused' = 'inactive'
+  state: 'inactive' | 'recording' = 'inactive'
   ondataavailable: ((event: { data: Blob }) => void) | null = null
   onstop: (() => void) | null = null
   constructor(
@@ -26,12 +26,6 @@ class FakeRecorder {
     public options: { mimeType: string },
   ) {}
   start() {
-    this.state = 'recording'
-  }
-  pause() {
-    this.state = 'paused'
-  }
-  resume() {
     this.state = 'recording'
   }
   stop() {
@@ -47,7 +41,7 @@ afterEach(() => {
   FakeRecorder.supported = []
 })
 
-// star-search, Requirement: Видео результата
+// star-search, Requirement: Запись видео результата
 describe('videoType', () => {
   it('is null without MediaRecorder', () => {
     vi.stubGlobal('MediaRecorder', undefined)
@@ -94,42 +88,82 @@ describe('recordCanvas', () => {
       document.dispatchEvent(new Event('visibilitychange'))
     }
 
-    it('pauses the recorder and counts only the visible time', async () => {
+    it('drops the recording and starts over from zero when the tab returns', async () => {
       vi.useFakeTimers()
       try {
         vi.stubGlobal('MediaRecorder', FakeRecorder)
-        const pause = vi.spyOn(FakeRecorder.prototype, 'pause')
-        const resume = vi.spyOn(FakeRecorder.prototype, 'resume')
         const draw = vi.fn()
-        const onPause = vi.fn()
-        const recording = recordCanvas(canvas, { type: 'video/webm', durationMs: 1000, draw, onPause })
+        const onProgress = vi.fn()
+        const onRestart = vi.fn()
+        const stop = vi.spyOn(FakeRecorder.prototype, 'stop')
+        const recording = recordCanvas(canvas, { type: 'video/webm', durationMs: 1000, draw, onProgress, onRestart })
 
         await vi.advanceTimersByTimeAsync(400)
         setVisibility('hidden')
-        expect(pause).toHaveBeenCalledOnce()
-        expect(onPause).toHaveBeenLastCalledWith(true)
+        expect(stop).toHaveBeenCalledOnce()
+        expect(onRestart).not.toHaveBeenCalled()
         draw.mockClear()
-        // Nothing is drawn, and the time away is not counted.
+        // Nothing is drawn while hidden.
         await vi.advanceTimersByTimeAsync(60_000)
         expect(draw).not.toHaveBeenCalled()
 
         setVisibility('visible')
-        expect(resume).toHaveBeenCalledOnce()
-        expect(onPause).toHaveBeenLastCalledWith(false)
+        expect(onRestart).toHaveBeenCalledOnce()
+        expect(draw).toHaveBeenCalledWith(0)
+        expect(onProgress).toHaveBeenLastCalledWith(0)
         await vi.advanceTimersByTimeAsync(32)
-        const resumed = draw.mock.calls[0][0] as number
-        expect(resumed).toBeGreaterThanOrEqual(400)
-        expect(resumed).toBeLessThan(500)
+        expect(draw.mock.calls.at(-1)![0]).toBeLessThan(100)
 
         await vi.advanceTimersByTimeAsync(1000)
-        await expect(recording).resolves.toBeInstanceOf(Blob)
+        const blob = await recording
+        expect(blob).toBeInstanceOf(Blob)
+        // Only the second recording is the result: the first one's chunk was thrown away.
+        expect(blob.size).toBe('frame'.length)
         expect(draw).toHaveBeenLastCalledWith(1000)
       } finally {
         vi.useRealTimers()
       }
     })
 
-    it('stops the recorder when aborted while paused', async () => {
+    it('restarts again on every new hide', async () => {
+      vi.useFakeTimers()
+      try {
+        vi.stubGlobal('MediaRecorder', FakeRecorder)
+        const onRestart = vi.fn()
+        const recording = recordCanvas(canvas, { type: 'video/webm', durationMs: 1000, draw: () => {}, onRestart })
+        for (let i = 0; i < 3; i++) {
+          await vi.advanceTimersByTimeAsync(300)
+          setVisibility('hidden')
+          setVisibility('visible')
+        }
+        expect(onRestart).toHaveBeenCalledTimes(3)
+        await vi.advanceTimersByTimeAsync(1100)
+        await expect(recording).resolves.toBeInstanceOf(Blob)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('waits for the tab when it is hidden at the start, without a restart notice', async () => {
+      vi.useFakeTimers()
+      try {
+        vi.stubGlobal('MediaRecorder', FakeRecorder)
+        setVisibility('hidden')
+        const draw = vi.fn()
+        const onRestart = vi.fn()
+        const recording = recordCanvas(canvas, { type: 'video/webm', durationMs: 500, draw, onRestart })
+        await vi.advanceTimersByTimeAsync(5000)
+        expect(draw).not.toHaveBeenCalled()
+        setVisibility('visible')
+        await vi.advanceTimersByTimeAsync(600)
+        await expect(recording).resolves.toBeInstanceOf(Blob)
+        expect(onRestart).not.toHaveBeenCalled()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('rejects when aborted while hidden', async () => {
       vi.stubGlobal('MediaRecorder', FakeRecorder)
       const controller = new AbortController()
       const recording = recordCanvas(canvas, {

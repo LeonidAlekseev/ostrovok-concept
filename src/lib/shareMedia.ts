@@ -81,8 +81,8 @@ interface RecordOptions {
   /** Paints the frame at `elapsed` ms. */
   draw: (elapsed: number) => void
   onProgress?: (share: number) => void
-  /** Called with `true` when the recording stops for a hidden tab and `false` when it goes on. */
-  onPause?: (paused: boolean) => void
+  /** Called when a hidden tab interrupted the recording and the tab's return began it again from zero. */
+  onRestart?: () => void
   signal?: AbortSignal
 }
 
@@ -90,66 +90,79 @@ export const VIDEO_FPS = 30
 
 /**
  * Records `durationMs` of a canvas animation; rejects with the signal's reason when aborted. A hidden tab
- * stops animation frames, so the recording pauses with it and the animation time counts only visible time.
+ * stops animation frames, and pausing the recorder breaks the file in Safari, so the recording is dropped
+ * and starts over from zero when the tab is visible again.
  */
 export function recordCanvas(
   canvas: HTMLCanvasElement,
-  { type, durationMs, draw, onProgress, onPause, signal }: RecordOptions,
+  { type, durationMs, draw, onProgress, onRestart, signal }: RecordOptions,
 ) {
   signal?.throwIfAborted()
   const stream = canvas.captureStream(VIDEO_FPS)
-  const recorder = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 8_000_000 })
-  const chunks: Blob[] = []
   let frame = 0
+  // The running recording; `null` while the tab is hidden, so the stopped one is not taken for the result.
+  let recorder: MediaRecorder | null = null
+  let began = false
   return new Promise<Blob>((resolve, reject) => {
-    // Visible time before the current visible stretch began at `resumedAt`.
-    let banked = 0
-    let resumedAt = performance.now()
-    const elapsedNow = () => Math.min(banked + performance.now() - resumedAt, durationMs)
-
-    const tick = () => {
-      const elapsed = elapsedNow()
-      draw(elapsed)
-      onProgress?.(elapsed / durationMs)
-      if (elapsed < durationMs) frame = requestAnimationFrame(tick)
-      else recorder.stop()
+    const finish = () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      stream.getTracks().forEach((track) => track.stop())
     }
-    const onVisibility = () => {
-      if (recorder.state === 'inactive') return
+
+    const begin = () => {
+      const current = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 8_000_000 })
+      const chunks: Blob[] = []
+      const startedAt = performance.now()
+      const tick = () => {
+        const elapsed = Math.min(performance.now() - startedAt, durationMs)
+        draw(elapsed)
+        onProgress?.(elapsed / durationMs)
+        if (elapsed < durationMs) frame = requestAnimationFrame(tick)
+        else current.stop()
+      }
+      current.ondataavailable = (event) => chunks.push(event.data)
+      current.onstop = () => {
+        if (recorder !== current) return
+        finish()
+        if (signal?.aborted) reject(signal.reason)
+        else resolve(new Blob(chunks, { type }))
+      }
+      recorder = current
+      began = true
+      draw(0)
+      onProgress?.(0)
+      current.start()
+      frame = requestAnimationFrame(tick)
+    }
+
+    function onVisibility() {
       if (document.visibilityState === 'hidden') {
-        if (recorder.state !== 'recording') return
-        banked = elapsedNow()
+        if (!recorder || recorder.state === 'inactive') return
         cancelAnimationFrame(frame)
-        recorder.pause()
-        onPause?.(true)
-      } else if (recorder.state === 'paused') {
-        resumedAt = performance.now()
-        recorder.resume()
-        onPause?.(false)
-        frame = requestAnimationFrame(tick)
+        const dropped = recorder
+        recorder = null
+        dropped.stop()
+      } else if (!recorder) {
+        const restarted = began
+        begin()
+        if (restarted) onRestart?.()
       }
     }
 
-    recorder.ondataavailable = (event) => chunks.push(event.data)
-    recorder.onstop = () => {
-      document.removeEventListener('visibilitychange', onVisibility)
-      stream.getTracks().forEach((track) => track.stop())
-      if (signal?.aborted) reject(signal.reason)
-      else resolve(new Blob(chunks, { type }))
-    }
     signal?.addEventListener(
       'abort',
       () => {
         cancelAnimationFrame(frame)
-        if (recorder.state !== 'inactive') recorder.stop()
+        if (recorder && recorder.state !== 'inactive') recorder.stop()
+        else {
+          finish()
+          reject(signal.reason)
+        }
       },
       { once: true },
     )
-    draw(0)
-    recorder.start()
     document.addEventListener('visibilitychange', onVisibility)
-    if (document.visibilityState === 'hidden') onVisibility()
-    else frame = requestAnimationFrame(tick)
+    if (document.visibilityState !== 'hidden') begin()
   })
 }
 

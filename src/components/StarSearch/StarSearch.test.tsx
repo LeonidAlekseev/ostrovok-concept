@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { addDays, todayIso } from '../../lib/dates'
@@ -207,6 +207,28 @@ describe('StarSearch video', () => {
     observer.disconnect()
     // 300 frames cover 30 % of the bar.
     expect(writes.length).toBeLessThanOrEqual(31)
+  })
+
+  it('warns not to hide the tab while recording and says so after a restart', async () => {
+    vi.stubGlobal('MediaRecorder', { isTypeSupported: () => true })
+    let restart!: () => void
+    let finish!: () => void
+    vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _type, { onRestart }) => {
+      restart = onRestart
+      await new Promise<void>((resolve) => (finish = resolve))
+      return video
+    })
+    const user = userEvent.setup()
+    await showResult(user)
+    await user.click(screen.getByRole('button', { name: 'Создать видео для друзей' }))
+    expect(await screen.findByText('Не сворачивайте вкладку, пока идёт запись')).toBeTruthy()
+
+    act(() => restart())
+    expect(screen.getByText('Запись прервалась — начали заново. Не сворачивайте вкладку')).toBeTruthy()
+
+    finish()
+    await screen.findByRole('button', { name: /Скачать видео|Поделиться видео/ })
+    expect(screen.queryByText(/Не сворачивайте вкладку/)).toBeNull()
   })
 
   it('shares the video file when the share sheet takes files', async () => {

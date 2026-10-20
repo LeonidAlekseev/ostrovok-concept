@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useToday } from '../../hooks/useToday'
 import { addDays } from '../../lib/dates'
 import { readStars, type Reading } from '../../lib/horoscope'
-import { DEFAULT_GUESTS, withStartDates, type Stay } from '../../lib/search'
+import { DEFAULT_GUESTS, startStay, type Stay } from '../../lib/search'
 import { MagicOrb } from './MagicOrb'
 import { StarForm, type StarAnswers } from './StarForm'
 import { StarResult } from './StarResult'
@@ -39,10 +39,8 @@ export function StarSearchDialog({ open, onOpenChange }: Props) {
   const [step, setStep] = useState<Step>({ kind: 'form' })
   const nameRef = useRef<HTMLInputElement>(null)
   // The check-in of the search by default: tomorrow.
-  const defaultCheckIn = withStartDates(
-    { destination: '', checkIn: '', checkOut: '', guests: DEFAULT_GUESTS },
-    today,
-  ).checkIn
+  const start = startStay(today)
+  const defaultCheckIn = start?.checkIn ?? ''
 
   const read = () => {
     const checkIn = answers.checkIn || defaultCheckIn
