@@ -111,23 +111,30 @@ const isIsoDate = (value: string | null): value is IsoDate =>
 const toCount = (value: string | null) => (value !== null && /^\d+$/.test(value) ? Number(value) : NaN)
 
 /**
+ * Reads the guests written by `setStayParams`, whatever the dates; `null` if the address has none.
+ * Counts are read as is (a missing one is NaN): `validateSearch` judges them.
+ */
+export function parseGuestParams(params: Pick<URLSearchParams, 'get'>): Guests | null {
+  const adults = params.get('adults')
+  const children = params.get('children')
+  const rooms = params.get('rooms')
+  if (adults === null && children === null && rooms === null) return null
+  return {
+    adults: toCount(adults),
+    children: children === null ? 0 : toCount(children),
+    rooms: toCount(rooms),
+  }
+}
+
+/**
  * Reads the stay written by `setStayParams`; `null` if the dates are missing or malformed.
- * Guest counts are read as is (a missing one is NaN): `validateSearch` judges them.
+ * Guest counts are read by `parseGuestParams` (none at all means NaN, for `validateSearch` to report).
  */
 export function parseStayParams(params: Pick<URLSearchParams, 'get'>): Stay | null {
   const checkIn = params.get('checkin')
   const checkOut = params.get('checkout')
   if (!isIsoDate(checkIn) || !isIsoDate(checkOut)) return null
-  const children = params.get('children')
-  return {
-    checkIn,
-    checkOut,
-    guests: {
-      adults: toCount(params.get('adults')),
-      children: children === null ? 0 : toCount(children),
-      rooms: toCount(params.get('rooms')),
-    },
-  }
+  return { checkIn, checkOut, guests: parseGuestParams(params) ?? { adults: NaN, children: 0, rooms: NaN } }
 }
 
 export function toSearchParams(query: SearchQuery, target: SearchTarget): URLSearchParams {

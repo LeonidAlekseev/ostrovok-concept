@@ -6,6 +6,7 @@ import { addDays, todayIso } from '../../lib/dates'
 import { getDestination, type Hotel } from '../../lib/catalog'
 import {
   DEFAULT_GUESTS,
+  parseGuestParams,
   parseStayParams,
   setStayParams,
   validateSearch,
@@ -18,7 +19,7 @@ export interface StayState {
   stay: Stay | null
   /** Why the address stay was rejected (a past check-in, too many nights…). */
   error: string | undefined
-  /** Guests of the stay, or the default couple without dates. */
+  /** Guests of the stay, or those of the address without dates; the default couple if none or invalid. */
   guests: Guests
   /** Replaces the address (no new history entry); the first call without dates starts from tomorrow. */
   setStay: (next: Partial<Stay>) => void
@@ -36,15 +37,24 @@ export function useStay(hotel: Hotel): StayState {
   const error = errors.dates ?? errors.guests
   const stay = parsed && !error ? parsed : null
 
+  // Without dates the address may still carry guests; they count only when they pass the limits.
+  const addressGuests = parseGuestParams(params)
+  const guests =
+    stay?.guests ??
+    (addressGuests &&
+    !validateSearch({ destination, checkIn: '', checkOut: '', guests: addressGuests }, todayIso()).guests
+      ? addressGuests
+      : DEFAULT_GUESTS)
+
   const setStay = useCallback(
     (next: Partial<Stay>) => {
       const tomorrow = addDays(todayIso(), 1)
-      const base: Stay = stay ?? { checkIn: tomorrow, checkOut: addDays(tomorrow, 1), guests: DEFAULT_GUESTS }
+      const base: Stay = stay ?? { checkIn: tomorrow, checkOut: addDays(tomorrow, 1), guests }
       const merged = setStayParams(new URLSearchParams(params), { ...base, ...next })
       router.replace(`${pathname}?${merged}`, { scroll: false })
     },
-    [stay, params, pathname, router],
+    [stay, guests, params, pathname, router],
   )
 
-  return { stay, error, guests: stay?.guests ?? DEFAULT_GUESTS, setStay }
+  return { stay, error, guests, setStay }
 }

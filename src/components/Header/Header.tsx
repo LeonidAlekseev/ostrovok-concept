@@ -44,6 +44,7 @@ export function Header() {
         <a
           className="rounded-sm text-[clamp(26px,6.6vw,32px)] leading-none font-extrabold tracking-[-0.035em] text-primary no-underline"
           href="/"
+          onClick={close}
           aria-label="Островок! — на главную"
         >
           Островок!
