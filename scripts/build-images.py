@@ -7,6 +7,8 @@ Expected files in <sources-dir> (see public/images/CREDITS.md for origins):
     florence.jpg  Florence panorama with the Duomo
     eiffel.jpg    Eiffel Tower at sunset
     sea.jpg       Navagio bay, Zakynthos
+    sky.png       Night sky with the Moon, background of the star search (optional)
+    orb.png       Magic orb on a black background (optional)
 
 The globe is built from vector data by scripts/build-globe.py.
 """
@@ -29,10 +31,14 @@ def crop_to(img: Image.Image, ratio: float, cx: float, cy: float, zoom: float = 
     return img.crop((int(left), int(top), int(left + cw), int(top + ch)))
 
 
-def save(img: Image.Image, name: str, width: int, quality: int = 80) -> None:
+def save_to(img: Image.Image, path: Path, width: int, quality: int = 80) -> None:
     img = img.resize((width, round(img.height * width / img.width)), Image.LANCZOS)
-    img.save(OUT / name, "WEBP", quality=quality, method=6)
-    print(f"{name}: {img.size[0]}x{img.size[1]}, {(OUT / name).stat().st_size // 1024} KB")
+    img.save(path, "WEBP", quality=quality, method=6)
+    print(f"{path.relative_to(OUT)}: {img.size[0]}x{img.size[1]}, {path.stat().st_size // 1024} KB")
+
+
+def save(img: Image.Image, name: str, width: int, quality: int = 80) -> None:
+    save_to(img, OUT / name, width, quality)
 
 
 def main(src: Path) -> None:
@@ -49,6 +55,16 @@ def main(src: Path) -> None:
             continue
         img = Image.open(src / source).convert("RGB")
         save(crop_to(img, ratio, cx, cy, zoom), name, width)
+
+    stars = OUT / "stars"
+    stars.mkdir(exist_ok=True)
+    if (src / "sky.png").exists():
+        sky = Image.open(src / "sky.png").convert("RGB")
+        for name, width, quality in (("sky.webp", 1400, 70), ("sky-mobile.webp", 800, 70)):
+            save_to(sky, stars / name, width, quality)
+    if (src / "orb.png").exists():
+        orb = Image.open(src / "orb.png").convert("RGB")
+        save_to(orb.resize((640, 640), Image.LANCZOS), stars / "orb.webp", 640, 80)
 
 
 if __name__ == "__main__":
