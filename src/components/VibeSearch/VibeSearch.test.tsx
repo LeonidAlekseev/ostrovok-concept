@@ -29,7 +29,8 @@ afterEach(() => {
 const renderDialog = () => render(<VibeSearchDialog open onOpenChange={() => {}} />)
 
 async function answerAll(user: ReturnType<typeof userEvent.setup>, option: string | RegExp) {
-  for (let i = 0; i < 7; i++) await user.click(screen.getAllByRole('button', { name: option })[0])
+  for (let i = 0; i < 7; i++)
+    await user.click(screen.getAllByRole(option === 'Не могу выбрать' ? 'button' : 'radio', { name: option })[0])
 }
 
 // vibe-search, Requirement: Блок на главной
@@ -44,8 +45,8 @@ describe('VibeSearch section', () => {
 
     await user.click(screen.getByRole('button', { name: 'Найти свой вайб' }))
     const dialog = await screen.findByRole('dialog', { name: 'Поиск вайба' })
-    expect(within(dialog).getByRole('button', { name: 'Тихий вечер' })).toBeTruthy()
-    expect(within(dialog).getByRole('button', { name: 'Шумная вечеринка' })).toBeTruthy()
+    expect(within(dialog).getByRole('radio', { name: 'Тихий вечер' })).toBeTruthy()
+    expect(within(dialog).getByRole('radio', { name: 'Шумная вечеринка' })).toBeTruthy()
     expect(within(dialog).getByText('1 из 7')).toBeTruthy()
   })
 })
@@ -56,10 +57,10 @@ describe('VibeSearch pairs', () => {
     const user = userEvent.setup()
     renderDialog()
     expect(screen.queryByRole('button', { name: 'Назад' })).toBeNull()
-    await user.click(screen.getByRole('button', { name: 'Тихий вечер' }))
+    await user.click(screen.getByRole('radio', { name: 'Тихий вечер' }))
     expect(screen.getByText('2 из 7')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Море' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Город' })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: 'Море' })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: 'Город' })).toBeTruthy()
     expect(screen.getByText('2 из 7: Море или Город').getAttribute('role')).toBe('status')
   })
 
@@ -77,19 +78,36 @@ describe('VibeSearch pairs', () => {
   it('goes back to the previous pair with its answer kept', async () => {
     const user = userEvent.setup()
     renderDialog()
-    await user.click(screen.getByRole('button', { name: 'Шумная вечеринка' }))
+    await user.click(screen.getByRole('radio', { name: 'Шумная вечеринка' }))
     await user.click(screen.getByRole('button', { name: 'Назад' }))
     expect(screen.getByText('1 из 7')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Шумная вечеринка' }).getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getByRole('button', { name: 'Тихий вечер' }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByRole('radio', { name: 'Шумная вечеринка' }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByRole('radio', { name: 'Тихий вечер' }).getAttribute('aria-checked')).toBe('false')
     // «Назад» is gone with the first pair: the focus is on its first option.
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Тихий вечер' }))
+    expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Тихий вечер' }))
+  })
+
+  it('is a radiogroup of two radios that the arrows switch between without moving on', async () => {
+    const user = userEvent.setup()
+    renderDialog()
+    const group = screen.getByRole('radiogroup', { name: 'Что ближе: Тихий вечер или Шумная вечеринка' })
+    expect(within(group).getAllByRole('radio')).toHaveLength(2)
+    const left = screen.getByRole('radio', { name: 'Тихий вечер' })
+    const right = screen.getByRole('radio', { name: 'Шумная вечеринка' })
+    await waitFor(() => expect(document.activeElement).toBe(left))
+    await user.keyboard('{ArrowRight}')
+    expect(document.activeElement).toBe(right)
+    expect(screen.getByText('1 из 7')).toBeTruthy()
+    await user.keyboard('{ArrowLeft}')
+    expect(document.activeElement).toBe(left)
+    await user.keyboard('{ArrowDown}{Enter}')
+    expect(screen.getByText('2 из 7')).toBeTruthy()
   })
 
   it('works from the keyboard', async () => {
     const user = userEvent.setup()
     renderDialog()
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Тихий вечер' })))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Тихий вечер' })))
     for (let i = 0; i < 7; i++) {
       // The focus stays on the left option from pair to pair.
       expect(screen.getByText(`${i + 1} из 7`)).toBeTruthy()
@@ -135,7 +153,7 @@ describe('VibeSearch result', () => {
     await answerAll(user, 'Не могу выбрать')
     await user.click(await screen.findByRole('button', { name: 'Пройти заново' }))
     expect(screen.getByText('1 из 7')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Тихий вечер' }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByRole('radio', { name: 'Тихий вечер' }).getAttribute('aria-checked')).toBe('false')
   })
 })
 

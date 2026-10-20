@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { cn } from 'cn'
-import { homeCollections } from '../../lib/collections'
+import { getHomeCollections } from '../../lib/collections'
 import { setStayParams, startStay } from '../../lib/search'
 import { useToday } from '../../hooks/useToday'
 import { HotelTile } from '../HotelTile/HotelTile'
@@ -22,7 +22,7 @@ export function HomeCollections() {
         Подборки
       </h2>
       <div className="flex flex-col gap-[clamp(18px,4vw,32px)]">
-        {homeCollections.map(({ collection, hotels }) => (
+        {getHomeCollections().map(({ collection, hotels }) => (
           <div key={collection.id}>
             <h3 className="text-[clamp(16px,4.2vw,22px)] font-semibold tracking-[-0.01em]">{collection.title}</h3>
             <p className="mb-3 text-[clamp(13px,3.4vw,16px)] text-muted-foreground">{collection.description}</p>

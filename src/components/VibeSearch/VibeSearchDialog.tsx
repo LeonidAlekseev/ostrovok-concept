@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -17,7 +17,7 @@ interface Props {
 
 // The inner side of each option is padded wider: the «vs» circle reaches 16px into it.
 const optionClass =
-  'flex min-h-28 items-center justify-center rounded-2xl p-3 text-center text-[clamp(19px,5vw,22px)]/[1.2] font-bold text-primary-foreground shadow-(--shadow-card) transition-transform hover:scale-[1.03] active:scale-[0.98] aria-pressed:ring-4 aria-pressed:ring-ring/60 aria-pressed:ring-offset-2'
+  'flex min-h-28 items-center justify-center rounded-2xl p-3 text-center text-[clamp(19px,5vw,22px)]/[1.2] font-bold text-primary-foreground shadow-(--shadow-card) transition-transform hover:scale-[1.03] active:scale-[0.98] aria-checked:ring-4 aria-checked:ring-ring/60 aria-checked:ring-offset-2'
 
 export function VibeSearchDialog({ open, onOpenChange }: Props) {
   const today = useToday()
@@ -25,6 +25,7 @@ export function VibeSearchDialog({ open, onOpenChange }: Props) {
   const [answers, setAnswers] = useState<Answer[]>([])
   const [step, setStep] = useState(0)
   const leftRef = useRef<HTMLButtonElement>(null)
+  const rightRef = useRef<HTMLButtonElement>(null)
   const done = step === VIBE_STEPS
   const vibe = useMemo(() => (done ? readVibe(answers) : null), [done, answers])
   // The links start tomorrow and the day after, as in the collections.
@@ -43,6 +44,13 @@ export function VibeSearchDialog({ open, onOpenChange }: Props) {
     next[step] = answer
     setAnswers(next)
     setStep(step + 1)
+  }
+  // The arrows only move between the two options; a choice is Enter, Space or a click.
+  const arrow = (event: KeyboardEvent) => {
+    const toRight = event.key === 'ArrowRight' || event.key === 'ArrowDown'
+    if (!toRight && event.key !== 'ArrowLeft' && event.key !== 'ArrowUp') return
+    event.preventDefault()
+    ;(toRight ? rightRef : leftRef).current?.focus()
   }
   const back = () => {
     setStep(step - 1)
@@ -95,11 +103,18 @@ export function VibeSearchDialog({ open, onOpenChange }: Props) {
               </div>
             </div>
 
-            <div className="relative grid grid-cols-2 gap-3">
+            <div
+              role="radiogroup"
+              aria-label={`Что ближе: ${axis.left} или ${axis.right}`}
+              className="relative grid grid-cols-2 gap-3"
+              onKeyDown={arrow}
+            >
               <button
                 ref={leftRef}
                 type="button"
-                aria-pressed={answers[step] === -1}
+                role="radio"
+                aria-checked={answers[step] === -1}
+                tabIndex={answers[step] === 1 ? -1 : 0}
                 className={cn(optionClass, 'pr-6 bg-(image:--decor-vibe-calm)')}
                 onClick={() => choose(-1)}
               >
@@ -108,8 +123,11 @@ export function VibeSearchDialog({ open, onOpenChange }: Props) {
                 </span>
               </button>
               <button
+                ref={rightRef}
                 type="button"
-                aria-pressed={answers[step] === 1}
+                role="radio"
+                aria-checked={answers[step] === 1}
+                tabIndex={answers[step] === 1 ? 0 : -1}
                 className={cn(optionClass, 'pl-6 bg-(image:--decor-vibe-loud)')}
                 onClick={() => choose(1)}
               >

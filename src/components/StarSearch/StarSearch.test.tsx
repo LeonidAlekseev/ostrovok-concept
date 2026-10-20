@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { addDays, todayIso } from '../../lib/dates'
 import { StarSearch } from './StarSearch'
 import { StarSearchDialog } from './StarSearchDialog'
+import { renderReadingVideo } from './starVideo'
 
 // jsdom has no canvas and no MediaRecorder: the recording itself is checked in the browser.
 const video = new File(['video'], 'ostrovok-zvezdy.mp4', { type: 'video/mp4' })
@@ -181,6 +182,32 @@ describe('StarSearch video', () => {
     await fillForm(user)
     await user.click(screen.getByRole('button', { name: 'Гадать' }))
   }
+
+  it('moves the progress bar in 1 % steps, not on every frame', async () => {
+    vi.stubGlobal('MediaRecorder', { isTypeSupported: () => true })
+    let finish!: () => void
+    vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _type, { onProgress }) => {
+      await new Promise<void>((resolve) => (finish = resolve))
+      onProgress(0)
+      for (let i = 1; i <= 300; i++) {
+        onProgress(i / 1000)
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      }
+      return video
+    })
+    const user = userEvent.setup()
+    await showResult(user)
+    await user.click(screen.getByRole('button', { name: 'Создать видео для друзей' }))
+    const bar = await screen.findByRole('progressbar', { name: 'Создание видео' })
+    const writes: string[] = []
+    const observer = new MutationObserver(() => writes.push(bar.getAttribute('aria-valuenow')!))
+    observer.observe(bar, { attributes: true, subtree: true })
+    finish()
+    await screen.findByRole('button', { name: /Скачать видео|Поделиться видео/ }, { timeout: 5000 })
+    observer.disconnect()
+    // 300 frames cover 30 % of the bar.
+    expect(writes.length).toBeLessThanOrEqual(31)
+  })
 
   it('shares the video file when the share sheet takes files', async () => {
     vi.stubGlobal('MediaRecorder', { isTypeSupported: (type: string) => type === 'video/mp4' })

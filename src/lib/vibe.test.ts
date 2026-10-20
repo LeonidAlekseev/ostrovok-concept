@@ -6,6 +6,13 @@ const all = (answer: Answer): Answer[] => VIBE_AXES.map(() => answer)
 const catalogue = hotels.map((h) => getHotel(h.id)!)
 
 describe('VIBE_AXES', () => {
+  it('spans the catalogue: the nearest hotel is fully central, the farthest fully remote', () => {
+    const location = VIBE_AXES.find((axis) => axis.id === 'location')!
+    const fits = catalogue.map((h) => [h.distanceKm, location.fit(h)] as const).sort((a, b) => a[0] - b[0])
+    expect(fits[0][1]).toBe(1)
+    expect(fits.at(-1)![1]).toBe(-1)
+  })
+
   it('has seven pairs, the first one is «Тихий вечер» / «Шумная вечеринка»', () => {
     expect(VIBE_AXES).toHaveLength(7)
     expect(VIBE_AXES[0]).toMatchObject({ left: 'Тихий вечер', right: 'Шумная вечеринка' })
@@ -54,6 +61,15 @@ describe('vibeArchetype', () => {
     expect(vibeArchetype([1, 0, 0, 1, 0, 0, 0]).name).toBe('Душа вечеринки')
     // «Море» and «Спа и бассейн».
     expect(vibeArchetype([0, -1, 0, -1, 0, 0, 0]).name).toBe('Морской гедонист')
+  })
+
+  it('takes «Морской гедонист» for «Море», «Спа и бассейн» and «Завтрак в номер»', () => {
+    expect(vibeArchetype([0, -1, 0, -1, -1, 0, 0]).name).toBe('Морской гедонист')
+  })
+
+  it('breaks a tie by the main axis, not the table order', () => {
+    // «Подальше от суеты» is the second pole of «Тихая гавань», «Море» the main one of «Морской гедонист».
+    expect(vibeArchetype([0, -1, 0, 0, 0, 0, -1]).name).toBe('Морской гедонист')
   })
 
   it('has a vibe for any single answer', () => {

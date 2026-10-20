@@ -50,7 +50,12 @@ export function StarVideo({ reading, name }: { reading: Reading; name: string })
     try {
       const file = await renderReadingVideo(reading, name, type, {
         signal: controller.signal,
-        onProgress: (progress) => setState({ kind: 'rendering', progress }),
+        // The bar moves in 1 % steps: a state update per frame would re-render the dialog 60 times a second.
+        onProgress: (share) =>
+          setState((prev) => {
+            const progress = Math.round(share * 100) / 100
+            return prev.kind === 'rendering' && prev.progress !== progress ? { kind: 'rendering', progress } : prev
+          }),
         onPause: setPaused,
       })
       setState({ kind: 'ready', file, url: URL.createObjectURL(file), shareable: canShareFile(file) })
