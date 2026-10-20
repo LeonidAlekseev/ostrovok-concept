@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fullHotelsIn, MEAL_LABEL } from '../../lib/catalog'
@@ -170,7 +170,11 @@ describe('SearchResultsPage query', () => {
     await results()
 
     expect(screen.getByRole('heading', { level: 1, name: 'Прага, Чехия' })).toBeDefined()
-    expect(screen.getByText(/3 ночи · 2 гостя/)).toBeDefined()
+    // The card of the search: the destination and the dates; the nights and guests are in the form.
+    const card = screen.getByRole('button', { name: /^Прага, Чехия/ })
+    expect(card.textContent).toBe('Прага, Чехия20 окт. — 23 окт.')
+    expect(card.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByText(/3 ночи/)).toBeNull()
     expect(cards().length).toBeGreaterThanOrEqual(6)
   })
 
@@ -195,7 +199,9 @@ describe('SearchResultsPage query', () => {
     open(PRAGUE)
     await results()
 
-    await user.click(screen.getByRole('button', { name: 'Изменить поиск' }))
+    await user.click(screen.getByRole('button', { name: /^Прага, Чехия/ }))
+    expect(screen.getByRole('button', { name: /^Прага, Чехия/ }).getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('button', { name: /^Прага, Чехия/ }).getAttribute('aria-describedby')).toBeTruthy()
     const destination = screen.getByRole('combobox', { name: 'Направление' })
     expect((destination as HTMLInputElement).value).toBe('Прага')
     await user.clear(destination)
@@ -262,13 +268,13 @@ describe('SearchResultsPage hotel card', () => {
     }
   })
 
-  it('lists the hotels in one column up to 2xl and in two from 2xl', async () => {
+  it('lists the hotels in one column up to 3xl (1920 px) and in two from 3xl', async () => {
     open(PRAGUE)
     await results()
 
     const list = screen.getByRole('region', { name: 'Отели' }).querySelector('ul')!
-    expect(list.className).toMatch(/(^|\s)2xl:grid-cols-2(\s|$)/)
-    expect(list.className).not.toMatch(/(^|\s)(sm|md|lg|xl):grid-cols-/)
+    expect(list.className).toMatch(/(^|\s)3xl:grid-cols-2(\s|$)/)
+    expect(list.className).not.toMatch(/(^|\s)(sm|md|lg|xl|2xl):grid-cols-/)
   })
 })
 
@@ -276,7 +282,7 @@ describe('SearchResultsPage hotel card', () => {
 describe('SearchResultsPage filters', () => {
   it('filters by stars and sorts by price, writing both into the URL without new history entries', async () => {
     const user = userEvent.setup()
-    open(PRAGUE)
+    open(PRAGUE, { desktop: true })
     await results()
     const pushState = vi.spyOn(window.history, 'pushState')
 
@@ -292,7 +298,7 @@ describe('SearchResultsPage filters', () => {
   })
 
   it('restores the filters and the sorting from the URL', async () => {
-    open(`${PRAGUE}&stars=5,4&rating=8&free_cancel=1&sort=price_desc`)
+    open(`${PRAGUE}&stars=5,4&rating=8&free_cancel=1&sort=price_desc`, { desktop: true })
     await results()
 
     expect(screen.getByRole('checkbox', { name: '5 звёзд' }).getAttribute('aria-checked')).toBe('true')
@@ -307,7 +313,7 @@ describe('SearchResultsPage filters', () => {
 
   it('shows "Ничего не нашлось" and resets the filters', async () => {
     const user = userEvent.setup()
-    open(PRAGUE)
+    open(PRAGUE, { desktop: true })
     await results()
     const all = cardNames()
 
@@ -322,10 +328,95 @@ describe('SearchResultsPage filters', () => {
   })
 })
 
+// search-results-page, Requirement: Строка поиска; Фильтры на телефоне
+describe('SearchResultsPage compact bar', () => {
+  const sheet = () => screen.getByRole('dialog', { name: 'Фильтры' })
+
+  it('shows the filters and map buttons on narrow screens only, hidden from lg', async () => {
+    open(PRAGUE)
+    await results()
+
+    for (const name of ['Фильтры', 'Карта']) {
+      const button = screen.getByRole('button', { name })
+      expect(button.className).toMatch(/(^|\s)lg:hidden(\s|$)/)
+    }
+    expect(screen.getByRole('heading', { level: 1 }).className).toContain('sr-only')
+  })
+
+  it('has no filter or map buttons and keeps the panels on desktop', async () => {
+    open(PRAGUE, { desktop: true })
+    await results()
+
+    expect(screen.getByRole('button', { name: 'Фильтры' }).className).toContain('lg:hidden')
+    const aside = screen.getByRole('complementary', { name: 'Фильтры' })
+    // The sorting is the first item of the side panel.
+    expect(aside.querySelector('select')).toBe(within(aside).getByLabelText('Сортировка'))
+    expect(aside.firstElementChild!.firstElementChild!.contains(within(aside).getByLabelText('Сортировка'))).toBe(true)
+  })
+
+  it('names the filters button with the number of enabled filters', async () => {
+    open(`${PRAGUE}&stars=5,4&free_cancel=1`)
+    await results()
+
+    const button = screen.getByRole('button', { name: 'Фильтры, включено 2' })
+    expect(button.textContent).toBe('2')
+  })
+
+  it('toggles between "Карта" and "Список" with the icon', async () => {
+    const user = userEvent.setup()
+    open(PRAGUE)
+    await results()
+
+    await user.click(screen.getByRole('button', { name: 'Карта' }))
+    expect(screen.queryByRole('button', { name: 'Карта' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Список' }))
+    expect(screen.getByRole('button', { name: 'Карта' })).toBeDefined()
+    expect(screen.getByRole('region', { name: 'Отели' }).className).not.toContain('hidden')
+  })
+
+  it('applies filters at once in the bottom sheet, sorting first, and closes with "Показать N отелей"', async () => {
+    const user = userEvent.setup()
+    open(PRAGUE)
+    await results()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    const pushState = vi.spyOn(window.history, 'pushState')
+
+    await user.click(screen.getByRole('button', { name: 'Фильтры' }))
+    const dialog = sheet()
+    expect(dialog.querySelector('select')).toBe(within(dialog).getByLabelText('Сортировка'))
+    await user.click(within(dialog).getByRole('checkbox', { name: '5 звёзд' }))
+
+    expect(window.location.search).toContain('stars=5')
+    expect(pushState).not.toHaveBeenCalled()
+    // The page behind the modal sheet is hidden from assistive technology.
+    const total = screen.queryAllByRole('article', { hidden: true }).length
+    expect(total).toBeGreaterThan(0)
+    const show = within(dialog).getByRole('button', { name: /^Показать \d+ отел/ })
+    expect(show.textContent).toBe(`Показать ${total} ${total === 1 ? 'отель' : total < 5 ? 'отеля' : 'отелей'}`)
+
+    await user.click(show)
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(screen.getByRole('button', { name: 'Фильтры, включено 1' })).toBeDefined()
+    for (const card of cards()) expect(within(card).getByLabelText('5 звёзд')).toBeDefined()
+  })
+
+  it('sorts from the bottom sheet', async () => {
+    const user = userEvent.setup()
+    open(PRAGUE)
+    await results()
+
+    await user.click(screen.getByRole('button', { name: 'Фильтры' }))
+    await user.selectOptions(within(sheet()).getByLabelText('Сортировка'), 'price_asc')
+
+    expect(window.location.search).toContain('sort=price_asc')
+    expect(prices()).toEqual([...prices()].sort((a, b) => a - b))
+  })
+})
+
 // search-results-page, Requirement: Карта результатов поиска
 describe('SearchResultsPage map', () => {
-  const markers = () => screen.findAllByRole('button', { name: /, от [\d\s]+₽$/ }, { timeout: 3000 })
-  const markerOf = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}, от `) })
+  const markers = () => screen.findAllByRole('button', { name: /, [\d\s]+₽$/ }, { timeout: 3000 })
+  const markerOf = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}, `) })
 
   it('shows a marker per hotel with the price of its card, without "за ночь"', async () => {
     open(`destination=prague&checkin=2026-10-20&checkout=2026-10-23&adults=3&rooms=2`, { desktop: true })
@@ -337,7 +428,7 @@ describe('SearchResultsPage map', () => {
       const price = priceOf(card)
       const marker = markerOf(name)
       expect(marker.textContent).toBe(price)
-      expect(marker.getAttribute('aria-label')).toBe(`${name}, от ${price}`)
+      expect(marker.getAttribute('aria-label')).toBe(`${name}, ${price}`)
     }
     // The price filter keeps "Цена за ночь"; the cards and the map show no period.
     for (const name of ['Отели', 'Карта отелей'])
@@ -389,7 +480,7 @@ describe('SearchResultsPage map attribution', () => {
     vi.setSystemTime(NOW)
     open(PRAGUE, { desktop: true })
     await results()
-    await screen.findAllByRole('button', { name: /, от / }, { timeout: 3000 })
+    await screen.findAllByRole('button', { name: /, [\d\s]+₽$/ }, { timeout: 3000 })
 
     expect(mapMock.options.at(-1)).toMatchObject({ attributionControl: { compact: true } })
     expect(attribution().classList.contains('maplibregl-compact-show')).toBe(true)
@@ -402,7 +493,7 @@ describe('SearchResultsPage map attribution', () => {
   it('folds the attribution on the first interaction with the map, and the "i" shows it again', async () => {
     open(PRAGUE, { desktop: true })
     await results()
-    const [marker] = await screen.findAllByRole('button', { name: /, от / }, { timeout: 3000 })
+    const [marker] = await screen.findAllByRole('button', { name: /, [\d\s]+₽$/ }, { timeout: 3000 })
     expect(attribution().classList.contains('maplibregl-compact-show')).toBe(true)
 
     act(() => mapMock.last!.fire('mousedown'))
@@ -418,7 +509,7 @@ describe('SearchResultsPage map attribution', () => {
 
 // search-results-page, Requirement: Краткая карточка на карте
 describe('SearchResultsPage map preview', () => {
-  const markers = () => screen.findAllByRole('button', { name: /, от / }, { timeout: 3000 })
+  const markers = () => screen.findAllByRole('button', { name: /, [\d\s]+₽$/ }, { timeout: 3000 })
 
   it('shows the short card of a hovered marker and highlights its card in the list', async () => {
     const user = userEvent.setup()
@@ -432,7 +523,8 @@ describe('SearchResultsPage map preview', () => {
     const preview = document.getElementById(marker.getAttribute('aria-describedby')!)!
     expect(map.contains(preview)).toBe(true)
     expect(within(preview).getByText(name)).toBeDefined()
-    expect(within(preview).getByText(/^от /).textContent).toBe(`от ${marker.textContent}`)
+    expect(within(preview).getByText(/^[\d\s]+₽$/).textContent).toBe(marker.textContent)
+    expect(preview.textContent).not.toMatch(/(^|\s)от \d/)
     expect(within(preview).getByRole('img', { name: /звезд|звёзд/ })).toBeDefined()
     expect(within(preview).getByText('Оценка гостей')).toBeDefined()
     expect(within(preview).getAllByRole('img').length).toBeGreaterThan(1)
@@ -467,7 +559,7 @@ describe('SearchResultsPage map preview', () => {
 
 // search-results-page, Requirement: Окно отеля с карты
 describe('SearchResultsPage hotel dialog', () => {
-  const markers = () => screen.findAllByRole('button', { name: /, от / }, { timeout: 3000 })
+  const markers = () => screen.findAllByRole('button', { name: /, [\d\s]+₽$/ }, { timeout: 3000 })
   const hotel = fullHotelsIn('prague')[0]
 
   it('opens the hotel of a pressed marker in a dialog with the dates of the search, without scrolling the list', async () => {
@@ -574,6 +666,24 @@ describe('SearchResultsPage hotel dialog', () => {
     expect(cardNames()).toEqual(before)
   })
 
+  // search-results-page, Requirement: Панель цены в окне отеля
+  it('keeps the price bar of the hotel page at the bottom of the scrolling dialog, with its dates and guests', async () => {
+    const user = userEvent.setup()
+    open(`${PRAGUE}&hotel=${hotel.id}`)
+    await results()
+    const dialog = await screen.findByRole('dialog', { name: hotel.name })
+    const bar = within(dialog).getByRole('region', { name: 'Цена' })
+
+    expect(bar.className).toContain('sticky')
+    expect(bar.className).toContain('bottom-0')
+    expect(bar.closest('.overflow-y-auto')).not.toBeNull()
+    expect(within(bar).getByText('за 3 ночи, для 2 гостей')).toBeDefined()
+    await user.click(within(dialog).getByRole('button', { name: /^Гости: / }))
+    await user.click(await screen.findByRole('button', { name: 'Взрослые: увеличить' }))
+    expect(within(bar).getByText('за 3 ночи, для 3 гостей')).toBeDefined()
+    expect(within(bar).getByRole('button', { name: 'Выбрать номер' })).toBeDefined()
+  })
+
   it('ignores an unknown hotel id', async () => {
     open(`${PRAGUE}&hotel=no-such-hotel`)
     await results()
@@ -593,6 +703,118 @@ describe('SearchResultsPage hotel dialog', () => {
 
     expect(await screen.findByRole('dialog')).toBeDefined()
     // The page behind the modal dialog is hidden from assistive technology.
-    expect(screen.getByRole('button', { name: 'Карта', hidden: true }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Список', hidden: true })).toBeDefined()
+  })
+})
+
+// search-results-page, Requirement: Страницы результатов
+describe('SearchResultsPage pages', () => {
+  const EUROPE = `scenario=europe&${STAY}`
+  const markers = () => screen.findAllByRole('button', { name: /, [\d\s]+₽$/ }, { timeout: 3000 })
+  const pagination = () => screen.getByRole('navigation', { name: 'Страницы результатов' })
+  const total = () => Number(screen.getByText(/^Найдено \d+/).textContent!.match(/\d+/)![0])
+
+  it('shows 12 hotels per page with the navigation, current page marked', async () => {
+    open(EUROPE)
+    await results()
+
+    expect(total()).toBeGreaterThan(12)
+    expect(cards()).toHaveLength(12)
+    expect(within(pagination()).getByRole('link', { name: 'Страница 1' }).getAttribute('aria-current')).toBe('page')
+    expect(within(pagination()).queryByRole('link', { name: 'Предыдущая страница' })).toBeNull()
+  })
+
+  it('moves to the second page with a new history entry, and "Назад" returns', async () => {
+    const user = userEvent.setup()
+    open(EUROPE)
+    await results()
+    const first = cardNames()
+    const length = window.history.length
+
+    await user.click(within(pagination()).getByRole('link', { name: 'Страница 2' }))
+
+    expect(window.location.search).toContain('page=2')
+    expect(window.history.length).toBe(length + 1)
+    expect(cardNames()).toHaveLength(Math.min(12, total() - 12))
+    expect(cardNames().some((name) => first.includes(name))).toBe(false)
+    expect(within(pagination()).getByRole('link', { name: 'Страница 2' }).getAttribute('aria-current')).toBe('page')
+
+    act(() => window.history.back())
+    await waitFor(() => expect(window.location.search).not.toContain('page='))
+    await waitFor(() => expect(cardNames()).toEqual(first))
+  })
+
+  it('focuses the results heading after the move', async () => {
+    const user = userEvent.setup()
+    open(EUROPE)
+    await results()
+
+    await user.click(within(pagination()).getByRole('link', { name: 'Следующая страница' }))
+
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: /^Найдено \d+/ })))
+  })
+
+  it('takes the nearest existing page for an invalid one', async () => {
+    open(`${EUROPE}&page=99`)
+    await results()
+    const last = Math.ceil(total() / 12)
+    expect(
+      within(pagination())
+        .getByRole('link', { name: `Страница ${last}` })
+        .getAttribute('aria-current'),
+    ).toBe('page')
+
+    cleanup()
+    open(`${EUROPE}&page=abc`)
+    await results()
+    expect(within(pagination()).getByRole('link', { name: 'Страница 1' }).getAttribute('aria-current')).toBe('page')
+  })
+
+  it('returns to the first page when the sorting changes', async () => {
+    const user = userEvent.setup()
+    open(`${EUROPE}&page=2`, { desktop: true })
+    await results()
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Сортировка' }), 'price_asc')
+
+    expect(window.location.search).not.toContain('page=')
+    expect(window.location.search).toContain('sort=price_asc')
+    expect(within(pagination()).getByRole('link', { name: 'Страница 1' }).getAttribute('aria-current')).toBe('page')
+  })
+
+  it('hides the navigation for a single page', async () => {
+    open(PRAGUE)
+    await results()
+
+    expect(total()).toBeLessThanOrEqual(12)
+    expect(screen.queryByRole('navigation', { name: 'Страницы результатов' })).toBeNull()
+  })
+
+  it('keeps the page when a hotel dialog opens and closes', async () => {
+    const user = userEvent.setup()
+    open(`${EUROPE}&page=2`, { desktop: true })
+    await results()
+    const [marker] = await markers()
+
+    await user.click(marker)
+    expect(await screen.findByRole('dialog')).toBeDefined()
+    expect(window.location.search).toMatch(/page=2.*hotel=|hotel=.*page=2/)
+
+    act(() => window.history.back())
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(window.location.search).toContain('page=2')
+  })
+
+  it('shows markers of all hotels on the second page and highlights the marker of a hovered card', async () => {
+    const user = userEvent.setup()
+    open(`${EUROPE}&page=2`, { desktop: true })
+    await results()
+
+    await waitFor(async () => expect(await markers()).toHaveLength(total()))
+    expect(cards().length).toBeLessThan(total())
+    const card = cards()[0]
+    await user.hover(card)
+    const name = within(card).getByRole('heading').textContent!
+    expect(screen.getByRole('button', { name: new RegExp(`^${name}, `) }).hasAttribute('data-active')).toBe(true)
   })
 })

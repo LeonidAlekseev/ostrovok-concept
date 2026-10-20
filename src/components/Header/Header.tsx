@@ -51,8 +51,6 @@ export function Header() {
         </a>
 
         <div className="relative flex items-center gap-[clamp(0px,1vw,14px)]">
-          <UserMenu buttonClass={`${iconButton} font-[650]`} />
-
           <Link
             href="/favorites"
             className={buttonVariants({ variant: 'ghost', size: 'icon', className: iconButton })}
@@ -75,6 +73,8 @@ export function Header() {
               </Button>
             </PopoverContent>
           </Popover>
+
+          <UserMenu buttonClass={iconButton} />
 
           <Popover {...panelProps('menu')}>
             <PopoverTrigger

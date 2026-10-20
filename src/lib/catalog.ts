@@ -100,12 +100,20 @@ export interface HotelSummary {
   isNew: boolean
 }
 
+export interface NearestStation {
+  station: string
+  /** Walking distance, m. */
+  meters: number
+}
+
 export interface Hotel extends HotelSummary {
   address: string
   lat: number
   lon: number
   /** Straight-line distance to the city centre, km. */
   distanceKm: number
+  /** The nearest metro station in a city with a metro, `null` elsewhere. */
+  metro: NearestStation | null
   amenities: Amenity[]
   description: string
   checkInTime: string
@@ -260,6 +268,17 @@ export const hotels: HotelSummary[] = summaries.all
 /** The hand-picked "recently added" hotels, in their original order. */
 export const newHotels: HotelSummary[] = summaries.newOnes
 
+/** Every second hotel of a city (by id) sells only non-refundable rates. */
+const nonRefundableIds = new Set(
+  destinations.flatMap((d) =>
+    hotels
+      .filter((h) => h.destinationId === d.id)
+      .map((h) => h.id)
+      .sort()
+      .filter((_, index) => index % 2 === 1),
+  ),
+)
+
 const summaryById = new Map(hotels.map((h) => [h.id, h]))
 
 export const getDestination = (id: string): Destination | undefined => destinations.find((d) => d.id === id)
@@ -374,6 +393,16 @@ const REVIEWS_UNTIL: IsoDate = '2026-09-30'
 
 const KM_PER_DEGREE = 111.32
 
+/**
+ * Demo transport: a station of the city's metro picked by the hotel id, 150–1 200 m away to the
+ * nearest 10 m. It has its own seed so the rest of the hotel stays as it was.
+ */
+function nearestStation(hotelId: string, stations: string[] | undefined): NearestStation | null {
+  if (!stations?.length) return null
+  const rng = seeded(`metro:${hotelId}`)
+  return { station: rng.pick(stations), meters: Math.round(rng.int(150, 1200) / 10) * 10 }
+}
+
 function buildHotel(summary: HotelSummary): Hotel {
   const rng = seeded(`hotel:${summary.id}`)
   const destination = getDestination(summary.destinationId)!
@@ -407,6 +436,7 @@ function buildHotel(summary: HotelSummary): Hotel {
       photos: [photo(`${type.id}-1`, type.name), photo(`${type.id}-2`, 'Ванная комната')],
       rates: rateTypes.map(({ factor, ...rate }) => ({
         ...rate,
+        ...(nonRefundableIds.has(summary.id) && { cancellation: { kind: 'non-refundable' } as const }),
         pricePerNight: factor === cheapest ? base : roundUp100((base * factor) / cheapest),
       })),
     }
@@ -431,6 +461,7 @@ function buildHotel(summary: HotelSummary): Hotel {
     lat: Math.round(lat * 1e4) / 1e4,
     lon: Math.round(lon * 1e4) / 1e4,
     distanceKm,
+    metro: nearestStation(summary.id, destination.metro),
     amenities,
     description: [
       `${summary.name} — ${summary.stars}-звёздочный отель в районе «${district}», в ${distance} от центра.`,

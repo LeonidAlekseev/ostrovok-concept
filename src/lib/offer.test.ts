@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { getHotel } from './catalog'
+import { cheapestRate, getHotel } from './catalog'
 import {
   averageNight,
   freeCancellationUntil,
   guruPrice,
+  lowestPrice,
   nightPrice,
   OFFER_NOT_FOUND,
   parseOffer,
@@ -74,6 +75,24 @@ describe('guruPrice', () => {
   it('takes 10 % off and rounds to the rouble', () => {
     expect(guruPrice(5985)).toBe(5387)
     expect(guruPrice(7000)).toBe(6300)
+  })
+})
+
+// hotel-page, Requirement: Панель цены
+describe('lowestPrice', () => {
+  const cheapest = cheapestRate(hotel).rate.pricePerNight
+  const stay = { checkIn: '2026-10-23', checkOut: '2026-10-25', guests: { adults: 2, children: 0, rooms: 2 } }
+
+  it('is the cheapest rate for the whole stay and all rooms', () => {
+    expect(lowestPrice(hotel, stay, 2, TODAY)).toBe(stayTotal(cheapest, stay.checkIn, stay.checkOut, 2))
+  })
+
+  it('without dates is the cheapest night of the check-ins in the next 7 days, × rooms', () => {
+    // From a Friday the week still has weekday nights, cheaper than Friday and Saturday.
+    expect(lowestPrice(hotel, null, 1, '2026-10-23')).toBe(cheapest)
+    expect(lowestPrice(hotel, null, 2, '2026-10-23')).toBe(cheapest * 2)
+    // A hotel whose only night in the window were the weekend would cost the weekend price.
+    expect(Math.min(nightPrice(cheapest, '2026-10-23'), nightPrice(cheapest, '2026-10-24'))).toBeGreaterThan(cheapest)
   })
 })
 

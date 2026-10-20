@@ -37,7 +37,7 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
     const places = suggestDestinations(value).map((d) => ({
       id: d.id,
       label: d.name,
-      hint: `${d.country} · от ${formatPrice(d.priceFrom)}`,
+      hint: `${d.country} · ${formatPrice(d.priceFrom)}`,
     }))
     return scenario
       ? [{ id: `scenario-${scenario.id}`, label: scenario.title, hint: 'Все подходящие направления' }, ...places]

@@ -1,4 +1,4 @@
-import { useId, useState, type Ref } from 'react'
+import { useId, useState, type ReactElement, type Ref } from 'react'
 import { CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/field'
@@ -18,12 +18,14 @@ interface Props {
   /** Id of the text that explains the field, read after its label. */
   describedBy?: string
   triggerRef?: Ref<HTMLButtonElement>
+  /** A button of the caller's, e.g. "Изменить", opens the calendar instead of the field; it names itself. */
+  trigger?: ReactElement
   onChange: (checkIn: IsoDate, checkOut: IsoDate) => void
 }
 
 const nightForms: [string, string, string] = ['ночь', 'ночи', 'ночей']
 
-export function DateField({ checkIn, checkOut, error, single, describedBy, triggerRef, onChange }: Props) {
+export function DateField({ checkIn, checkOut, error, single, describedBy, triggerRef, trigger, onChange }: Props) {
   const [open, setOpen] = useState(false)
   // Check-in picked, check-out pending. Discarded if the popover closes midway.
   const [draftStart, setDraftStart] = useState<IsoDate | null>(null)
@@ -57,20 +59,25 @@ export function DateField({ checkIn, checkOut, error, single, describedBy, trigg
   return (
     <div className="relative min-w-0">
       <Popover open={open} onOpenChange={onOpenChange}>
-        <PopoverTrigger
-          className={`${fieldBox(Boolean(error))}`}
-          ref={triggerRef}
-          aria-label={single ? `Дата заезда: ${label}` : `Даты поездки: ${label}, ${countRu(nights, nightForms)}`}
-          aria-describedby={[describedBy, error && errorId].filter(Boolean).join(' ') || undefined}
-        >
-          <CalendarDays className="shrink-0 text-brand-foreground" size={22} strokeWidth={1.8} aria-hidden />
-          <span className="truncate text-[clamp(13px,3.55vw,18px)] max-xs:text-sm/[normal]" title={label}>
-            {label}
-          </span>
-        </PopoverTrigger>
+        {trigger ? (
+          <PopoverTrigger render={trigger} ref={triggerRef} />
+        ) : (
+          <PopoverTrigger
+            className={`${fieldBox(Boolean(error))}`}
+            ref={triggerRef}
+            aria-label={single ? `Дата заезда: ${label}` : `Даты поездки: ${label}, ${countRu(nights, nightForms)}`}
+            aria-describedby={[describedBy, error && errorId].filter(Boolean).join(' ') || undefined}
+          >
+            <CalendarDays className="shrink-0 text-brand-foreground" size={22} strokeWidth={1.8} aria-hidden />
+            <span className="truncate text-[clamp(13px,3.55vw,18px)] max-xs:text-sm/[normal]" title={label}>
+              {label}
+            </span>
+          </PopoverTrigger>
+        )}
 
         <PopoverContent
-          align="start"
+          // A caller's button sits at the end of its row: the calendar opens towards the start.
+          align={trigger ? 'end' : 'start'}
           sideOffset={8}
           // Stays under the field and lets the page scroll, as it did before the popover moved to Base UI.
           collisionAvoidance={{ side: 'none' }}

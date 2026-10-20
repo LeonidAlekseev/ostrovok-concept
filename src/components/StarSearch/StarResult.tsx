@@ -56,9 +56,7 @@ export function StarResult({ reading, stay, name, onRestart }: Props) {
         ))}
       </dl>
 
-      <p className="font-hand text-[clamp(20px,5.4vw,24px)] leading-[1.25] font-semibold text-primary">
-        {reading.forecast}
-      </p>
+      <p className="font-hand text-[clamp(25px,6.75vw,30px)] leading-[1.25] text-primary">{reading.forecast}</p>
 
       <HotelTile hotel={main} href={hrefOf(main)} heading="h4" />
 

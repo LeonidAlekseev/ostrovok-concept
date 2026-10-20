@@ -1,15 +1,28 @@
 import { useId, type ReactNode } from 'react'
+import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { MEAL_LABEL } from '../../lib/catalog'
 import { countRu } from '../../lib/format'
-import { countFilters, MEAL_OPTIONS, NO_FILTERS, RATING_OPTIONS, STAR_OPTIONS, type Filters } from '../../lib/results'
+import {
+  countFilters,
+  MEAL_OPTIONS,
+  NO_FILTERS,
+  RATING_OPTIONS,
+  SORTS,
+  STAR_OPTIONS,
+  type Filters,
+  type Sort,
+} from '../../lib/results'
 
 interface Props {
   filters: Filters
   onChange: (filters: Filters) => void
+  /** Inside the bottom sheet: no card of its own and no reset button, the sheet footer has it. */
+  embedded?: boolean
 }
 
 const toggle = <T,>(list: T[], value: T, on: boolean) => (on ? [...list, value] : list.filter((v) => v !== value))
@@ -50,12 +63,31 @@ function CheckboxRow({
 const ratingItem =
   'h-9 rounded-lg border border-transparent bg-(--decor-surface-soft) px-2.5 text-sm/[normal] transition-[background-color,border-color] hover:bg-secondary data-checked:border-primary data-checked:bg-secondary data-checked:font-[650] data-checked:text-primary'
 
-/** Price per night, stars, minimal rating, meals and free cancellation. */
-export function FiltersPanel({ filters, onChange }: Props) {
+/** Sorting first, then price per night, stars, minimal rating, meals and free cancellation. */
+export function FiltersPanel({ filters, onChange, embedded = false }: Props) {
   const set = (patch: Partial<Filters>) => onChange({ ...filters, ...patch })
   const count = countFilters(filters)
+  const sortId = useId()
   return (
-    <div className="flex flex-col gap-5 rounded-2xl bg-card p-4 shadow-(--shadow-card)">
+    <div className={cn('flex flex-col gap-5', !embedded && 'rounded-2xl bg-card p-4 shadow-(--shadow-card)')}>
+      <div className="flex flex-col gap-2">
+        <label htmlFor={sortId} className="font-semibold">
+          Сортировка
+        </label>
+        <NativeSelect
+          id={sortId}
+          className="w-full"
+          value={filters.sort}
+          onChange={(e) => set({ sort: e.target.value as Sort })}
+        >
+          {Object.entries(SORTS).map(([value, label]) => (
+            <NativeSelectOption key={value} value={value}>
+              {label}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+      </div>
+
       <Group legend="Цена за ночь, ₽">
         <div className="grid grid-cols-2 gap-2">
           <Input
@@ -122,7 +154,7 @@ export function FiltersPanel({ filters, onChange }: Props) {
         />
       </Group>
 
-      {count > 0 && (
+      {!embedded && count > 0 && (
         <Button variant="outline" onClick={() => onChange({ ...NO_FILTERS, sort: filters.sort })}>
           Сбросить фильтры
         </Button>

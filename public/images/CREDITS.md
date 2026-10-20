@@ -25,3 +25,9 @@ coastlines (public domain).
 | `vibe/location-left.webp`  | [Pier by Sabine Hut 16-9, Nelson Lakes National Park, New Zealand](https://commons.wikimedia.org/wiki/File:Pier_by_Sabine_Hut_16-9,_Nelson_Lakes_National_Park,_New_Zealand.jpg)                                                                                           | Michal Klajban   | CC BY-SA 4.0 |
 | `vibe/location-right.webp` | [Fuente de la Plaza Nueva, Liubliana, Eslovenia, 2017-04-14, DD 50-52 HDR](https://commons.wikimedia.org/wiki/File:Fuente_de_la_Plaza_Nueva,_Liubliana,_Eslovenia,_2017-04-14,_DD_50-52_HDR.jpg)                                                                           | Diego Delso      | CC BY-SA 4.0 |
 | `vibe/balance.webp`        | [From Temple of Olympian Zeus to Lycabetus Athens Greece](https://commons.wikimedia.org/wiki/File:From_Temple_of_Olympian_Zeus_to_Lycabetus_Athens_Greece.jpg)                                                                                                             | Jebulon          | CC0          |
+
+## Star search
+
+`stars/sky.webp`, `stars/sky-mobile.webp` (night sky with the Moon) and `stars/orb.webp` (magic orb) are
+provided by the project owner; `scripts/build-images.py` resizes them to WebP. The source PNGs are not kept
+in the repository.

@@ -13,6 +13,8 @@ export interface Destination {
   scenarios: ScenarioId[]
   /** Show a marker for the destination on the hero globe. */
   onGlobe?: boolean
+  /** Real metro stations of a city with a metro; the demo hotels get one of them as the nearest. */
+  metro?: string[]
 }
 
 export interface Scenario {
@@ -33,6 +35,7 @@ export const destinations: Destination[] = [
     priceFrom: 6900,
     scenarios: ['weekend', 'europe'],
     onGlobe: true,
+    metro: ['Мустек', 'Музеум', 'Старомнестска', 'Народни тршида', 'Флоренц', 'Анёл', 'Вышеградска', 'Малостранска'],
   },
   {
     id: 'paris',
@@ -43,6 +46,7 @@ export const destinations: Destination[] = [
     lon: 2.35,
     priceFrom: 9800,
     scenarios: ['weekend', 'europe'],
+    metro: ['Шатле', 'Опера', 'Лувр — Риволи', 'Сен-Мишель', 'Бастилия', 'Монпарнас — Бьенвеню', 'Трокадеро'],
   },
   {
     id: 'london',
@@ -54,6 +58,15 @@ export const destinations: Destination[] = [
     priceFrom: 12500,
     scenarios: ['europe'],
     onGlobe: true,
+    metro: [
+      'Пикадилли-серкус',
+      'Ковент-Гарден',
+      'Вестминстер',
+      'Кингс-Кросс Сент-Панкрас',
+      'Ватерлоо',
+      'Бейкер-стрит',
+      'Оксфорд-серкус',
+    ],
   },
   {
     id: 'oslo',
@@ -65,6 +78,7 @@ export const destinations: Destination[] = [
     priceFrom: 10400,
     scenarios: ['europe'],
     onGlobe: true,
+    metro: ['Юрнбанеторгет', 'Стортинг', 'Национальный театр', 'Грёнланн', 'Майорстюен'],
   },
   {
     id: 'stockholm',
@@ -75,6 +89,7 @@ export const destinations: Destination[] = [
     lon: 18.07,
     priceFrom: 9100,
     scenarios: ['europe'],
+    metro: ['Т-Сентрален', 'Гамла Стан', 'Слюссен', 'Эстермальмсторг', 'Мариаторгет', 'Рёдмансгатан'],
   },
   {
     id: 'helsinki',
@@ -86,6 +101,7 @@ export const destinations: Destination[] = [
     priceFrom: 8700,
     scenarios: ['europe'],
     onGlobe: true,
+    metro: ['Раутатиентори', 'Камппи', 'Хаканиеми', 'Каисаниеми', 'Сёрнайнен'],
   },
   {
     id: 'florence',
@@ -107,6 +123,7 @@ export const destinations: Destination[] = [
     priceFrom: 8200,
     scenarios: ['weekend', 'europe'],
     onGlobe: true,
+    metro: ['Термини', 'Спанья', 'Барберини', 'Колоссео', 'Чирко Массимо', 'Оттавиано', 'Фламинио'],
   },
   {
     id: 'madrid',
@@ -118,6 +135,7 @@ export const destinations: Destination[] = [
     priceFrom: 7900,
     scenarios: ['europe'],
     onGlobe: true,
+    metro: ['Соль', 'Гран-Виа', 'Сибелес', 'Опера', 'Каллао', 'Тирсо-де-Молина', 'Аточа'],
   },
   {
     id: 'barcelona',
@@ -128,6 +146,7 @@ export const destinations: Destination[] = [
     lon: 2.17,
     priceFrom: 8900,
     scenarios: ['sea', 'europe'],
+    metro: ['Каталония', 'Лисеу', 'Пасеч-де-Грасия', 'Диагональ', 'Жауме I', 'Барселонета', 'Саграда Фамилия'],
   },
   {
     id: 'lisbon',
@@ -139,6 +158,7 @@ export const destinations: Destination[] = [
     priceFrom: 7400,
     scenarios: ['sea', 'europe'],
     onGlobe: true,
+    metro: ['Байша-Шиаду', 'Россиу', 'Рештаурадореш', 'Маркеш-де-Помбал', 'Тереиру-ду-Пасу', 'Авенида'],
   },
   {
     id: 'athens',
@@ -149,6 +169,7 @@ export const destinations: Destination[] = [
     lon: 23.73,
     priceFrom: 6800,
     scenarios: ['sea', 'europe'],
+    metro: ['Синтагма', 'Монастираки', 'Акрополи', 'Омония', 'Тисио', 'Эвангелизмос'],
   },
   {
     id: 'zakynthos',
@@ -170,6 +191,7 @@ export const destinations: Destination[] = [
     priceFrom: 5200,
     scenarios: ['weekend'],
     onGlobe: true,
+    metro: ['Таксим', 'Шишхане', 'Везнеджилер', 'Османбей', 'Шишли-Меджидиекёй', 'Йеникапы'],
   },
   {
     id: 'antalya',
@@ -211,6 +233,7 @@ export const destinations: Destination[] = [
     priceFrom: 3900,
     scenarios: ['weekend'],
     onGlobe: true,
+    metro: ['Площадь Свободы', 'Руставели', 'Авлабари', 'Марджанишвили', 'Вокзальная площадь'],
   },
   {
     id: 'reykjavik',
@@ -233,6 +256,14 @@ export const destinations: Destination[] = [
     priceFrom: 16900,
     scenarios: [],
     onGlobe: true,
+    metro: [
+      'Таймс-сквер — 42-я улица',
+      'Гранд-Сентрал — 42-я улица',
+      'Юнион-сквер',
+      '34-я улица — Пенн-стейшн',
+      'Уолл-стрит',
+      'Колумбус-серкл',
+    ],
   },
   {
     id: 'miami',
@@ -244,6 +275,7 @@ export const destinations: Destination[] = [
     priceFrom: 14200,
     scenarios: ['sea'],
     onGlobe: true,
+    metro: ['Гавернмент-Сентер', 'Брикелл', 'Хисторик-Оверактаун', 'Санта-Клара', 'Вискайя'],
   },
   {
     id: 'los-angeles',
@@ -255,6 +287,13 @@ export const destinations: Destination[] = [
     priceFrom: 15300,
     scenarios: ['sea'],
     onGlobe: true,
+    metro: [
+      'Юнион-стейшн',
+      'Пёршинг-сквер',
+      'Голливуд — Хайленд',
+      '7-я улица — Метро-Сентер',
+      'Вермонт — Санта-Моника',
+    ],
   },
   {
     id: 'vancouver',
@@ -310,6 +349,7 @@ export const destinations: Destination[] = [
     priceFrom: 4600,
     scenarios: [],
     onGlobe: true,
+    metro: ['Садат', 'Насер', 'Ораби', 'Мохамед Нагиб', 'Аль-Шохада'],
   },
   {
     id: 'dubai',
@@ -321,6 +361,7 @@ export const destinations: Destination[] = [
     priceFrom: 11200,
     scenarios: ['sea'],
     onGlobe: true,
+    metro: ['Бурджуман', 'Юнион', 'Бурдж-Халифа — Дубай Молл', 'Аль-Губайба', 'Шараф ДГ'],
   },
   {
     id: 'almaty',
@@ -332,6 +373,7 @@ export const destinations: Destination[] = [
     priceFrom: 5100,
     scenarios: ['weekend'],
     onGlobe: true,
+    metro: ['Абая', 'Алмалы', 'Жибек Жолы', 'Райымбек батыра', 'Байконур'],
   },
   {
     id: 'delhi',
@@ -343,6 +385,7 @@ export const destinations: Destination[] = [
     priceFrom: 4300,
     scenarios: [],
     onGlobe: true,
+    metro: ['Раджив-Чоук', 'Чандни-Чоук', 'Патель-Чоук', 'Нью-Дели', 'Хауз-Хас'],
   },
   {
     id: 'beijing',
@@ -354,6 +397,7 @@ export const destinations: Destination[] = [
     priceFrom: 7300,
     scenarios: [],
     onGlobe: true,
+    metro: ['Тяньаньмэнь-Восток', 'Ванфуцзин', 'Дунсы', 'Цяньмэнь', 'Гомао', 'Сидань'],
   },
   {
     id: 'seoul',
@@ -365,6 +409,7 @@ export const destinations: Destination[] = [
     priceFrom: 8600,
     scenarios: [],
     onGlobe: true,
+    metro: ['Мёндон', 'Ыльчиро 1-га', 'Чонгак', 'Анкук', 'Хондэ', 'Каннам'],
   },
   {
     id: 'vladivostok',
@@ -387,6 +432,7 @@ export const destinations: Destination[] = [
     priceFrom: 10900,
     scenarios: [],
     onGlobe: true,
+    metro: ['Гиндза', 'Синдзюку', 'Сибуя', 'Токио', 'Асакуса', 'Уэно', 'Роппонги'],
   },
 ]
 

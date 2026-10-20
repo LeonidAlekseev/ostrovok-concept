@@ -101,15 +101,11 @@
   --decor-magenta: #c13df5;
   --decor-indigo: #3b2bb8;
   --decor-night: #0b1033;
-  --decor-orb-swirl: conic-gradient(
-    var(--brand-blue),
-    var(--decor-violet),
-    var(--decor-magenta),
-    var(--brand-lime),
-    var(--brand-blue)
-  );
-  --decor-orb-shadow: 0 0 60px color-mix(in srgb, var(--decor-violet) 45%, transparent);
   --decor-spin-gradient: linear-gradient(100deg, var(--brand-blue), var(--decor-violet) 55%, var(--decor-magenta));
+  --decor-gold-deep: #c8923a;
+  --decor-lavender: #c9c2ff;
+  --decor-gold-gradient: linear-gradient(to bottom, var(--decor-light), var(--decor-gold) 45%, var(--decor-gold-deep));
+  --decor-star-button: linear-gradient(100deg, var(--brand-blue), var(--decor-violet));
   --decor-spin-shadow: 0 10px 24px color-mix(in srgb, var(--decor-violet) 30%, transparent);
   /* Vibe search: the calm blue-lilac and the loud pink-orange sides; white text keeps 3:1 on both. */
   --decor-vibe-calm-from: #3b5bdb;
@@ -146,8 +142,9 @@
   --breakpoint-md: 768px;
   --breakpoint-lg: 980px;
   --breakpoint-xl: 1240px;
+  --breakpoint-3xl: 120rem;
   --font-sans: 'Onest Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-hand: Caveat, cursive;
+  --font-hand: 'Great Vibes', cursive;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -163,12 +160,12 @@
      animation-delay styles. */
   /* The assistant's typing indicator: three dots bouncing in turn. */
   --animate-typing-dot: typing-dot 1s ease-in-out infinite;
-  /* The magic orb: its colours swirl and shimmer, the glow breathes, sparkles twinkle around it, and while the
+  /* The magic orb: the glow breathes, sparkles twinkle around it, and while the
      stars are read the sign's symbol surfaces from the nebula (2.5 s, the length of the reading). */
-  --animate-orb-swirl: orb-swirl 8s linear infinite;
-  --animate-orb-swirl-fast: orb-swirl 1.2s linear infinite;
   --animate-orb-glow: orb-glow 3s ease-in-out infinite;
   --animate-orb-reveal: orb-reveal 2.5s ease-out both;
+  /* The zodiac circle of the star search block turns once in two minutes. */
+  --animate-zodiac-spin: zodiac-spin 120s linear infinite;
   --animate-twinkle: twinkle 1.8s ease-in-out infinite;
   /* The glow under the hub pin on the globe breathes. */
   --animate-hub-pulse: hub-pulse 2.4s ease-in-out infinite;
@@ -211,15 +208,6 @@
     }
   }
 
-  @keyframes orb-swirl {
-    50% {
-      filter: hue-rotate(40deg) saturate(1.3);
-    }
-    to {
-      rotate: 1turn;
-    }
-  }
-
   @keyframes orb-glow {
     50% {
       opacity: 0.6;
@@ -238,6 +226,12 @@
       opacity: 1;
       scale: 1;
       filter: blur(0);
+    }
+  }
+
+  @keyframes zodiac-spin {
+    to {
+      rotate: 1turn;
     }
   }
 

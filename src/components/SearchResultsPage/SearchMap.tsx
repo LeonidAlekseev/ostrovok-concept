@@ -3,23 +3,15 @@
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useCallback, useEffect, useId, useRef, useState, type FocusEvent, type PointerEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { LngLatBounds, Map as MapLibreMap, Marker, Popup, setWorkerUrl, type PopupOptions } from 'maplibre-gl'
+import { LngLatBounds, Map as MapLibreMap, Marker, Popup, type PopupOptions } from 'maplibre-gl'
 import { Star } from 'lucide-react'
 import { cn } from 'cn'
 import { Badge } from '@/components/ui/badge'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import type { Hotel } from '../../lib/catalog'
 import { countRu, formatDecimal, formatPrice } from '../../lib/format'
+import { ATTRIBUTION_SHOWN_MS, foldAttribution, MAP_STYLE } from './mapSetup'
 import { MapUnavailable } from './MapUnavailable'
-
-// MapLibre looks for its worker next to its own module, which the bundler moves: point it to the file.
-setWorkerUrl(new URL('maplibre-gl/dist/maplibre-gl-worker.mjs', import.meta.url).href)
-
-/** Free vector tiles without a key; the style credits OpenFreeMap, OpenMapTiles and OpenStreetMap. */
-export const MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty'
-
-/** The attribution is shown in full this long after the map loads, then folds into its "i" button. */
-export const ATTRIBUTION_SHOWN_MS = 5000
 
 export interface MapHotel {
   hotel: Hotel
@@ -47,14 +39,6 @@ interface Props {
   onActivate: (id: string | null) => void
   /** A marker press opens the hotel. */
   onOpen: (id: string) => void
-}
-
-/**
- * Folds the compact attribution into its "i" button the way pressing it does. The OSMF rules let an
- * interactive map fold it only after showing it: on the first interaction or after a few seconds.
- */
-function foldAttribution(map: MapLibreMap) {
-  map.getContainer().querySelector<HTMLElement>('.maplibregl-compact-show > .maplibregl-ctrl-attrib-button')?.click()
 }
 
 /**
@@ -174,7 +158,7 @@ export default function SearchMap({ hotels, activeId, onActivate, onOpen }: Prop
           return createPortal(
             <button
               type="button"
-              aria-label={`${hotel.name}, от ${formatPrice(price)}`}
+              aria-label={`${hotel.name}, ${formatPrice(price)}`}
               aria-haspopup="dialog"
               aria-describedby={previewId === hotel.id ? previewDomId : undefined}
               data-active={active || undefined}
@@ -218,7 +202,7 @@ function MapPreview({ id, hotel, price }: MapHotel & { id: string }) {
           ))}
         </span>
         <div className="flex items-center gap-2 pt-1">
-          <p className="mr-auto text-base font-bold whitespace-nowrap">от {formatPrice(price)}</p>
+          <p className="mr-auto text-base font-bold whitespace-nowrap">{formatPrice(price)}</p>
           <Badge className="bg-primary text-primary-foreground">
             <span className="sr-only">Оценка гостей </span>
             {formatDecimal(hotel.rating)}

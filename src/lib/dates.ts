@@ -42,6 +42,14 @@ function monthLabel(date: Date): string {
   return shortMonth.format(date)
 }
 
+const shortWeekday = new Intl.DateTimeFormat('ru-RU', { weekday: 'short' })
+
+/** "24 окт, сб": the day, the short month without its dot and the short weekday. */
+export function formatShortDay(iso: IsoDate): string {
+  const date = fromIso(iso)
+  return `${date.getDate()} ${monthLabel(date).replace('.', '')}, ${shortWeekday.format(date)}`
+}
+
 export function formatLongDate(iso: IsoDate): string {
   return longDate.format(fromIso(iso))
 }
@@ -59,6 +67,12 @@ export function formatDateRange(from: IsoDate, to: IsoDate | null): string {
     return `${a.getDate()} ${monthLabel(a)} – ${b.getDate()} ${monthLabel(b)} ${year}`
   }
   return `${a.getDate()} – ${b.getDate()} ${monthLabel(b)} ${year}`
+}
+
+/** "24 окт. — 25 окт.": the day and the short month of both ends, without the year. */
+export function formatShortRange(from: IsoDate, to: IsoDate): string {
+  const [a, b] = [fromIso(from), fromIso(to)]
+  return `${a.getDate()} ${monthLabel(a)} — ${b.getDate()} ${monthLabel(b)}`
 }
 
 /** Monday-first grid of a month; `null` cells pad the first week. */

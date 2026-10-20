@@ -133,6 +133,39 @@ describe('hasFreeCancellation', () => {
   it('is false when no rate is', () => {
     expect(hasFreeCancellation(withRates('non-refundable', 'non-refundable'))).toBe(false)
   })
+
+  it('is false for exactly every second hotel of a city, by id', () => {
+    expect(catalog.filter((h) => !hasFreeCancellation(h))).toHaveLength(Math.floor(catalog.length / 2))
+    for (const d of destinations) {
+      const own = catalog.filter((h) => h.destinationId === d.id).sort((a, b) => a.id.localeCompare(b.id))
+      own.forEach((h, i) => expect(hasFreeCancellation(h), h.id).toBe(i % 2 === 0))
+      if (own.length > 1) expect(own.some(hasFreeCancellation), d.id).toBe(true)
+    }
+  })
+
+  it('keeps every rate of a non-refundable hotel non-refundable', () => {
+    const none = catalog.filter((h) => !hasFreeCancellation(h))
+    for (const h of none)
+      for (const room of h.rooms)
+        for (const rate of room.rates) expect(rate.cancellation.kind, h.id).toBe('non-refundable')
+  })
+})
+
+// hotel-catalog, Requirement: Транспорт рядом с отелем
+describe('nearest metro station', () => {
+  it('is one of the city stations 150–1 200 m away, to 10 m, in a city with a metro', () => {
+    const prague = destinations.find((d) => d.id === 'prague')!
+    for (const h of catalog.filter((h) => h.destinationId === 'prague')) {
+      expect(prague.metro, h.id).toContain(h.metro?.station)
+      expect(h.metro!.meters).toBeGreaterThanOrEqual(150)
+      expect(h.metro!.meters).toBeLessThanOrEqual(1200)
+      expect(h.metro!.meters % 10).toBe(0)
+    }
+  })
+
+  it('is missing in a city without one', () => {
+    for (const h of catalog.filter((h) => h.destinationId === 'zakynthos')) expect(h.metro, h.id).toBeNull()
+  })
 })
 
 describe('slugify', () => {

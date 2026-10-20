@@ -31,8 +31,37 @@ const readPalette = (): Palette => ({
   soft: cssColor('--secondary'),
 })
 
-/** The magic orb: a swirl of the brand colours under a glass highlight, sparkles around it. */
-function drawOrb(ctx: CanvasRenderingContext2D, p: Palette, x: number, y: number, r: number, t: number) {
+/** Loads the orb's picture. It is decoded before the recording starts; null if it did not load. */
+export async function loadOrbImage(src = '/images/stars/orb.webp'): Promise<HTMLImageElement | null> {
+  try {
+    const image = new Image()
+    image.src = src
+    await image.decode()
+    return image
+  } catch {
+    return null
+  }
+}
+
+/** The magic orb: the picture, or without it a swirl of the brand colours; sparkles around. */
+function drawOrb(
+  ctx: CanvasRenderingContext2D,
+  p: Palette,
+  orb: HTMLImageElement | null,
+  x: number,
+  y: number,
+  r: number,
+  t: number,
+) {
+  if (orb) {
+    ctx.drawImage(orb, x - r * 1.25, y - r * 1.25, r * 2.5, r * 2.5)
+  } else {
+    drawSwirlOrb(ctx, p, x, y, r, t)
+  }
+  drawSparkles(ctx, p, x, y, r, t)
+}
+
+function drawSwirlOrb(ctx: CanvasRenderingContext2D, p: Palette, x: number, y: number, r: number, t: number) {
   ctx.save()
   const glow = ctx.createRadialGradient(x, y, r * 0.7, x, y, r * 1.6)
   glow.addColorStop(0, p.violet)
@@ -64,7 +93,9 @@ function drawOrb(ctx: CanvasRenderingContext2D, p: Palette, x: number, y: number
   ctx.fillStyle = shine
   ctx.fillRect(x - r, y - r, r * 2, r * 2)
   ctx.restore()
+}
 
+function drawSparkles(ctx: CanvasRenderingContext2D, p: Palette, x: number, y: number, r: number, t: number) {
   ctx.save()
   ctx.fillStyle = p.gold
   for (let i = 0; i < 14; i++) {
@@ -97,7 +128,7 @@ export function drawReadingFrame(
   reading: Reading,
   name: string,
   t: number,
-  { p, font, site }: { p: Palette; font: string; site: string },
+  { p, font, site, orb }: { p: Palette; font: string; site: string; orb: HTMLImageElement | null },
 ) {
   const W = VIDEO_WIDTH
   const bg = ctx.createLinearGradient(0, 0, 0, VIDEO_HEIGHT)
@@ -113,7 +144,7 @@ export function drawReadingFrame(
   const intro = sceneAlpha(t, -FADE_MS, FORECAST_AT)
   if (intro > 0) {
     ctx.globalAlpha = intro
-    drawOrb(ctx, p, W / 2, 800, 300, t)
+    drawOrb(ctx, p, orb, W / 2, 800, 300, t)
     const reveal = ease((t - 600) / 1400)
     ctx.globalAlpha = intro * reveal
     drawSymbol(ctx, p, reading.sign.symbol, W / 2, 800, 220 * (0.5 + 0.5 * reveal))
@@ -129,7 +160,7 @@ export function drawReadingFrame(
   const forecast = sceneAlpha(t, FORECAST_AT, HOTEL_AT)
   if (forecast > 0) {
     ctx.globalAlpha = forecast
-    drawOrb(ctx, p, W / 2, 470, 130, t)
+    drawOrb(ctx, p, orb, W / 2, 470, 130, t)
     drawSymbol(ctx, p, reading.sign.symbol, W / 2, 470, 120)
     ctx.fillStyle = p.ink
     ctx.font = `600 52px ${font}`
@@ -180,7 +211,7 @@ export function drawReadingFrame(
     y += 110
     ctx.fillStyle = p.primary
     ctx.font = `800 80px ${font}`
-    ctx.fillText(`от ${formatPrice(hotel.priceFrom)}`, W / 2, y)
+    ctx.fillText(`${formatPrice(hotel.priceFrom)}`, W / 2, y)
     ctx.restore()
   }
   ctx.globalAlpha = 1
@@ -201,8 +232,8 @@ export async function renderReadingVideo(
   canvas.width = VIDEO_WIDTH
   canvas.height = VIDEO_HEIGHT
   const ctx = canvas.getContext('2d')!
-  const font = await brandFont()
-  const style = { p: readPalette(), font, site: window.location.host }
+  const [font, orb] = await Promise.all([brandFont(), loadOrbImage()])
+  const style = { p: readPalette(), font, site: window.location.host, orb }
   const blob = await recordCanvas(canvas, {
     type,
     durationMs: VIDEO_MS,
