@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { addDays, todayIso } from '../../lib/dates'
 import { StarSearch } from './StarSearch'
 import { StarSearchDialog } from './StarSearchDialog'
+import { renderReadingVideo } from './starVideo'
 
 // jsdom has no canvas and no MediaRecorder: the recording itself is checked in the browser.
 const video = new File(['video'], 'ostrovok-zvezdy.mp4', { type: 'video/mp4' })
@@ -54,6 +55,27 @@ describe('StarSearch section', () => {
 
 // star-search, Requirement: Анкета
 describe('StarSearch form', () => {
+  it('picks the check-in in the search calendar, where past days are not available', async () => {
+    reduceMotion()
+    const user = userEvent.setup()
+    renderDialog()
+    await fillForm(user)
+    const today = todayIso()
+    const later = addDays(today, 10)
+
+    await user.click(screen.getByRole('button', { name: /^Дата заезда: / }))
+    const calendar = await screen.findByRole('dialog', { name: 'Выбор даты заезда' })
+    const day = (iso: string) => calendar.querySelector<HTMLButtonElement>(`[data-date="${iso}"]`)
+    expect(day(addDays(today, -1))?.disabled).toBe(true)
+    await user.click(day(later)!)
+    expect(screen.queryByRole('dialog', { name: 'Выбор даты заезда' })).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Гадать' }))
+    const url = new URL(screen.getAllByRole('link')[0].getAttribute('href')!, 'https://x')
+    expect(url.searchParams.get('checkin')).toBe(later)
+    expect(url.searchParams.get('checkout')).toBe(addDays(later, 2))
+  })
+
   it('shows the sign as soon as the birthday is known', async () => {
     const user = userEvent.setup()
     renderDialog()
@@ -160,6 +182,32 @@ describe('StarSearch video', () => {
     await fillForm(user)
     await user.click(screen.getByRole('button', { name: 'Гадать' }))
   }
+
+  it('moves the progress bar in 1 % steps, not on every frame', async () => {
+    vi.stubGlobal('MediaRecorder', { isTypeSupported: () => true })
+    let finish!: () => void
+    vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _type, { onProgress }) => {
+      await new Promise<void>((resolve) => (finish = resolve))
+      onProgress(0)
+      for (let i = 1; i <= 300; i++) {
+        onProgress(i / 1000)
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      }
+      return video
+    })
+    const user = userEvent.setup()
+    await showResult(user)
+    await user.click(screen.getByRole('button', { name: 'Создать видео для друзей' }))
+    const bar = await screen.findByRole('progressbar', { name: 'Создание видео' })
+    const writes: string[] = []
+    const observer = new MutationObserver(() => writes.push(bar.getAttribute('aria-valuenow')!))
+    observer.observe(bar, { attributes: true, subtree: true })
+    finish()
+    await screen.findByRole('button', { name: /Скачать видео|Поделиться видео/ }, { timeout: 5000 })
+    observer.disconnect()
+    // 300 frames cover 30 % of the bar.
+    expect(writes.length).toBeLessThanOrEqual(31)
+  })
 
   it('shares the video file when the share sheet takes files', async () => {
     vi.stubGlobal('MediaRecorder', { isTypeSupported: (type: string) => type === 'video/mp4' })

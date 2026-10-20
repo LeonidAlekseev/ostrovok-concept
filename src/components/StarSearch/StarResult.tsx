@@ -67,7 +67,7 @@ export function StarResult({ reading, stay, name, onRestart }: Props) {
         <p id="star-backups" className="font-semibold">
           Запасные варианты
         </p>
-        <ul className="grid grid-cols-2 gap-2">
+        <ul className="grid gap-2 sm:grid-cols-2">
           {backups.map((hotel) => (
             <li key={hotel.id}>
               <HotelTile hotel={hotel} href={hrefOf(hotel)} heading="h4" />

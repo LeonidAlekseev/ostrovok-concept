@@ -2,8 +2,8 @@
 
 import { useMemo } from 'react'
 import { cn } from 'cn'
-import { homeCollections } from '../../lib/collections'
-import { DEFAULT_GUESTS, setStayParams, withStartDates, type Stay } from '../../lib/search'
+import { getHomeCollections } from '../../lib/collections'
+import { setStayParams, startStay } from '../../lib/search'
 import { useToday } from '../../hooks/useToday'
 import { HotelTile } from '../HotelTile/HotelTile'
 
@@ -11,14 +11,7 @@ import { HotelTile } from '../HotelTile/HotelTile'
 export function HomeCollections() {
   const today = useToday()
   // Starts are tomorrow and the day after, as in the search form; empty until the date is known.
-  const stay = useMemo<Stay | null>(() => {
-    if (!today) return null
-    const { checkIn, checkOut, guests } = withStartDates(
-      { destination: '', checkIn: '', checkOut: '', guests: DEFAULT_GUESTS },
-      today,
-    )
-    return { checkIn, checkOut, guests }
-  }, [today])
+  const stay = useMemo(() => startStay(today), [today])
 
   return (
     <section id="collections" aria-labelledby="collections-title">
@@ -29,7 +22,7 @@ export function HomeCollections() {
         Подборки
       </h2>
       <div className="flex flex-col gap-[clamp(18px,4vw,32px)]">
-        {homeCollections.map(({ collection, hotels }) => (
+        {getHomeCollections().map(({ collection, hotels }) => (
           <div key={collection.id}>
             <h3 className="text-[clamp(16px,4.2vw,22px)] font-semibold tracking-[-0.01em]">{collection.title}</h3>
             <p className="mb-3 text-[clamp(13px,3.4vw,16px)] text-muted-foreground">{collection.description}</p>

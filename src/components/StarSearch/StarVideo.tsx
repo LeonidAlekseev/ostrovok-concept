@@ -18,6 +18,8 @@ export function StarVideo({ reading, name }: { reading: Reading; name: string })
   const [type] = useState(videoType)
   const [state, setState] = useState<State>({ kind: 'idle' })
   const [note, setNote] = useState('')
+  // The recording stands while the tab is hidden.
+  const [paused, setPaused] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
   const hotel = reading.hotels[0]
@@ -43,15 +45,23 @@ export function StarVideo({ reading, name }: { reading: Reading; name: string })
     const controller = new AbortController()
     abortRef.current = controller
     setNote('')
+    setPaused(false)
     setState({ kind: 'rendering', progress: 0 })
     try {
       const file = await renderReadingVideo(reading, name, type, {
         signal: controller.signal,
-        onProgress: (progress) => setState({ kind: 'rendering', progress }),
+        // The bar moves in 1 % steps: a state update per frame would re-render the dialog 60 times a second.
+        onProgress: (share) =>
+          setState((prev) => {
+            const progress = Math.round(share * 100) / 100
+            return prev.kind === 'rendering' && prev.progress !== progress ? { kind: 'rendering', progress } : prev
+          }),
+        onPause: setPaused,
       })
       setState({ kind: 'ready', file, url: URL.createObjectURL(file), shareable: canShareFile(file) })
       setNote('Видео готово')
     } catch {
+      setPaused(false)
       if (controller.signal.aborted) {
         setState({ kind: 'idle' })
         setNote('Видео отменено')
@@ -177,7 +187,7 @@ export function StarVideo({ reading, name }: { reading: Reading; name: string })
     <div className="flex flex-col gap-2">
       {actions}
       <p className="min-h-5 text-center text-sm text-muted-foreground" role="status">
-        {note}
+        {paused ? 'Запись на паузе — вернитесь на вкладку' : note}
       </p>
     </div>
   )

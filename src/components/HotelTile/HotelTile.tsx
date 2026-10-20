@@ -64,12 +64,12 @@ export function HotelTile({
               {hotel.name}
             </Link>
           </Heading>
-          <p className="text-sm/[normal] text-muted-foreground">{getDestination(hotel.destinationId)!.name}</p>
+          <p className="text-sm/[normal] text-muted-foreground">{getDestination(hotel.destinationId)?.name}</p>
         </div>
         {children}
         <div className="mt-auto flex items-center gap-2 pt-1">
           <p className="mr-auto text-base/8 font-bold whitespace-nowrap">от {formatPrice(price)}</p>
-          <Badge className="bg-primary text-primary-foreground">
+          <Badge className="h-6 bg-primary text-sm text-primary-foreground">
             <span className="sr-only">Оценка гостей </span>
             {formatDecimal(hotel.rating)}
           </Badge>

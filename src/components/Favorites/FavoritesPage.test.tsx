@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
+import { addDays, todayIso } from '@/lib/dates'
 import { favoritesStore } from '@/lib/storage'
 import { FavoritesPage } from './FavoritesPage'
 
@@ -16,10 +17,18 @@ describe('FavoritesPage', () => {
     expect(screen.getByRole('link', { name: 'Найти отель' }).getAttribute('href')).toBe('/')
   })
 
-  it('lists a saved hotel with a link to it, without signing in', () => {
+  it('lists a saved hotel with a link to it with the start dates, without signing in', () => {
     favoritesStore.set([HOTEL])
     render(<FavoritesPage />)
-    expect(screen.getByRole('link', { name: /Lantern/i }).getAttribute('href')).toBe(`/hotels/${HOTEL}`)
+    const url = new URL(screen.getByRole('link', { name: /Lantern/i }).getAttribute('href')!, 'https://x')
+    const checkIn = addDays(todayIso(), 1)
+    expect(url.pathname).toBe(`/hotels/${HOTEL}`)
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      checkin: checkIn,
+      checkout: addDays(checkIn, 1),
+      adults: '2',
+      rooms: '1',
+    })
   })
 
   it('removes a hotel and shows the empty state', async () => {

@@ -19,9 +19,10 @@ export interface VibeAxis {
 
 const clamp = (value: number) => Math.max(-1, Math.min(1, value))
 
-/** Distances in the catalogue run from 0.3 to 5 km: the centre is +1, the outskirts −1. */
-const MIN_KM = 0.3
-const MAX_KM = 5
+/** The scale of the catalogue's own distances: its nearest hotel is +1, the farthest −1. */
+const distances = hotels.map((summary) => getHotel(summary.id)!.distanceKm)
+const MIN_KM = Math.min(...distances)
+const MAX_KM = Math.max(...distances)
 const centrality = (hotel: Hotel) => clamp(1 - (2 * (hotel.distanceKm - MIN_KM)) / (MAX_KM - MIN_KM))
 const has = (hotel: Hotel, amenity: Hotel['amenities'][number]) => hotel.amenities.includes(amenity)
 
@@ -102,7 +103,7 @@ export interface Archetype {
 /** A side of an axis: `evening:-1` is «Тихий вечер». */
 type Pole = `${string}:${-1 | 1}`
 
-/** Every pole is in some archetype, so any answer but «Не могу выбрать» everywhere has a match. */
+/** The first pole of an archetype is its main axis. Every pole is in some archetype, so any answer but «Не могу выбрать» everywhere has a match. */
 const ARCHETYPES: readonly (Archetype & { poles: readonly [Pole, Pole] })[] = [
   {
     name: 'Тихая гавань',
@@ -133,18 +134,19 @@ const ARCHETYPES: readonly (Archetype & { poles: readonly [Pole, Pole] })[] = [
 export const BALANCE: Archetype = { name: 'Баланс во всём', description: 'Всего понемногу — и всё по настроению' }
 
 /**
- * The archetype of the answers: the one whose two poles match most of them, the table order breaking ties;
- * «Баланс во всём» when none matches.
+ * The archetype of the answers: the one whose two poles match most of them; on a tie the one whose main
+ * axis is answered, then the table order; «Баланс во всём» when none matches.
  */
 export function vibeArchetype(answers: readonly Answer[]): Archetype {
   const chosen = new Set(VIBE_AXES.flatMap((axis, i) => (answers[i] ? [`${axis.id}:${answers[i]}`] : [])))
   let best: Archetype = BALANCE
-  let bestMatches = 0
+  let bestScore = 0
   for (const { poles, ...archetype } of ARCHETYPES) {
-    const matches = poles.filter((pole) => chosen.has(pole)).length
-    if (matches > bestMatches) {
+    // A match is worth two, the main axis one more: the main axis only breaks a tie of matches.
+    const score = 2 * poles.filter((pole) => chosen.has(pole)).length + (chosen.has(poles[0]) ? 1 : 0)
+    if (score > bestScore) {
       best = archetype
-      bestMatches = matches
+      bestScore = score
     }
   }
   return best
