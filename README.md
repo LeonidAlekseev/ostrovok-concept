@@ -119,6 +119,26 @@ Tailwind CSS v4 (через `@tailwindcss/postcss`, `postcss.config.mjs`) и sha
 
 Фокус у всех элементов — одно кольцо `:focus-visible` на `--ring` из `globals.css`.
 
+## Визуальная проверка
+
+`scripts/screenshots.mjs` снимает страницы в двух viewport (390×844 и 1280×800, полная высота) в
+headless Chromium (`playwright-core`, браузер из `~/.cache/ms-playwright`; при отсутствии —
+`npx playwright-core install chromium`) и сравнивает кадры с прошлым прогоном через `pixelmatch`
+(threshold 0.1). Изображения в репозиторий не попадают: по умолчанию вывод в
+`/tmp/ostrovok-screenshots/<label>/`.
+
+```bash
+npm run build && npx next start -p 3341 &
+node scripts/screenshots.mjs --label before --mask canvas / /search?destination=prague
+# … правки, пересборка …
+node scripts/screenshots.mjs --label after --against before --mask canvas / /search?destination=prague
+```
+
+Параметры: `--base` (по умолчанию `http://localhost:3341`), `--name` и `--out` (каталог вывода),
+`--label`, `--against` (с чем сравнивать), `--wait` (мс после загрузки, 1000), `--mask <selector>`
+(закрасить анимируемые элементы; глобус на `/` — `canvas`). Для расхождений рядом с кадром
+сохраняется `*.diff.png`; код выхода 1, если кадры различаются.
+
 ## Демо-режим
 
 Бэкенда нет: поиск валидирует форму и открывает страницу результатов с параметрами запроса
