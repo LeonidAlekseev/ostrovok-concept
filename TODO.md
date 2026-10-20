@@ -5,7 +5,8 @@
 
 ## В работе
 
-Нет.
+- [ ] Пять мелких пунктов из «Предложений»: логотип и панель шапки, JSDoc у `splitName`, 404 под
+      `next start`, `parseGuestParams`, защита loader MapLibre — `fix-prototype-nits` — в работе.
 
 ## Ожидает согласования
 
@@ -18,22 +19,7 @@
 
 ## Предложения
 
-- [ ] В jsdom клик по логотипу не закрыл открытую панель, нажатие вне шапки закрыло — источник:
-      `src/components/Header/Header.test.tsx:58` (`add-prototype-foundation`) — проверить в браузере,
-      закрывает ли нажатие на логотип панель — лёгкий — нет.
-- [ ] Лишний JSDoc рядом с `splitName` после выноса функции — источник:
-      `src/components/BookingPage/BookingForm.tsx:20` (`add-auth-pages`) — проверить, что комментарий у
-      своей функции — лёгкий — нет.
-- [ ] Около 50 ресурсов с ответом 404 в консоли при `next start` — источник: `add-auth-pages` — открыть
-      `/` с логом сети и найти отсутствующие файлы — лёгкий — нет.
-- [ ] Гостей нельзя прочитать из адреса без дат: `parseStayParams` возвращает `null` — источник:
-      `src/lib/search.ts:108` (`add-hotel-pages`) — добавить `parseGuestParams`, когда понадобится —
-      лёгкий — нет.
-
-- [ ] Loader `config/maplibre-no-asset-glob.cjs` заменяет `import.meta.url` в `maplibre-gl.mjs`, чтобы
-      Turbopack не копировал ~5 МБ `.mjs` — источник: `next.config.ts:5` (`tidy-dev-tooling`) — при
-      обновлении MapLibre может стать лишним или сломаться; после обновления проверить
-      `du -sk .next/static/media` и карту на `/search` — лёгкий — нет.
+Нет.
 
 ## Выполнено
 
