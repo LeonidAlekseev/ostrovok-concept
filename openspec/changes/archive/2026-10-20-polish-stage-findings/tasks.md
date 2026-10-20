@@ -8,4 +8,4 @@
 
 ## 2. Итог
 
-- [ ] 2.1 `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check`, `npm run build` проходят.
+- [x] 2.1 `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check`, `npm run build` проходят.
