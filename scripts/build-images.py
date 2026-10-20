@@ -7,6 +7,8 @@ Expected files in <sources-dir> (see public/images/CREDITS.md for origins):
     florence.jpg  Florence panorama with the Duomo
     eiffel.jpg    Eiffel Tower at sunset
     sea.jpg       Navagio bay, Zakynthos
+    <axis>-<left|right>.<ext>, balance.<ext>
+                  the vibe search photos (see VIBE below and public/images/CREDITS.md)
 
 The globe is built from vector data by scripts/build-globe.py.
 """
@@ -35,6 +37,39 @@ def save(img: Image.Image, name: str, width: int, quality: int = 80) -> None:
     print(f"{name}: {img.size[0]}x{img.size[1]}, {(OUT / name).stat().st_size // 1024} KB")
 
 
+# Vibe search photos: output name -> (cx, cy, zoom) of the 4:3 crop, 800x600 WebP of at most VIBE_MAX_KB.
+VIBE_DIR = "vibe"
+VIBE_MAX_KB = 60
+VIBE = {
+    "evening-left": (0.5, 0.5, 1.0),
+    "evening-right": (0.5, 0.5, 1.0),
+    "place-left": (0.5, 0.5, 1.0),
+    "place-right": (0.5, 0.5, 1.0),
+    "size-left": (0.5, 0.5, 1.0),
+    "size-right": (0.5, 0.5, 1.0),
+    "leisure-left": (0.5, 0.5, 1.0),
+    "leisure-right": (0.5, 0.5, 1.0),
+    "food-left": (0.5, 0.5, 1.0),
+    "food-right": (0.5, 0.5, 1.0),
+    "budget-left": (0.5, 0.5, 1.0),
+    "budget-right": (0.5, 0.5, 1.0),
+    "location-left": (0.5, 0.5, 1.0),
+    "location-right": (0.5, 0.5, 1.0),
+    "balance": (0.5, 0.5, 1.0),
+}
+
+
+def save_vibe(img: Image.Image, name: str) -> None:
+    """Saves at the best quality (from 75 down) that fits VIBE_MAX_KB."""
+    img = img.resize((800, 600), Image.LANCZOS)
+    path = OUT / VIBE_DIR / f"{name}.webp"
+    for quality in range(75, 29, -5):
+        img.save(path, "WEBP", quality=quality, method=6)
+        if path.stat().st_size <= VIBE_MAX_KB * 1024:
+            break
+    print(f"{VIBE_DIR}/{name}.webp: q{quality}, {path.stat().st_size // 1024} KB")
+
+
 def main(src: Path) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
 
@@ -49,6 +84,14 @@ def main(src: Path) -> None:
             continue
         img = Image.open(src / source).convert("RGB")
         save(crop_to(img, ratio, cx, cy, zoom), name, width)
+
+    (OUT / VIBE_DIR).mkdir(exist_ok=True)
+    for name, (cx, cy, zoom) in VIBE.items():
+        found = next(iter(sorted(src.glob(f"{name}.*"))), None)
+        if found is None:
+            print(f"{name}: missing, kept as is")
+            continue
+        save_vibe(crop_to(Image.open(found).convert("RGB"), 4 / 3, cx, cy, zoom), name)
 
 
 if __name__ == "__main__":

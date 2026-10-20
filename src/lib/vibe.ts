@@ -95,16 +95,21 @@ export const VIBE_AXES: readonly VibeAxis[] = [
 
 export const VIBE_STEPS = VIBE_AXES.length
 
+/** The photo of a side of an axis: `public/images/vibe/evening-left.webp` is «Тихий вечер». */
+export const poleImage = (axisId: string, side: -1 | 1) => `/images/vibe/${axisId}-${side < 0 ? 'left' : 'right'}.webp`
+
 export interface Archetype {
   name: string
   description: string
+  /** The photo of the main pole; «Баланс во всём» has its own. */
+  image: string
 }
 
 /** A side of an axis: `evening:-1` is «Тихий вечер». */
 type Pole = `${string}:${-1 | 1}`
 
 /** The first pole of an archetype is its main axis. Every pole is in some archetype, so any answer but «Не могу выбрать» everywhere has a match. */
-const ARCHETYPES: readonly (Archetype & { poles: readonly [Pole, Pole] })[] = [
+const ARCHETYPES: readonly (Omit<Archetype, 'image'> & { poles: readonly [Pole, Pole] })[] = [
   {
     name: 'Тихая гавань',
     description: 'Тишина, простор и вечер без спешки',
@@ -131,7 +136,11 @@ const ARCHETYPES: readonly (Archetype & { poles: readonly [Pole, Pole] })[] = [
   { name: 'Уютный сибарит', description: 'Завтрак в постель и долгий день в спа', poles: ['food:-1', 'leisure:-1'] },
 ]
 
-export const BALANCE: Archetype = { name: 'Баланс во всём', description: 'Всего понемногу — и всё по настроению' }
+export const BALANCE: Archetype = {
+  name: 'Баланс во всём',
+  description: 'Всего понемногу — и всё по настроению',
+  image: '/images/vibe/balance.webp',
+}
 
 /**
  * The archetype of the answers: the one whose two poles match most of them; on a tie the one whose main
@@ -145,7 +154,8 @@ export function vibeArchetype(answers: readonly Answer[]): Archetype {
     // A match is worth two, the main axis one more: the main axis only breaks a tie of matches.
     const score = 2 * poles.filter((pole) => chosen.has(pole)).length + (chosen.has(poles[0]) ? 1 : 0)
     if (score > bestScore) {
-      best = archetype
+      const [axisId, side] = poles[0].split(':')
+      best = { ...archetype, image: poleImage(axisId, Number(side) < 0 ? -1 : 1) }
       bestScore = score
     }
   }
