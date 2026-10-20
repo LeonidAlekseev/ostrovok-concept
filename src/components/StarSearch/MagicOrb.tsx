@@ -19,8 +19,8 @@ const sparkles = [
 ]
 
 /**
- * The crystal ball: the owner's picture, its black background gone under `mix-blend-screen`, with a breathing
- * glow and twinkling sparkles. Always sits on a dark surface. Decorative; under reduced motion the global rule
+ * The crystal ball: the owner's picture (transparent outside the glass), with a breathing glow and twinkling
+ * sparkles. Decorative; under reduced motion the global rule
  * stops every animation, so the orb stands still and the symbol is shown.
  */
 export function MagicOrb({ symbol, active = false, className }: Props) {
@@ -32,11 +32,10 @@ export function MagicOrb({ symbol, active = false, className }: Props) {
         alt=""
         width={640}
         height={640}
-        className="absolute -inset-[12.5%] size-[125%] max-w-none mix-blend-screen mask-radial-closest-side mask-radial-from-85% mask-radial-to-100% select-none"
+        className="absolute -inset-[12.5%] size-[125%] max-w-none select-none"
         draggable={false}
       />
       {symbol && (
-        // Its own container, so that the picture's blend mode still reaches the sky behind the orb.
         <div className="@container absolute inset-0">
           <span
             key={String(active)}

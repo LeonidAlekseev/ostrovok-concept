@@ -23,7 +23,7 @@ function stubImage(decode: () => Promise<void>) {
 }
 
 const palette = Object.fromEntries(
-  ['primary', 'night', 'violet', 'magenta', 'lime', 'gold', 'light', 'ink', 'muted', 'soft'].map((k) => [k, '#123456']),
+  ['primary', 'violet', 'magenta', 'lime', 'gold', 'light', 'ink', 'muted', 'soft'].map((k) => [k, '#123456']),
 ) as Parameters<typeof drawReadingFrame>[4]['p']
 
 /** A canvas context that remembers what was drawn. */
@@ -58,7 +58,7 @@ describe('orb picture of the video', () => {
     expect(await loadOrbImage()).toBeNull()
   })
 
-  it('is drawn with screen blending', () => {
+  it('is drawn as a picture', () => {
     const { ctx, calls } = fakeContext()
     const orb = {} as HTMLImageElement
     drawReadingFrame(ctx, reading, 'Анна', 1000, { p: palette, font: 'sans-serif', site: 'x.test', orb })

@@ -17,14 +17,10 @@ const ease = (x: number) => 1 - (1 - clamp(x)) ** 3
 const sceneAlpha = (t: number, from: number, to: number) =>
   Math.min(clamp((t - from) / FADE_MS), to === Infinity ? 1 : clamp((to - t) / FADE_MS))
 
-type Palette = Record<
-  'primary' | 'night' | 'violet' | 'magenta' | 'lime' | 'gold' | 'light' | 'ink' | 'muted' | 'soft',
-  string
->
+type Palette = Record<'primary' | 'violet' | 'magenta' | 'lime' | 'gold' | 'light' | 'ink' | 'muted' | 'soft', string>
 
 const readPalette = (): Palette => ({
   primary: cssColor('--primary'),
-  night: cssColor('--decor-night'),
   violet: cssColor('--decor-violet'),
   magenta: cssColor('--decor-magenta'),
   lime: cssColor('--brand'),
@@ -47,7 +43,7 @@ export async function loadOrbImage(src = '/images/stars/orb.webp'): Promise<HTML
   }
 }
 
-/** The magic orb: the picture over a night glow, or without it a swirl of the brand colours; sparkles around. */
+/** The magic orb: the picture, or without it a swirl of the brand colours; sparkles around. */
 function drawOrb(
   ctx: CanvasRenderingContext2D,
   p: Palette,
@@ -58,20 +54,7 @@ function drawOrb(
   t: number,
 ) {
   if (orb) {
-    // The frame is light: the night glow lets `screen` keep the orb's colours, and its black background vanishes.
-    ctx.save()
-    const night = ctx.createRadialGradient(x, y, r * 0.95, x, y, r * 1.3)
-    night.addColorStop(0, p.night)
-    night.addColorStop(1, 'transparent')
-    ctx.fillStyle = night
-    ctx.fillRect(x - r * 1.3, y - r * 1.3, r * 2.6, r * 2.6)
-    ctx.beginPath()
-    ctx.arc(x, y, r * 0.95, 0, Math.PI * 2)
-    ctx.fillStyle = p.night
-    ctx.fill()
-    ctx.globalCompositeOperation = 'screen'
     ctx.drawImage(orb, x - r * 1.25, y - r * 1.25, r * 2.5, r * 2.5)
-    ctx.restore()
   } else {
     drawSwirlOrb(ctx, p, x, y, r, t)
   }
