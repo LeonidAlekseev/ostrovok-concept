@@ -25,13 +25,16 @@ export function PhotoPlaceholder({ photo, kind = 'hotel', className }: Props) {
       role="img"
       aria-label={photo.caption}
       className={cn(
-        'flex flex-col items-center justify-center gap-2 text-sm font-medium text-(--decor-light)',
+        '@container flex flex-col items-center justify-center gap-2 text-sm font-medium text-(--decor-light)',
         tones[photo.tone % tones.length],
         className,
       )}
     >
       <Icon className="size-8 opacity-80" strokeWidth={1.6} aria-hidden />
-      <span aria-hidden>{photo.caption}</span>
+      {/* One truncated line; hidden when the tile is too narrow for even that. */}
+      <span aria-hidden className="hidden max-w-full truncate @[4rem]:block">
+        {photo.caption}
+      </span>
     </span>
   )
 }

@@ -35,9 +35,6 @@ export function UserMenu({ buttonClass }: { buttonClass: string }) {
           <Link className={linkClass} href="/trips" onClick={() => setOpen(false)}>
             Мои поездки
           </Link>
-          <Link className={linkClass} href="/favorites" onClick={() => setOpen(false)}>
-            Избранное
-          </Link>
         </nav>
         <Button
           variant="outline"

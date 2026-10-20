@@ -99,7 +99,6 @@ describe('Header', () => {
     const nav = screen.getByRole('navigation', { name: 'Аккаунт' })
     expect([...nav.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
       ['Мои поездки', '/trips'],
-      ['Избранное', '/favorites'],
     ])
 
     await user.click(screen.getByRole('button', { name: 'Выйти' }))
