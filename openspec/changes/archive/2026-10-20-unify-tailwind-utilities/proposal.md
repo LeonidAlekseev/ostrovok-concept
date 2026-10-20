@@ -32,3 +32,11 @@
 
 - `src/components/Hero/*`, `src/components/SearchPanel/RandomSearch.tsx`, `src/components/SearchForm/GuestsField.tsx`, `src/components/DestinationCard/*`, `src/components/ui/accordion.tsx`, `src/app/globals.css`, `README.md` («Стили»).
 - Источник: TODO, «Предложения»; решение пользователя 2026-10-20 (наведение — `hover:`).
+
+## Решения
+
+- Пин `Hero` с несколькими свойствами `transition` и разной длительностью записан списками значений утилит: `transition-[scale,width,height,color] duration-[600ms,700ms,700ms,400ms] ease-[cubic-bezier(…),…,ease]` — вычисленный `transition` тот же, что был у `[transition:…]`.
+- Остальные `[transition:…]` (`DestinationCard`, `GuestsField`) — те же утилиты с одной длительностью (`duration-250`, `duration-500`, `duration-200`), `ease-in-out` = `cubic-bezier(0.4,0,0.2,1)`.
+- Лента барабана: `translate-y-(--shift)`, `--shift` = `0%` в покое и `-(n-1)/n·100%` при вращении; `transition-[translate]` вместо `transition-transform`, потому что утилита сдвига меняет свойство `translate`.
+- Аккордеон: анимации на панели Base UI (`data-open:animate-accordion-down`, `data-closed:animate-accordion-up`, `motion-reduce:animate-none`); при закрытии у панели нет `data-open`, поэтому используется `data-closed`. Высота внутреннего блока (`h-(--accordion-panel-height)`, `data-*-style:h-0`) убрана: её даёт анимация панели.
+- Комментарий в `globals.css`: фон `html` — фон страницы, на котором стоит подвал без своей заливки.

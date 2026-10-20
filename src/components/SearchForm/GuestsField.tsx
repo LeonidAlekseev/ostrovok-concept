@@ -46,7 +46,7 @@ export function GuestsField({ value, error, onChange }: Props) {
           </span>
           <ChevronDown
             // The glyph has built-in side bearings; -mr-1 pulls it towards the edge.
-            className={`-mr-1 ml-auto flex-none text-brand-foreground [transition:rotate_200ms_cubic-bezier(0.4,0,0.2,1)] group-data-popup-open:rotate-180`}
+            className={`-mr-1 ml-auto flex-none text-brand-foreground transition-[rotate] duration-200 ease-in-out group-data-popup-open:rotate-180`}
             size={22}
             aria-hidden
           />
