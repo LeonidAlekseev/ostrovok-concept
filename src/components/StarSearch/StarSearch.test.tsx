@@ -54,6 +54,27 @@ describe('StarSearch section', () => {
 
 // star-search, Requirement: Анкета
 describe('StarSearch form', () => {
+  it('picks the check-in in the search calendar, where past days are not available', async () => {
+    reduceMotion()
+    const user = userEvent.setup()
+    renderDialog()
+    await fillForm(user)
+    const today = todayIso()
+    const later = addDays(today, 10)
+
+    await user.click(screen.getByRole('button', { name: /^Дата заезда: / }))
+    const calendar = await screen.findByRole('dialog', { name: 'Выбор даты заезда' })
+    const day = (iso: string) => calendar.querySelector<HTMLButtonElement>(`[data-date="${iso}"]`)
+    expect(day(addDays(today, -1))?.disabled).toBe(true)
+    await user.click(day(later)!)
+    expect(screen.queryByRole('dialog', { name: 'Выбор даты заезда' })).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Гадать' }))
+    const url = new URL(screen.getAllByRole('link')[0].getAttribute('href')!, 'https://x')
+    expect(url.searchParams.get('checkin')).toBe(later)
+    expect(url.searchParams.get('checkout')).toBe(addDays(later, 2))
+  })
+
   it('shows the sign as soon as the birthday is known', async () => {
     const user = userEvent.setup()
     renderDialog()

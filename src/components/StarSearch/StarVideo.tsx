@@ -18,6 +18,8 @@ export function StarVideo({ reading, name }: { reading: Reading; name: string })
   const [type] = useState(videoType)
   const [state, setState] = useState<State>({ kind: 'idle' })
   const [note, setNote] = useState('')
+  // The recording stands while the tab is hidden.
+  const [paused, setPaused] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
   const hotel = reading.hotels[0]
@@ -43,15 +45,18 @@ export function StarVideo({ reading, name }: { reading: Reading; name: string })
     const controller = new AbortController()
     abortRef.current = controller
     setNote('')
+    setPaused(false)
     setState({ kind: 'rendering', progress: 0 })
     try {
       const file = await renderReadingVideo(reading, name, type, {
         signal: controller.signal,
         onProgress: (progress) => setState({ kind: 'rendering', progress }),
+        onPause: setPaused,
       })
       setState({ kind: 'ready', file, url: URL.createObjectURL(file), shareable: canShareFile(file) })
       setNote('Видео готово')
     } catch {
+      setPaused(false)
       if (controller.signal.aborted) {
         setState({ kind: 'idle' })
         setNote('Видео отменено')
@@ -177,7 +182,7 @@ export function StarVideo({ reading, name }: { reading: Reading; name: string })
     <div className="flex flex-col gap-2">
       {actions}
       <p className="min-h-5 text-center text-sm text-muted-foreground" role="status">
-        {note}
+        {paused ? 'Запись на паузе — вернитесь на вкладку' : note}
       </p>
     </div>
   )

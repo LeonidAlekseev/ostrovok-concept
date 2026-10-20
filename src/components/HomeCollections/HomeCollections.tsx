@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { cn } from 'cn'
 import { homeCollections } from '../../lib/collections'
-import { DEFAULT_GUESTS, setStayParams, withStartDates, type Stay } from '../../lib/search'
+import { setStayParams, startStay } from '../../lib/search'
 import { useToday } from '../../hooks/useToday'
 import { HotelTile } from '../HotelTile/HotelTile'
 
@@ -11,14 +11,7 @@ import { HotelTile } from '../HotelTile/HotelTile'
 export function HomeCollections() {
   const today = useToday()
   // Starts are tomorrow and the day after, as in the search form; empty until the date is known.
-  const stay = useMemo<Stay | null>(() => {
-    if (!today) return null
-    const { checkIn, checkOut, guests } = withStartDates(
-      { destination: '', checkIn: '', checkOut: '', guests: DEFAULT_GUESTS },
-      today,
-    )
-    return { checkIn, checkOut, guests }
-  }, [today])
+  const stay = useMemo(() => startStay(today), [today])
 
   return (
     <section id="collections" aria-labelledby="collections-title">
