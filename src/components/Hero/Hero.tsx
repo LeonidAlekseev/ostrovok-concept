@@ -51,8 +51,6 @@ const ROUTE_DELAY_MS = 200
 /** Routes to the first spotlight, matching the reference composition. */
 const initialSourceIds = ['london', 'lisbon', 'tbilisi']
 
-// Hover states use [&:hover], not hover:, which Tailwind limits to (hover: hover): on phones a tap on a pin
-// still shows its tooltip and lifts the card.
 const hero = [
   // The sphere is much larger than the viewport: it rises from the lower right behind the title.
   // Offsets include the transparent header laid over the top of the hero.
@@ -83,11 +81,10 @@ const pin = [
   'group absolute top-0 left-0 touch-none rounded-[50%_50%_50%_50%/40%_40%_60%_60%] text-primary opacity-[var(--o,1)] will-change-[translate,scale] data-hidden:invisible',
   'translate-x-[calc(var(--x)_*_var(--unit)_-_50%)] translate-y-[calc(var(--y)_*_var(--unit)_-_100%)]',
   // The translate is rewritten every frame; the scale eases on its own.
-  '[transition:scale_0.6s_cubic-bezier(0.22,1,0.36,1),width_0.7s_cubic-bezier(0.22,1,0.36,1),height_0.7s_cubic-bezier(0.22,1,0.36,1),color_0.4s_ease]',
-  'focus-visible:scale-115 [&:hover]:scale-115',
-  // The selected pin grows and darkens; the globe turns it to the middle and stops. The ! keeps its scale over the
-  // hover one, whose arbitrary variant comes later in the CSS.
-  'aria-pressed:z-3 aria-pressed:scale-145! aria-pressed:text-(--decor-pin-selected)',
+  'transition-[scale,width,height,color] duration-[600ms,700ms,700ms,400ms] ease-[cubic-bezier(0.22,1,0.36,1),cubic-bezier(0.22,1,0.36,1),cubic-bezier(0.22,1,0.36,1),ease]',
+  'hover:scale-115 focus-visible:scale-115',
+  // The selected pin grows and darkens; the globe turns it to the middle and stops.
+  'aria-pressed:z-3 aria-pressed:scale-145 aria-pressed:text-(--decor-pin-selected)',
   "before:absolute before:left-1/2 before:-translate-x-1/2 before:content-['']",
 ].join(' ')
 const pinShadow =
@@ -108,7 +105,7 @@ const placeCard = [
   'absolute top-0 left-0 z-5 w-max rounded-[clamp(10px,3vw,14px)] border-0 bg-card py-(--card-pad) pr-[calc(var(--card-pad)_+_4px)] pl-(--card-pad) text-left text-foreground',
   'translate-x-[calc(var(--x)_*_var(--unit)_+_var(--card-dx))] translate-y-[calc(var(--y)_*_var(--unit)_+_var(--card-dy)_-_var(--card-lift))] touch-none opacity-[var(--o,1)] will-change-transform',
   'shadow-[0_14px_34px_color-mix(in_srgb,var(--decor-hotel-shadow)_25%,transparent)] transition-shadow duration-200 ease-[ease]',
-  '[&:hover]:shadow-[0_18px_40px_color-mix(in_srgb,var(--decor-hotel-shadow)_32%,transparent)] [&:hover]:[--card-lift:4px]',
+  'hover:shadow-[0_18px_40px_color-mix(in_srgb,var(--decor-hotel-shadow)_32%,transparent)] hover:[--card-lift:4px]',
 ].join(' ')
 const placeIcon =
   // Concentric with the card's corner.

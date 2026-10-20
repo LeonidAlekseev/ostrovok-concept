@@ -308,12 +308,12 @@ function SlotMachine({ fortune, spinning, onLanded }: { fortune: Fortune; spinni
               className={`${spinning ? '' : 'animate-slot-win'} ${windowShade} relative h-(--h) overflow-hidden rounded-lg bg-card inset-shadow-[0_0_0_2px_color-mix(in_srgb,var(--decor-gold)_60%,transparent)]`}
             >
               <ul
-                className={`transition-transform duration-(--d) ease-[cubic-bezier(0.12,0.8,0.22,1.04)] ${spinning ? 'blur-[0.4px]' : ''}`}
+                className={`translate-y-(--shift) transition-[translate] duration-(--d) ease-[cubic-bezier(0.12,0.8,0.22,1.04)] ${spinning ? 'blur-[0.4px]' : ''}`}
                 style={
                   {
                     '--n': strip.length,
                     '--d': `${REEL_SECONDS + i * REEL_STAGGER}s`,
-                    transform: go ? `translateY(${(-100 * (strip.length - 1)) / strip.length}%)` : undefined,
+                    '--shift': go ? `${(-100 * (strip.length - 1)) / strip.length}%` : '0%',
                   } as CSSProperties
                 }
                 onTransitionEnd={i === strips.length - 1 ? land : undefined}

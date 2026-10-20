@@ -171,6 +171,28 @@
   /* The glow under the hub pin on the globe breathes. */
   --animate-hub-pulse: hub-pulse 2.4s ease-in-out infinite;
 
+  /* The ui/accordion panel opens and closes to the height Base UI measures. */
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--accordion-panel-height);
+    }
+  }
+
+  @keyframes accordion-up {
+    from {
+      height: var(--accordion-panel-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+
   @keyframes typing-dot {
     0%,
     80%,
@@ -281,8 +303,9 @@
     /* Preflight sets 1.5; the components are laid out for the browser default. */
     line-height: normal;
     color: var(--foreground);
-    /* Shows only where Safari uncovers the page edge (its toolbars collapsing): match the content
-       at the bottom. The hero and the browser chrome (theme-color) carry the green. */
+    /* Shows only where Safari uncovers the page edge (its toolbars collapsing): the page background,
+       which the footer (the last block, no fill of its own) stands on. The hero and the browser chrome
+       (theme-color) carry the green. */
     background: var(--background);
     font-synthesis: none;
     text-rendering: optimizeLegibility;

@@ -82,6 +82,13 @@ Tailwind CSS v4 (через `@tailwindcss/postcss`, `postcss.config.mjs`) и sha
 `@keyframes` двигают элемент, они меняют то же свойство, что задаёт утилита (`translate`, `scale`),
 а не `transform`. Тень, которую анимация `box-shadow` должна плавно продолжить, ставится тем
 слоем Tailwind, на месте которого она в `@keyframes` (`inset-shadow-*` для внутренней обводки).
+Наведение — всегда `hover:` (Tailwind применяет его только на устройствах с наведением, касание
+состояние не показывает); `[&:hover]` не использовать. `transition` — стандартными утилитами
+(`transition-[scale,box-shadow] duration-250 ease-[ease]`; у нескольких свойств — списки значений:
+`duration-[600ms,700ms]`), не `[transition:…]`. Значение, которое задаёт сдвиг или поворот по
+состоянию, — CSS-переменная в `style`, читает её утилита (`translate-y-(--shift)`), а не
+`transform` в `style`. Раскрытие аккордеона `ui/accordion` — анимации `animate-accordion-down`/`-up`
+из `@theme` (высоту даёт `--accordion-panel-height` Base UI), при `prefers-reduced-motion` их нет.
 Примитивы `src/components/ui/*` генерирует CLI shadcn, правило к ним не применяется.
 
 Все токены описаны в `src/app/globals.css` слоями:
