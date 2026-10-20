@@ -156,6 +156,18 @@ describe('SearchResultsPage hotel card', () => {
     expect(within(card).getByText(/\d+ отзыв/)).toBeDefined()
     expect(within(card).getByRole('button', { name: 'Добавить в избранное' })).toBeDefined()
   })
+
+  it('puts the photo above the text in every card', async () => {
+    open(PRAGUE)
+    await results()
+
+    for (const card of cards()) {
+      // The first block of the card holds the photo and nothing of the text.
+      const top = card.firstElementChild as HTMLElement
+      expect(within(top).getAllByRole('img')[0].className).toMatch(/\bw-full\b/)
+      expect(within(top).queryByRole('heading')).toBeNull()
+    }
+  })
 })
 
 // search-results-page, Requirement: Фильтры и сортировка
