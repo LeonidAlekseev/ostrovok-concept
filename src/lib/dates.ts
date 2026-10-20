@@ -42,6 +42,14 @@ function monthLabel(date: Date): string {
   return shortMonth.format(date)
 }
 
+const shortWeekday = new Intl.DateTimeFormat('ru-RU', { weekday: 'short' })
+
+/** "24 окт, сб": the day, the short month without its dot and the short weekday. */
+export function formatShortDay(iso: IsoDate): string {
+  const date = fromIso(iso)
+  return `${date.getDate()} ${monthLabel(date).replace('.', '')}, ${shortWeekday.format(date)}`
+}
+
 export function formatLongDate(iso: IsoDate): string {
   return longDate.format(fromIso(iso))
 }

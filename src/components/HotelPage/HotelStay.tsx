@@ -1,28 +1,14 @@
 'use client'
 
-import { Suspense } from 'react'
+import { Suspense, type ReactNode } from 'react'
 import type { Hotel } from '@/lib/catalog'
-import { StayBar } from '../StayBar/StayBar'
-import { DEFAULT_GUESTS, type Stay } from '@/lib/search'
-import { useLocalStay, useStay, type StayState } from '../StayBar/useStay'
+import type { Stay } from '@/lib/search'
+import { useLocalStay, useStay } from '../StayBar/useStay'
 import { RoomList } from './RoomList'
+import { noDates, StayContext, useHotelStay } from './stayContext'
 
-const noDates: StayState = { stay: null, error: undefined, guests: DEFAULT_GUESTS, setStay: () => {} }
-
-function Rooms({ hotel, state }: { hotel: Hotel; state: StayState }) {
-  return (
-    <section aria-labelledby="rooms-title" className="flex flex-col gap-4">
-      <h2 id="rooms-title" className="text-heading font-bold">
-        Номера
-      </h2>
-      <StayBar state={state} />
-      <RoomList hotel={hotel} stay={state.stay} guests={state.guests} onPickDates={() => state.setStay({})} />
-    </section>
-  )
-}
-
-function Stay({ hotel }: { hotel: Hotel }) {
-  return <Rooms hotel={hotel} state={useStay(hotel)} />
+function AddressStay({ hotel, children }: { hotel: Hotel; children: ReactNode }) {
+  return <StayContext value={useStay(hotel)}>{children}</StayContext>
 }
 
 /** The stay the caller holds (the hotel dialog); nothing is written to the address. */
@@ -31,19 +17,37 @@ export interface LocalStay {
   onChange: (next: Stay) => void
 }
 
-function LocalStays({ hotel, local }: { hotel: Hotel; local: LocalStay }) {
-  return <Rooms hotel={hotel} state={useLocalStay(hotel, local.value, local.onChange)} />
+function LocalStays({ hotel, local, children }: { hotel: Hotel; local: LocalStay; children: ReactNode }) {
+  return <StayContext value={useLocalStay(hotel, local.value, local.onChange)}>{children}</StayContext>
 }
 
 /**
- * Dates, guests and rooms: they depend on the address, so the prerendered page shows the no-dates state.
- * With `local` they come from the caller instead.
+ * Gives the blocks inside it the dates and guests. They depend on the address, so the prerendered
+ * page shows the no-dates state. With `local` they come from the caller instead.
  */
-export function HotelStay({ hotel, local }: { hotel: Hotel; local?: LocalStay }) {
-  if (local) return <LocalStays hotel={hotel} local={local} />
+export function HotelStay({ hotel, local, children }: { hotel: Hotel; local?: LocalStay; children: ReactNode }) {
+  if (local)
+    return (
+      <LocalStays hotel={hotel} local={local}>
+        {children}
+      </LocalStays>
+    )
   return (
-    <Suspense fallback={<Rooms hotel={hotel} state={noDates} />}>
-      <Stay hotel={hotel} />
+    <Suspense fallback={<StayContext value={noDates}>{children}</StayContext>}>
+      <AddressStay hotel={hotel}>{children}</AddressStay>
     </Suspense>
+  )
+}
+
+/** The rooms for the stay; "Выбрать номер" of the price bar leads here. */
+export function HotelRooms({ hotel, className }: { hotel: Hotel; className?: string }) {
+  const { stay, guests, setStay } = useHotelStay()
+  return (
+    <section id="rooms" tabIndex={-1} aria-labelledby="rooms-title" className={className}>
+      <h2 id="rooms-title" className="text-heading font-bold">
+        Номера
+      </h2>
+      <RoomList hotel={hotel} stay={stay} guests={guests} onPickDates={() => setStay({})} />
+    </section>
   )
 }

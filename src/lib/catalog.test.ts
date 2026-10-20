@@ -151,6 +151,23 @@ describe('hasFreeCancellation', () => {
   })
 })
 
+// hotel-catalog, Requirement: Транспорт рядом с отелем
+describe('nearest metro station', () => {
+  it('is one of the city stations 150–1 200 m away, to 10 m, in a city with a metro', () => {
+    const prague = destinations.find((d) => d.id === 'prague')!
+    for (const h of catalog.filter((h) => h.destinationId === 'prague')) {
+      expect(prague.metro, h.id).toContain(h.metro?.station)
+      expect(h.metro!.meters).toBeGreaterThanOrEqual(150)
+      expect(h.metro!.meters).toBeLessThanOrEqual(1200)
+      expect(h.metro!.meters % 10).toBe(0)
+    }
+  })
+
+  it('is missing in a city without one', () => {
+    for (const h of catalog.filter((h) => h.destinationId === 'zakynthos')) expect(h.metro, h.id).toBeNull()
+  })
+})
+
 describe('slugify', () => {
   it('turns Latin, accented and Cyrillic names into slugs', () => {
     expect(slugify('Old Town Lantern')).toBe('old-town-lantern')
