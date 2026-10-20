@@ -1,10 +1,13 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Bell, Heart, Menu, X } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useStickyHeader } from '@/hooks/useStickyHeader'
+import { cn } from '@/lib/utils'
 import { UserMenu } from './UserMenu'
 
 type Panel = 'notifications' | 'menu'
@@ -27,6 +30,15 @@ const menuLinks = [
   { href: '/help', label: 'Поддержка' },
 ]
 
+// A pointer or touch press leaves focus on the button; only keyboard focus should keep the header shown.
+const isKeyboardFocus = (element: Element | null) => {
+  try {
+    return element?.matches(':focus-visible') ?? false
+  } catch {
+    return false
+  }
+}
+
 export function Header() {
   const [open, setOpen] = useState<Panel | null>(null)
   const close = useCallback(() => setOpen(null), [])
@@ -37,83 +49,104 @@ export function Header() {
     onOpenChange: (next: boolean) => setOpen((current) => (next ? panel : current === panel ? null : current)),
   })
 
-  // Transparent: the hero (and the globe's glow) continues underneath.
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const [focusWithin, setFocusWithin] = useState(false)
+  const { floating, shown } = useStickyHeader(wrapperRef, open !== null || focusWithin)
+  // On the home page the docked header is transparent: the hero (and the globe's glow) continues underneath.
+  const transparent = usePathname() === '/' && !floating
+
+  // The wrapper keeps the header's place in the flow, so the content does not jump when the header turns fixed.
   return (
-    <header className="relative z-20">
-      <div className="mx-auto flex h-(--header-height) max-w-(--page-max) items-center justify-between gap-4 px-[calc(var(--page-x)+8px)]">
-        <a
-          className="rounded-sm text-[clamp(26px,6.6vw,32px)] leading-none font-extrabold tracking-[-0.035em] text-primary no-underline"
-          href="/"
-          onClick={close}
-          aria-label="Островок! — на главную"
-        >
-          Островок!
-        </a>
-
-        <div className="relative flex items-center gap-[clamp(0px,1vw,14px)]">
-          <Link
-            href="/favorites"
-            className={buttonVariants({ variant: 'ghost', size: 'icon', className: iconButton })}
-            aria-label="Избранное"
+    <div ref={wrapperRef} className="relative z-20 h-(--header-height)">
+      <header
+        data-sticky={floating ? (shown ? 'shown' : 'hidden') : 'docked'}
+        onFocus={() => setFocusWithin(isKeyboardFocus(document.activeElement))}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setFocusWithin(false)
+        }}
+        className={cn(
+          'inset-x-0 top-0',
+          floating ? 'fixed transition-transform duration-200 ease-out motion-reduce:transition-none' : 'absolute',
+          floating && !shown && '-translate-y-full',
+          floating && shown && 'translate-y-0 shadow-md',
+          !transparent && 'rounded-b-[clamp(20px,5vw,32px)] bg-chrome',
+        )}
+      >
+        <div className="mx-auto flex h-(--header-height) max-w-(--page-max) items-center justify-between gap-4 px-[calc(var(--page-x)+8px)]">
+          <a
+            className="rounded-sm text-[clamp(26px,6.6vw,32px)] leading-none font-extrabold tracking-[-0.035em] text-primary no-underline"
+            href="/"
+            onClick={close}
+            aria-label="Островок! — на главную"
           >
-            <Heart className="size-6.5" fill="currentColor" strokeWidth={2} aria-hidden />
-          </Link>
+            Островок!
+          </a>
 
-          <Popover {...panelProps('notifications')}>
-            <PopoverTrigger
-              render={<Button variant="ghost" size="icon" className={iconButton} aria-label="Уведомления" />}
+          <div className="relative flex items-center gap-[clamp(0px,1vw,14px)]">
+            <Link
+              href="/favorites"
+              className={buttonVariants({ variant: 'ghost', size: 'icon', className: iconButton })}
+              aria-label="Избранное"
             >
-              <Bell className="size-6.25" fill="currentColor" strokeWidth={2} aria-hidden />
-            </PopoverTrigger>
-            <PopoverContent align="end" sideOffset={10} aria-label={panelTitle.notifications} className={panelClass}>
-              <p className={panelTitleClass}>Новых уведомлений нет</p>
-              <p className={panelTextClass}>Здесь появятся изменения цен и статусы бронирований.</p>
-              <Button className="w-full" onClick={close}>
-                Понятно
-              </Button>
-            </PopoverContent>
-          </Popover>
+              <Heart className="size-6.5" fill="currentColor" strokeWidth={2} aria-hidden />
+            </Link>
 
-          <UserMenu buttonClass={iconButton} />
+            <Popover {...panelProps('notifications')}>
+              <PopoverTrigger
+                render={<Button variant="ghost" size="icon" className={iconButton} aria-label="Уведомления" />}
+              >
+                <Bell className="size-6.25" fill="currentColor" strokeWidth={2} aria-hidden />
+              </PopoverTrigger>
+              <PopoverContent align="end" sideOffset={10} aria-label={panelTitle.notifications} className={panelClass}>
+                <p className={panelTitleClass}>Новых уведомлений нет</p>
+                <p className={panelTextClass}>Здесь появятся изменения цен и статусы бронирований.</p>
+                <Button className="w-full" onClick={close}>
+                  Понятно
+                </Button>
+              </PopoverContent>
+            </Popover>
 
-          <Popover {...panelProps('menu')}>
-            <PopoverTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={iconButton}
-                  aria-label={open === 'menu' ? 'Закрыть меню' : 'Открыть меню'}
-                />
-              }
-            >
-              {open === 'menu' ? (
-                <X className="size-7" strokeWidth={2.8} aria-hidden />
-              ) : (
-                <Menu className="size-7" strokeWidth={2.8} aria-hidden />
-              )}
-            </PopoverTrigger>
-            <PopoverContent align="end" sideOffset={10} aria-label={panelTitle.menu} className={panelClass}>
-              <nav aria-label="Основное меню">
-                <ul className="-m-1.5">
-                  {menuLinks.map((link) => (
-                    <li key={link.href}>
-                      <Link
-                        className="block rounded-md p-3 font-[550] text-foreground no-underline hover:bg-muted hover:text-primary"
-                        href={link.href}
-                        onClick={close}
-                      >
-                        {link.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-            </PopoverContent>
-          </Popover>
+            <UserMenu buttonClass={iconButton} />
+
+            <Popover {...panelProps('menu')}>
+              <PopoverTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={iconButton}
+                    aria-label={open === 'menu' ? 'Закрыть меню' : 'Открыть меню'}
+                  />
+                }
+              >
+                {open === 'menu' ? (
+                  <X className="size-7" strokeWidth={2.8} aria-hidden />
+                ) : (
+                  <Menu className="size-7" strokeWidth={2.8} aria-hidden />
+                )}
+              </PopoverTrigger>
+              <PopoverContent align="end" sideOffset={10} aria-label={panelTitle.menu} className={panelClass}>
+                <nav aria-label="Основное меню">
+                  <ul className="-m-1.5">
+                    {menuLinks.map((link) => (
+                      <li key={link.href}>
+                        <Link
+                          className="block rounded-md p-3 font-[550] text-foreground no-underline hover:bg-muted hover:text-primary"
+                          href={link.href}
+                          onClick={close}
+                        >
+                          {link.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </nav>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+    </div>
   )
 }
 
