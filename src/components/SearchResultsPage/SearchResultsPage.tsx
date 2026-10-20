@@ -35,7 +35,7 @@ import {
 } from '../../lib/search'
 import { SearchForm } from '../SearchForm/SearchForm'
 import { FiltersPanel } from './FiltersPanel'
-import { HotelCard } from './HotelCard'
+import { ResultTile } from './ResultTile'
 import { MapUnavailable } from './MapUnavailable'
 
 // MapLibre is loaded only here and only in the browser; a failed chunk load reads as an unavailable map.
@@ -282,15 +282,14 @@ function Results({ query, target, initialFilters }: ResultsProps) {
                   <Button onClick={() => updateFilters({ ...NO_FILTERS, sort: filters.sort })}>Сбросить фильтры</Button>
                 </div>
               ) : (
-                <ul className="flex flex-col gap-3">
+                <ul className="grid gap-3 sm:grid-cols-2">
                   {items.map((item) => (
                     <li key={item.hotel.id}>
-                      <HotelCard
+                      <ResultTile
                         id={cardId(item.hotel.id)}
                         item={item}
                         stay={query}
                         nights={nights}
-                        showCity={target.kind === 'scenario'}
                         active={item.hotel.id === activeId}
                         onActivate={setActiveId}
                       />
