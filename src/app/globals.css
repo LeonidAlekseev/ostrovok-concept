@@ -90,6 +90,10 @@
   --decor-hotel-shadow: #1e5014;
   --decor-badge-green: #1f9d55;
   --decor-star: #ffb800;
+  /* The spark of the GURU logo. */
+  --decor-guru-from: #2ee6ff;
+  --decor-guru-via: #1f6bff;
+  --decor-guru-to: #8a3dff;
   --decor-stats: #b7ffb0;
   /* Star search: the magic orb, its sparkles and the night sky around it. */
   --decor-gold: #ffe08a;

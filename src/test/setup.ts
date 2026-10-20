@@ -9,3 +9,6 @@ afterEach(cleanup)
 document.addEventListener('click', (event) => {
   if (event.target instanceof Element && event.target.closest('a[href]')) event.preventDefault()
 })
+
+// jsdom has no layout and no element scrolling: scrollTo is a no-op, as for a strip without width.
+Element.prototype.scrollTo ??= () => {}

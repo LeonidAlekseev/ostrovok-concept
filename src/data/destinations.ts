@@ -3,6 +3,8 @@ export type ScenarioId = 'sea' | 'weekend' | 'europe'
 export interface Destination {
   id: string
   name: string
+  /** The name in the genitive: «от центра Праги». */
+  genitive: string
   country: string
   lat: number
   lon: number
@@ -24,6 +26,7 @@ export const destinations: Destination[] = [
   {
     id: 'prague',
     name: 'Прага',
+    genitive: 'Праги',
     country: 'Чехия',
     lat: 50.08,
     lon: 14.43,
@@ -34,6 +37,7 @@ export const destinations: Destination[] = [
   {
     id: 'paris',
     name: 'Париж',
+    genitive: 'Парижа',
     country: 'Франция',
     lat: 48.86,
     lon: 2.35,
@@ -43,6 +47,7 @@ export const destinations: Destination[] = [
   {
     id: 'london',
     name: 'Лондон',
+    genitive: 'Лондона',
     country: 'Великобритания',
     lat: 51.51,
     lon: -0.13,
@@ -53,6 +58,7 @@ export const destinations: Destination[] = [
   {
     id: 'oslo',
     name: 'Осло',
+    genitive: 'Осло',
     country: 'Норвегия',
     lat: 59.91,
     lon: 10.75,
@@ -63,6 +69,7 @@ export const destinations: Destination[] = [
   {
     id: 'stockholm',
     name: 'Стокгольм',
+    genitive: 'Стокгольма',
     country: 'Швеция',
     lat: 59.33,
     lon: 18.07,
@@ -72,6 +79,7 @@ export const destinations: Destination[] = [
   {
     id: 'helsinki',
     name: 'Хельсинки',
+    genitive: 'Хельсинки',
     country: 'Финляндия',
     lat: 60.17,
     lon: 24.94,
@@ -82,6 +90,7 @@ export const destinations: Destination[] = [
   {
     id: 'florence',
     name: 'Флоренция',
+    genitive: 'Флоренции',
     country: 'Италия',
     lat: 43.77,
     lon: 11.25,
@@ -91,6 +100,7 @@ export const destinations: Destination[] = [
   {
     id: 'rome',
     name: 'Рим',
+    genitive: 'Рима',
     country: 'Италия',
     lat: 41.9,
     lon: 12.5,
@@ -101,6 +111,7 @@ export const destinations: Destination[] = [
   {
     id: 'madrid',
     name: 'Мадрид',
+    genitive: 'Мадрида',
     country: 'Испания',
     lat: 40.42,
     lon: -3.7,
@@ -111,6 +122,7 @@ export const destinations: Destination[] = [
   {
     id: 'barcelona',
     name: 'Барселона',
+    genitive: 'Барселоны',
     country: 'Испания',
     lat: 41.39,
     lon: 2.17,
@@ -120,6 +132,7 @@ export const destinations: Destination[] = [
   {
     id: 'lisbon',
     name: 'Лиссабон',
+    genitive: 'Лиссабона',
     country: 'Португалия',
     lat: 38.72,
     lon: -9.14,
@@ -130,16 +143,27 @@ export const destinations: Destination[] = [
   {
     id: 'athens',
     name: 'Афины',
+    genitive: 'Афин',
     country: 'Греция',
     lat: 37.98,
     lon: 23.73,
     priceFrom: 6800,
     scenarios: ['sea', 'europe'],
   },
-  { id: 'zakynthos', name: 'Закинф', country: 'Греция', lat: 37.78, lon: 20.9, priceFrom: 5900, scenarios: ['sea'] },
+  {
+    id: 'zakynthos',
+    name: 'Закинф',
+    genitive: 'Закинфа',
+    country: 'Греция',
+    lat: 37.78,
+    lon: 20.9,
+    priceFrom: 5900,
+    scenarios: ['sea'],
+  },
   {
     id: 'istanbul',
     name: 'Стамбул',
+    genitive: 'Стамбула',
     country: 'Турция',
     lat: 41.01,
     lon: 28.98,
@@ -147,10 +171,20 @@ export const destinations: Destination[] = [
     scenarios: ['weekend'],
     onGlobe: true,
   },
-  { id: 'antalya', name: 'Анталья', country: 'Турция', lat: 36.9, lon: 30.7, priceFrom: 4800, scenarios: ['sea'] },
+  {
+    id: 'antalya',
+    name: 'Анталья',
+    genitive: 'Антальи',
+    country: 'Турция',
+    lat: 36.9,
+    lon: 30.7,
+    priceFrom: 4800,
+    scenarios: ['sea'],
+  },
   {
     id: 'sochi',
     name: 'Сочи',
+    genitive: 'Сочи',
     country: 'Россия',
     lat: 43.6,
     lon: 39.73,
@@ -160,6 +194,7 @@ export const destinations: Destination[] = [
   {
     id: 'kaliningrad',
     name: 'Калининград',
+    genitive: 'Калининграда',
     country: 'Россия',
     lat: 54.71,
     lon: 20.51,
@@ -169,6 +204,7 @@ export const destinations: Destination[] = [
   {
     id: 'tbilisi',
     name: 'Тбилиси',
+    genitive: 'Тбилиси',
     country: 'Грузия',
     lat: 41.72,
     lon: 44.79,
@@ -179,6 +215,7 @@ export const destinations: Destination[] = [
   {
     id: 'reykjavik',
     name: 'Рейкьявик',
+    genitive: 'Рейкьявика',
     country: 'Исландия',
     lat: 64.15,
     lon: -21.94,
@@ -189,6 +226,7 @@ export const destinations: Destination[] = [
   {
     id: 'new-york',
     name: 'Нью-Йорк',
+    genitive: 'Нью-Йорка',
     country: 'США',
     lat: 40.71,
     lon: -74.01,
@@ -199,6 +237,7 @@ export const destinations: Destination[] = [
   {
     id: 'miami',
     name: 'Майами',
+    genitive: 'Майами',
     country: 'США',
     lat: 25.76,
     lon: -80.19,
@@ -209,6 +248,7 @@ export const destinations: Destination[] = [
   {
     id: 'los-angeles',
     name: 'Лос-Анджелес',
+    genitive: 'Лос-Анджелеса',
     country: 'США',
     lat: 34.05,
     lon: -118.24,
@@ -219,6 +259,7 @@ export const destinations: Destination[] = [
   {
     id: 'vancouver',
     name: 'Ванкувер',
+    genitive: 'Ванкувера',
     country: 'Канада',
     lat: 49.28,
     lon: -123.12,
@@ -229,6 +270,7 @@ export const destinations: Destination[] = [
   {
     id: 'cancun',
     name: 'Канкун',
+    genitive: 'Канкуна',
     country: 'Мексика',
     lat: 21.16,
     lon: -86.85,
@@ -239,6 +281,7 @@ export const destinations: Destination[] = [
   {
     id: 'honolulu',
     name: 'Гонолулу',
+    genitive: 'Гонолулу',
     country: 'США',
     lat: 21.31,
     lon: -157.86,
@@ -249,6 +292,7 @@ export const destinations: Destination[] = [
   {
     id: 'marrakesh',
     name: 'Марракеш',
+    genitive: 'Марракеша',
     country: 'Марокко',
     lat: 31.63,
     lon: -7.99,
@@ -259,6 +303,7 @@ export const destinations: Destination[] = [
   {
     id: 'cairo',
     name: 'Каир',
+    genitive: 'Каира',
     country: 'Египет',
     lat: 30.04,
     lon: 31.24,
@@ -269,6 +314,7 @@ export const destinations: Destination[] = [
   {
     id: 'dubai',
     name: 'Дубай',
+    genitive: 'Дубая',
     country: 'ОАЭ',
     lat: 25.2,
     lon: 55.27,
@@ -279,6 +325,7 @@ export const destinations: Destination[] = [
   {
     id: 'almaty',
     name: 'Алматы',
+    genitive: 'Алматы',
     country: 'Казахстан',
     lat: 43.24,
     lon: 76.89,
@@ -289,6 +336,7 @@ export const destinations: Destination[] = [
   {
     id: 'delhi',
     name: 'Дели',
+    genitive: 'Дели',
     country: 'Индия',
     lat: 28.61,
     lon: 77.21,
@@ -299,6 +347,7 @@ export const destinations: Destination[] = [
   {
     id: 'beijing',
     name: 'Пекин',
+    genitive: 'Пекина',
     country: 'Китай',
     lat: 39.9,
     lon: 116.4,
@@ -309,6 +358,7 @@ export const destinations: Destination[] = [
   {
     id: 'seoul',
     name: 'Сеул',
+    genitive: 'Сеула',
     country: 'Южная Корея',
     lat: 37.57,
     lon: 126.98,
@@ -319,6 +369,7 @@ export const destinations: Destination[] = [
   {
     id: 'vladivostok',
     name: 'Владивосток',
+    genitive: 'Владивостока',
     country: 'Россия',
     lat: 43.12,
     lon: 131.89,
@@ -329,6 +380,7 @@ export const destinations: Destination[] = [
   {
     id: 'tokyo',
     name: 'Токио',
+    genitive: 'Токио',
     country: 'Япония',
     lat: 35.68,
     lon: 139.69,

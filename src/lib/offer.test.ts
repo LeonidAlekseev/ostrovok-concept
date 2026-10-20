@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getHotel } from './catalog'
 import {
   freeCancellationUntil,
+  guruPrice,
   OFFER_NOT_FOUND,
   offerTotal,
   parseOffer,
@@ -35,6 +36,14 @@ const parse = (overrides: Record<string, string | null>) => {
 describe('offerTotal', () => {
   it('multiplies the nightly price by nights and rooms', () => {
     expect(offerTotal(7000, 2, 2)).toBe(28_000)
+  })
+})
+
+// hotel-catalog, Requirement: Цена GURU
+describe('guruPrice', () => {
+  it('takes 10 % off and rounds to the rouble', () => {
+    expect(guruPrice(5985)).toBe(5387)
+    expect(guruPrice(7000)).toBe(6300)
   })
 })
 

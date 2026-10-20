@@ -1,6 +1,6 @@
 import { getDefaultNormalizer, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { getDestination, getHotel } from '../../lib/catalog'
+import { getHotel, type Hotel } from '../../lib/catalog'
 import { countRu, formatDecimal, formatPrice } from '../../lib/format'
 import { HotelTile } from './HotelTile'
 
@@ -8,43 +8,101 @@ const hotel = getHotel('prague-old-town-lantern')!
 // Prices keep their no-break spaces.
 const exact = { normalizer: getDefaultNormalizer({ collapseWhitespace: false }) }
 
+/** The hotel with every rate non-refundable. */
+const nonRefundable: Hotel = {
+  ...hotel,
+  rooms: hotel.rooms.map((room) => ({
+    ...room,
+    rates: room.rates.map((rate) => ({ ...rate, cancellation: { kind: 'non-refundable' } })),
+  })),
+}
+
 afterEach(() => localStorage.clear())
 
-// home-page, Requirement: Подборки отелей (Scenario: Состав карточки)
-describe('HotelTile', () => {
-  it('puts the stars on the photo and the name with the city right below it', () => {
+// hotel-tile, Requirement: Метки на фото карточки
+describe('HotelTile photo', () => {
+  it('lays the free cancellation, the rating, the heart, the counter and the stars over the photos', () => {
     render(<HotelTile hotel={hotel} href={`/hotels/${hotel.id}`} />)
     const card = screen.getByRole('article')
-    const photo = within(card).getByRole('img', { name: hotel.photos[0].caption })
-    const stars = within(card).getByRole('img', { name: countRu(hotel.stars, ['звезда', 'звезды', 'звёзд']) })
-    expect(stars.parentElement).toBe(photo.parentElement)
-    expect(stars.className).toMatch(/\bright-2\b/)
-    expect(stars.className).toMatch(/\bbottom-2\b/)
+    const photos = within(card).getByRole('group', { name: 'Фото отеля' })
+    const carousel = photos.parentElement!
+    expect(card.firstElementChild).toBe(carousel)
+    expect(carousel.className).toMatch(/\brounded-xl\b/)
 
-    const heading = within(card).getByRole('heading', { level: 3, name: hotel.name })
-    expect(heading.nextElementSibling?.textContent).toBe(getDestination(hotel.destinationId)!.name)
-    expect(within(card).getByRole('link', { name: hotel.name }).getAttribute('href')).toBe(`/hotels/${hotel.id}`)
-  })
+    const corners = [
+      [within(carousel).getByText('1 / 5').parentElement!, /\bbottom-2\b/, /\bleft-2\b/],
+      [
+        within(carousel).getByRole('img', { name: countRu(hotel.stars, ['звезда', 'звезды', 'звёзд']) }),
+        /\bbottom-2\b/,
+        /\bright-2\b/,
+      ],
+    ] as const
+    for (const [badge, y, x] of corners) {
+      expect(badge.className).toMatch(y)
+      expect(badge.className).toMatch(x)
+    }
 
-  it('shows the price without "за ночь" and the rating next to the favourite button', () => {
-    render(<HotelTile hotel={hotel} href={`/hotels/${hotel.id}`} />)
-    const card = screen.getByRole('article')
-    expect(within(card).getByText(`от ${formatPrice(hotel.priceFrom)}`, exact)).toBeDefined()
-    expect(card.textContent).not.toMatch(/за ночь/)
-
-    const button = within(card).getByRole('button', { name: 'Добавить в избранное' })
-    const rating = within(card).getByText(formatDecimal(hotel.rating))
-    expect(button.previousElementSibling).toBe(rating)
+    const button = within(carousel).getByRole('button', { name: 'Добавить в избранное' })
+    const rating = within(carousel).getByText(formatDecimal(hotel.rating))
     expect(rating.textContent).toBe(`Оценка гостей ${formatDecimal(hotel.rating)}`)
+    expect(button.previousElementSibling).toBe(rating)
+    // The top row: the free cancellation on the left, the rating pushed right, the heart last.
+    const top = button.parentElement!
+    expect(top.className).toMatch(/\btop-2\b/)
+    expect(top.className).toMatch(/\binset-x-2\b/)
+    expect(top.firstElementChild).toBe(within(carousel).getByText('Бесплатная отмена'))
+    expect(rating.className).toMatch(/\bml-auto\b/)
+    expect(top.lastElementChild).toBe(button)
+  })
+})
+
+// hotel-tile, Requirement: Листание фото карточки
+describe('HotelTile photo links', () => {
+  it('lets a photo lead where the name does, without adding a link for the keyboard', () => {
+    render(<HotelTile hotel={hotel} href={`/hotels/${hotel.id}`} />)
+    const card = screen.getByRole('article')
+    expect(within(card).getAllByRole('link')).toHaveLength(1)
+    const photoLinks = card.querySelectorAll('a[aria-hidden="true"]')
+    expect(photoLinks).toHaveLength(hotel.photos.length)
+    for (const link of photoLinks) {
+      expect(link.getAttribute('href')).toBe(`/hotels/${hotel.id}`)
+      expect(link.getAttribute('tabindex')).toBe('-1')
+    }
+  })
+})
+
+// hotel-tile, Requirement: Текст и цены карточки
+describe('HotelTile text and prices', () => {
+  it('shows the name, the distance to the centre of the city and both prices without "от"', () => {
+    render(<HotelTile hotel={hotel} href={`/hotels/${hotel.id}`} />)
+    const card = screen.getByRole('article')
+    expect(within(card).getByRole('link', { name: hotel.name }).getAttribute('href')).toBe(`/hotels/${hotel.id}`)
+    const heading = within(card).getByRole('heading', { level: 3, name: hotel.name })
+    expect(heading.nextElementSibling?.textContent).toBe(`${formatDecimal(hotel.distanceKm)} км от центра Праги`)
+
+    expect(within(card).getByText(formatPrice(hotel.priceFrom), exact)).toBeDefined()
+    expect(within(card).getByText(formatPrice(Math.round(hotel.priceFrom * 0.9)), exact)).toBeDefined()
+    expect(within(card).getByRole('img', { name: 'GURU' })).toBeDefined()
+    expect(card.textContent).not.toMatch(/(^|\s)от \d|за ночь|за \d+ ноч/)
   })
 
-  it('shows a given price and details between the city and the bottom row', () => {
-    render(
-      <HotelTile hotel={hotel} href="/" price={12345}>
-        <p>за 3 ночи</p>
-      </HotelTile>,
-    )
-    expect(screen.getByText(`от ${formatPrice(12345)}`, exact)).toBeDefined()
-    expect(screen.getByText('за 3 ночи')).toBeDefined()
+  it('prices a given price', () => {
+    render(<HotelTile hotel={hotel} href="/" price={5985} />)
+    const card = screen.getByRole('article')
+    expect(within(card).getByText(formatPrice(5985), exact)).toBeDefined()
+    expect(within(card).getByText(formatPrice(5387), exact).textContent).toBe(`Цена GURU ${formatPrice(5387)}`)
+  })
+})
+
+// hotel-tile, Requirement: Бесплатная отмена на карточке
+describe('HotelTile free cancellation', () => {
+  it('follows the hotel by default', () => {
+    render(<HotelTile hotel={nonRefundable} href="/" />)
+    expect(screen.queryByText('Бесплатная отмена')).toBeNull()
+  })
+
+  it('follows a given rate', () => {
+    render(<HotelTile hotel={hotel} href="/" freeCancellation={false} />)
+    expect(screen.queryByText('Бесплатная отмена')).toBeNull()
   })
 })

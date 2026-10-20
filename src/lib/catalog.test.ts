@@ -6,6 +6,7 @@ import {
   cheapestRate,
   fullHotelsIn,
   getHotel,
+  hasFreeCancellation,
   hotels,
   hotelsIn,
   MIN_HOTELS_PER_DESTINATION,
@@ -97,6 +98,40 @@ describe('catalogue', () => {
     for (const d of destinations) {
       expect(Math.min(...hotelsIn(d.id).map((h) => h.priceFrom)), d.id).toBe(d.priceFrom)
     }
+  })
+})
+
+// hotel-catalog, Requirement: Город в родительном падеже
+describe('destinations', () => {
+  it('have a name in the genitive', () => {
+    for (const d of destinations) expect(d.genitive.trim(), d.id).not.toBe('')
+    expect(destinations.find((d) => d.id === 'prague')!.genitive).toBe('Праги')
+  })
+})
+
+// hotel-catalog, Requirement: Бесплатная отмена отеля
+describe('hasFreeCancellation', () => {
+  const hotel = getHotel('prague-old-town-lantern')!
+  const withRates = (...kinds: ('free' | 'non-refundable')[]) => ({
+    ...hotel,
+    rooms: [
+      {
+        ...hotel.rooms[0],
+        rates: kinds.map((kind, i) => ({
+          ...hotel.rooms[0].rates[0],
+          id: `rate-${i}`,
+          cancellation: kind === 'free' ? { kind, daysBefore: 1 } : { kind },
+        })),
+      },
+    ],
+  })
+
+  it('is true when one rate is refundable', () => {
+    expect(hasFreeCancellation(withRates('non-refundable', 'free', 'non-refundable'))).toBe(true)
+  })
+
+  it('is false when no rate is', () => {
+    expect(hasFreeCancellation(withRates('non-refundable', 'non-refundable'))).toBe(false)
   })
 })
 
