@@ -107,6 +107,13 @@
   --decor-orb-shadow: 0 0 60px color-mix(in srgb, var(--decor-violet) 45%, transparent);
   --decor-spin-gradient: linear-gradient(100deg, var(--brand-blue), var(--decor-violet) 55%, var(--decor-magenta));
   --decor-spin-shadow: 0 10px 24px color-mix(in srgb, var(--decor-violet) 30%, transparent);
+  /* Vibe search: the calm blue-lilac and the loud pink-orange sides; white text keeps 3:1 on both. */
+  --decor-vibe-calm-from: #3b5bdb;
+  --decor-vibe-calm-to: #7048e8;
+  --decor-vibe-loud-from: #d6336c;
+  --decor-vibe-loud-to: #e8590c;
+  --decor-vibe-calm: linear-gradient(135deg, var(--decor-vibe-calm-from), var(--decor-vibe-calm-to));
+  --decor-vibe-loud: linear-gradient(135deg, var(--decor-vibe-loud-from), var(--decor-vibe-loud-to));
   /* Assistant robot avatar. */
   --decor-robot-bg-from: #eef3ff;
   --decor-robot-bg-to: #d9e4ff;
@@ -158,6 +165,9 @@
   --animate-twinkle: twinkle 1.8s ease-in-out infinite;
   /* The glow under the hub pin on the globe breathes. */
   --animate-hub-pulse: hub-pulse 2.4s ease-in-out infinite;
+  /* The vibe search: the «vs» between the sides beats, and each new pair of opposites slides in. */
+  --animate-vibe-beat: vibe-beat 2.4s ease-in-out infinite;
+  --animate-vibe-in: vibe-in 0.3s ease-out both;
 
   /* The ui/accordion panel opens and closes to the height Base UI measures. */
   --animate-accordion-down: accordion-down 0.2s ease-out;
@@ -235,6 +245,19 @@
     50% {
       opacity: 0.55;
       scale: 1.25;
+    }
+  }
+
+  @keyframes vibe-beat {
+    50% {
+      scale: 1.12;
+    }
+  }
+
+  @keyframes vibe-in {
+    from {
+      opacity: 0;
+      translate: 0 8px;
     }
   }
 }
