@@ -9,4 +9,12 @@ describe('PhotoPlaceholder', () => {
     render(<PhotoPlaceholder photo={photo} />)
     expect(screen.getByRole('img', { name: photo.caption })).toBeTruthy()
   })
+
+  it('keeps the caption to one truncated line that hides in a narrow tile', () => {
+    const photo = getHotel('prague-old-town-lantern')!.photos[0]
+    render(<PhotoPlaceholder photo={photo} />)
+    const caption = screen.getByRole('img', { name: photo.caption }).lastElementChild
+    expect(caption?.className).toContain('truncate')
+    expect(caption?.className).toContain('@[4rem]:block')
+  })
 })
