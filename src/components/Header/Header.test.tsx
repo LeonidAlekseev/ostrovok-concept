@@ -69,6 +69,13 @@ describe('Header', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
+  it('closes a panel on a press on the logo', async () => {
+    const user = setup()
+    await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
+    await user.click(screen.getByRole('link', { name: 'Островок! — на главную' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
   it('lists the sections in the menu and closes it on a choice', async () => {
     const user = setup()
     await user.click(screen.getByRole('button', { name: 'Открыть меню' }))

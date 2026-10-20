@@ -3,6 +3,8 @@ import { destinations } from '../data/destinations'
 import {
   findScenario,
   fromSearchParams,
+  parseGuestParams,
+  parseStayParams,
   resolveTarget,
   suggestDestinations,
   toSearchParams,
@@ -185,5 +187,29 @@ describe('withStartDates', () => {
     const chosen = { ...empty, checkIn: '2026-11-01', checkOut: '2026-11-04' }
     expect(withStartDates(chosen, '2026-10-19')).toEqual(chosen)
     expect(withStartDates(empty, '')).toBe(empty)
+  })
+})
+
+describe('parseGuestParams', () => {
+  it('reads the guests whatever the dates', () => {
+    expect(parseGuestParams(new URLSearchParams('adults=3&children=1&rooms=2'))).toEqual({
+      adults: 3,
+      children: 1,
+      rooms: 2,
+    })
+  })
+
+  it('is null without any guest parameter, and keeps malformed counts as NaN', () => {
+    expect(parseGuestParams(new URLSearchParams('checkin=2099-01-10'))).toBeNull()
+    expect(parseGuestParams(new URLSearchParams('adults=x'))).toEqual({ adults: NaN, children: 0, rooms: NaN })
+  })
+
+  it('leaves parseStayParams null without dates and NaN guests without guest parameters', () => {
+    expect(parseStayParams(new URLSearchParams('adults=3&rooms=1'))).toBeNull()
+    expect(parseStayParams(new URLSearchParams('checkin=2099-01-10&checkout=2099-01-12'))?.guests).toEqual({
+      adults: NaN,
+      children: 0,
+      rooms: NaN,
+    })
   })
 })

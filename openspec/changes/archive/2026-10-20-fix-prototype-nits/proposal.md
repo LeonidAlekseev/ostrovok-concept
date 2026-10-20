@@ -33,3 +33,11 @@
 
 - `src/components/Header/*`, `src/components/BookingPage/BookingForm.tsx`, `src/lib/search.ts`, `src/components/StayBar/useStay.ts`, тесты, `config/*`, `README.md`; по пункту 3 — файлы, где найдётся источник 404.
 - Источник: TODO, «Предложения»; запрос пользователя 2026-10-20.
+
+## Решения
+
+1. Логотип: в jsdom нажатие не закрывало панель (тест воспроизвёл), в Chromium под `next start` закрывало (через перезагрузку по `href="/"`). Добавлен `onClick={close}` на логотипе, тест «closes a panel on a press on the logo».
+2. `splitName`: комментарий в `BookingForm.tsx` уже стоит у своей функции и описывает её; лишнего JSDoc нет, правок нет.
+3. 404: **до 0, после 0.** Под `next start` (сборка этой ветки, порт 3351, Chromium, окна 1280×800 и 390×844) обошёл 90 страниц по внутренним ссылкам (из 272 найденных) с прокруткой и `networkidle`, плюс `/`, `/search`, `/login`, `/trips`, `/favorites`, `/help`, `/booking`, страница отеля: ни одного ответа ≥400 и `requestfailed`. Единственные 404 — запросы к несуществующим `/signup` и `/hotels` (мои контрольные пути). Иконки объявлены в `<head>` (`/favicon.svg`, `/favicon.png`), `/favicon.ico` не запрашивается. Источник ~50 404 не воспроизведён; вероятно, был устранён позднее изменениями или относился к dev-режиму/расширениям браузера. Менять нечего.
+4. `parseGuestParams` возвращает `null`, если в адресе нет `adults`, `children`, `rooms`; `parseStayParams` без них даёт прежние NaN-гости (ошибка валидации). `useStay` берёт гостей адреса без дат, только если они проходят `validateSearch`, иначе пара по умолчанию. `fromSearchParams` (страница поиска) не менялась: это сверх согласованного.
+5. Тест `src/lib/maplibreLoader.test.ts`: в установленном `maplibre-gl.mjs` есть `new URL(…, import.meta.url)` и после loader `import.meta.url` не осталось. Заметка в README («Карта»).

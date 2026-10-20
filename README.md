@@ -190,6 +190,13 @@ node scripts/screenshots.mjs --label after --against before --mask canvas / /sea
 нет WebGL, вместо карты — «Карта недоступна», список и фильтры работают. В тестах `maplibre-gl`
 подменяется моком.
 
+Turbopack превращает `new URL(x, import.meta.url)` в `maplibre-gl.mjs` в ассеты всех файлов
+`maplibre-gl/dist` (~5 МБ), поэтому `next.config.ts` пропускает этот файл через loader
+`config/maplibre-no-asset-glob.cjs`, заменяющий `import.meta.url`. При обновлении MapLibre запустите
+`npm test`: тест `src/lib/maplibreLoader.test.ts` падает, если в новой версии такого шаблона уже нет
+(loader не нужен — удалите его и правило в `next.config.ts`) или после замены остался `import.meta.url`
+(поправьте loader). Затем проверьте `npm run build` и карту на `/search`.
+
 ### Страница отеля и выбор тарифа
 
 `/hotels/<id>` (`src/components/HotelPage`) — шапка с избранным, галерея из 5 заглушек
