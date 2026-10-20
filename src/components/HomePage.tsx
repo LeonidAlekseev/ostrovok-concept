@@ -13,6 +13,7 @@ import { DestinationCard } from './DestinationCard/DestinationCard'
 import { HomeCollections } from './HomeCollections/HomeCollections'
 import { Hero } from './Hero/Hero'
 import { SearchPanel, type SearchMode } from './SearchPanel/SearchPanel'
+import { StarSearch } from './StarSearch/StarSearch'
 import { TravelBanner } from './TravelBanner/TravelBanner'
 
 const featured = destinations.find((d) => d.id === FEATURED_DESTINATION_ID)!
@@ -126,6 +127,8 @@ export function HomePage() {
             ))}
           </ul>
         </section>
+
+        <StarSearch />
 
         <HomeCollections />
 

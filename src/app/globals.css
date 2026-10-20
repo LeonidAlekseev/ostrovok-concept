@@ -66,7 +66,7 @@
   --shadow-popover: 0 18px 50px color-mix(in srgb, var(--shadow-color) 16%, transparent);
   --shadow-primary: 0 8px 20px color-mix(in srgb, var(--primary) 25%, transparent);
 
-  /* Decorative accents: illustrations, glass and glow, the slot machine, confetti. Values outside
+  /* Decorative accents: illustrations, glass and glow, the magic orb. Values outside
      the brand palette live only here. */
   --decor-light: var(--brand-white);
   --decor-black: #000000;
@@ -91,32 +91,22 @@
   --decor-badge-green: #1f9d55;
   --decor-star: #ffb800;
   --decor-stats: #b7ffb0;
-  /* Slot machine and its ticket. */
+  /* Star search: the magic orb, its sparkles and the night sky around it. */
   --decor-gold: #ffe08a;
-  --decor-gold-light: #fff6d8;
   --decor-violet: #5b3df5;
   --decor-magenta: #c13df5;
-  --decor-purple: #a03df5;
-  --decor-machine-dark: #0b1f5c;
   --decor-machine-indigo: #3b2bb8;
-  --decor-machine-shadow: #061e6e;
-  --decor-lever-dark: #8a95ad;
-  --decor-lever-light: #d9dfeb;
-  --decor-knob: #ff2d55;
-  --decor-knob-light: #ff9db5;
-  --decor-knob-dark: #b3002a;
-  --decor-ticket-star: #ffd257;
+  --decor-night: #0b1033;
+  --decor-orb-swirl: conic-gradient(
+    var(--brand-blue),
+    var(--decor-violet),
+    var(--decor-magenta),
+    var(--brand-lime),
+    var(--brand-blue)
+  );
+  --decor-orb-shadow: 0 0 60px color-mix(in srgb, var(--decor-violet) 45%, transparent);
   --decor-spin-gradient: linear-gradient(100deg, var(--brand-blue), var(--decor-violet) 55%, var(--decor-magenta));
   --decor-spin-shadow: 0 10px 24px color-mix(in srgb, var(--decor-violet) 30%, transparent);
-  --decor-ticket-gradient:
-    radial-gradient(circle at 90% 0%, color-mix(in srgb, var(--brand-lime) 55%, transparent), transparent 45%),
-    linear-gradient(135deg, var(--brand-blue), var(--decor-violet) 60%, var(--decor-purple));
-  --decor-ticket-shadow: 0 16px 36px color-mix(in srgb, var(--decor-violet) 30%, transparent);
-  --decor-confetti-1: var(--brand-blue);
-  --decor-confetti-2: var(--brand-lime);
-  --decor-confetti-3: #ffb020;
-  --decor-confetti-4: #ff5c8a;
-  --decor-confetti-5: #5ee7ff;
   /* Assistant robot avatar. */
   --decor-robot-bg-from: #eef3ff;
   --decor-robot-bg-to: #d9e4ff;
@@ -159,15 +149,13 @@
      animation-delay styles. */
   /* The assistant's typing indicator: three dots bouncing in turn. */
   --animate-typing-dot: typing-dot 1s ease-in-out infinite;
-  /* The slot machine: a highlight across the spin button, the bulbs chasing while the reels spin and
-     blinking when they stop, the lever pulled, the windows flashing gold on a win. */
-  --animate-slot-shine: slot-shine 2.8s ease-in-out infinite;
-  --animate-slot-chase: slot-chase 0.4s linear infinite;
-  --animate-slot-blink: slot-blink 0.5s steps(2) 6;
-  --animate-slot-pull: slot-pull 0.7s ease-in-out;
-  --animate-slot-win: slot-win 0.9s ease-out;
-  /* A confetti piece flies up to --x/--y, turning by --r, and falls out of sight. */
-  --animate-confetti: confetti 1.6s cubic-bezier(0.2, 0.7, 0.4, 1) forwards;
+  /* The magic orb: its colours swirl and shimmer, the glow breathes, sparkles twinkle around it, and while the
+     stars are read the sign's symbol surfaces from the nebula (2.5 s, the length of the reading). */
+  --animate-orb-swirl: orb-swirl 8s linear infinite;
+  --animate-orb-swirl-fast: orb-swirl 1.2s linear infinite;
+  --animate-orb-glow: orb-glow 3s ease-in-out infinite;
+  --animate-orb-reveal: orb-reveal 2.5s ease-out both;
+  --animate-twinkle: twinkle 1.8s ease-in-out infinite;
   /* The glow under the hub pin on the globe breathes. */
   --animate-hub-pulse: hub-pulse 2.4s ease-in-out infinite;
 
@@ -206,51 +194,40 @@
     }
   }
 
-  @keyframes slot-shine {
-    60%,
-    100% {
-      translate: 100%;
+  @keyframes orb-swirl {
+    50% {
+      filter: hue-rotate(40deg) saturate(1.3);
     }
-  }
-
-  @keyframes slot-chase {
     to {
-      background-position-x: 16px;
+      rotate: 1turn;
     }
   }
 
-  @keyframes slot-blink {
-    to {
-      opacity: 0.2;
+  @keyframes orb-glow {
+    50% {
+      opacity: 0.6;
+      scale: 1.08;
     }
   }
 
-  @keyframes slot-pull {
-    45% {
-      transform: scaleY(-0.6);
-    }
-  }
-
-  @keyframes slot-win {
+  @keyframes orb-reveal {
+    0%,
     30% {
-      box-shadow:
-        inset 0 0 0 3px var(--decor-gold),
-        0 0 18px color-mix(in srgb, var(--decor-gold) 90%, transparent);
+      opacity: 0;
+      scale: 0.4;
+      filter: blur(12px);
+    }
+    to {
+      opacity: 1;
+      scale: 1;
+      filter: blur(0);
     }
   }
 
-  @keyframes confetti {
-    0% {
-      opacity: 1;
-      transform: translate(0, 0) rotate(0);
-    }
-    55% {
-      opacity: 1;
-      transform: translate(var(--x), var(--y)) rotate(calc(var(--r) / 2));
-    }
-    100% {
-      opacity: 0;
-      transform: translate(calc(var(--x) * 1.15), calc(var(--y) + 260px)) rotate(var(--r));
+  @keyframes twinkle {
+    50% {
+      opacity: 0.2;
+      scale: 0.5;
     }
   }
 
