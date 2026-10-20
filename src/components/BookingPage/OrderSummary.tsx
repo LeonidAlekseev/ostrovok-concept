@@ -33,7 +33,7 @@ export function OrderSummary({ offer }: { offer: Offer }) {
         <dt className="text-muted-foreground">Гости</dt>
         <dd>{guestsLabel(offer.guests)}</dd>
         <dt className="text-muted-foreground">Отмена</dt>
-        <dd>{cancellationLabel(effectiveCancellation(offer, todayIso()), offer.checkIn)}</dd>
+        <dd>{cancellationLabel(effectiveCancellation(rate, offer.checkIn, todayIso()), offer.checkIn)}</dd>
         <dt className="text-muted-foreground">Оплата</dt>
         <dd>{PAYMENT_LABEL[rate.payment]}</dd>
       </dl>

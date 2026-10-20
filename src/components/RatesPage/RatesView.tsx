@@ -3,7 +3,8 @@
 import { Suspense } from 'react'
 import type { Hotel } from '@/lib/catalog'
 import { StayBar } from '../StayBar/StayBar'
-import { DEFAULT_GUESTS, useStay, type StayState } from '../StayBar/useStay'
+import { DEFAULT_GUESTS } from '@/lib/search'
+import { useStay, type StayState } from '../StayBar/useStay'
 import { RoomRates } from './RoomRates'
 
 const noDates: StayState = { stay: null, error: undefined, guests: DEFAULT_GUESTS, setStay: () => {} }

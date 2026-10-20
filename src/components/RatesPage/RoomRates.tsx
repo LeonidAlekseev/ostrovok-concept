@@ -3,25 +3,19 @@
 import Link from 'next/link'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
+import { cancellationLabel, effectiveCancellation } from '@/lib/booking'
 import { MEAL_LABEL, PAYMENT_LABEL, type Hotel, type Rate, type Room } from '@/lib/catalog'
-import { fromIso, nightsBetween, todayIso } from '../../lib/dates'
+import { nightsBetween, todayIso } from '../../lib/dates'
 import { countRu, formatPrice } from '../../lib/format'
 import { toOfferParams } from '../../lib/offer'
-import { cancellationDeadline, ratePrice, unavailableReason } from '../../lib/rates'
+import { ratePrice, unavailableReason } from '../../lib/rates'
 import type { Guests, Stay } from '../../lib/search'
 
 const nightForms: [string, string, string] = ['ночь', 'ночи', 'ночей']
-const shortDate = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' })
-
-function cancellationText(rate: Rate, stay: Stay | null): string {
-  if (stay) {
-    const until = cancellationDeadline(rate, stay.checkIn, todayIso())
-    return until ? `Бесплатная отмена до ${shortDate.format(fromIso(until))}` : 'Невозвратный тариф'
-  }
-  return rate.cancellation.kind === 'free'
-    ? `Бесплатная отмена за ${countRu(rate.cancellation.daysBefore, ['день', 'дня', 'дней'])} до заезда`
-    : 'Невозвратный тариф'
-}
+const cancellationText = (rate: Rate, stay: Stay | null) =>
+  stay
+    ? cancellationLabel(effectiveCancellation(rate, stay.checkIn, todayIso()), stay.checkIn, { short: true })
+    : cancellationLabel(rate.cancellation, null)
 
 interface Props {
   hotel: Hotel

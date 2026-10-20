@@ -89,6 +89,7 @@ describe('BookingDetailsPage', () => {
     render(<BookingDetailsPage />)
     await user.click(screen.getByRole('button', { name: 'Отменить бронирование' }))
     expect(screen.getByText('Бесплатно')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Подтвердить отмену' }).className).toContain('bg-destructive')
     await user.click(screen.getByRole('button', { name: 'Подтвердить отмену' }))
     expect(bookingsStore.get()[0]).toMatchObject({ status: 'cancelled', cancellationFee: 0 })
     expect(screen.getByText(/Бронирование отменено/)).toBeTruthy()

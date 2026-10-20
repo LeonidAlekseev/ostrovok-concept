@@ -6,7 +6,7 @@ import { cn } from 'cn'
 import { Badge } from '@/components/ui/badge'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import { getDestination, type Hotel } from '../../lib/catalog'
-import { formatPrice, formatRating } from '../../lib/format'
+import { formatPrice, formatDecimal } from '../../lib/format'
 import { homeCollections } from '../../lib/collections'
 import { DEFAULT_GUESTS, setStayParams, withStartDates, type Stay } from '../../lib/search'
 import { useToday } from '../../hooks/useToday'
@@ -31,7 +31,7 @@ function HotelTile({ hotel, stay }: { hotel: Hotel; stay: Stay | null }) {
         </h4>
         <p className="text-sm/[normal] text-muted-foreground">{getDestination(hotel.destinationId)!.name}</p>
         <p className="mt-auto flex items-center justify-between gap-2">
-          <Badge className="bg-primary text-primary-foreground">{formatRating(hotel.rating)}</Badge>
+          <Badge className="bg-primary text-primary-foreground">{formatDecimal(hotel.rating)}</Badge>
           <span className="text-right text-sm/[normal]">
             <span className="font-bold">от {formatPrice(hotel.priceFrom)}</span>
             <span className="block text-muted-foreground">за ночь</span>

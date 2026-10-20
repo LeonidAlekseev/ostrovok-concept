@@ -4,67 +4,27 @@ import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { buttonVariants, Button } from '@/components/ui/button'
+import { BookingDetails } from '@/components/BookingDetails/BookingDetails'
 import { useBookings } from '@/hooks/useStore'
-import { cancellationLabel } from '@/lib/booking'
-import { findRate, findRoom, getHotel, MEAL_LABEL } from '@/lib/catalog'
-import { formatDateRange, formatLongDate, nightsBetween, todayIso } from '@/lib/dates'
-import { countRu, formatPrice, guestsLabel } from '@/lib/format'
+import { formatLongDate, todayIso } from '@/lib/dates'
+import { formatPrice } from '@/lib/format'
 import { findBooking, type Booking } from '@/lib/storage'
 import { feeLabel, STATUS_LABEL, tripTab } from '@/lib/trips'
 import { CancelDialog } from './CancelDialog'
 import { EditForm } from './EditForm'
 import { pageClass, TripsGate } from './TripsGate'
 
-const nightForms: [string, string, string] = ['ночь', 'ночи', 'ночей']
-
 function Details({ booking }: { booking: Booking }) {
-  const hotel = getHotel(booking.hotelId)
-  const room = hotel && findRoom(hotel, booking.roomId)
-  const rate = room && findRate(room, booking.rateId)
-  const tab = tripTab(booking, todayIso())
-  const rows: [string, string][] = [
+  const leadingRows: [string, string][] = [
     ['Номер бронирования', booking.id],
     ['Создано', formatLongDate(booking.createdAt.slice(0, 10))],
-    ['Статус', STATUS_LABEL[tab]],
+    ['Статус', STATUS_LABEL[tripTab(booking, todayIso())]],
   ]
   if (booking.cancelledAt) {
-    rows.push(['Отменено', formatLongDate(booking.cancelledAt.slice(0, 10))])
-    rows.push(['Удержано при отмене', formatPrice(booking.cancellationFee ?? 0)])
+    leadingRows.push(['Отменено', formatLongDate(booking.cancelledAt.slice(0, 10))])
+    leadingRows.push(['Удержано при отмене', formatPrice(booking.cancellationFee ?? 0)])
   }
-  rows.push(
-    ['Отель', hotel?.name ?? 'Отель'],
-    ['Номер', room?.name ?? 'Номер'],
-    ['Тариф', rate ? MEAL_LABEL[rate.meal] : 'Тариф'],
-    [
-      'Даты',
-      `${formatDateRange(booking.checkIn, booking.checkOut)}, ${countRu(nightsBetween(booking.checkIn, booking.checkOut), nightForms)}`,
-    ],
-    ['Гости', guestsLabel(booking.guests)],
-    [
-      booking.roomGuests.length > 1 ? 'Основные гости' : 'Основной гость',
-      booking.roomGuests.map((g) => `${g.firstName} ${g.lastName}`).join(', '),
-    ],
-    ['Контакты', `${booking.contact.email}, ${booking.contact.phone}`],
-    ['Пожелания', booking.requests || 'Нет'],
-    ['Оплата', booking.cardLast4 ? `Карта •••• ${booking.cardLast4}` : 'Оплата в отеле при заселении'],
-    ['Условия отмены', cancellationLabel(booking.cancellation, booking.checkIn)],
-  )
-  return (
-    <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-lg border border-border bg-card p-4 [&_dd]:text-right">
-      {rows.map(([term, value]) => (
-        <div key={term} className="col-span-2 grid grid-cols-subgrid">
-          <dt className="text-muted-foreground">{term}</dt>
-          <dd>{value}</dd>
-        </div>
-      ))}
-      <div className="col-span-2 grid grid-cols-subgrid border-t border-border pt-3">
-        <dt className="font-semibold">{booking.payment === 'now' ? 'Оплачено' : 'К оплате в отеле'}</dt>
-        <dd>
-          <b className="text-xl">{formatPrice(booking.total)}</b>
-        </dd>
-      </div>
-    </dl>
-  )
+  return <BookingDetails booking={booking} leadingRows={leadingRows} cancellationTerm="Условия отмены" />
 }
 
 function BookingView({ booking }: { booking: Booking }) {

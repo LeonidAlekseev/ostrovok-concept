@@ -8,8 +8,8 @@ export function formatPrice(value: number): string {
   return `${priceFormat.format(value).replace(/ /g, ' ')} ₽`
 }
 
-/** Guest rating with a decimal comma: 9.4 → "9,4". */
-export function formatRating(value: number): string {
+/** One decimal with a decimal comma: 9.4 → "9,4"; guest rating, distance. */
+export function formatDecimal(value: number): string {
   return value.toFixed(1).replace('.', ',')
 }
 
