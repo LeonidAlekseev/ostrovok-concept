@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { signIn } from '@/lib/auth'
 import { favoritesStore, sessionStore } from '@/lib/storage'
 import { Header } from './Header'
@@ -130,6 +130,14 @@ describe('Header', () => {
   })
 })
 
+// jsdom has no `:focus-visible`: pretend the focused header element got focus from the keyboard.
+const focusVisible = () => {
+  const matches = Element.prototype.matches
+  return vi.spyOn(Element.prototype, 'matches').mockImplementation(function (this: Element, selector: string) {
+    return selector === ':focus-visible' ? this === document.activeElement : matches.call(this, selector)
+  })
+}
+
 describe('Header on scroll', () => {
   const scrollTo = (y: number) => {
     Object.defineProperty(window, 'scrollY', { value: y, configurable: true })
@@ -141,7 +149,10 @@ describe('Header on scroll', () => {
   const frame = () => act(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
   const stateAfter = (expected: string) => waitFor(() => expect(state()).toBe(expected))
 
-  afterEach(() => scrollTo(0))
+  afterEach(() => {
+    vi.restoreAllMocks()
+    scrollTo(0)
+  })
 
   it('scrolls with the page at the top, hides when fixed, shows on a scroll up far from the top', async () => {
     setup()
@@ -163,22 +174,46 @@ describe('Header on scroll', () => {
     expect(state()).toBe('hidden')
   })
 
-  it('stays shown while the menu is open and while focus is inside', async () => {
-    const user = setup()
+  const showFar = async () => {
     scrollTo(2000)
     await frame()
     scrollTo(1900)
     await stateAfter('shown')
+  }
+
+  it('stays shown while the menu is open', async () => {
+    const user = setup()
+    await showFar()
     await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
     scrollTo(2100)
     await frame()
     expect(state()).toBe('shown')
     await user.keyboard('{Escape}')
-    screen.getByRole('link', { name: 'Избранное' }).focus()
+    await stateAfter('hidden')
+  })
+
+  it('stays shown while keyboard focus is inside and hides once it leaves', async () => {
+    focusVisible()
+    const user = setup()
+    await showFar()
+    await user.tab()
+    expect(screen.getByRole('banner').contains(document.activeElement)).toBe(true)
     scrollTo(2200)
     await frame()
     expect(state()).toBe('shown')
     ;(document.activeElement as HTMLElement).blur()
+    await stateAfter('hidden')
+  })
+
+  it('hides on a scroll down after a mouse click left focus on a header button', async () => {
+    const user = setup()
+    scrollTo(2000)
+    await frame()
+    scrollTo(1900)
+    await stateAfter('shown')
+    await user.click(screen.getByRole('link', { name: 'Избранное' }))
+    expect(document.activeElement).toBe(screen.getByRole('link', { name: 'Избранное' }))
+    scrollTo(2100)
     await stateAfter('hidden')
   })
 

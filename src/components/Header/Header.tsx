@@ -30,6 +30,15 @@ const menuLinks = [
   { href: '/help', label: 'Поддержка' },
 ]
 
+// A pointer or touch press leaves focus on the button; only keyboard focus should keep the header shown.
+const isKeyboardFocus = (element: Element | null) => {
+  try {
+    return element?.matches(':focus-visible') ?? false
+  } catch {
+    return false
+  }
+}
+
 export function Header() {
   const [open, setOpen] = useState<Panel | null>(null)
   const close = useCallback(() => setOpen(null), [])
@@ -51,7 +60,7 @@ export function Header() {
     <div ref={wrapperRef} className="relative z-20 h-(--header-height)">
       <header
         data-sticky={floating ? (shown ? 'shown' : 'hidden') : 'docked'}
-        onFocus={() => setFocusWithin(true)}
+        onFocus={() => setFocusWithin(isKeyboardFocus(document.activeElement))}
         onBlur={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget)) setFocusWithin(false)
         }}
