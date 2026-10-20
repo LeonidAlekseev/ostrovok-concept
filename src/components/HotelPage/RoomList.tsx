@@ -37,7 +37,6 @@ function RoomRow({ hotel, room, stay, guests, onPickDates }: Props & { room: Roo
       </div>
       <div className="flex flex-col items-start gap-2 sm:items-end sm:text-right">
         <p>
-          <span className="text-sm text-muted-foreground">от </span>
           <b className="text-lg">{formatPrice(price.total ?? price.perNight)}</b>
           <span className="block text-sm text-muted-foreground">
             {price.total === null

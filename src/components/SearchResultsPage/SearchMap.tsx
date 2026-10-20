@@ -174,7 +174,7 @@ export default function SearchMap({ hotels, activeId, onActivate, onOpen }: Prop
           return createPortal(
             <button
               type="button"
-              aria-label={`${hotel.name}, от ${formatPrice(price)}`}
+              aria-label={`${hotel.name}, ${formatPrice(price)}`}
               aria-haspopup="dialog"
               aria-describedby={previewId === hotel.id ? previewDomId : undefined}
               data-active={active || undefined}
@@ -218,7 +218,7 @@ function MapPreview({ id, hotel, price }: MapHotel & { id: string }) {
           ))}
         </span>
         <div className="flex items-center gap-2 pt-1">
-          <p className="mr-auto text-base font-bold whitespace-nowrap">от {formatPrice(price)}</p>
+          <p className="mr-auto text-base font-bold whitespace-nowrap">{formatPrice(price)}</p>
           <Badge className="bg-primary text-primary-foreground">
             <span className="sr-only">Оценка гостей </span>
             {formatDecimal(hotel.rating)}
