@@ -8,8 +8,6 @@ import { setStayParams, type Stay } from '../../lib/search'
 import { HotelTile } from '../HotelTile/HotelTile'
 
 interface Props {
-  /** DOM id of the card, for scrolling to it. */
-  id: string
   item: ResultItem
   stay: Stay
   nights: number
@@ -18,12 +16,10 @@ interface Props {
 }
 
 /** A hotel in the results: links to the hotel page with the same dates and guests; the price is for the stay. */
-export function ResultTile({ id, item, stay, nights, active, onActivate }: Props) {
+export function ResultTile({ item, stay, nights, active, onActivate }: Props) {
   const { hotel, rate } = item
-  const rooms = stay.guests.rooms > 1 ? `, ${countRu(stay.guests.rooms, ['номер', 'номера', 'номеров'])}` : ''
   return (
     <HotelTile
-      id={id}
       hotel={hotel}
       href={`/hotels/${hotel.id}?${setStayParams(new URLSearchParams(), stay)}`}
       price={offerTotal(rate.pricePerNight, nights, stay.guests.rooms)}
@@ -32,7 +28,7 @@ export function ResultTile({ id, item, stay, nights, active, onActivate }: Props
       onMouseLeave={() => onActivate(null)}
       onFocus={() => onActivate(hotel.id)}
       onBlur={() => onActivate(null)}
-      className={cn('scroll-mt-24 ring-2 ring-transparent transition-[box-shadow]', active && 'ring-primary')}
+      className={cn('ring-2 ring-transparent transition-[box-shadow]', active && 'ring-primary')}
     >
       <div className="flex flex-col gap-1.5 text-sm/[normal]">
         <p className="flex flex-col text-muted-foreground">
@@ -42,10 +38,6 @@ export function ResultTile({ id, item, stay, nights, active, onActivate }: Props
         <p className="flex flex-wrap gap-1.5">
           {rate.cancellation.kind === 'free' && <Badge variant="success">Бесплатная отмена</Badge>}
           <Badge variant="secondary">{MEAL_LABEL[rate.meal]}</Badge>
-        </p>
-        <p className="text-muted-foreground">
-          за {countRu(nights, ['ночь', 'ночи', 'ночей'])}
-          {rooms}
         </p>
       </div>
     </HotelTile>

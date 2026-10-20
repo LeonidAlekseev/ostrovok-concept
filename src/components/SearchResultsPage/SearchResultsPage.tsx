@@ -9,8 +9,10 @@ import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { useHotelSearch } from '../../hooks/useHotelSearch'
 import { useToday } from '../../hooks/useToday'
+import { getHotel } from '../../lib/catalog'
 import { formatDateRange, nightsBetween } from '../../lib/dates'
 import { countRu, guestsLabel } from '../../lib/format'
+import { offerTotal } from '../../lib/offer'
 import {
   applyFilters,
   countFilters,
@@ -35,6 +37,7 @@ import {
 } from '../../lib/search'
 import { SearchForm } from '../SearchForm/SearchForm'
 import { FiltersPanel } from './FiltersPanel'
+import { HotelDialog } from './HotelDialog'
 import { ResultTile } from './ResultTile'
 import { MapUnavailable } from './MapUnavailable'
 
@@ -44,7 +47,8 @@ const SearchMap = dynamic(() => import('./SearchMap').catch(() => ({ default: Ma
   loading: () => <div className="size-full animate-pulse bg-muted" aria-hidden />,
 })
 
-const cardId = (hotelId: string) => `hotel-${hotelId}`
+/** The hotel opened from the map, `?hotel=<id>`: one history entry, so "Назад" closes it. */
+const HOTEL_PARAM = 'hotel'
 
 type Status = { state: 'loading' } | { state: 'done'; result: SearchResult } | { state: 'error'; message: string }
 
@@ -88,10 +92,10 @@ const useDesktop = () =>
 export function SearchResultsPage() {
   const params = useSearchParams()
   const today = useToday()
-  // The query part of the URL; the filters change without a new search.
+  // The query part of the URL; the filters and the opened hotel change without a new search.
   const request = useMemo(() => {
     const next = new URLSearchParams(params.toString())
-    for (const name of FILTER_PARAMS) next.delete(name)
+    for (const name of [...FILTER_PARAMS, HOTEL_PARAM]) next.delete(name)
     return next.toString()
   }, [params])
   const query = useMemo(() => withStartDates(fromSearchParams(new URLSearchParams(request)), today), [request, today])
@@ -100,7 +104,15 @@ export function SearchResultsPage() {
   const errors = validateSearch(query, today)
   const target = resolveTarget(query.destination)
   if (Object.keys(errors).length > 0 || !target) return <InvalidQuery key={request} query={query} errors={errors} />
-  return <Results key={request} query={query} target={target} initialFilters={parseFilters(params)} />
+  return (
+    <Results
+      key={request}
+      query={query}
+      target={target}
+      initialFilters={parseFilters(params)}
+      hotelId={params.get(HOTEL_PARAM)}
+    />
+  )
 }
 
 function EditSearch({ query, errors }: { query: SearchQuery; errors?: SearchErrors }) {
@@ -128,16 +140,19 @@ interface ResultsProps {
   query: SearchQuery
   target: SearchTarget
   initialFilters: Filters
+  /** The hotel opened from the map; an unknown id is ignored. */
+  hotelId: string | null
 }
 
-function Results({ query, target, initialFilters }: ResultsProps) {
+function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
   const [status, setStatus] = useState<Status>({ state: 'loading' })
   const [filters, setFilters] = useState(initialFilters)
   const [editing, setEditing] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [view, setView] = useState<'list' | 'map'>('list')
   const [activeId, setActiveId] = useState<string | null>(null)
-  const scrollTo = useRef<string | null>(null)
+  // Whether the open hotel has its own history entry: closing then goes back to the results.
+  const pushedHotel = useRef(false)
   const desktop = useDesktop()
   const sortId = useId()
 
@@ -153,27 +168,18 @@ function Results({ query, target, initialFilters }: ResultsProps) {
     return () => controller.abort()
   }, [query, target])
 
+  const nights = nightsBetween(query.checkIn, query.checkOut)
   const result = status.state === 'done' ? status.result : null
   const items = useMemo(() => (result ? applyFilters(result.hotels, filters) : []), [result, filters])
+  // The markers show the price of the cards: the stay for the nights and rooms of the query.
   const mapHotels = useMemo(
     () =>
       items.map(({ hotel, rate }) => ({
-        id: hotel.id,
-        name: hotel.name,
-        lat: hotel.lat,
-        lon: hotel.lon,
-        price: rate.pricePerNight,
+        hotel,
+        price: offerTotal(rate.pricePerNight, nights, query.guests.rooms),
       })),
-    [items],
+    [items, nights, query.guests.rooms],
   )
-
-  // A marker click scrolls its card into view once the list is shown.
-  useEffect(() => {
-    const id = scrollTo.current
-    if (!id || view !== 'list') return
-    scrollTo.current = null
-    document.getElementById(cardId(id))?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
-  }, [activeId, view])
 
   /** Filters and sorting go to the URL without a new history entry. */
   const updateFilters = (next: Filters) => {
@@ -182,15 +188,27 @@ function Results({ query, target, initialFilters }: ResultsProps) {
     window.history.replaceState(null, '', `?${setFilterParams(url, next)}`)
   }
 
-  const selectFromMap = (id: string) => {
-    scrollTo.current = id
-    setActiveId(id)
-    setView('list')
+  /** Opens a hotel over the results in a new history entry. */
+  const openHotel = (id: string) => {
+    const url = new URLSearchParams(window.location.search)
+    url.set(HOTEL_PARAM, id)
+    pushedHotel.current = true
+    window.history.pushState(null, '', `?${url}`)
+  }
+  /** Goes back to the results; a hotel opened by its link drops the parameter instead. */
+  const closeHotel = () => {
+    if (pushedHotel.current) {
+      pushedHotel.current = false
+      window.history.back()
+      return
+    }
+    const url = new URLSearchParams(window.location.search)
+    url.delete(HOTEL_PARAM)
+    window.history.replaceState(null, '', `?${url}`)
   }
 
   const title =
     target.kind === 'destination' ? `${target.destination.name}, ${target.destination.country}` : target.title
-  const nights = nightsBetween(query.checkIn, query.checkOut)
   const filterCount = countFilters(filters)
 
   return (
@@ -282,11 +300,10 @@ function Results({ query, target, initialFilters }: ResultsProps) {
                   <Button onClick={() => updateFilters({ ...NO_FILTERS, sort: filters.sort })}>Сбросить фильтры</Button>
                 </div>
               ) : (
-                <ul className="grid gap-3 sm:grid-cols-2">
+                <ul className="grid gap-3 xl:grid-cols-2">
                   {items.map((item) => (
                     <li key={item.hotel.id}>
                       <ResultTile
-                        id={cardId(item.hotel.id)}
                         item={item}
                         stay={query}
                         nights={nights}
@@ -300,13 +317,15 @@ function Results({ query, target, initialFilters }: ResultsProps) {
             </section>
 
             {(desktop || view === 'map') && (
-              <div className="h-[70dvh] overflow-hidden rounded-2xl shadow-(--shadow-card) lg:sticky lg:top-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-[calc(100dvh-2rem)] xl:col-start-3">
-                <SearchMap hotels={mapHotels} activeId={activeId} onSelect={selectFromMap} />
+              // `svh`: the phone address bar showing and hiding while scrolling does not resize the map.
+              <div className="h-[70svh] overflow-hidden rounded-2xl shadow-(--shadow-card) lg:sticky lg:top-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-[calc(100svh-2rem)] xl:col-start-3">
+                <SearchMap hotels={mapHotels} activeId={activeId} onActivate={setActiveId} onOpen={openHotel} />
               </div>
             )}
           </div>
         </>
       )}
+      <HotelDialog hotel={hotelId ? getHotel(hotelId) : undefined} stay={query} onClose={closeHotel} />
     </main>
   )
 }
