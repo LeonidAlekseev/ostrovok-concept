@@ -31,6 +31,12 @@ export const OFFER_NOT_FOUND = 'Предложение не найдено'
 /** Price of an offer: per night × nights × rooms. */
 export const offerTotal = (pricePerNight: number, nights: number, rooms: number) => pricePerNight * nights * rooms
 
+/** The demo discount of the GURU price. */
+const GURU_DISCOUNT = 0.1
+
+/** The GURU price: the regular price less the demo discount, to the rouble. */
+export const guruPrice = (price: number) => Math.round(price * (1 - GURU_DISCOUNT))
+
 /** The last day free cancellation applies, or `null` for a non-refundable rate. */
 export const freeCancellationUntil = (rate: Pick<Rate, 'cancellation'>, checkIn: IsoDate): IsoDate | null =>
   rate.cancellation.kind === 'free' ? addDays(checkIn, -rate.cancellation.daysBefore) : null

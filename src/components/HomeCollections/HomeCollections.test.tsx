@@ -1,7 +1,9 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
+import { hasFreeCancellation } from '../../lib/catalog'
 import { getHomeCollections } from '../../lib/collections'
+import { formatPrice } from '../../lib/format'
 import { addDays, todayIso } from '../../lib/dates'
 import { favoritesStore } from '../../lib/storage'
 import { HomeCollections } from './HomeCollections'
@@ -25,6 +27,19 @@ describe('HomeCollections', () => {
         const link = within(list).getByRole('link', { name: hotel.name })
         expect(link.getAttribute('href')).toMatch(new RegExp(`^/hotels/${hotel.id}\\?`))
       }
+    }
+  })
+
+  // home-page, Requirement: Карточка отеля в подборке; hotel-tile, Requirement: Бесплатная отмена на карточке
+  it('prices the hotels without "от" and marks free cancellation by the hotel', () => {
+    render(<HomeCollections />)
+    const [{ hotels }] = getHomeCollections()
+    const list = firstList(screen.getByRole('region', { name: 'Подборки' }))
+    for (const [i, card] of within(list).getAllByRole('article').entries()) {
+      const hotel = hotels[i]
+      expect(within(card).getAllByText(/^[\d\s]+₽$/)[0].textContent).toBe(formatPrice(hotel.priceFrom))
+      expect(card.textContent).not.toMatch(/(^|\s)от \d/)
+      expect(within(card).queryByText('Бесплатная отмена') !== null, hotel.id).toBe(hasFreeCancellation(hotel))
     }
   })
 

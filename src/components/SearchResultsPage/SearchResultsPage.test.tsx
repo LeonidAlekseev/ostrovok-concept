@@ -1,7 +1,8 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fullHotelsIn } from '../../lib/catalog'
+import { fullHotelsIn, MEAL_LABEL } from '../../lib/catalog'
+import { applyFilters, NO_FILTERS } from '../../lib/results'
 import { SearchResultsPage } from './SearchResultsPage'
 
 // The page reads the URL through Next's hooks; here they read jsdom's location and, like Next,
@@ -143,7 +144,9 @@ function open(search: string, { desktop = false } = {}) {
 const results = () => screen.findByText(/Найдено \d+|Ничего не нашлось/, {}, { timeout: 3000 })
 const cards = () => screen.queryAllByRole('article')
 const cardNames = () => cards().map((card) => within(card).getByRole('heading').textContent)
-const prices = () => cards().map((card) => Number(within(card).getByText(/^от /).textContent!.replace(/\D/g, '')))
+// The regular price comes before the GURU one.
+const priceOf = (card: HTMLElement) => within(card).getAllByText(/^[\d\s]+₽$/)[0].textContent!
+const prices = () => cards().map((card) => Number(priceOf(card).replace(/\D/g, '')))
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
@@ -216,9 +219,34 @@ describe('SearchResultsPage hotel card', () => {
       /^\/hotels\/prague-[a-z-]+\?checkin=2026-10-20&checkout=2026-10-23&adults=3&children=1&rooms=2$/,
     )
     expect(within(card).queryByText(/за \d* ?ноч/)).toBeNull()
-    expect(within(card).getByText(/км до центра/)).toBeDefined()
-    expect(within(card).getByText(/\d+ отзыв/)).toBeDefined()
+    expect(within(card).getByText(/км от центра Праги/)).toBeDefined()
     expect(within(card).getByRole('button', { name: 'Добавить в избранное' })).toBeDefined()
+  })
+
+  it('shows neither the meal nor the number of reviews', async () => {
+    open(PRAGUE)
+    await results()
+
+    for (const card of cards()) {
+      expect(card.textContent).not.toMatch(new RegExp(Object.values(MEAL_LABEL).join('|')))
+      expect(card.textContent).not.toMatch(/отзыв/)
+    }
+  })
+
+  it('takes the free cancellation from the rate of the card', async () => {
+    open(PRAGUE)
+    await results()
+
+    const items = applyFilters(fullHotelsIn('prague'), NO_FILTERS)
+    const badges = cards().map((card) => {
+      const name = within(card).getByRole('heading').textContent!
+      const { rate } = items.find((item) => item.hotel.name === name)!
+      const badge = within(card).queryByText('Бесплатная отмена') !== null
+      expect(badge, name).toBe(rate.cancellation.kind === 'free')
+      return badge
+    })
+    // Every Prague hotel has a free cancellation rate, yet not every cheapest rate is one.
+    expect(new Set(badges)).toEqual(new Set([true, false]))
   })
 
   it('puts the photo above the text in every card', async () => {
@@ -228,7 +256,8 @@ describe('SearchResultsPage hotel card', () => {
     for (const card of cards()) {
       // The first block of the card holds the photo and nothing of the text.
       const top = card.firstElementChild as HTMLElement
-      expect(within(top).getAllByRole('img')[0].className).toMatch(/\bw-full\b/)
+      expect(within(top).getByRole('group', { name: 'Фото отеля' })).toBeDefined()
+      expect(top.className).toMatch(/\bw-full\b/)
       expect(within(top).queryByRole('heading')).toBeNull()
     }
   })
@@ -305,7 +334,7 @@ describe('SearchResultsPage map', () => {
     expect(await markers()).toHaveLength(cards().length)
     for (const card of cards()) {
       const name = within(card).getByRole('heading').textContent!
-      const price = within(card).getByText(/^от /).textContent!.replace(/^от /, '')
+      const price = priceOf(card)
       const marker = markerOf(name)
       expect(marker.textContent).toBe(price)
       expect(marker.getAttribute('aria-label')).toBe(`${name}, от ${price}`)

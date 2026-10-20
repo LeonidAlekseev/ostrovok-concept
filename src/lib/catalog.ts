@@ -472,3 +472,7 @@ export function cheapestRate(hotel: Hotel): { room: Room; rate: Rate } {
     for (const rate of room.rates) if (rate.pricePerNight < best.rate.pricePerNight) best = { room, rate }
   return best
 }
+
+/** A hotel offers free cancellation when at least one of its rates does. */
+export const hasFreeCancellation = (hotel: Hotel): boolean =>
+  hotel.rooms.some((room) => room.rates.some((rate) => rate.cancellation.kind === 'free'))
