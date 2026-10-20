@@ -42,7 +42,6 @@ describe('SearchPanel tabs', () => {
     await user.type(destination, 'Сочи')
     await user.keyboard('{Escape}')
 
-    await user.click(screen.getByRole('tab', { name: 'Случайность' }))
     await user.click(screen.getByRole('tab', { name: 'Ассистент' }))
 
     // Same nodes: the panels were hidden, not unmounted and mounted again.
@@ -52,6 +51,39 @@ describe('SearchPanel tabs', () => {
     await user.click(screen.getByRole('tab', { name: 'Вручную' }))
     expect(screen.getByRole('combobox', { name: 'Направление' })).toBe(destination)
     expect((destination as HTMLInputElement).value).toBe('Сочи')
+  })
+})
+
+// search-modes, Requirement: Вкладки режимов
+describe('SearchPanel tab list', () => {
+  it('has the assistant and the manual tabs, the assistant first and active', () => {
+    render(<Harness />)
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Ассистент', 'Вручную'])
+    expect(screen.getByRole('tablist', { name: 'Способ поиска' })).toBeTruthy()
+    expect(tabs[0].getAttribute('aria-selected')).toBe('true')
+    expect(tabs.map((tab) => tab.tabIndex)).toEqual([0, -1])
+  })
+
+  it('moves between the tabs with the arrows, Home and End, wrapping around', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    const [assistant, manual] = screen.getAllByRole('tab')
+    await user.click(assistant)
+
+    await user.keyboard('{ArrowRight}')
+    expect(document.activeElement).toBe(manual)
+    expect(manual.getAttribute('aria-selected')).toBe('true')
+    await user.keyboard('{ArrowRight}')
+    expect(document.activeElement).toBe(assistant)
+    await user.keyboard('{ArrowLeft}')
+    expect(document.activeElement).toBe(manual)
+    await user.keyboard('{Home}')
+    expect(document.activeElement).toBe(assistant)
+    expect(assistant.getAttribute('aria-selected')).toBe('true')
+    await user.keyboard('{End}')
+    expect(document.activeElement).toBe(manual)
+    expect(manual.getAttribute('aria-selected')).toBe('true')
   })
 })
 
