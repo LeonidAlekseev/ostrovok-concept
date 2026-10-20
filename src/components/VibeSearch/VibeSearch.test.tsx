@@ -51,6 +51,47 @@ describe('VibeSearch section', () => {
   })
 })
 
+// vibe-search, Requirement: Фото вариантов; Requirement: Загрузка фото вайба
+describe('VibeSearch photos', () => {
+  const vibePhotos = () =>
+    [...document.querySelectorAll('img')]
+      .map((img) => img.getAttribute('src'))
+      .filter((src) => src?.includes('/images/vibe/'))
+
+  it('loads no vibe photos on the home page until the window is opened', async () => {
+    const user = userEvent.setup()
+    render(<VibeSearch />)
+    expect(vibePhotos()).toEqual([])
+    await user.click(screen.getByRole('button', { name: 'Найти свой вайб' }))
+    await screen.findByRole('dialog', { name: 'Поиск вайба' })
+    expect(vibePhotos()).toEqual(['/images/vibe/evening-left.webp', '/images/vibe/evening-right.webp'])
+  })
+
+  it('shows the photos of the pair as decorative images inside the options and fetches the next pair', async () => {
+    const user = userEvent.setup()
+    const fetched: string[] = []
+    vi.stubGlobal(
+      'Image',
+      class {
+        set src(value: string) {
+          fetched.push(value)
+        }
+      },
+    )
+    try {
+      renderDialog()
+      expect(fetched).toEqual(['/images/vibe/place-left.webp', '/images/vibe/place-right.webp'])
+      const left = screen.getByRole('radio', { name: 'Тихий вечер' })
+      expect(left.querySelector('img')?.getAttribute('alt')).toBe('')
+      await user.click(left)
+      expect(vibePhotos()).toEqual(['/images/vibe/place-left.webp', '/images/vibe/place-right.webp'])
+      expect(fetched.slice(2)).toEqual(['/images/vibe/size-left.webp', '/images/vibe/size-right.webp'])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})
+
 // vibe-search, Requirement: Выбор
 describe('VibeSearch pairs', () => {
   it('moves to the next pair on a choice and announces it', async () => {
@@ -145,6 +186,30 @@ describe('VibeSearch result', () => {
         rooms: '1',
       })
     }
+  })
+
+  // vibe-search, Requirement: Оформление итога
+  it('starts the result with the photo of the main pole and the name of the vibe over it', async () => {
+    const user = userEvent.setup()
+    renderDialog()
+    await answerAll(
+      user,
+      /^(Тихий вечер|Море|Уютный бутик|Спа и бассейн|Завтрак в номер|Без лишних трат|Подальше от суеты)$/,
+    )
+    const heading = await screen.findByRole('heading', { name: 'Тихая гавань' })
+    const hero = heading.closest('div')!.parentElement!
+    expect(hero.querySelector('img')?.getAttribute('src')).toBe('/images/vibe/evening-left.webp')
+    expect(within(hero).getByText('Ваш вайб')).toBeTruthy()
+  })
+
+  it('starts the «Баланс во всём» result with its own photo', async () => {
+    const user = userEvent.setup()
+    renderDialog()
+    await answerAll(user, 'Не могу выбрать')
+    const heading = await screen.findByRole('heading', { name: 'Баланс во всём' })
+    expect(heading.closest('div')!.parentElement!.querySelector('img')?.getAttribute('src')).toBe(
+      '/images/vibe/balance.webp',
+    )
   })
 
   it('starts over', async () => {

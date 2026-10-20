@@ -1,6 +1,18 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { hotels, getHotel } from './catalog'
-import { axisShares, BALANCE, readVibe, VIBE_AXES, VIBE_HOTELS, vibeArchetype, vibeHotels, type Answer } from './vibe'
+import {
+  axisShares,
+  BALANCE,
+  poleImage,
+  readVibe,
+  VIBE_AXES,
+  VIBE_HOTELS,
+  vibeArchetype,
+  vibeHotels,
+  type Answer,
+} from './vibe'
 
 const all = (answer: Answer): Answer[] => VIBE_AXES.map(() => answer)
 const catalogue = hotels.map((h) => getHotel(h.id)!)
@@ -29,6 +41,23 @@ describe('VIBE_AXES', () => {
 
   it('tells hotels apart on every axis', () => {
     for (const axis of VIBE_AXES) expect(new Set(catalogue.map(axis.fit)).size, axis.id).toBeGreaterThan(1)
+  })
+})
+
+// vibe-search, Requirement: Фото вариантов
+describe('vibe photos', () => {
+  const file = (image: string) => join(process.cwd(), 'public', image)
+
+  it('has a photo for each of the 14 poles and for «Баланс во всём»', () => {
+    const images = [...VIBE_AXES.flatMap((axis) => [poleImage(axis.id, -1), poleImage(axis.id, 1)]), BALANCE.image]
+    expect(images).toHaveLength(15)
+    for (const image of images) expect(existsSync(file(image)), image).toBe(true)
+  })
+
+  it('shows the photo of the main pole for an archetype and its own for «Баланс во всём»', () => {
+    expect(vibeArchetype([-1, 0, 0, 0, 0, 0, -1]).image).toBe('/images/vibe/evening-left.webp')
+    expect(vibeArchetype([0, 0, 0, 0, 0, 1, 0]).image).toBe('/images/vibe/size-right.webp')
+    expect(vibeArchetype(all(0)).image).toBe('/images/vibe/balance.webp')
   })
 })
 
