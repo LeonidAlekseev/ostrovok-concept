@@ -1,6 +1,6 @@
 import { formatPrice } from '../../lib/format'
 import { lowerFirst, type Reading } from '../../lib/horoscope'
-import { brandFont, cssColor, drawBrandFrame, extensionOf, recordCanvas } from '../../lib/shareMedia'
+import { brandFont, cssColor, drawBrandFrame, extensionOf, recordCanvas, wrapText } from '../../lib/shareMedia'
 
 export const VIDEO_WIDTH = 1080
 export const VIDEO_HEIGHT = 1920
@@ -16,21 +16,6 @@ const ease = (x: number) => 1 - (1 - clamp(x)) ** 3
 /** Opacity of a scene from `from` to `to` ms, fading in and out. */
 const sceneAlpha = (t: number, from: number, to: number) =>
   Math.min(clamp((t - from) / FADE_MS), to === Infinity ? 1 : clamp((to - t) / FADE_MS))
-
-/** Splits text into lines no wider than `width` at the current font. */
-function wrap(ctx: CanvasRenderingContext2D, text: string, width: number): string[] {
-  const lines: string[] = []
-  let line = ''
-  for (const word of text.split(' ')) {
-    const next = line ? `${line} ${word}` : word
-    if (line && ctx.measureText(next).width > width) {
-      lines.push(line)
-      line = word
-    } else line = next
-  }
-  if (line) lines.push(line)
-  return lines
-}
 
 type Palette = Record<'primary' | 'violet' | 'magenta' | 'lime' | 'gold' | 'light' | 'ink' | 'muted' | 'soft', string>
 
@@ -148,7 +133,7 @@ export function drawReadingFrame(
     drawSymbol(ctx, p, reading.sign.symbol, W / 2, 470, 120)
     ctx.fillStyle = p.ink
     ctx.font = `600 52px ${font}`
-    const lines = wrap(ctx, reading.forecast, 900)
+    const lines = wrapText(ctx, reading.forecast, 900)
     lines.forEach((line, i) => ctx.fillText(line, W / 2, 720 + i * 72 + (1 - ease((t - FORECAST_AT) / 600)) * 40))
   }
 
@@ -182,7 +167,7 @@ export function drawReadingFrame(
 
     ctx.fillStyle = p.ink
     ctx.font = `800 64px ${font}`
-    const nameLines = wrap(ctx, hotel.name, 820).slice(0, 2)
+    const nameLines = wrapText(ctx, hotel.name, 820).slice(0, 2)
     nameLines.forEach((line, i) => ctx.fillText(line, W / 2, 1000 + i * 76))
     let y = 1000 + nameLines.length * 76 + 10
     ctx.fillStyle = p.muted
