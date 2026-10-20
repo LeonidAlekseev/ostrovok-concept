@@ -180,7 +180,7 @@ export function drawReadingFrame(
     y += 110
     ctx.fillStyle = p.primary
     ctx.font = `800 80px ${font}`
-    ctx.fillText(`от ${formatPrice(hotel.priceFrom)}`, W / 2, y)
+    ctx.fillText(`${formatPrice(hotel.priceFrom)}`, W / 2, y)
     ctx.restore()
   }
   ctx.globalAlpha = 1

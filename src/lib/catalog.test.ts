@@ -133,6 +133,22 @@ describe('hasFreeCancellation', () => {
   it('is false when no rate is', () => {
     expect(hasFreeCancellation(withRates('non-refundable', 'non-refundable'))).toBe(false)
   })
+
+  it('is false for exactly every second hotel of a city, by id', () => {
+    expect(catalog.filter((h) => !hasFreeCancellation(h))).toHaveLength(Math.floor(catalog.length / 2))
+    for (const d of destinations) {
+      const own = catalog.filter((h) => h.destinationId === d.id).sort((a, b) => a.id.localeCompare(b.id))
+      own.forEach((h, i) => expect(hasFreeCancellation(h), h.id).toBe(i % 2 === 0))
+      if (own.length > 1) expect(own.some(hasFreeCancellation), d.id).toBe(true)
+    }
+  })
+
+  it('keeps every rate of a non-refundable hotel non-refundable', () => {
+    const none = catalog.filter((h) => !hasFreeCancellation(h))
+    for (const h of none)
+      for (const room of h.rooms)
+        for (const rate of room.rates) expect(rate.cancellation.kind, h.id).toBe('non-refundable')
+  })
 })
 
 describe('slugify', () => {

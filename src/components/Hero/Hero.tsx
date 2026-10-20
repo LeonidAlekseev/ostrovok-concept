@@ -499,7 +499,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
           type="button"
           className={placeCard}
           style={positionStyle(initialScene.hub)}
-          aria-label={`Новый отель ${hotel.name}, ${destination.name}, от ${formatPrice(hotel.priceFrom)} за ночь — выбрать направление`}
+          aria-label={`Новый отель ${hotel.name}, ${destination.name}, ${formatPrice(hotel.priceFrom)} за ночь — выбрать направление`}
           onClick={() => onSelect(destination)}
           {...pauseHandlers}
         >
@@ -527,7 +527,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
                   ))}
                 </span>
                 <span className="text-(length:--meta-size) whitespace-nowrap text-muted-foreground">
-                  от {formatPrice(hotel.priceFrom)}/ночь
+                  {formatPrice(hotel.priceFrom)}/ночь
                 </span>
               </span>
             </span>

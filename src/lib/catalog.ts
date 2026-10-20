@@ -260,6 +260,17 @@ export const hotels: HotelSummary[] = summaries.all
 /** The hand-picked "recently added" hotels, in their original order. */
 export const newHotels: HotelSummary[] = summaries.newOnes
 
+/** Every second hotel of a city (by id) sells only non-refundable rates. */
+const nonRefundableIds = new Set(
+  destinations.flatMap((d) =>
+    hotels
+      .filter((h) => h.destinationId === d.id)
+      .map((h) => h.id)
+      .sort()
+      .filter((_, index) => index % 2 === 1),
+  ),
+)
+
 const summaryById = new Map(hotels.map((h) => [h.id, h]))
 
 export const getDestination = (id: string): Destination | undefined => destinations.find((d) => d.id === id)
@@ -407,6 +418,7 @@ function buildHotel(summary: HotelSummary): Hotel {
       photos: [photo(`${type.id}-1`, type.name), photo(`${type.id}-2`, 'Ванная комната')],
       rates: rateTypes.map(({ factor, ...rate }) => ({
         ...rate,
+        ...(nonRefundableIds.has(summary.id) && { cancellation: { kind: 'non-refundable' } as const }),
         pricePerNight: factor === cheapest ? base : roundUp100((base * factor) / cheapest),
       })),
     }

@@ -294,7 +294,7 @@ function PlanView({ plan, onChoose }: { plan: Plan; onChoose: Props['onChoose'] 
                 )}
               </span>
               <span className="flex-none text-right font-[650] whitespace-nowrap">
-                от {formatPrice(total)}
+                {formatPrice(total)}
                 {fitsBudget ? (
                   <span className={hintClass}>за {nights}</span>
                 ) : (

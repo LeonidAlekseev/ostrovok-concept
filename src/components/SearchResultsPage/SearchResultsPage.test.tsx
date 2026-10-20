@@ -324,8 +324,8 @@ describe('SearchResultsPage filters', () => {
 
 // search-results-page, Requirement: Карта результатов поиска
 describe('SearchResultsPage map', () => {
-  const markers = () => screen.findAllByRole('button', { name: /, от [\d\s]+₽$/ }, { timeout: 3000 })
-  const markerOf = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}, от `) })
+  const markers = () => screen.findAllByRole('button', { name: /, [\d\s]+₽$/ }, { timeout: 3000 })
+  const markerOf = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}, `) })
 
   it('shows a marker per hotel with the price of its card, without "за ночь"', async () => {
     open(`destination=prague&checkin=2026-10-20&checkout=2026-10-23&adults=3&rooms=2`, { desktop: true })
@@ -337,7 +337,7 @@ describe('SearchResultsPage map', () => {
       const price = priceOf(card)
       const marker = markerOf(name)
       expect(marker.textContent).toBe(price)
-      expect(marker.getAttribute('aria-label')).toBe(`${name}, от ${price}`)
+      expect(marker.getAttribute('aria-label')).toBe(`${name}, ${price}`)
     }
     // The price filter keeps "Цена за ночь"; the cards and the map show no period.
     for (const name of ['Отели', 'Карта отелей'])
@@ -389,7 +389,7 @@ describe('SearchResultsPage map attribution', () => {
     vi.setSystemTime(NOW)
     open(PRAGUE, { desktop: true })
     await results()
-    await screen.findAllByRole('button', { name: /, от / }, { timeout: 3000 })
+    await screen.findAllByRole('button', { name: /, [\d\s]+₽$/ }, { timeout: 3000 })
 
     expect(mapMock.options.at(-1)).toMatchObject({ attributionControl: { compact: true } })
     expect(attribution().classList.contains('maplibregl-compact-show')).toBe(true)
@@ -402,7 +402,7 @@ describe('SearchResultsPage map attribution', () => {
   it('folds the attribution on the first interaction with the map, and the "i" shows it again', async () => {
     open(PRAGUE, { desktop: true })
     await results()
-    const [marker] = await screen.findAllByRole('button', { name: /, от / }, { timeout: 3000 })
+    const [marker] = await screen.findAllByRole('button', { name: /, [\d\s]+₽$/ }, { timeout: 3000 })
     expect(attribution().classList.contains('maplibregl-compact-show')).toBe(true)
 
     act(() => mapMock.last!.fire('mousedown'))
@@ -418,7 +418,7 @@ describe('SearchResultsPage map attribution', () => {
 
 // search-results-page, Requirement: Краткая карточка на карте
 describe('SearchResultsPage map preview', () => {
-  const markers = () => screen.findAllByRole('button', { name: /, от / }, { timeout: 3000 })
+  const markers = () => screen.findAllByRole('button', { name: /, [\d\s]+₽$/ }, { timeout: 3000 })
 
   it('shows the short card of a hovered marker and highlights its card in the list', async () => {
     const user = userEvent.setup()
@@ -432,7 +432,8 @@ describe('SearchResultsPage map preview', () => {
     const preview = document.getElementById(marker.getAttribute('aria-describedby')!)!
     expect(map.contains(preview)).toBe(true)
     expect(within(preview).getByText(name)).toBeDefined()
-    expect(within(preview).getByText(/^от /).textContent).toBe(`от ${marker.textContent}`)
+    expect(within(preview).getByText(/^[\d\s]+₽$/).textContent).toBe(marker.textContent)
+    expect(preview.textContent).not.toMatch(/(^|\s)от \d/)
     expect(within(preview).getByRole('img', { name: /звезд|звёзд/ })).toBeDefined()
     expect(within(preview).getByText('Оценка гостей')).toBeDefined()
     expect(within(preview).getAllByRole('img').length).toBeGreaterThan(1)
@@ -467,7 +468,7 @@ describe('SearchResultsPage map preview', () => {
 
 // search-results-page, Requirement: Окно отеля с карты
 describe('SearchResultsPage hotel dialog', () => {
-  const markers = () => screen.findAllByRole('button', { name: /, от / }, { timeout: 3000 })
+  const markers = () => screen.findAllByRole('button', { name: /, [\d\s]+₽$/ }, { timeout: 3000 })
   const hotel = fullHotelsIn('prague')[0]
 
   it('opens the hotel of a pressed marker in a dialog with the dates of the search, without scrolling the list', async () => {
