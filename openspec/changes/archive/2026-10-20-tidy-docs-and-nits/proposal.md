@@ -29,3 +29,14 @@
 
 - `README.md`, `src/app/globals.css`, `src/components/ui/PhotoPlaceholder.tsx`, `src/components/StarSearch/StarVideo.tsx`, `src/components/HotelTile/HotelTile.tsx`, `src/lib/vibe.ts`, `src/components/VibeSearch/VibeSearchDialog.tsx`, `src/lib/collections.ts`, `src/components/HomeCollections/HomeCollections.tsx` при необходимости.
 - Пересекается с `polish-tiles-and-star-search` (`StarVideo.tsx`, `HotelTile.tsx`): запускается после его слияния.
+
+## Замер JS главной
+
+Сумма чанков `/_next/static/**/*.js`, подключённых к `index.html` главной, `npm run build`:
+
+| | файлов | байт | gzip |
+| --- | --- | --- | --- |
+| до | 16 | 920 436 | 303 113 |
+| после | 16 | 920 454 | 303 124 |
+
+Размер не меняется (+18 байт — обёртка геттера): подборки считаются при сборке статической главной, а клиентский чанк их не содержит. Выигрыш ленивости — в том, что модуль `collections` больше не обходит каталог при импорте.

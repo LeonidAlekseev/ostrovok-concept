@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
-import { homeCollections } from '../../lib/collections'
+import { getHomeCollections } from '../../lib/collections'
 import { addDays, todayIso } from '../../lib/dates'
 import { favoritesStore } from '../../lib/storage'
 import { HomeCollections } from './HomeCollections'
@@ -17,7 +17,7 @@ describe('HomeCollections', () => {
     const section = screen.getByRole('region', { name: 'Подборки' })
     expect(section.id).toBe('collections')
 
-    for (const { collection, hotels } of homeCollections) {
+    for (const { collection, hotels } of getHomeCollections()) {
       const heading = within(section).getByRole('heading', { level: 3, name: collection.title })
       const list = heading.parentElement!.querySelector('ul')!
       expect(within(list).getAllByRole('listitem')).toHaveLength(hotels.length)
@@ -30,7 +30,7 @@ describe('HomeCollections', () => {
 
   it('links to the hotel with starts tomorrow, the day after, for two adults in one room', () => {
     render(<HomeCollections />)
-    const hotel = homeCollections[0].hotels[0]
+    const hotel = getHomeCollections()[0].hotels[0]
     const href = within(firstList(screen.getByRole('region', { name: 'Подборки' })))
       .getByRole('link', {
         name: hotel.name,
@@ -47,7 +47,7 @@ describe('HomeCollections', () => {
   it('toggles a hotel in favourites without opening it', async () => {
     const user = userEvent.setup()
     render(<HomeCollections />)
-    const hotel = homeCollections[0].hotels[0]
+    const hotel = getHomeCollections()[0].hotels[0]
     const card = within(firstList(screen.getByRole('region', { name: 'Подборки' })))
       .getByRole('link', { name: hotel.name })
       .closest('article')!

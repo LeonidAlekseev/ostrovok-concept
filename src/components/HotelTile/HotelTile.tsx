@@ -64,7 +64,7 @@ export function HotelTile({
               {hotel.name}
             </Link>
           </Heading>
-          <p className="text-sm/[normal] text-muted-foreground">{getDestination(hotel.destinationId)!.name}</p>
+          <p className="text-sm/[normal] text-muted-foreground">{getDestination(hotel.destinationId)?.name}</p>
         </div>
         {children}
         <div className="mt-auto flex items-center gap-2 pt-1">

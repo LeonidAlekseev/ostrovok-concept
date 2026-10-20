@@ -6,7 +6,7 @@ import type { Photo } from '@/lib/catalog'
 const tones = [
   '[background:linear-gradient(135deg,var(--decor-photo-from),var(--decor-photo-to))]',
   '[background:linear-gradient(135deg,var(--decor-hotel-from),var(--decor-hotel-to))]',
-  '[background:linear-gradient(135deg,var(--decor-violet),var(--decor-machine-indigo))]',
+  '[background:linear-gradient(135deg,var(--decor-violet),var(--decor-indigo))]',
   '[background:linear-gradient(135deg,var(--decor-trail),var(--decor-badge-green))]',
 ]
 

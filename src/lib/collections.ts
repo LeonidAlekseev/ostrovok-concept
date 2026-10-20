@@ -73,13 +73,21 @@ export interface HomeCollection {
   hotels: Hotel[]
 }
 
-/** The home page collections over the whole catalogue, in order; a hotel appears in one collection only. */
-export const homeCollections: readonly HomeCollection[] = (() => {
-  const catalogue = hotels.map((summary) => getHotel(summary.id)!)
-  const shown = new Set<string>()
-  return COLLECTIONS.map((collection) => {
-    const picked = pickCollection(collection, catalogue, shown)
-    for (const hotel of picked) shown.add(hotel.id)
-    return { collection, hotels: picked }
-  })
-})()
+let home: readonly HomeCollection[] | undefined
+
+/**
+ * The home page collections over the whole catalogue, in order; a hotel appears in one collection only.
+ * Picked on the first call, not when the module is imported, and kept after.
+ */
+export function getHomeCollections(): readonly HomeCollection[] {
+  if (!home) {
+    const catalogue = hotels.map((summary) => getHotel(summary.id)!)
+    const shown = new Set<string>()
+    home = COLLECTIONS.map((collection) => {
+      const picked = pickCollection(collection, catalogue, shown)
+      for (const hotel of picked) shown.add(hotel.id)
+      return { collection, hotels: picked }
+    })
+  }
+  return home
+}
