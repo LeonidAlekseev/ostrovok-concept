@@ -300,7 +300,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
                   <Button onClick={() => updateFilters({ ...NO_FILTERS, sort: filters.sort })}>Сбросить фильтры</Button>
                 </div>
               ) : (
-                <ul className="grid gap-3 xl:grid-cols-2">
+                <ul className="grid gap-3 2xl:grid-cols-2">
                   {items.map((item) => (
                     <li key={item.hotel.id}>
                       <ResultTile

@@ -233,13 +233,13 @@ describe('SearchResultsPage hotel card', () => {
     }
   })
 
-  it('lists the hotels in one column up to xl and in two from xl', async () => {
+  it('lists the hotels in one column up to 2xl and in two from 2xl', async () => {
     open(PRAGUE)
     await results()
 
     const list = screen.getByRole('region', { name: 'Отели' }).querySelector('ul')!
-    expect(list.className).toMatch(/(^|\s)xl:grid-cols-2(\s|$)/)
-    expect(list.className).not.toMatch(/(^|\s)(sm|md|lg):grid-cols-/)
+    expect(list.className).toMatch(/(^|\s)2xl:grid-cols-2(\s|$)/)
+    expect(list.className).not.toMatch(/(^|\s)(sm|md|lg|xl):grid-cols-/)
   })
 })
 
@@ -509,6 +509,40 @@ describe('SearchResultsPage hotel dialog', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(window.location.search).toBe(`?${PRAGUE}`)
     expect(cards().length).toBeGreaterThan(0)
+  })
+
+  it('starts the dialog with the start dates of a search without dates', async () => {
+    open(`destination=prague&hotel=${hotel.id}`)
+    await results()
+
+    const dialog = await screen.findByRole('dialog', { name: hotel.name })
+
+    expect(within(dialog).getByRole('link', { name: 'Открыть страницу отеля' }).getAttribute('href')).toBe(
+      `/hotels/${hotel.id}?checkin=2026-10-20&checkout=2026-10-21&adults=2&rooms=1`,
+    )
+    expect(within(dialog).queryByText('Выберите даты')).toBeNull()
+  })
+
+  it('changes the stay in the dialog only: the address and the list stay and the links follow', async () => {
+    const user = userEvent.setup()
+    open(`${PRAGUE}&hotel=${hotel.id}`)
+    await results()
+    const before = cardNames()
+    const search = window.location.search
+    const dialog = await screen.findByRole('dialog', { name: hotel.name })
+
+    await user.click(within(dialog).getByRole('button', { name: /^Гости: / }))
+    await user.click(await screen.findByRole('button', { name: 'Взрослые: увеличить' }))
+
+    const changed = `/hotels/${hotel.id}?checkin=2026-10-20&checkout=2026-10-23&adults=3&rooms=1`
+    expect(within(dialog).getByRole('link', { name: 'Открыть страницу отеля' }).getAttribute('href')).toBe(changed)
+    expect(
+      within(dialog)
+        .getAllByRole('link', { name: /^Выбрать: / })[0]
+        .getAttribute('href'),
+    ).toMatch(/^\/hotels\/[^/]+\/rooms\?checkin=2026-10-20&checkout=2026-10-23&adults=3&rooms=1#/)
+    expect(window.location.search).toBe(search)
+    expect(cardNames()).toEqual(before)
   })
 
   it('ignores an unknown hotel id', async () => {

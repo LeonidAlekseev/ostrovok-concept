@@ -2,16 +2,18 @@ import type { Hotel } from '@/lib/catalog'
 import { AMENITY_LABEL } from '@/lib/catalog'
 import { Gallery } from './Gallery'
 import { HotelHeader } from './HotelHeader'
-import { HotelStay } from './HotelStay'
+import { HotelStay, type LocalStay } from './HotelStay'
 import { Reviews } from './Reviews'
 
 interface Props {
   hotel: Hotel
   /** Inside a dialog: no `main` landmark, and the hotel name is an `h2` with this id to label the dialog. */
   titleId?: string
+  /** Dates and guests held by the dialog instead of the address. */
+  stay?: LocalStay
 }
 
-export function HotelPage({ hotel, titleId }: Props) {
+export function HotelPage({ hotel, titleId, stay }: Props) {
   const Root = titleId ? 'div' : 'main'
   return (
     <Root
@@ -34,7 +36,7 @@ export function HotelPage({ hotel, titleId }: Props) {
           ))}
         </ul>
       </section>
-      <HotelStay hotel={hotel} />
+      <HotelStay hotel={hotel} local={stay} />
       <Reviews rating={hotel.rating} reviewCount={hotel.reviewCount} reviews={hotel.reviews} />
     </Root>
   )

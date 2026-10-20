@@ -15,6 +15,9 @@ interface Props {
   onClose: () => void
 }
 
+/** Only the dates and guests of the search query. */
+const searchStay = ({ checkIn, checkOut, guests }: Stay): Stay => ({ checkIn, checkOut, guests })
+
 /** A hotel opened from the results map: the hotel page with the dates and guests of the search. */
 export function HotelDialog({ hotel, stay, onClose }: Props) {
   const titleId = useId()
@@ -22,6 +25,13 @@ export function HotelDialog({ hotel, stay, onClose }: Props) {
   const [last, setLast] = useState(hotel)
   if (hotel && hotel.id !== last?.id) setLast(hotel)
   const shown = hotel ?? last
+  // The dates of the window are its own: they start from the search each time it opens.
+  const [local, setLocal] = useState<Stay>(() => searchStay(stay))
+  const [wasOpen, setWasOpen] = useState(false)
+  if (Boolean(hotel) !== wasOpen) {
+    setWasOpen(Boolean(hotel))
+    if (hotel) setLocal(searchStay(stay))
+  }
 
   return (
     <Dialog open={Boolean(hotel)} onOpenChange={(open) => !open && onClose()}>
@@ -33,13 +43,13 @@ export function HotelDialog({ hotel, stay, onClose }: Props) {
         {shown && (
           <>
             <div className="min-h-0 flex-1 overflow-y-auto p-[clamp(16px,4vw,32px)] text-base">
-              <HotelPage hotel={shown} titleId={titleId} />
+              <HotelPage hotel={shown} titleId={titleId} stay={{ value: local, onChange: setLocal }} />
             </div>
             <div className="flex flex-wrap justify-end gap-2 border-t p-4">
               <DialogClose render={<Button variant="outline" />}>Закрыть</DialogClose>
               <Link
                 className={buttonVariants()}
-                href={`/hotels/${shown.id}?${setStayParams(new URLSearchParams(), stay)}`}
+                href={`/hotels/${shown.id}?${setStayParams(new URLSearchParams(), local)}`}
               >
                 Открыть страницу отеля
               </Link>
