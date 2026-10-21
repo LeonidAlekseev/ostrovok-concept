@@ -54,7 +54,8 @@ const HOTEL_PARAM = 'hotel'
 
 type Status = { state: 'loading' } | { state: 'done'; result: SearchResult } | { state: 'error'; message: string }
 
-const pageClass = 'mx-auto flex w-full max-w-(--page-max) flex-1 flex-col gap-4 px-(--page-x) pt-2 pb-12'
+const pageClass =
+  'mx-auto flex w-full max-w-(--page-max) 3xl:max-w-(--page-max-wide) flex-1 flex-col gap-4 px-(--page-x) pt-2 pb-12'
 
 function Searching() {
   return (
@@ -292,7 +293,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
 
       {result && (
         <>
-          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_minmax(0,1fr)] 3xl:grid-cols-[15rem_minmax(0,1.6fr)_minmax(0,1fr)]">
             {desktop && (
               <aside aria-label="Фильтры" className="lg:col-start-1 lg:row-start-1">
                 <FiltersPanel filters={filters} onChange={updateFilters} />

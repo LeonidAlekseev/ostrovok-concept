@@ -136,6 +136,8 @@
 
   --page-x: clamp(14px, 4vw, 40px);
   --page-max: 1240px;
+  /* Wider page for /search on 3xl screens only. */
+  --page-max-wide: 1760px;
   --header-height: clamp(60px, 15vw, 72px);
   /* Set by useStickyHeader: how far the shown fixed header covers the top of the screen. */
   --sticky-header-offset: 0px;
