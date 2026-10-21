@@ -2,6 +2,8 @@
 
 86б: «подключаем vercel ai sdk с openrouter provider и бесплатной моделью minimax/minimax-m3.1-flash:free». Провайдер: https://github.com/OpenRouterTeam/ai-sdk-provider (`@openrouter/ai-sdk-provider`, для `ai@^7`, Node ≥ 22, ESM).
 
+Смена модели (2026-10-21): по умолчанию `nvidia/nemotron-3.5-lightning:free` вместо `minimax/minimax-m3.1-flash:free`. Рассуждение выключено через `providerOptions.openrouter.reasoning.effort: 'none'`, чтобы ответ укладывался в 8 с.
+
 ## Окружение
 
 `OPENROUTER_API_KEY` (сервер), `OPENROUTER_MODEL` (необязательно). Ключ никогда не попадает в клиентский бандл (`import 'server-only'`). Без ключа — правила, как сейчас; CI без секретов зелёный.

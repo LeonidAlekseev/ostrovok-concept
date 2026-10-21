@@ -3,7 +3,7 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import type { LanguageModel } from 'ai'
 import { getSecret } from '../secrets'
 
-export const DEFAULT_MODEL = 'minimax/minimax-m3.1-flash:free'
+export const DEFAULT_MODEL = 'nvidia/nemotron-3.5-lightning:free'
 
 /** The OpenRouter model of the assistant, or `undefined` without `OPENROUTER_API_KEY` (the rules take over). */
 export async function getAssistantModel(): Promise<LanguageModel | undefined> {

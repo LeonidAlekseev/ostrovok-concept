@@ -111,6 +111,19 @@ describe('POST /api/assistant', () => {
     expect((await (await ask('в Прагу поскорее')).json()).brief).toEqual({ destinationId: 'prague', when: 'soon' })
   })
 
+  it("drops a city the message does not name and the model's own «any»", async () => {
+    useModel(new MockLanguageModelV4({ doGenerate: answer({ vibe: 'sea', destinationId: 'zakynthos', party: 'any' }) }))
+    const { brief } = await (await ask('хочу туда, где тепло и можно поплавать с маской')).json()
+    expect(brief).toEqual({ vibe: 'sea' })
+  })
+
+  it('turns reasoning off for the 8 seconds', async () => {
+    const model = new MockLanguageModelV4({ doGenerate: answer({}) })
+    useModel(model)
+    await ask('море')
+    expect(model.doGenerateCalls[0].providerOptions).toEqual({ openrouter: { reasoning: { effort: 'none' } } })
+  })
+
   it('adds the answer to what is understood (Scenario: Уточнение темы)', async () => {
     useModel(new MockLanguageModelV4({ doGenerate: answer({ vibe: 'weekend', when: 'soon', nights: 2 }) }))
     const { brief } = await (await ask('на выходные', { vibe: 'sea', budget: 70000 })).json()

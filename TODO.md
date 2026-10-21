@@ -11,7 +11,7 @@ Travel OS «О!Погнали» (видение 2026-10-21, решения 85–
 - [ ] Название «О!Погнали» в интерфейсе, метаданных и текстах — `rename-opognali`.
 - [ ] Supabase: клиенты, схема с RLS, загрузка каталога, вход по одноразовой ссылке и демо-аккаунт —
       `supabase-foundation`. Нужны ключи (после `git-secret-env`).
-- [ ] Помощник на Vercel AI SDK + OpenRouter (`minimax/minimax-m3.1-flash:free`), отказ к правилам —
+- [ ] Помощник на Vercel AI SDK + OpenRouter (`nvidia/nemotron-3.5-lightning:free`), отказ к правилам —
       `ai-openrouter-assistant`. Нужен `OPENROUTER_API_KEY`.
 
 Дорожная карта (планы — после этапа A):
