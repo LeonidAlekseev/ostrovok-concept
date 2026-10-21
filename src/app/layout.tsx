@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { Footer } from '../components/Footer/Footer'
 import { Header } from '../components/Header/Header'
 import '@fontsource-variable/onest'
-import '@fontsource/great-vibes/400.css'
+import '@fontsource/caveat/600.css'
 import './globals.css'
 
 export const metadata: Metadata = {
