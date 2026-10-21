@@ -76,7 +76,7 @@ describe('catalogue', () => {
       expect(hotel.address).not.toBe('')
       expect(hotel.description).not.toBe('')
       expect(hotel.amenities).toContain('wifi')
-      expect(hotel.photos.length).toBeGreaterThan(0)
+      expect(hotel.photos.length).toBeGreaterThanOrEqual(12)
       expect(hotel.distanceKm).toBeLessThanOrEqual(5)
       expect(hotel.rooms.length).toBeGreaterThanOrEqual(3)
       expect(hotel.rooms.length).toBeLessThanOrEqual(6)
@@ -103,6 +103,57 @@ describe('catalogue', () => {
     for (const d of destinations) {
       expect(Math.min(...hotelsIn(d.id).map((h) => h.priceFrom)), d.id).toBe(d.priceFrom)
     }
+  })
+})
+
+// hotel-catalog, Requirement: Фото отеля и гостей
+describe('hotel and guest photos', () => {
+  it('gives every hotel 12–30 photos, the five first as before, and 0–40 guest photos', () => {
+    for (const hotel of catalog) {
+      expect(hotel.photos.length).toBeGreaterThanOrEqual(12)
+      expect(hotel.photos.length).toBeLessThanOrEqual(30)
+      expect(hotel.photos.slice(0, 5).map((p) => p.caption)).toEqual([
+        'Фасад',
+        'Лобби',
+        'Ресторан',
+        'Терраса',
+        'Вид из окна',
+      ])
+      expect(new Set(hotel.photos.map((p) => p.id)).size).toBe(hotel.photos.length)
+      expect(hotel.guestPhotos.length).toBeLessThanOrEqual(40)
+      expect(new Set(hotel.guestPhotos.map((p) => p.id)).size).toBe(hotel.guestPhotos.length)
+      for (const photo of [...hotel.photos, ...hotel.guestPhotos]) expect(photo.caption).not.toBe('')
+    }
+    expect(catalog.some((h) => h.guestPhotos.length === 0)).toBe(true)
+    expect(catalog.some((h) => h.guestPhotos.length > 20)).toBe(true)
+  })
+})
+
+// hotel-catalog, Requirement: Плюсы и минусы отзывов
+describe('review details', () => {
+  const reviews = catalog.flatMap((h) => h.reviews)
+
+  it('gives every review its good and a usefulness of 0–60, about half of them the bad', () => {
+    for (const review of reviews) {
+      expect(review.pros).not.toBe('')
+      expect(review.helpful).toBeGreaterThanOrEqual(0)
+      expect(review.helpful).toBeLessThanOrEqual(60)
+      if ('cons' in review) expect(review.cons).not.toBe('')
+    }
+    const withCons = reviews.filter((r) => r.cons).length / reviews.length
+    expect(withCons).toBeGreaterThan(0.4)
+    expect(withCons).toBeLessThan(0.6)
+    // Some run long enough to fold.
+    expect(reviews.some((r) => r.pros.length > 300)).toBe(true)
+  })
+
+  it('keeps the scores, dates and authors of the reviews', () => {
+    const lantern = getHotel('prague-old-town-lantern')!
+    expect(lantern.reviews.slice(0, 3).map(({ id, author, date, score }) => ({ id, author, date, score }))).toEqual([
+      { id: 'prague-old-town-lantern-review-2', author: 'Алексей Н.', date: '2026-09-20', score: 9.3 },
+      { id: 'prague-old-town-lantern-review-3', author: 'Павел Б.', date: '2026-06-23', score: 8.6 },
+      { id: 'prague-old-town-lantern-review-1', author: 'Сергей Т.', date: '2026-01-15', score: 9.6 },
+    ])
   })
 })
 

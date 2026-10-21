@@ -220,6 +220,19 @@ describe('PriceBar', () => {
     expect(rooms.scrollIntoView).toHaveBeenCalled()
     expect(document.activeElement).toBe(rooms)
   })
+
+  // hotel-page, Requirement: Панель цены (Широкий экран)
+  it('sticks to the bottom only below md and ends the page from md, after the rooms, without a shadow', () => {
+    render(<HotelPage hotel={hotel} />)
+    const classes = bar().className.split(/\s+/)
+    expect(classes).toEqual(
+      expect.arrayContaining(['max-md:sticky', 'max-md:bottom-0', 'max-md:shadow-(--shadow-card)']),
+    )
+    expect(classes.filter((c) => /^(sticky|fixed|shadow|bg-|rounded)/.test(c))).toEqual([])
+    const rooms = screen.getByRole('region', { name: 'Номера' })
+    expect(rooms.compareDocumentPosition(bar()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(bar().parentElement!.lastElementChild).toBe(bar())
+  })
 })
 
 // hotel-page, Requirement: Плоская страница отеля
@@ -267,7 +280,7 @@ describe('HotelPage', () => {
     render(<HotelPage hotel={hotel} />)
     expect(screen.queryByRole('region', { name: 'Отзывы' })).toBeNull()
     expect(document.getElementById('reviews')).toBeNull()
-    expect(screen.queryByText(hotel.reviews[0].text)).toBeNull()
+    expect(screen.queryByText(hotel.reviews[0].pros)).toBeNull()
     expect(screen.getByRole('button', { name: /^Читать отзывы \(/ })).toBeDefined()
   })
 
