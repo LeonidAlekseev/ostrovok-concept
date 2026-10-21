@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CLUSTER_RADIUS, clusterPoints, expansionZoom, MAX_CLUSTER_ZOOM, project } from './mapClusters'
+import { CLUSTER_SPAN, clusterPoints, expansionZoom, MAX_CLUSTER_ZOOM, project } from './mapClusters'
 
 const point = (id: string, lon: number, lat: number, price: number) => ({ hotel: { id, lon, lat }, price })
 
@@ -48,17 +48,22 @@ describe('clusterPoints', () => {
     expect(group.lat).toBeCloseTo((50.087 + 50.0875 + 50.0868 + 50.0872) / 4)
   })
 
-  it('groups only markers closer than the radius', () => {
-    const [x, y] = project(14.42, 50.087, 12)
-    const near = [
-      point('a', 14.42, 50.087, 1),
-      point('b', 14.42 + ((CLUSTER_RADIUS - 1) / (512 * 2 ** 12)) * 360, 50.087, 1),
-    ]
-    const far = [near[0], point('c', 14.42 + ((CLUSTER_RADIUS + 1) / (512 * 2 ** 12)) * 360, 50.087, 1)]
-    expect(project(near[1].hotel.lon, 50.087, 12)[0] - x).toBeCloseTo(CLUSTER_RADIUS - 1)
-    expect(y).toBeGreaterThan(0)
-    expect(clusterPoints(near, 12)).toHaveLength(1)
-    expect(clusterPoints(far, 12)).toHaveLength(2)
+  it('groups only markers closer than the span across and down', () => {
+    const zoom = 12
+    const [x, y] = project(14.42, 50.087, zoom)
+    // Moves a point by pixels at `zoom`: across by longitude, down by small latitude steps.
+    const lonBy = (px: number) => 14.42 + (px / (512 * 2 ** zoom)) * 360
+    const latBy = (px: number) => {
+      let lat = 50.087
+      while (project(14.42, lat, zoom)[1] - y < px) lat -= 0.00001
+      return lat
+    }
+    const seed = point('a', 14.42, 50.087, 1)
+    expect(project(lonBy(CLUSTER_SPAN.x - 1), 50.087, zoom)[0] - x).toBeCloseTo(CLUSTER_SPAN.x - 1)
+    expect(clusterPoints([seed, point('b', lonBy(CLUSTER_SPAN.x - 1), 50.087, 1)], zoom)).toHaveLength(1)
+    expect(clusterPoints([seed, point('b', lonBy(CLUSTER_SPAN.x + 1), 50.087, 1)], zoom)).toHaveLength(2)
+    expect(clusterPoints([seed, point('b', 14.42, latBy(CLUSTER_SPAN.y - 1), 1)], zoom)).toHaveLength(1)
+    expect(clusterPoints([seed, point('b', 14.42, latBy(CLUSTER_SPAN.y + 1), 1)], zoom)).toHaveLength(2)
   })
 })
 

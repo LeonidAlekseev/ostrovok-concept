@@ -59,12 +59,14 @@ function Chip({
   onPress,
   label,
   children,
+  className,
 }: {
   pressed: boolean
   onPress: () => void
   /** The name for screen readers when the text is short, as "5★". */
   label?: string
   children: ReactNode
+  className?: string
 }) {
   return (
     <button
@@ -72,7 +74,10 @@ function Chip({
       aria-pressed={pressed}
       aria-label={label}
       onClick={onPress}
-      className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-transparent bg-(--decor-surface-soft) px-2.5 py-1.5 text-left text-sm/[normal] transition-[background-color,border-color] outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50 aria-pressed:border-primary aria-pressed:bg-secondary aria-pressed:font-[650] aria-pressed:text-primary"
+      className={cn(
+        'inline-flex min-h-9 items-center gap-1 rounded-lg border border-transparent bg-(--decor-surface-soft) px-2.5 py-1.5 text-left text-sm/[normal] transition-[background-color,border-color] outline-none hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50 aria-pressed:border-primary aria-pressed:bg-secondary aria-pressed:font-[650] aria-pressed:text-primary',
+        className,
+      )}
     >
       {children}
     </button>
@@ -145,13 +150,15 @@ export function FiltersPanel({ filters, onChange, priceBounds, embedded = false 
       </Group>
 
       <Group legend="Звёзды">
-        <div className={chips}>
+        {/* One row even in the narrow side panel. */}
+        <div className="grid grid-cols-5 gap-1.5">
           {STAR_OPTIONS.map((stars) => (
             <Chip
               key={stars}
               label={countRu(stars, ['звезда', 'звезды', 'звёзд'])}
               pressed={filters.stars.includes(stars)}
               onPress={() => set({ stars: toggle(filters.stars, stars) })}
+              className="justify-center px-1"
             >
               {stars}
               <Star className="size-3.5 text-(--decor-star)" fill="currentColor" strokeWidth={0} aria-hidden />

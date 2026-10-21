@@ -1,6 +1,6 @@
 /**
- * Groups of the results map: hotels whose price markers would stand closer than `CLUSTER_RADIUS`
- * pixels at the current zoom share one marker, "4 от 8 000 ₽".
+ * Groups of the results map: hotels whose price markers would overlap at the current zoom, standing
+ * closer than `CLUSTER_SPAN` pixels across and down, share one marker, "4 от 8 000 ₽".
  */
 
 export interface MapPoint {
@@ -18,8 +18,11 @@ export interface MapCluster<T extends MapPoint> {
   price: number
 }
 
-/** Markers closer than this many screen pixels are grouped. */
-export const CLUSTER_RADIUS = 48
+/**
+ * Markers closer than this many screen pixels across and down are grouped: a price marker is wide
+ * and low, so a round radius would either leave wide labels overlapping or group markers one above the other.
+ */
+export const CLUSTER_SPAN = { x: 120, y: 32 } as const
 /** The zoom a group may expand to at most: hotels on one spot never part. */
 export const MAX_CLUSTER_ZOOM = 18
 
@@ -34,35 +37,43 @@ export function project(lon: number, lat: number, zoom: number): [number, number
 }
 
 /**
- * Groups the points at `zoom`: each point, in the order of its id so the groups do not depend on the
- * sorting of the list, takes the free points within the radius around it. A group stands at the mean
- * position of its members.
+ * Groups the points at `zoom`: while two markers stand within the span of each other, they merge into
+ * one group at the mean position of its members. Points are taken in the order of their id, so the
+ * groups do not depend on the sorting of the list.
  */
-export function clusterPoints<T extends MapPoint>(
-  points: readonly T[],
-  zoom: number,
-  radius = CLUSTER_RADIUS,
-): MapCluster<T>[] {
-  const placed = [...points]
+export function clusterPoints<T extends MapPoint>(points: readonly T[], zoom: number): MapCluster<T>[] {
+  const groups = [...points]
     .sort((a, b) => (a.hotel.id < b.hotel.id ? -1 : a.hotel.id > b.hotel.id ? 1 : 0))
-    .map((point) => ({ point, at: project(point.hotel.lon, point.hotel.lat, zoom) }))
-  const taken = new Set<T>()
-  const clusters: MapCluster<T>[] = []
-  for (const seed of placed) {
-    if (taken.has(seed.point)) continue
-    const members = placed
-      .filter(({ point, at }) => !taken.has(point) && Math.hypot(at[0] - seed.at[0], at[1] - seed.at[1]) < radius)
-      .map(({ point }) => point)
-    for (const member of members) taken.add(member)
-    clusters.push({
-      key: members.map((m) => m.hotel.id).join('+'),
-      members,
-      lon: members.reduce((sum, m) => sum + m.hotel.lon, 0) / members.length,
-      lat: members.reduce((sum, m) => sum + m.hotel.lat, 0) / members.length,
-      price: Math.min(...members.map((m) => m.price)),
-    })
+    .map((point) => ({ members: [point], at: project(point.hotel.lon, point.hotel.lat, zoom) }))
+  const near = (a: [number, number], b: [number, number]) =>
+    Math.abs(a[0] - b[0]) < CLUSTER_SPAN.x && Math.abs(a[1] - b[1]) < CLUSTER_SPAN.y
+  const mean = (members: T[], of: (point: T) => number) => members.reduce((sum, m) => sum + of(m), 0) / members.length
+  for (let merged = true; merged;) {
+    merged = false
+    for (let i = 0; i < groups.length && !merged; i++)
+      for (let j = i + 1; j < groups.length && !merged; j++) {
+        if (!near(groups[i].at, groups[j].at)) continue
+        const members = [...groups[i].members, ...groups[j].members]
+        const at = project(
+          mean(members, (m) => m.hotel.lon),
+          mean(members, (m) => m.hotel.lat),
+          zoom,
+        )
+        groups[i] = { members, at }
+        groups.splice(j, 1)
+        merged = true
+      }
   }
-  return clusters
+  return groups.map(({ members }) => ({
+    key: members
+      .map((m) => m.hotel.id)
+      .sort()
+      .join('+'),
+    members,
+    lon: mean(members, (m) => m.hotel.lon),
+    lat: mean(members, (m) => m.hotel.lat),
+    price: Math.min(...members.map((m) => m.price)),
+  }))
 }
 
 /** The first whole zoom above `zoom` at which the group parts, at most `MAX_CLUSTER_ZOOM`. */
