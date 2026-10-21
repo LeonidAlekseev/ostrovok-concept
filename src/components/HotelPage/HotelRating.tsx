@@ -11,7 +11,7 @@ import { ScoreBadge } from './ScoreBadge'
  * bars in the colours of the same scale, and the reviews dialog.
  */
 export function HotelRating({ hotel }: { hotel: Hotel }) {
-  const { rating, reviewCount, reviews, sectionScores } = hotel
+  const { rating, reviewCount, sectionScores } = hotel
   return (
     <section aria-labelledby="rating-title" className="flex flex-col gap-5">
       <h2 id="rating-title" className="sr-only">
@@ -45,7 +45,7 @@ export function HotelRating({ hotel }: { hotel: Hotel }) {
           </li>
         ))}
       </ul>
-      <ReviewsDialog rating={rating} reviewCount={reviewCount} reviews={reviews} />
+      <ReviewsDialog hotel={hotel} />
     </section>
   )
 }

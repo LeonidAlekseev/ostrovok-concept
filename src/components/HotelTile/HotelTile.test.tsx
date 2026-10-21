@@ -63,7 +63,7 @@ describe('HotelTile photo links', () => {
     const card = screen.getByRole('article')
     expect(within(card).getAllByRole('link')).toHaveLength(1)
     const photoLinks = card.querySelectorAll('a[aria-hidden="true"]')
-    expect(photoLinks).toHaveLength(hotel.photos.length)
+    expect(photoLinks).toHaveLength(5)
     for (const link of photoLinks) {
       expect(link.getAttribute('href')).toBe(`/hotels/${hotel.id}`)
       expect(link.getAttribute('tabindex')).toBe('-1')

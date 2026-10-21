@@ -23,6 +23,9 @@ interface Props extends Omit<ComponentProps<'article'>, 'children'> {
   swipePhotos?: boolean
 }
 
+/** The photos a tile leafs through. */
+const TILE_PHOTOS = 5
+
 /**
  * The hotel card of collections, favourites and search results: the photo carousel with the free
  * cancellation, the guest rating, the favourite toggle and the stars on it, then the name, the
@@ -46,9 +49,10 @@ export function HotelTile({
         className,
       )}
     >
-      {/* Above the card link: the photos swipe and lead to the hotel themselves. */}
+      {/* Above the card link: the photos swipe and lead to the hotel themselves. The first five
+          only: the rest are for the hotel page. */}
       <PhotoCarousel
-        photos={hotel.photos}
+        photos={hotel.photos.slice(0, TILE_PHOTOS)}
         href={href}
         swipe={swipePhotos}
         className="@container z-10 aspect-[4/3] w-full rounded-xl"

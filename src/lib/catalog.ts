@@ -195,7 +195,12 @@ export interface Review {
   date: IsoDate
   /** 1…10. */
   score: number
-  text: string
+  /** «Что было хорошо». */
+  pros: string
+  /** «Что было плохо»: about half of the reviews have it. */
+  cons?: string
+  /** How many guests found the review useful, 0…60. */
+  helpful: number
 }
 
 export interface HotelSummary {
@@ -234,7 +239,10 @@ export interface Hotel extends HotelSummary {
   description: string
   checkInTime: string
   checkOutTime: string
+  /** 12–30 photos of the hotel. */
   photos: Photo[]
+  /** 0–40 photos taken by the guests. */
+  guestPhotos: Photo[]
   /** Cheapest first. */
   rooms: Room[]
   /** A sample of the reviews, newest first; `reviewCount` is the total. */
@@ -456,6 +464,8 @@ function sectionScores(summary: HotelSummary): SectionScore[] {
 }
 
 const HOTEL_PHOTOS = ['Фасад', 'Лобби', 'Ресторан', 'Терраса', 'Вид из окна']
+/** Captions of the photos after the first five, and of the guests' photos. */
+const MORE_PHOTOS = ['Номер', 'Ванная', 'Вид', 'Завтрак', 'Бассейн', 'Холл', 'Терраса', 'Ресторан', 'Улица', 'Бар']
 
 const ROOM_TYPES = [
   { id: 'standard', name: 'Стандартный номер', area: [16, 22], beds: '1 двуспальная кровать', capacity: 2, factor: 1 },
@@ -531,6 +541,24 @@ const REVIEW_TEXTS = {
   ],
   low: ['Номер не соответствовал фотографиям.', 'Долго ждали заселения.', 'Кондиционер работал плохо.'],
 }
+/** More of the good, drawn with a seed of their own: some reviews run longer than six lines. */
+const REVIEW_MORE = [
+  'Номер просторный, с большим окном, по утрам в нём много света, а вечером тихо даже с открытым окном.',
+  'На ресепшене всегда приветливо здоровались, подсказали, куда сходить поужинать и как добраться до вокзала.',
+  'Кровать широкая и удобная, подушки на выбор, постельное бельё меняли каждый день без напоминаний.',
+  'Завтрак подают с семи утра: горячие блюда, выпечка, фрукты, есть безглютеновые продукты по запросу.',
+  'Уборка ежедневная и аккуратная, в ванной хорошая косметика и всегда свежие полотенца.',
+  'До ближайшей остановки две минуты пешком, рядом круглосуточный магазин и несколько хороших кафе.',
+]
+const REVIEW_CONS = [
+  'Слабая звукоизоляция, слышно соседей и лифт.',
+  'Завтрак однообразный, к концу недели надоел.',
+  'Ранний заезд только за доплату.',
+  'В номере не хватало розеток у кровати.',
+  'Душ то горячий, то холодный, долго подстраивали воду.',
+  'Парковка платная и маленькая, мест часто нет.',
+  'Шумно по ночам из-за бара на первом этаже.',
+]
 /** Reviews are dated back from a fixed day: the catalogue must not depend on the build date. */
 const REVIEWS_UNTIL: IsoDate = '2026-09-30'
 
@@ -544,6 +572,42 @@ function nearestStation(hotelId: string, stations: string[] | undefined): Neares
   if (!stations?.length) return null
   const rng = seeded(`metro:${hotelId}`)
   return { station: rng.pick(stations), meters: Math.round(rng.int(150, 1200) / 10) * 10 }
+}
+
+/** The photos after the first five, 7–25 of them: a seed of their own, so the rest of the hotel stays as it was. */
+function morePhotos(hotelId: string): Photo[] {
+  const rng = seeded(`photos:${hotelId}`)
+  return Array.from({ length: rng.int(12, 30) - HOTEL_PHOTOS.length }, (_, i) => ({
+    id: `photo-${HOTEL_PHOTOS.length + i + 1}`,
+    caption: rng.pick(MORE_PHOTOS),
+    tone: rng.int(0, PHOTO_TONE_COUNT - 1),
+  }))
+}
+
+/** 0–40 photos of the guests, their own seed. */
+function guestPhotos(hotelId: string): Photo[] {
+  const rng = seeded(`guest-photos:${hotelId}`)
+  return Array.from({ length: rng.int(0, 40) }, (_, i) => ({
+    id: `guest-photo-${i + 1}`,
+    caption: rng.pick(MORE_PHOTOS),
+    tone: rng.int(0, PHOTO_TONE_COUNT - 1),
+  }))
+}
+
+/**
+ * The longer good, the bad of about half the reviews and their usefulness, with a seed of the review
+ * of their own: the scores and dates stay as they were.
+ */
+function reviewDetails(review: Review): Review {
+  const rng = seeded(`review:${review.id}`)
+  const more = rng.next() < 0.35 ? rng.sample(REVIEW_MORE, rng.int(2, 4)) : []
+  const cons = rng.next() < 0.5 ? rng.sample(REVIEW_CONS, rng.int(1, 2)).join(' ') : undefined
+  return {
+    ...review,
+    pros: [review.pros, ...more].join(' '),
+    ...(cons && { cons }),
+    helpful: rng.int(0, 60),
+  }
 }
 
 function buildHotel(summary: HotelSummary): Hotel {
@@ -593,9 +657,12 @@ function buildHotel(summary: HotelSummary): Hotel {
       author: rng.pick(REVIEW_AUTHORS),
       date: addDays(REVIEWS_UNTIL, -rng.int(0, 540)),
       score,
-      text: rng.sample(texts, rng.int(1, 2)).join(' '),
+      pros: rng.sample(texts, rng.int(1, 2)).join(' '),
+      helpful: 0,
     }
-  }).sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id))
+  })
+    .map(reviewDetails)
+    .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id))
 
   const distance = `${distanceKm.toLocaleString('ru-RU')} км`
   return {
@@ -614,7 +681,8 @@ function buildHotel(summary: HotelSummary): Hotel {
     ].join(' '),
     checkInTime: '14:00',
     checkOutTime: '12:00',
-    photos: HOTEL_PHOTOS.map((caption, i) => photo(`photo-${i + 1}`, caption)),
+    photos: [...HOTEL_PHOTOS.map((caption, i) => photo(`photo-${i + 1}`, caption)), ...morePhotos(summary.id)],
+    guestPhotos: guestPhotos(summary.id),
     rooms,
     reviews,
   }
