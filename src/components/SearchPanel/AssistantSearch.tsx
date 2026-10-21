@@ -6,9 +6,10 @@ import { Textarea } from '@/components/ui/textarea'
 import type { Destination } from '@/data/destinations'
 import type { HotelSearch } from '@/hooks/useHotelSearch'
 import {
+  MAX_MESSAGE_LENGTH,
+  askAssistant,
   describeBrief,
   makePlan,
-  mergeBrief,
   nextQuestion,
   starterChips,
   type Brief,
@@ -30,7 +31,7 @@ interface Props {
   onChoose: HotelSearch['searchFor']
 }
 
-/** A pause before the assistant replies, so the answer reads as a reply rather than an echo. */
+/** The shortest pause before the assistant replies, so the answer reads as a reply rather than an echo. */
 const THINK_MS = 650
 
 const messageClass =
@@ -49,10 +50,18 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
   const [thinking, setThinking] = useState(false)
   const [text, setText] = useState('')
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+  /** Cancels the pending reply on "Заново" and on unmount. */
+  const pendingRef = useRef<AbortController>(undefined)
   const logRef = useRef<HTMLOListElement>(null)
   const inputId = useId()
 
-  useEffect(() => () => clearTimeout(timerRef.current), [])
+  useEffect(
+    () => () => {
+      clearTimeout(timerRef.current)
+      pendingRef.current?.abort()
+    },
+    [],
+  )
 
   // Keep the newest message in view inside the log (not the page: that would yank the scroll).
   useEffect(() => {
@@ -64,22 +73,34 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
     const wish = raw.trim()
     if (!wish || thinking) return
     setText('')
-    setMessages((list) => [...list, { from: 'user', text: wish }])
+    const history = [...messages, { from: 'user', text: wish } satisfies Message]
+    setMessages(history)
     setThinking(true)
-    const next = mergeBrief(brief, wish, question?.id ?? null)
-    setBrief(next)
+    pendingRef.current?.abort()
+    const pending = new AbortController()
+    pendingRef.current = pending
+    const reply = askAssistant(
+      {
+        messages: history.map((m) => ({ role: m.from === 'user' ? 'user' : 'assistant', text: m.text })),
+        brief,
+      },
+      question?.id ?? null,
+      pending.signal,
+    )
     clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => {
+    timerRef.current = setTimeout(async () => {
+      const { brief: next, reply: remark } = await reply
+      if (pending.signal.aborted) return
+      setBrief(next)
       const today = todayIso()
       const ask = nextQuestion(next, today)
       const understood = describeBrief(next)
       setThinking(false)
       setQuestion(ask)
       if (ask) {
-        setMessages((list) => [
-          ...list,
-          { from: 'agent', text: understood ? `Записал: ${understood}. ${ask.text}` : ask.text },
-        ])
+        // The model's remark fills in only when nothing is understood yet, so answers keep "Записал: …".
+        const lead = understood ? `Записал: ${understood}.` : remark
+        setMessages((list) => [...list, { from: 'agent', text: lead ? `${lead} ${ask.text}` : ask.text }])
         return
       }
       const plan = makePlan(next, today)
@@ -90,6 +111,7 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
 
   const reset = () => {
     clearTimeout(timerRef.current)
+    pendingRef.current?.abort()
     setMessages([])
     setBrief({})
     setQuestion(null)
@@ -200,6 +222,7 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
           rows={2}
           value={text}
           enterKeyHint="send"
+          maxLength={MAX_MESSAGE_LENGTH}
           placeholder={
             started
               ? 'Ответьте или уточните пожелания…'
