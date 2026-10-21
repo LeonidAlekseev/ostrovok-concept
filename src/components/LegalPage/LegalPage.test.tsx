@@ -23,9 +23,9 @@ describe.each([terms, privacy, cookies])('legal page $slug', (document) => {
 })
 
 describe('cookies page', () => {
-  it('lists the storage keys and says there are no third-party cookies', () => {
+  it('lists the session cookie and the storage keys and says there are no third-party cookies', () => {
     render(<LegalPage document={cookies} />)
-    for (const key of ['ostrovok:v1:session', 'ostrovok:v1:favorites', 'ostrovok:v1:bookings'])
+    for (const key of ['sb-<проект>-auth-token', 'ostrovok:v1:favorites', 'ostrovok:v1:bookings'])
       expect(screen.getByText(key)).toBeTruthy()
     expect(screen.getByText(/Сторонних cookie и аналитики на сайте нет/)).toBeTruthy()
   })

@@ -1,32 +1,22 @@
-// @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest'
-import { nameFromEmail, resolveNext, signIn, signOut, validateLogin, validateRegister } from './auth'
-import { bookingsStore, favoritesStore, sessionStore } from './storage'
-
-beforeEach(() => window.localStorage.clear())
+import { describe, expect, it } from 'vitest'
+import { nameFromEmail, resolveNext, validateLogin, validateRegister } from './auth'
 
 describe('validateLogin', () => {
-  it('accepts any email and a password of 8 characters', () => {
-    expect(validateLogin({ email: 'anna@example.com', password: '12345678' })).toEqual({})
-  })
-
-  it('rejects a short password and a bad email', () => {
-    expect(validateLogin({ email: 'anna@example.com', password: '12345' })).toEqual({
-      password: 'Не меньше 8 символов',
-    })
-    expect(Object.keys(validateLogin({ email: 'anna', password: '12345678' }))).toEqual(['email'])
+  it('needs only a valid email', () => {
+    expect(validateLogin({ email: 'anna@example.com' })).toEqual({})
+    expect(validateLogin({ email: 'anna.example.com' })).toEqual({ email: 'Проверьте email' })
+    expect(validateLogin({ email: ' ' })).toEqual({ email: 'Введите email' })
   })
 })
 
 describe('validateRegister', () => {
-  const valid = { name: 'Анна', email: 'anna@example.com', password: '12345678', repeat: '12345678', agreed: true }
-
-  it('accepts a complete form', () => expect(validateRegister(valid)).toEqual({}))
-
-  it('checks every field, in form order', () => {
-    const errors = validateRegister({ name: ' ', email: '', password: '1', repeat: '2', agreed: false })
-    expect(Object.keys(errors)).toEqual(['name', 'email', 'password', 'repeat', 'agreed'])
-    expect(errors.repeat).toBe('Пароли не совпадают')
+  it('needs a name, an email and the agreement', () => {
+    expect(validateRegister({ name: 'Анна', email: 'anna@example.com', agreed: true })).toEqual({})
+    expect(validateRegister({ name: ' ', email: 'anna', agreed: false })).toEqual({
+      name: 'Введите имя',
+      email: 'Проверьте email',
+      agreed: 'Нужно принять условия',
+    })
   })
 })
 
@@ -46,29 +36,6 @@ describe('resolveNext', () => {
   )
 })
 
-describe('session', () => {
-  it('takes the name from the email when none is given', () => {
-    expect(signIn('anna@example.com')).toEqual({ name: 'anna', email: 'anna@example.com' })
-    expect(nameFromEmail(' a.b@x.ru ')).toBe('a.b')
-  })
-
-  it('uses the registered name, and keeps it on a later sign-in with the same email', () => {
-    signIn('anna@example.com', 'Анна Петрова')
-    expect(signIn('anna@example.com').name).toBe('Анна Петрова')
-    expect(signIn('boris@example.com').name).toBe('boris')
-  })
-
-  it('stores no password', () => {
-    signIn('anna@example.com')
-    expect(window.localStorage.getItem(sessionStore.key)).toBe('{"name":"anna","email":"anna@example.com"}')
-  })
-
-  it('signOut removes only the session', () => {
-    favoritesStore.set(['h1'])
-    signIn('anna@example.com')
-    signOut()
-    expect(sessionStore.get()).toBeNull()
-    expect(favoritesStore.get()).toEqual(['h1'])
-    expect(bookingsStore.get()).toEqual([])
-  })
+describe('nameFromEmail', () => {
+  it('takes the part before @', () => expect(nameFromEmail(' a.b@x.ru ')).toBe('a.b'))
 })

@@ -57,6 +57,20 @@ Vercel определяет проект как Next.js без дополнит�
 - **Сменить ключ проекта** — новый ключ GPG, `git secret removeperson secrets@opognali.local`, `git secret tell` нового,
   `npm run secrets:hide`, новый закрытый ключ — в `GIT_SECRET_PRIVATE_KEY` на Vercel.
 
+## Supabase
+
+Постоянные данные — в Supabase: аккаунты (`profiles`) и каталог (`destinations`, `hotels`: ключевые колонки и весь
+объект в `data jsonb`). Схема с RLS — `supabase/migrations/`: каталог читают все, пишет только сервисный ключ,
+профиль читает и меняет владелец. Интерфейс пока берёт каталог из кода.
+
+- `npm run db:push` — применяет миграции (`supabase db push --db-url "$SUPABASE_DB_URL"`, строка из `.env.local`).
+  Прямой адрес `db.<ref>.supabase.co` доступен только по IPv6; без IPv6 подставьте строку пулера
+  (Dashboard → Connect → Transaction pooler, порт 6543) в `SUPABASE_DB_URL` окружения.
+- `npm run db:seed` — `scripts/seed.ts` (Node исполняет TypeScript сам): строит каталог генератором
+  `src/lib/catalog.ts`, делает upsert пачками по 100 и печатает число строк; повторный запуск оставляет те же строки.
+  Создаёт демо-аккаунт «Демо-путешественник» из `DEMO_USER_EMAIL`/`DEMO_USER_PASSWORD`, если его нет.
+  `SUPABASE_SERVICE_ROLE_KEY` читают только этот скрипт и сервер, никогда клиент.
+
 ## Производительность глобуса
 
 Глобус — точечный wireframe на Canvas 2D, без WebGL и текстур: ~7 700 точек суши, контуры
@@ -174,7 +188,7 @@ node scripts/screenshots.mjs --label after --against before --mask canvas / /sea
 
 ## Демо-режим
 
-Бэкенда нет: поиск валидирует форму и открывает страницу результатов с параметрами запроса
+Поиск работает без бэкенда: валидирует форму и открывает страницу результатов с параметрами запроса
 (`/search?destination=…&checkin=…&checkout=…&adults=…&rooms=…`, для сценария — `scenario=…`);
 отели и цены берутся из локального каталога.
 Страницы прототипа (поиск, отель, оформление, вход, поездки) строятся на основе ниже.
@@ -183,7 +197,7 @@ node scripts/screenshots.mjs --label after --against before --mask canvas / /sea
 
 Шапка (`src/components/Header`) и подвал (`src/components/Footer`) рендерятся в
 `src/app/layout.tsx` на каждой странице; страница сама рендерит свой `main`. Сейчас есть `/`,
-`/search` (результаты поиска), `/hotels/<id>`, `/hotels/<id>/rooms`, `/booking`, `/booking/confirmation`, `/login`, `/register`, `/trips`, `/trips/booking`, `/favorites`, `/help`, `/legal/terms`, `/legal/privacy`, `/legal/cookies` и страница 404 (`src/app/not-found.tsx`). Шапка и подвал ссылаются на все эти разделы. Все маршруты пререндерятся статически.
+`/search` (результаты поиска), `/hotels/<id>`, `/hotels/<id>/rooms`, `/booking`, `/booking/confirmation`, `/login`, `/register`, `/trips`, `/trips/booking`, `/favorites`, `/help`, `/legal/terms`, `/legal/privacy`, `/legal/cookies`, `/auth/callback` (обработчик ссылки из письма) и страница 404 (`src/app/not-found.tsx`). Шапка и подвал ссылаются на разделы. Все страницы пререндерятся статически.
 
 ### Каталог
 
@@ -269,12 +283,19 @@ Escape, фокус возвращается на фото), название с 
 
 ### Вход и регистрация
 
-Настоящей аутентификации нет: подойдут любой email и пароль от 8 символов, пароль нигде не
-сохраняется. Успешный вход или регистрация записывает демо-сессию `{ name, email }`
-(`signIn` в `src/lib/auth.ts`); имя — из регистрации, при входе — прежнее имя для того же email или
-часть email до `@`. «Выйти» (`signOut`) удаляет только сессию: избранное и бронирования остаются.
-Формы и проверки (`validateLogin`, `validateRegister`) — `src/components/Auth/AuthForm.tsx`,
-`src/lib/auth.ts`; «Не меньше 8 символов», «Пароли не совпадают», согласие с условиями — у полей.
+Вход — Supabase Auth по одноразовой ссылке (`signInWithOtp` из браузерного клиента
+`src/lib/supabase/client.ts`): «Вход» просит email, «Регистрация» — имя, email и согласие с условиями (имя уходит в
+`options.data` и триггером попадает в `profiles`). Паролей в формах нет. После отправки форма показывает «Проверьте
+почту»; ошибки проверки — у полей, ошибки отправки — над кнопкой. Ссылка из письма ведёт на `/auth/callback`
+(`src/app/auth/callback/route.ts`): обмен `code` на сессию (или `token_hash`) и переход на `next`, иначе `/login`
+с «Ссылка устарела…». В настройках Auth проекта Supabase адрес `<сайт>/auth/callback` должен быть в Redirect URLs.
+
+«Войти в демо-аккаунт» — серверное действие `signInDemo` (`src/app/auth/actions.ts`, `signInWithPassword` с
+`DEMO_USER_EMAIL` и `DEMO_USER_PASSWORD` через `getSecret`); аккаунт создаёт `npm run db:seed`. Сессия живёт в cookie
+Supabase; `src/proxy.ts` обновляет её на запросах с этой cookie. Интерфейс читает её через `sessionStore`
+(`src/lib/session.ts`, `onAuthStateChange`, имя — из `profiles`, затем из данных регистрации, затем часть email до
+`@`). «Выйти» (`signOut`, `scope: 'local'` — демо-аккаунт общий) завершает сессию только в этом браузере: избранное и
+бронирования остаются. Без `NEXT_PUBLIC_SUPABASE_*` вход сообщает «Вход временно недоступен».
 
 `/login` и `/register` — полные страницы (`AuthPage`). Переход на них из приложения (ссылка «Войти» в
 шапке) перехватывается: параллельный маршрут `@modal` с `(.)login` и `(.)register` показывает ту же форму диалогом
@@ -315,12 +336,12 @@ Escape, фокус возвращается на фото), название с 
 
 `/legal/terms`, `/legal/privacy`, `/legal/cookies`: тексты-шаблоны лежат в `src/data/legal.ts`,
 разметку даёт общий `src/components/LegalPage` (дата обновления, демо-пометка, оглавление по
-`h2` с якорями). Страница cookie перечисляет ключи `ostrovok:v1:*`. Все страницы статические.
+`h2` с якорями). Страница cookie перечисляет cookie сессии Supabase и ключи `ostrovok:v1:*`. Все страницы статические.
 
 ### Состояние в браузере
 
-`src/lib/storage.ts` хранит демо-сессию, избранное и бронирования в `localStorage`
-(`ostrovok:v1:session`, `ostrovok:v1:favorites`, `ostrovok:v1:bookings`); хуки — в
+`src/lib/storage.ts` хранит избранное и бронирования в `localStorage`
+(`ostrovok:v1:favorites`, `ostrovok:v1:bookings`), сессия — Supabase (`src/lib/session.ts`); хуки — в
 `src/hooks/useStore.ts` (`useSyncExternalStore`, без библиотек состояния). При пререндере и
 гидрации значения пустые, изменения видны в других вкладках, повреждённые данные читаются как
 пустые. Платёжные данные не сохраняются: у бронирования только последние 4 цифры карты.

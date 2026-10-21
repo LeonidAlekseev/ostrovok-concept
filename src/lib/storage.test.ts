@@ -1,14 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import {
-  bookingsStore,
-  createStore,
-  favoritesStore,
-  saveBooking,
-  sessionStore,
-  toggleFavorite,
-  type Booking,
-} from './storage'
+import { bookingsStore, createStore, favoritesStore, saveBooking, toggleFavorite, type Booking } from './storage'
 
 const booking: Booking = {
   id: 'OS-AB12CD',
@@ -33,18 +25,13 @@ afterEach(() => localStorage.clear())
 
 describe('stores', () => {
   it('use the versioned keys', () => {
-    expect([sessionStore.key, favoritesStore.key, bookingsStore.key]).toEqual([
-      'ostrovok:v1:session',
-      'ostrovok:v1:favorites',
-      'ostrovok:v1:bookings',
-    ])
+    expect([favoritesStore.key, bookingsStore.key]).toEqual(['ostrovok:v1:favorites', 'ostrovok:v1:bookings'])
   })
 
   it('give the empty value to the server snapshot', () => {
     localStorage.setItem('ostrovok:v1:favorites', '["a"]')
     expect(favoritesStore.get()).toEqual(['a'])
     expect(favoritesStore.getServerSnapshot()).toEqual([])
-    expect(sessionStore.getServerSnapshot()).toBeNull()
   })
 
   it('read damaged or foreign values as empty', () => {
@@ -52,8 +39,6 @@ describe('stores', () => {
     expect(bookingsStore.get()).toEqual([])
     localStorage.setItem('ostrovok:v1:bookings', '{"v":2}')
     expect(bookingsStore.get()).toEqual([])
-    localStorage.setItem('ostrovok:v1:session', '"Анна"')
-    expect(sessionStore.get()).toBeNull()
     localStorage.setItem('ostrovok:v1:bookings', JSON.stringify([booking, { id: 'broken' }]))
     expect(bookingsStore.get()).toEqual([booking])
   })
@@ -78,7 +63,7 @@ describe('stores', () => {
     expect(listener).toHaveBeenCalledTimes(2)
     expect(favoritesStore.get()).toEqual(['oslo-fjordline-hotel'])
 
-    window.dispatchEvent(new StorageEvent('storage', { key: 'ostrovok:v1:session' }))
+    window.dispatchEvent(new StorageEvent('storage', { key: 'ostrovok:v1:bookings' }))
     expect(listener).toHaveBeenCalledTimes(2)
     unsubscribe()
     window.dispatchEvent(new StorageEvent('storage', { key: 'ostrovok:v1:favorites' }))
