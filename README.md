@@ -27,11 +27,35 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) на каждый PR и push в 
 Vercel определяет проект как Next.js без дополнительной настройки:
 импортируйте репозиторий (Framework Preset — Next.js, команды по умолчанию)
 или выполните `npx vercel --prod` из корня. Нужен Node.js ≥ 20.9.
-Переменные окружения не требуются.
+В настройках проекта Vercel нужна одна переменная — `GIT_SECRET_PRIVATE_KEY` (см. «Ключи API»).
 
 Вне production (`npm run dev` и preview-деплои Vercel, по `VERCEL_ENV`) в левом нижнем углу
 показываются технические параметры глобуса: fps, время кадра, разрешение рендера,
 объём геометрии. Проверить production-сборку с ними локально: `VERCEL_ENV=preview npm run build`.
+
+## Ключи API
+
+Ключи API (Supabase, OpenRouter) хранятся в репозитории зашифрованными через
+[git-secret](https://github.com/sobolevn/git-secret): в git лежит только `.env.local.secret`, открытые `.env*`
+(кроме `.env.example` с именами переменных) и закрытые ключи в `.gitignore`. Файл зашифрован для ключа GPG проекта
+`secrets@opognali.local` (без пароля) и ключей людей, добавленных через `git secret tell`.
+
+- **Раскрыть** — `npm run secrets:reveal` создаёт `.env.local`: с переменной `GIT_SECRET_PRIVATE_KEY` (закрытый ключ
+  в armored-виде, `\n` можно экранировать) расшифровывает пакетом `openpgp`, без неё — через `git secret reveal -f`
+  (нужны git-secret и закрытый ключ в `gpg`). Без ключа и git-secret ничего не делает.
+- **Добавить или сменить ключ** — правка `.env.local`, затем `npm run secrets:hide` (`git secret hide`) и коммит
+  `.env.local.secret`. Новое имя переменной — ещё и в `.env.example`.
+- **Добавить человека** — импорт его открытого ключа (`gpg --import`), `git secret tell <email>`, затем
+  `npm run secrets:hide` и коммит `.gitsecret/` и `.env.local.secret`. Убрать — `git secret removeperson <email>`,
+  `npm run secrets:hide` и смена самих ключей API: старые копии файла остаются в истории git.
+- **Сборка** — `prebuild` (`node scripts/secrets.mjs build`) при наличии `GIT_SECRET_PRIVATE_KEY` пишет
+  `.env.production.local`, из которого `next build` встраивает `NEXT_PUBLIC_*`; `.env.local` при этом не трогается.
+  Без ключа (CI) шаг пропускается, сборка и тесты проходят.
+- **Сервер** — `getSecret(name)` из `src/lib/secrets.ts` (`server-only`) берёт `process.env[name]`, иначе один раз на
+  холодный старт расшифровывает `.env.local.secret` (файл попадает в функции Vercel через `outputFileTracingIncludes`
+  в `next.config.ts`). Нет ключа — `undefined`, код работает в режиме без ключей. Клиент серверные ключи не получает.
+- **Сменить ключ проекта** — новый ключ GPG, `git secret removeperson secrets@opognali.local`, `git secret tell` нового,
+  `npm run secrets:hide`, новый закрытый ключ — в `GIT_SECRET_PRIVATE_KEY` на Vercel.
 
 ## Производительность глобуса
 
