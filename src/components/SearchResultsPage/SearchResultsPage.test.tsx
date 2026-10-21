@@ -276,6 +276,16 @@ describe('SearchResultsPage hotel card', () => {
     expect(list.className).toMatch(/(^|\s)3xl:grid-cols-2(\s|$)/)
     expect(list.className).not.toMatch(/(^|\s)(sm|md|lg|xl|2xl):grid-cols-/)
   })
+
+  it('widens the page and gives the list more room than the map from 3xl (1920 px)', async () => {
+    open(PRAGUE)
+    await results()
+
+    const page = screen.getByRole('region', { name: 'Отели' }).closest('main')!
+    expect(page.className).toMatch(/(^|\s)3xl:max-w-\(--page-max-wide\)(\s|$)/)
+    const columns = screen.getByRole('region', { name: 'Отели' }).closest('.grid')!
+    expect(columns.className).toMatch(/(^|\s)3xl:grid-cols-\[15rem_minmax\(0,1\.6fr\)_minmax\(0,1fr\)\](\s|$)/)
+  })
 })
 
 // search-results-page, Requirement: Фильтры и сортировка
