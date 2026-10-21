@@ -54,8 +54,7 @@ const initialSourceIds = ['london', 'lisbon', 'tbilisi']
 const hero = [
   // The sphere is much larger than the viewport: it rises from the lower right behind the title.
   // Offsets include the transparent header laid over the top of the hero.
-  // On phones the globe sits further right than its box: the hint stays on the strip left of its limb, clear of the pins.
-  '[--globe-size:clamp(540px,144vw,640px)] [--globe-top:calc(var(--header-height)+clamp(24px,8vw,40px))] [--globe-x:106%]',
+  '[--globe-size:clamp(540px,144vw,640px)] [--globe-top:calc(var(--header-height)+clamp(24px,8vw,40px))] [--globe-x:88%]',
   'md:[--globe-size:clamp(760px,76vw,980px)] md:[--globe-top:calc(var(--header-height)+32px)] md:[--globe-x:64%]',
   'relative isolate h-[calc(var(--globe-top)+var(--globe-size)*0.76)] overflow-hidden text-brand-foreground md:h-[calc(var(--globe-top)+var(--globe-size)*0.62)]',
   'bg-brand bg-[radial-gradient(ellipse_60%_45%_at_85%_30%,color-mix(in_srgb,var(--decor-glow)_75%,transparent),transparent_70%)]',
@@ -401,7 +400,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
 
       <p
         ref={hintRef}
-        className="pointer-events-none relative z-4 mt-[clamp(40px,11vw,90px)] ml-[calc(var(--page-x)+4px)] w-[5em] origin-top-left -rotate-10 font-hand text-[clamp(17px,2.2vw,24px)]/[1.05] text-primary md:mt-[clamp(40px,10.5vw,90px)] md:ml-[calc(max(0px,(100%-var(--page-max))/2)+var(--page-x)-8px)]"
+        className="pointer-events-none relative z-4 mt-[clamp(32px,9vw,64px)] ml-[calc(var(--page-x)+4px)] w-[9.5em] origin-top-left -rotate-10 font-hand text-[clamp(21px,5.75vw,34px)]/[1.05] text-primary md:ml-[calc(max(0px,(100%-var(--page-max))/2)+var(--page-x)+8px)]"
         aria-hidden
       >
         Вращай глобус — воплощай мечту
