@@ -5,7 +5,7 @@ import { UserRound } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useSession } from '@/hooks/useStore'
-import { signOut } from '@/lib/auth'
+import { signOut } from '@/lib/session'
 
 const linkClass = 'block rounded-md p-3 font-[550] text-foreground no-underline hover:bg-muted hover:text-primary'
 
@@ -50,7 +50,7 @@ export function UserMenu({ buttonClass, open, onOpenChange }: Props) {
           variant="outline"
           className="mt-2 w-full"
           onClick={() => {
-            signOut()
+            void signOut()
             onOpenChange(false)
           }}
         >

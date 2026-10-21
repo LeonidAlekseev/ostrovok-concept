@@ -1,8 +1,8 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { signIn } from '@/lib/auth'
-import { favoritesStore, sessionStore } from '@/lib/storage'
+import { sessionStore } from '@/lib/session'
+import { favoritesStore } from '@/lib/storage'
 import { Header } from './Header'
 
 vi.mock('next/navigation', async (importOriginal) => {
@@ -128,7 +128,7 @@ describe('Header', () => {
   })
 
   it('opens the account menu from the menu once signed in', async () => {
-    signIn('anna@example.com')
+    sessionStore.set({ name: 'anna', email: 'anna@example.com' })
     const user = setup()
     await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
     const nav = screen.getByRole('navigation', { name: 'Основное меню' })
@@ -155,7 +155,7 @@ describe('Header', () => {
 
   it('shows the account icon, not the name, once signed in, and "Выйти" ends the session only', async () => {
     favoritesStore.set(['h1'])
-    signIn('anna@example.com')
+    sessionStore.set({ name: 'anna', email: 'anna@example.com' })
     const user = setup()
     expect(screen.queryByRole('link', { name: 'Войти' })).toBeNull()
     const account = screen.getByRole('button', { name: 'Аккаунт: anna' })

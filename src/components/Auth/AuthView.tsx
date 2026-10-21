@@ -6,16 +6,20 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { resolveNext } from '@/lib/auth'
 import { AuthForm, type AuthMode } from './AuthForm'
 import { AuthSwitch } from './AuthSwitch'
+import { DemoSignIn } from './DemoSignIn'
 
 const title: Record<AuthMode, string> = { login: 'Вход', register: 'Регистрация' }
 const lead: Record<AuthMode, string> = {
   login: 'Войдите, чтобы видеть поездки и избранное.',
-  register: 'Создайте демо-аккаунт, чтобы сохранять поездки и избранное.',
+  register: 'Создайте аккаунт, чтобы сохранять поездки и избранное.',
 }
+
+const LINK_ERROR = 'Ссылка устарела или уже использована: отправьте новую'
 
 function Content({ mode, modal }: { mode: AuthMode; modal: boolean }) {
   const router = useRouter()
-  const next = resolveNext(useSearchParams().get('next'))
+  const params = useSearchParams()
+  const next = resolveNext(params.get('next'))
 
   // The dialog goes back to the page under it unless `next` is given; the full page has no page under it.
   const done = () => (next ? router.replace(next) : modal ? router.back() : router.replace('/'))
@@ -31,7 +35,13 @@ function Content({ mode, modal }: { mode: AuthMode; modal: boolean }) {
         </div>
         <AuthSwitch mode={mode} />
       </div>
-      <AuthForm key={mode} mode={mode} onDone={done} />
+      <AuthForm
+        key={mode}
+        mode={mode}
+        next={next ?? '/'}
+        initialError={params.get('error') === 'link' ? LINK_ERROR : undefined}
+      />
+      <DemoSignIn onDone={done} />
     </>
   )
 }

@@ -3,20 +3,24 @@ import type { IsoDate } from './dates'
 import type { Guests } from './search'
 
 /**
- * Demo user state in localStorage: there is no backend. Each store reads its key lazily and
+ * Favorites and bookings in localStorage (the session is Supabase's: see session.ts). Each store reads its key lazily and
  * caches the parsed value by the raw string, so snapshots stay referentially stable for
  * `useSyncExternalStore`. The server (prerender) and hydration see the empty value; a damaged
  * or foreign value also reads as empty. Other tabs are followed through the `storage` event.
  */
 
-export interface Store<T> {
-  readonly key: string
+/** What `useSyncExternalStore` reads. */
+export interface ExternalStore<T> {
   get(): T
   /** The empty value: used for prerender and hydration, so the markup matches. */
   getServerSnapshot(): T
+  subscribe(listener: () => void): () => void
+}
+
+export interface Store<T> extends ExternalStore<T> {
+  readonly key: string
   set(next: T): void
   update(change: (current: T) => T): void
-  subscribe(listener: () => void): () => void
 }
 
 export function createStore<T>(key: string, empty: T, parse: (value: unknown) => T | null): Store<T> {
@@ -84,18 +88,6 @@ const isObject = (value: unknown): value is Shape => typeof value === 'object' &
 const isString = (value: unknown): value is string => typeof value === 'string'
 const isCount = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 0
 const isAmount = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0
-
-// ---------------------------------------------------------------------------------------------
-// Session
-
-export interface Session {
-  name: string
-  email: string
-}
-
-export const sessionStore = createStore<Session | null>('ostrovok:v1:session', null, (value) =>
-  isObject(value) && isString(value.name) && isString(value.email) ? { name: value.name, email: value.email } : null,
-)
 
 // ---------------------------------------------------------------------------------------------
 // Favorites: hotel ids, most recently added first
