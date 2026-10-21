@@ -71,14 +71,14 @@ export function Header() {
         >
           <a
             className={cn(
-              'rounded-sm text-[clamp(26px,6.6vw,32px)] leading-none font-extrabold tracking-[-0.035em] no-underline',
+              'rounded-sm text-[clamp(26px,6.6vw,32px)] leading-none font-extrabold tracking-[-0.035em] whitespace-nowrap no-underline',
               onPhoto ? 'text-white' : 'text-primary',
             )}
             href="/"
             onClick={close}
-            aria-label="Островок! — на главную"
+            aria-label="О!Погнали — на главную"
           >
-            Островок!
+            О!Погнали
           </a>
 
           <div className="relative flex items-center gap-[clamp(0px,1vw,14px)] max-[360px]:gap-0">
