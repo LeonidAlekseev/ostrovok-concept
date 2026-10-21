@@ -54,9 +54,9 @@ export function Reviews({ rating, reviewCount, reviews, className }: Props) {
           ))}
         </ul>
       </div>
-      <ul className="flex flex-col gap-3">
+      <ul className="flex flex-col gap-4">
         {reviews.slice(0, visible).map((review) => (
-          <li key={review.id} className="rounded-lg border border-border bg-card p-4">
+          <li key={review.id} className="border-t border-border pt-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <span className="font-semibold">{review.author}</span>
               <span className="text-sm text-muted-foreground">{formatLongDate(review.date)}</span>

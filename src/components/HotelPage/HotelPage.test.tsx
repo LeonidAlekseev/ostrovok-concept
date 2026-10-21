@@ -41,8 +41,10 @@ describe('HotelHeader rating', () => {
         <section id="reviews" tabIndex={-1} />
       </>,
     )
-    for (const text of ['9,1', 'Превосходно', '1 323 отзыва']) expect(screen.getByText(text)).toBeDefined()
     const rating = screen.getByRole('button', { name: /^Оценка гостей 9,1, Превосходно, 1\s323 отзыва$/ })
+    for (const text of ['9,1', 'Превосходно', '1 323 отзыва']) expect(within(rating).getByText(text)).toBeDefined()
+    // The line under the name repeats the rating and the review count.
+    expect(screen.getByText(/^9,1$/, { selector: 'b' })).toBeDefined()
     const reviews = document.getElementById('reviews')!
     reviews.scrollIntoView = vi.fn()
 
@@ -147,13 +149,24 @@ describe('PriceBar', () => {
   })
 })
 
-// hotel-page, Requirement: Страница отеля
+// hotel-page, Requirement: Плоская страница отеля
 describe('HotelPage', () => {
-  it('is one column of blocks in the main landmark', () => {
+  it('stands on the page background: the heart beside the name, no white blocks around the sections', () => {
     render(<HotelPage hotel={hotel} />)
     const main = screen.getByRole('main')
     expect(main.children).toHaveLength(1)
-    expect(main.firstElementChild!.className).toContain('max-w-2xl')
-    expect(screen.getByRole('heading', { level: 1, name: hotel.name })).toBeDefined()
+    const title = screen.getByRole('heading', { level: 1, name: hotel.name })
+    expect(within(title.parentElement!).getByRole('button', { name: /избранное/i })).toBeDefined()
+    expect(main.querySelectorAll('section.bg-card, section.rounded-2xl, header.bg-card')).toHaveLength(0)
+    expect(main.querySelector('[class*="max-w-2xl"]')).toBeNull()
+  })
+
+  it('shows the stars, the rating, the free cancellation and the distance under the name', () => {
+    render(<HotelPage hotel={{ ...hotel, rating: 9.5, reviewCount: 598 }} />)
+    const summary = screen.getByRole('heading', { level: 1 }).parentElement!.parentElement!
+    expect(within(summary).getByRole('img', { name: /звезд/ })).toBeDefined()
+    expect(summary.textContent).toContain('9,5 · 598 отзывов')
+    expect(summary.textContent).toContain('от центра')
+    expect(summary.textContent).toContain(hotel.address)
   })
 })

@@ -16,36 +16,40 @@ interface Props {
   stay?: LocalStay
 }
 
-const block = 'rounded-2xl bg-card p-[clamp(16px,4vw,24px)]'
-
 /**
- * One centred column of white blocks on every screen: the photos, the hotel, the dates, the hotel's
- * description, the rooms and the reviews, with the price bar stuck to the bottom.
+ * Text and headings straight on the page's background: the hotel with its photos, the dates, the
+ * hotel's description, the rooms and the reviews, with the price bar stuck to the bottom.
  */
 export function HotelPage({ hotel, titleId, stay }: Props) {
   const column = (
-    <div className={cn('mx-auto flex w-full max-w-2xl flex-col gap-3', !titleId && 'px-(--page-x) pt-3 sm:pt-6')}>
-      <Gallery hotel={hotel} />
-      <HotelHeader hotel={hotel} titleId={titleId} className={block} />
+    <div
+      className={cn(
+        'mx-auto flex w-full flex-1 flex-col gap-8',
+        !titleId && 'max-w-(--page-max) px-(--page-x) pt-[clamp(20px,5vw,40px)]',
+      )}
+    >
       <HotelStay hotel={hotel} local={stay}>
-        <StayDates hotel={hotel} className={block} />
-        <section aria-labelledby="about-title" className={cn('flex flex-col gap-3', block)}>
+        <HotelHeader hotel={hotel} titleId={titleId}>
+          <Gallery hotel={hotel} />
+        </HotelHeader>
+        <StayDates hotel={hotel} />
+        <section aria-labelledby="about-title" className="flex flex-col gap-3">
           <h2 id="about-title" className="text-heading font-bold">
             Об отеле
           </h2>
-          <p>{hotel.description}</p>
-          <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2" aria-label="Удобства">
+          <p className="max-w-3xl">{hotel.description}</p>
+          <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3" aria-label="Удобства">
             {hotel.amenities.map((amenity) => (
               <li key={amenity}>{AMENITY_LABEL[amenity]}</li>
             ))}
           </ul>
         </section>
-        <HotelRooms hotel={hotel} className={cn('flex scroll-mt-3 flex-col gap-4 outline-none', block)} />
+        <HotelRooms hotel={hotel} className="flex scroll-mt-3 flex-col gap-4 outline-none" />
         <Reviews
           rating={hotel.rating}
           reviewCount={hotel.reviewCount}
           reviews={hotel.reviews}
-          className={cn('scroll-mt-3 outline-none', block)}
+          className="scroll-mt-3 outline-none"
         />
         <PriceBar
           hotel={hotel}

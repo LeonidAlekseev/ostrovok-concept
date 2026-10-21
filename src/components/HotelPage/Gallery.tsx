@@ -7,14 +7,12 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import type { Hotel } from '@/lib/catalog'
-import { PhotoBadges } from '../HotelTile/PhotoBadges'
-import { PhotoCarousel } from '../PhotoCarousel/PhotoCarousel'
 
 const GRID_PHOTOS = 5
 
 /**
- * The photos with the badges of the hotel card: its carousel on phones, five photos in a grid from
- * `md` with the badges on the main one. A photo opens the full-screen viewer.
+ * Five photos, bare of badges and buttons: a swipeable row showing the edge of the next photo up to
+ * `md`, a grid from `md`. A photo opens the full-screen viewer.
  */
 export function Gallery({ hotel }: { hotel: Hotel }) {
   const { name: hotelName, photos } = hotel
@@ -31,30 +29,21 @@ export function Gallery({ hotel }: { hotel: Hotel }) {
   }
 
   return (
-    <section aria-label="Фотографии отеля" className="rounded-2xl bg-card p-2">
-      <PhotoCarousel
-        photos={photos}
-        onOpen={setCurrent}
-        className="@container aspect-[4/3] w-full rounded-xl md:hidden"
-      >
-        <PhotoBadges hotel={hotel} />
-      </PhotoCarousel>
-      <div className="hidden h-96 grid-cols-4 grid-rows-2 gap-2 md:grid">
+    <section aria-label="Фотографии отеля">
+      <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto md:grid md:h-96 md:grid-cols-4 md:grid-rows-2 md:overflow-visible">
         {shown.map((photo, index) => (
-          <div
+          <button
             key={photo.id}
-            className={cn('relative overflow-hidden rounded-xl', index === 0 && '@container col-span-2 row-span-2')}
+            type="button"
+            aria-label={`Открыть фото: ${photo.caption}`}
+            className={cn(
+              'h-56 w-[80%] shrink-0 snap-center overflow-hidden rounded-lg md:h-auto md:w-auto',
+              index === 0 && 'md:col-span-2 md:row-span-2',
+            )}
+            onClick={() => setCurrent(index)}
           >
-            <button
-              type="button"
-              aria-label={`Открыть фото: ${photo.caption}`}
-              className="size-full"
-              onClick={() => setCurrent(index)}
-            >
-              <PhotoPlaceholder photo={photo} className="size-full transition-opacity hover:opacity-90" />
-            </button>
-            {index === 0 && <PhotoBadges hotel={hotel} />}
-          </div>
+            <PhotoPlaceholder photo={photo} className="size-full transition-opacity hover:opacity-90" />
+          </button>
         ))}
       </div>
 

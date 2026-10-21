@@ -1,7 +1,6 @@
 'use client'
 
 import { ChevronRight, User } from 'lucide-react'
-import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
 import type { Hotel } from '@/lib/catalog'
 import { formatShortDay, nightsBetween, type IsoDate } from '../../lib/dates'
@@ -26,12 +25,12 @@ function Day({ title, date, time }: { title: string; date: IsoDate; time: string
  * "Даты проживания": check-in and check-out with the hotel's times, "Изменить" opening the calendar
  * and the guests row opening the guests picker. Without dates, "Выберите даты" stands for the days.
  */
-export function StayDates({ hotel, className }: { hotel: Hotel; className?: string }) {
+export function StayDates({ hotel }: { hotel: Hotel }) {
   const { stay, error, guests, setStay } = useHotelStay()
   const nights = stay ? nightsBetween(stay.checkIn, stay.checkOut) : 0
 
   return (
-    <section aria-labelledby="stay-title" className={cn('flex flex-col gap-4', className)}>
+    <section aria-labelledby="stay-title" className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <h2 id="stay-title" className="text-heading font-bold">
           Даты проживания
@@ -63,7 +62,7 @@ export function StayDates({ hotel, className }: { hotel: Hotel; className?: stri
         trigger={
           <button
             type="button"
-            className="flex w-full items-center gap-3 rounded-xl bg-(--decor-surface-soft) px-4 py-3 text-left font-semibold transition-colors hover:bg-secondary"
+            className="flex w-full items-center gap-3 border-y border-border py-3 text-left font-semibold transition-colors hover:bg-secondary"
           >
             <User className="size-6 shrink-0" strokeWidth={1.8} aria-hidden />
             <span className="min-w-0 flex-1">

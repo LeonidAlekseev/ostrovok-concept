@@ -1,8 +1,8 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
-import { getHotel, hasFreeCancellation } from '@/lib/catalog'
-import { countRu, formatDecimal } from '@/lib/format'
+import { getHotel } from '@/lib/catalog'
+import { formatDecimal } from '@/lib/format'
 import { Gallery } from './Gallery'
 
 const hotel = getHotel('prague-old-town-lantern')!
@@ -36,18 +36,15 @@ describe('Gallery', () => {
 })
 
 // hotel-page, Requirement: Галерея (Телефон)
-describe('Gallery badges', () => {
-  it('lays the badges of the hotel card over the carousel and the main photo of the grid', () => {
+describe('Gallery without badges', () => {
+  it('has only photo buttons: no badges, counter, rating or favourite toggle over the photos', () => {
     render(<Gallery hotel={hotel} />)
-    const carousel = screen.getByRole('group', { name: 'Фото отеля' }).parentElement!
-    expect(within(carousel).getByText(`1 / ${hotel.photos.length}`)).toBeDefined()
-    expect(within(carousel).getByText(formatDecimal(hotel.rating))).toBeDefined()
-    expect(
-      within(carousel).getByRole('img', { name: countRu(hotel.stars, ['звезда', 'звезды', 'звёзд']) }),
-    ).toBeDefined()
-    expect(within(carousel).getByRole('button', { name: /избранное/i })).toBeDefined()
-    expect(within(carousel).queryByText('Бесплатная отмена') !== null).toBe(hasFreeCancellation(hotel))
-    // The grid has them once, on its main photo.
-    expect(screen.getAllByText(formatDecimal(hotel.rating))).toHaveLength(2)
+    const gallery = screen.getByRole('region', { name: 'Фотографии отеля' })
+    const buttons = within(gallery).getAllByRole('button')
+    expect(buttons.length).toBeGreaterThan(0)
+    for (const button of buttons) expect(button.getAttribute('aria-label')).toMatch(/^Открыть фото/)
+    expect(gallery.textContent).not.toContain(formatDecimal(hotel.rating))
+    expect(gallery.textContent).not.toContain('Бесплатная отмена')
+    expect(gallery.textContent).not.toMatch(/\d+ \/ \d+/)
   })
 })
