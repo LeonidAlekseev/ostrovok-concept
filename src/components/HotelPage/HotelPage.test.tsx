@@ -44,17 +44,22 @@ describe('HotelRating', () => {
     expect(within(block).getAllByText('9,1')[0].className).toMatch(/\bbg-\(--score\)/)
     for (const text of ['Превосходно', 'Основано на 1 323 отзывах гостей.'])
       expect(within(block).getByText(text)).toBeDefined()
-    expect(within(block).getByText(`На вашем языке доступно ${hotel.reviews.length} отзывов.`)).toBeDefined()
+    // Every review is in Russian: the same count as "Основано на…".
+    expect(within(block).getByText('На вашем языке доступно 1 323 отзыва.')).toBeDefined()
     const sections = within(block).getByRole('list', { name: 'Оценки по разделам' })
     expect(within(sections).getAllByRole('listitem')).toHaveLength(8)
     expect(within(block).getByRole('button', { name: /^Читать отзывы \(1\s323\)$/ })).toBeDefined()
     expect(within(block).queryByRole('list', { name: 'Распределение оценок' })).toBeNull()
   })
 
-  it('words the counts by number: 1 and 21 reviews, 1 own-language review', () => {
-    render(<HotelRating hotel={{ ...hotel, reviewCount: 21, reviews: hotel.reviews.slice(0, 1) }} />)
+  it('words the counts by number: 21 and 1 review, 846 reviews', () => {
+    const { unmount } = render(<HotelRating hotel={{ ...hotel, reviewCount: 21 }} />)
     expect(screen.getByText('Основано на 21 отзыве гостей.')).toBeDefined()
-    expect(screen.getByText('На вашем языке доступен 1 отзыв.')).toBeDefined()
+    expect(screen.getByText('На вашем языке доступен 21 отзыв.')).toBeDefined()
+    unmount()
+    render(<HotelRating hotel={{ ...hotel, reviewCount: 846 }} />)
+    expect(screen.getByText('Основано на 846 отзывах гостей.')).toBeDefined()
+    expect(screen.getByText('На вашем языке доступно 846 отзывов.')).toBeDefined()
   })
 
   it('colours the badge and the bars on one scale: Wi‑Fi at 6,1 yellow-orange, cleanliness at 9,2 green', () => {

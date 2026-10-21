@@ -96,7 +96,7 @@ export function Gallery({ hotel, inDialog = false }: Props) {
                 aria-label={`Фото ${index + 1}: ${photo.caption}`}
                 aria-pressed={index === selected}
                 className={cn(
-                  'block h-14 w-20 overflow-hidden rounded-lg border-3 shadow-(--shadow-card) transition-colors sm:h-20 sm:w-28',
+                  'block h-14 w-20 overflow-hidden rounded-lg border-3 transition-colors sm:h-20 sm:w-28',
                   index === selected ? 'border-primary' : 'border-card',
                 )}
                 onClick={() => select(index)}
