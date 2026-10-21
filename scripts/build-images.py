@@ -73,21 +73,21 @@ def orb_with_alpha(img: Image.Image) -> Image.Image:
 VIBE_DIR = "vibe"
 VIBE_MAX_KB = 60
 VIBE = {
-    "evening-left": (0.5, 0.5, 1.0),
-    "evening-right": (0.5, 0.5, 1.0),
-    "place-left": (0.5, 0.5, 1.0),
-    "place-right": (0.5, 0.5, 1.0),
-    "size-left": (0.5, 0.5, 1.0),
-    "size-right": (0.5, 0.5, 1.0),
+    "evening-left": (0.55, 0.55, 1.15),
+    "evening-right": (0.4, 0.45, 1.15),
+    "place-left": (0.66, 0.42, 1.4),
+    "place-right": (0.55, 0.6, 1.1),
+    "size-left": (0.6, 0.65, 1.2),
+    "size-right": (0.5, 0.45, 1.0),
     "leisure-left": (0.5, 0.5, 1.0),
-    "leisure-right": (0.5, 0.5, 1.0),
-    "food-left": (0.5, 0.5, 1.0),
-    "food-right": (0.5, 0.5, 1.0),
+    "leisure-right": (0.45, 0.45, 1.15),
+    "food-left": (0.4, 0.65, 1.25),
+    "food-right": (0.4, 0.5, 1.0),
     "budget-left": (0.5, 0.5, 1.0),
-    "budget-right": (0.5, 0.5, 1.0),
-    "location-left": (0.5, 0.5, 1.0),
-    "location-right": (0.5, 0.5, 1.0),
-    "balance": (0.5, 0.5, 1.0),
+    "budget-right": (0.55, 0.5, 1.0),
+    "location-left": (0.47, 0.3, 1.8),
+    "location-right": (0.42, 0.45, 1.15),
+    "balance": (0.62, 0.4, 1.4),
 }
 
 
