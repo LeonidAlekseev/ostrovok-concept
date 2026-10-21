@@ -2,6 +2,7 @@ import type { LanguageModel } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getAssistantModel } from '@/lib/ai/model'
+import { nextQuestion } from '@/lib/assistant'
 import { POST } from './route'
 
 vi.mock('@/lib/ai/model', () => ({ getAssistantModel: vi.fn() }))
@@ -33,7 +34,7 @@ const answer = (fields: Record<string, unknown>) => ({
   warnings: [],
 })
 
-function useModel(model: MockLanguageModelV4 | undefined) {
+function setModel(model: MockLanguageModelV4 | undefined) {
   vi.mocked(getAssistantModel).mockResolvedValue(model as LanguageModel | undefined)
 }
 
@@ -61,7 +62,7 @@ afterEach(() => {
 // assistant-search, Requirement: Разбор пожелания
 describe('POST /api/assistant', () => {
   it('reads the wish with the rules without a key (Scenario: Модель недоступна)', async () => {
-    useModel(undefined)
+    setModel(undefined)
     const response = await ask('Хочу на море в октябре, бюджет до 70 000 ₽')
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ brief: { vibe: 'sea', when: 9, budget: 70000 }, source: 'rules' })
@@ -69,7 +70,7 @@ describe('POST /api/assistant', () => {
 
   it('reads a free phrase with the model (Scenario: Свободная фраза)', async () => {
     const model = new MockLanguageModelV4({ doGenerate: answer({ vibe: 'sea', budget: 50000 }) })
-    useModel(model)
+    setModel(model)
     const response = await ask('хочу туда, где тепло и можно поплавать с маской, недорого')
     expect(await response.json()).toEqual({
       brief: { vibe: 'sea', budget: 50000 },
@@ -89,7 +90,7 @@ describe('POST /api/assistant', () => {
   })
 
   it('normalizes the model answer: catalog cities only, whole budget, 1–30 nights, months 1–12', async () => {
-    useModel(
+    setModel(
       new MockLanguageModelV4({
         doGenerate: answer({
           destinationId: 'atlantis',
@@ -102,43 +103,71 @@ describe('POST /api/assistant', () => {
         }),
       }),
     )
-    const { brief } = await (await ask('что-то')).json()
+    const { brief } = await (await ask('вдвоём в октябре на 45 ночей')).json()
     expect(brief).toEqual({ when: 9, nights: 30, party: 'couple', budget: 70000 })
   })
 
   it('keeps a known catalog city', async () => {
-    useModel(new MockLanguageModelV4({ doGenerate: answer({ destinationId: 'prague', when: 'soon' }) }))
-    expect((await (await ask('в Прагу поскорее')).json()).brief).toEqual({ destinationId: 'prague', when: 'soon' })
+    setModel(new MockLanguageModelV4({ doGenerate: answer({ destinationId: 'prague', when: 'soon' }) }))
+    expect((await (await ask('в Прагу, и скорее бы — завтра')).json()).brief).toEqual({
+      destinationId: 'prague',
+      when: 'soon',
+    })
+  })
+
+  // What the live nemotron answered without reasoning: the theme is right, the rest is made up.
+  const madeUp = { destinationId: 'zakynthos', nights: 7, party: 'solo', when: 'soon', mood: 'active' }
+  const answeredBy = (fields: Record<string, unknown>) =>
+    setModel(new MockLanguageModelV4({ doGenerate: answer({ ...madeUp, ...fields }) }))
+
+  it('keeps only what the full request says and asks who goes (Scenario: Полный запрос)', async () => {
+    answeredBy({ vibe: 'sea', when: '10', budget: 70000 })
+    const { brief } = await (await ask('Хочу на море в октябре, бюджет до 70 000 ₽')).json()
+    expect(brief).toEqual({ vibe: 'sea', when: 9, budget: 70000 })
+    expect(nextQuestion(brief, '2026-10-21')?.id).toBe('party')
+  })
+
+  it('keeps the theme of a free phrase and asks when (Scenario: Свободная фраза)', async () => {
+    answeredBy({ vibe: 'sea', reply: '탐험 Анталья — отличный выбор!' })
+    const response = await (await ask('хочу туда, где тепло и можно поплавать с маской, недорого')).json()
+    expect(response).toEqual({ brief: { vibe: 'sea' }, source: 'model' })
+    expect(nextQuestion(response.brief, '2026-10-21')?.id).toBe('when')
+  })
+
+  it('keeps the made-up fields once the message backs them', async () => {
+    answeredBy({ vibe: 'sea', when: 'soon' })
+    const { brief } = await (await ask('на море одна, на 7 ночей, в ближайшее время, хочу активно')).json()
+    expect(brief).toEqual({ vibe: 'sea', when: 'soon', nights: 7, party: 'solo', mood: 'active' })
   })
 
   it("drops a city the message does not name and the model's own «any»", async () => {
-    useModel(new MockLanguageModelV4({ doGenerate: answer({ vibe: 'sea', destinationId: 'zakynthos', party: 'any' }) }))
+    setModel(new MockLanguageModelV4({ doGenerate: answer({ vibe: 'sea', destinationId: 'zakynthos', party: 'any' }) }))
     const { brief } = await (await ask('хочу туда, где тепло и можно поплавать с маской')).json()
     expect(brief).toEqual({ vibe: 'sea' })
   })
 
   it('turns reasoning off for the 8 seconds', async () => {
     const model = new MockLanguageModelV4({ doGenerate: answer({}) })
-    useModel(model)
+    setModel(model)
     await ask('море')
     expect(model.doGenerateCalls[0].providerOptions).toEqual({ openrouter: { reasoning: { effort: 'none' } } })
   })
 
   it('adds the answer to what is understood (Scenario: Уточнение темы)', async () => {
-    useModel(new MockLanguageModelV4({ doGenerate: answer({ vibe: 'weekend', when: 'soon', nights: 2 }) }))
+    setModel(new MockLanguageModelV4({ doGenerate: answer({ vibe: 'weekend', when: 'soon', nights: 2 }) }))
     const { brief } = await (await ask('на выходные', { vibe: 'sea', budget: 70000 })).json()
     expect(brief).toEqual({ vibe: 'sea', when: 'soon', nights: 2, budget: 70000 })
   })
 
   it('hands the asked question to the assistant (Scenario: Довериться ассистенту)', async () => {
-    useModel(new MockLanguageModelV4({ doGenerate: answer({}) }))
+    setModel(new MockLanguageModelV4({ doGenerate: answer({}) }))
     // The brief lacks the dates, so "не важно" answers "Когда планируете поехать?".
     const { brief } = await (await ask('не важно', { vibe: 'sea' })).json()
     expect(brief).toEqual({ vibe: 'sea', when: 'any' })
   })
 
   it('falls back to the rules when the model fails', async () => {
-    useModel(
+    setModel(
       new MockLanguageModelV4({
         doGenerate: async () => {
           throw new Error('429 Rate limit exceeded')
@@ -151,7 +180,7 @@ describe('POST /api/assistant', () => {
   })
 
   it('falls back to the rules when the answer is not JSON', async () => {
-    useModel(
+    setModel(
       new MockLanguageModelV4({
         doGenerate: { ...answer({}), content: [{ type: 'text', text: 'Конечно! Море — отличный выбор.' }] },
       }),
@@ -169,7 +198,7 @@ describe('POST /api/assistant', () => {
           clock.abort(new DOMException('The operation timed out.', 'TimeoutError'))
         }),
     })
-    useModel(model)
+    setModel(model)
     const response = await ask('в горы')
     expect(timeout).toHaveBeenCalledWith(8000)
     expect(model.doGenerateCalls).toHaveLength(1)
@@ -177,13 +206,13 @@ describe('POST /api/assistant', () => {
   })
 
   it('cleans the brief sent by the client', async () => {
-    useModel(undefined)
+    setModel(undefined)
     const { brief } = await (await ask('вдвоём', { vibe: 'sea', when: 9, budget: -5, destinationId: 'x' })).json()
     expect(brief).toEqual({ vibe: 'sea', when: 9, party: 'couple' })
   })
 
   it('rejects long messages, long histories and broken bodies', async () => {
-    useModel(undefined)
+    setModel(undefined)
     expect((await ask('а'.repeat(501))).status).toBe(400)
     expect((await ask('а'.repeat(500))).status).toBe(200)
     const history = Array.from({ length: 21 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', text: 'море' }))
@@ -195,7 +224,7 @@ describe('POST /api/assistant', () => {
   })
 
   it('limits each address to 20 requests a minute', async () => {
-    useModel(undefined)
+    setModel(undefined)
     const body = { messages: [{ role: 'user', text: 'море' }], brief: {} }
     for (let i = 0; i < 20; i++) expect((await post(body, '192.0.2.1')).status).toBe(200)
     expect((await post(body, '192.0.2.1')).status).toBe(429)
