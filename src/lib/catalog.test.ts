@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { destinations } from '../data/destinations'
 import { newHotelSeeds } from '../data/hotels'
 import {
+  AMENITIES,
+  AMENITY_SECTIONS,
   buildCatalog,
   cheapestRate,
   fullHotelsIn,
@@ -11,7 +13,10 @@ import {
   hotelsIn,
   MIN_HOTELS_PER_DESTINATION,
   newHotels,
+  POPULAR_AMENITIES,
+  SCORE_SECTIONS,
   slugify,
+  travelTimes,
 } from './catalog'
 
 const catalog = buildCatalog()
@@ -175,5 +180,90 @@ describe('slugify', () => {
     expect(slugify('Malasaña Patio')).toBe('malasana-patio')
     expect(slugify('Золотой Рог')).toBe('zolotoy-rog')
     expect(slugify('Kok-Tobe View')).toBe('kok-tobe-view')
+  })
+})
+
+// hotel-catalog, Requirement: Удобства по разделам
+describe('amenities', () => {
+  it('belong each to a known section, and every section has some', () => {
+    const sections = new Set(Object.values(AMENITIES).map((a) => a.section))
+    expect([...sections]).toEqual(Object.keys(AMENITY_SECTIONS))
+    expect(POPULAR_AMENITIES.every((key) => key in AMENITIES)).toBe(true)
+  })
+
+  it('mark the paid ones', () => {
+    const paid = Object.values(AMENITIES).filter((a) => 'paid' in a)
+    expect(paid.map((a) => a.label)).toContain('Трансфер из аэропорта')
+    expect(paid.map((a) => a.label)).toContain('Спа-центр')
+    expect(AMENITIES.wifi).not.toHaveProperty('paid')
+  })
+
+  it('give every hotel Wi‑Fi and the front desk, without repeats, in the order of the catalogue', () => {
+    const order = Object.keys(AMENITIES)
+    for (const hotel of catalog) {
+      expect(hotel.amenities, hotel.id).toEqual(expect.arrayContaining(['wifi', 'front-desk']))
+      expect(new Set(hotel.amenities).size, hotel.id).toBe(hotel.amenities.length)
+      const indexes = hotel.amenities.map((key) => order.indexOf(key))
+      expect(indexes, hotel.id).toEqual([...indexes].sort((a, b) => a - b))
+    }
+  })
+
+  it('are the same every time the catalogue is built', () => {
+    expect(buildCatalog().map((h) => h.amenities)).toEqual(catalog.map((h) => h.amenities))
+  })
+
+  it('grow with the stars', () => {
+    const average = (stars: number) => {
+      const some = catalog.filter((h) => h.stars === stars)
+      return some.reduce((sum, h) => sum + h.amenities.length, 0) / some.length
+    }
+    expect(average(5)).toBeGreaterThan(average(3))
+  })
+})
+
+// hotel-catalog, Requirement: Оценки по разделам
+describe('section scores', () => {
+  it('rate each of the 8 sections 1–10 to a tenth, around the rating', () => {
+    for (const hotel of catalog) {
+      expect(
+        hotel.sectionScores.map((s) => s.label),
+        hotel.id,
+      ).toEqual([...SCORE_SECTIONS])
+      for (const { score } of hotel.sectionScores) {
+        expect(score).toBeGreaterThanOrEqual(1)
+        expect(score).toBeLessThanOrEqual(10)
+        expect(Math.round(score * 10) / 10).toBe(score)
+        expect(Math.abs(score - hotel.rating)).toBeLessThanOrEqual(1.5 + 1e-9)
+      }
+    }
+  })
+
+  it('put some sections of some hotels below 7, so the colour scale shows', () => {
+    expect(catalog.some((h) => h.sectionScores.some((s) => s.score < 7))).toBe(true)
+  })
+
+  it('are the same every time the catalogue is built', () => {
+    expect(buildCatalog().map((h) => h.sectionScores)).toEqual(catalog.map((h) => h.sectionScores))
+  })
+})
+
+// hotel-page, Requirement: Расположение отеля
+describe('travelTimes', () => {
+  it('drives 3 minutes a kilometre to the centre and walks 80 m a minute to the metro', () => {
+    expect(travelTimes({ distanceKm: 1.7, metro: { station: 'Můstek', meters: 1200 } })).toEqual({
+      centre: 6,
+      transport: 5,
+      metro: 15,
+    })
+    expect(travelTimes({ distanceKm: 2, metro: { station: 'x', meters: 810 } })).toMatchObject({ centre: 6, metro: 11 })
+  })
+
+  it('takes at least a minute to the centre', () => {
+    expect(travelTimes({ distanceKm: 0.1, metro: null }).centre).toBe(1)
+    expect(travelTimes({ distanceKm: 0, metro: null }).centre).toBe(1)
+  })
+
+  it('has no metro time in a city without a metro', () => {
+    expect(travelTimes({ distanceKm: 3, metro: null })).toEqual({ centre: 9, transport: 5, metro: null })
   })
 })

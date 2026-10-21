@@ -30,6 +30,7 @@
   /* Background of the page and the hero; the transparent header shows it too. */
   --brand-lime: #a5e87b;
   --brand-danger: #d92d20;
+  --brand-yellow: #f5b400;
 
   /* Semantic roles (shadcn names plus a few of our own). */
   --background: var(--brand-page-bg);
@@ -58,6 +59,10 @@
   --chrome: var(--brand);
   --chrome-muted: var(--brand-green-gray);
   --destructive: var(--brand-danger);
+  /* The score scale of the hotel page, mixed in between by scoreColor (src/lib/reviews.ts). */
+  --score-low: var(--destructive);
+  --score-mid: var(--brand-yellow);
+  --score-high: var(--success-foreground);
   --border: var(--brand-line);
   --input: var(--brand-line);
   --ring: var(--brand-blue);

@@ -212,6 +212,33 @@ describe('Header on scroll', () => {
     await stateAfter('hidden')
   })
 
+  // site-header, Requirement: Оформление шапки
+  it('on the hotel page is transparent with a white logo and icons at the top, green once fixed', async () => {
+    window.history.pushState({}, '', '/hotels/prague-old-town-lantern')
+    setup()
+    const header = screen.getByRole('banner')
+    const logo = screen.getByRole('link', { name: 'Островок! — на главную' })
+    expect(header.className).not.toMatch(/\bbg-chrome\b/)
+    expect(logo.className).toMatch(/\btext-white\b/)
+    expect(screen.getByRole('link', { name: 'Избранное' }).className).toMatch(/(^|\s)text-white(\s|$)/)
+
+    scrollTo(2000)
+    await stateAfter('hidden')
+    scrollTo(1900)
+    await stateAfter('shown')
+    expect(header.className).toMatch(/\bbg-chrome\b/)
+    expect(header.className).toMatch(/rounded-b-/)
+    expect(logo.className).toMatch(/\btext-primary\b/)
+    window.history.pushState({}, '', '/')
+  })
+
+  it('keeps the green header on the rates page of a hotel', () => {
+    window.history.pushState({}, '', '/hotels/prague-old-town-lantern/rooms')
+    setup()
+    expect(screen.getByRole('banner').className).toMatch(/\bbg-chrome\b/)
+    window.history.pushState({}, '', '/')
+  })
+
   it('does not show on a scroll up closer than half a screen', async () => {
     setup()
     scrollTo(300)

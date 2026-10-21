@@ -25,22 +25,135 @@ export const MEAL_LABEL: Record<Meal, string> = {
 
 export const PAYMENT_LABEL: Record<Payment, string> = { now: 'Оплата сейчас', 'at-hotel': 'Оплата в отеле' }
 
-export const AMENITY_LABEL = {
-  wifi: 'Бесплатный Wi‑Fi',
-  'front-desk': 'Круглосуточная стойка регистрации',
-  'air-conditioning': 'Кондиционер',
-  restaurant: 'Ресторан',
-  bar: 'Бар',
+/** Sections of the amenities, in the order the hotel page lists them. */
+export const AMENITY_SECTIONS = {
+  internet: 'Интернет',
+  general: 'Общее',
+  rooms: 'В номерах',
+  accessibility: 'Доступность',
+  services: 'Услуги',
+  food: 'Питание',
+  transfer: 'Трансфер',
   parking: 'Парковка',
-  pool: 'Бассейн',
-  spa: 'Спа',
-  gym: 'Фитнес-центр',
-  shuttle: 'Трансфер из аэропорта',
-  pets: 'Можно с питомцами',
-  family: 'Семейные номера',
+  pool: 'Бассейн и пляж',
+  business: 'Бизнес',
+  sport: 'Спорт',
+  wellness: 'Красота и здоровье',
+  entertainment: 'Развлечения',
+  kids: 'Дети',
+  pets: 'Животные',
+  languages: 'Персонал говорит',
 } as const
 
-export type Amenity = keyof typeof AMENITY_LABEL
+export type AmenitySection = keyof typeof AMENITY_SECTIONS
+
+interface AmenityInfo {
+  section: AmenitySection
+  label: string
+  /** «Оплачивается отдельно». */
+  paid?: true
+}
+
+/** Every amenity of the catalogue by its key, in the order of its section. */
+export const AMENITIES = {
+  wifi: { section: 'internet', label: 'Бесплатный Wi‑Fi' },
+  internet: { section: 'internet', label: 'Бесплатный доступ в интернет' },
+  atm: { section: 'general', label: 'Банкомат' },
+  computer: { section: 'general', label: 'Компьютер' },
+  'air-conditioning': { section: 'general', label: 'Кондиционер' },
+  'front-desk': { section: 'general', label: 'Круглосуточная стойка регистрации' },
+  elevator: { section: 'general', label: 'Лифт' },
+  'smoking-area': { section: 'general', label: 'Места для курения' },
+  'currency-exchange': { section: 'general', label: 'Обмен валюты' },
+  'non-smoking-hotel': { section: 'general', label: 'Отель для некурящих' },
+  heating: { section: 'general', label: 'Отопление' },
+  security: { section: 'general', label: 'Охрана' },
+  'express-check-in': { section: 'general', label: 'Ускоренная регистрация заезда' },
+  'early-check-in': { section: 'general', label: 'Ранняя регистрация заезда' },
+  'late-check-out': { section: 'general', label: 'Поздняя регистрация выезда' },
+  'private-check-in': { section: 'general', label: 'Индивидуальная регистрация заезда и отъезда' },
+  'fire-extinguisher': { section: 'general', label: 'Огнетушитель' },
+  'allergy-free-rooms': { section: 'rooms', label: 'Номера для аллергиков' },
+  'non-smoking-rooms': { section: 'rooms', label: 'Номера для некурящих' },
+  soundproofing: { section: 'rooms', label: 'Номера со звукоизоляцией' },
+  'room-service': { section: 'rooms', label: 'Обслуживание номеров' },
+  fridge: { section: 'rooms', label: 'Холодильник' },
+  'family-rooms': { section: 'rooms', label: 'Семейные номера' },
+  'cable-tv': { section: 'rooms', label: 'Кабельное телевидение' },
+  tv: { section: 'rooms', label: 'Телевизор' },
+  safe: { section: 'rooms', label: 'Сейф (в номере)' },
+  accessible: { section: 'accessibility', label: 'Удобства для гостей с ограниченными физическими возможностями' },
+  'accessible-restaurant': { section: 'accessibility', label: 'Ресторан для гостей на инвалидных креслах' },
+  'accessible-bar': { section: 'accessibility', label: 'Бар для гостей на инвалидных креслах' },
+  'ironing-kit': { section: 'services', label: 'Гладильные принадлежности' },
+  ironing: { section: 'services', label: 'Гладильные услуги', paid: true },
+  laundry: { section: 'services', label: 'Прачечная', paid: true },
+  concierge: { section: 'services', label: 'Услуги консьержа' },
+  'dry-cleaning': { section: 'services', label: 'Химчистка', paid: true },
+  'luggage-storage': { section: 'services', label: 'Хранение багажа' },
+  phone: { section: 'services', label: 'Телефон' },
+  iron: { section: 'services', label: 'Утюг' },
+  bar: { section: 'food', label: 'Бар' },
+  'tea-coffee': { section: 'food', label: 'Бесплатный чай/кофе' },
+  'diet-menu': { section: 'food', label: 'Диетическое меню (по запросу)' },
+  breakfast: { section: 'food', label: 'Завтрак' },
+  'breakfast-in-room': { section: 'food', label: 'Завтрак в номер' },
+  restaurant: { section: 'food', label: 'Ресторан' },
+  'packed-lunch': { section: 'food', label: 'Упакованные ланчи' },
+  shuttle: { section: 'transfer', label: 'Трансфер из аэропорта', paid: true },
+  parking: { section: 'parking', label: 'Парковка' },
+  'parking-nearby': { section: 'parking', label: 'Парковка рядом с отелем', paid: true },
+  pool: { section: 'pool', label: 'Крытый бассейн' },
+  'business-centre': { section: 'business', label: 'Бизнес-центр' },
+  copier: { section: 'business', label: 'Ксерокс' },
+  events: { section: 'business', label: 'Организация встреч и банкетов' },
+  'conference-room': { section: 'business', label: 'Конференц-зал' },
+  gym: { section: 'sport', label: 'Фитнес-центр' },
+  massage: { section: 'wellness', label: 'Массаж', paid: true },
+  sauna: { section: 'wellness', label: 'Сауна' },
+  spa: { section: 'wellness', label: 'Спа-центр', paid: true },
+  hammam: { section: 'wellness', label: 'Хаммам' },
+  'first-aid': { section: 'wellness', label: 'Аптечка первой помощи' },
+  celebrations: { section: 'entertainment', label: 'Подходит для праздничных мероприятий' },
+  family: { section: 'kids', label: 'Подходит для семей с детьми' },
+  pets: { section: 'pets', label: 'Можно с питомцами', paid: true },
+  'staff-ru': { section: 'languages', label: 'на русском' },
+  'staff-en': { section: 'languages', label: 'на английском' },
+} as const satisfies Record<string, AmenityInfo>
+
+export type Amenity = keyof typeof AMENITIES
+
+/** The amenities the hotel page shows first, in this order. */
+export const POPULAR_AMENITIES: readonly Amenity[] = [
+  'wifi',
+  'front-desk',
+  'restaurant',
+  'shuttle',
+  'parking',
+  'pets',
+  'pool',
+  'family',
+  'spa',
+  'gym',
+]
+
+/** The eight parts of the stay guests rate separately. */
+export const SCORE_SECTIONS = [
+  'Чистота',
+  'Расположение',
+  'Цена/Качество',
+  'Обслуживание',
+  'Средства гигиены',
+  'Питание',
+  'Номер',
+  'Качество Wi‑Fi',
+] as const
+
+export interface SectionScore {
+  label: (typeof SCORE_SECTIONS)[number]
+  /** 1…10, one decimal. */
+  score: number
+}
 
 /** A photo placeholder: no image files, only a caption and one of the gradient tones. */
 export interface Photo {
@@ -114,7 +227,10 @@ export interface Hotel extends HotelSummary {
   distanceKm: number
   /** The nearest metro station in a city with a metro, `null` elsewhere. */
   metro: NearestStation | null
+  /** In the order of `AMENITIES`. */
   amenities: Amenity[]
+  /** The guests' rating of each of `SCORE_SECTIONS`, in that order. */
+  sectionScores: SectionScore[]
   description: string
   checkInTime: string
   checkOutTime: string
@@ -300,6 +416,7 @@ const DESCRIPTION_SERVICE = [
   'Утром в ресторане сервируют завтрак, вечером работает бар.',
   'Отель подходит и для деловых поездок, и для отдыха с семьёй.',
 ]
+/** The first amenities of the catalogue: their draw comes first, so their choice stays as it was. */
 const OPTIONAL_AMENITIES: Amenity[] = [
   'air-conditioning',
   'restaurant',
@@ -312,6 +429,32 @@ const OPTIONAL_AMENITIES: Amenity[] = [
   'pets',
   'family',
 ]
+/** Every hotel has these. */
+const BASE_AMENITIES: Amenity[] = ['wifi', 'front-desk']
+/** The rest of the catalogue, drawn with a seed of their own. */
+const EXTRA_AMENITIES = (Object.keys(AMENITIES) as Amenity[]).filter(
+  (key) => !BASE_AMENITIES.includes(key) && !OPTIONAL_AMENITIES.includes(key),
+)
+const amenityOrder = new Map((Object.keys(AMENITIES) as Amenity[]).map((key, index) => [key, index]))
+
+/**
+ * The extra amenities: more of them in a hotel with more stars. They have their own seed, so the
+ * rest of the hotel stays as it was.
+ */
+function extraAmenities(summary: HotelSummary): Amenity[] {
+  const rng = seeded(`amenities:${summary.id}`)
+  return rng.sample(EXTRA_AMENITIES, rng.int(6, 10) + summary.stars * 4)
+}
+
+/** The section scores scatter around the rating by up to 1.5, within 1…10; their own seed. */
+function sectionScores(summary: HotelSummary): SectionScore[] {
+  const rng = seeded(`scores:${summary.id}`)
+  return SCORE_SECTIONS.map((label) => ({
+    label,
+    score: Math.max(1, Math.min(10, round1(summary.rating + (rng.next() * 2 - 1) * 1.5))),
+  }))
+}
+
 const HOTEL_PHOTOS = ['Фасад', 'Лобби', 'Ресторан', 'Терраса', 'Вид из окна']
 
 const ROOM_TYPES = [
@@ -416,10 +559,10 @@ function buildHotel(summary: HotelSummary): Hotel {
   const district = rng.pick(DISTRICTS)
 
   const amenities: Amenity[] = [
-    'wifi',
-    'front-desk',
+    ...BASE_AMENITIES,
     ...rng.sample(OPTIONAL_AMENITIES, rng.int(2, 3) + Math.max(0, summary.stars - 2)),
-  ]
+    ...extraAmenities(summary),
+  ].sort((a, b) => amenityOrder.get(a)! - amenityOrder.get(b)!)
 
   const roomTypes = [ROOM_TYPES[0], ...rng.sample(ROOM_TYPES.slice(1), rng.int(2, ROOM_TYPES.length - 1))]
   const rooms = roomTypes.map((type, index): Room => {
@@ -463,6 +606,7 @@ function buildHotel(summary: HotelSummary): Hotel {
     distanceKm,
     metro: nearestStation(summary.id, destination.metro),
     amenities,
+    sectionScores: sectionScores(summary),
     description: [
       `${summary.name} — ${summary.stars}-звёздочный отель в районе «${district}», в ${distance} от центра.`,
       rng.pick(DESCRIPTION_ROOMS),
@@ -503,6 +647,23 @@ export function cheapestRate(hotel: Hotel): { room: Room; rate: Rate } {
     for (const rate of room.rates) if (rate.pricePerNight < best.rate.pricePerNight) best = { room, rate }
   return best
 }
+
+/** Travel times from the hotel, minutes. */
+export interface TravelTimes {
+  /** By car to the city centre: 3 minutes a kilometre, at least 1. */
+  centre: number
+  /** On foot to the stop of the city transport. */
+  transport: number
+  /** On foot to the metro (80 m a minute), `null` in a city without a metro. */
+  metro: number | null
+}
+
+export const travelTimes = (hotel: Pick<Hotel, 'distanceKm' | 'metro'>): TravelTimes => ({
+  // Rounded to tenths first: 1.7 × 3 is 5.1000000000000005 in floating point.
+  centre: Math.max(1, Math.ceil(Math.round(hotel.distanceKm * 30) / 10)),
+  transport: 5,
+  metro: hotel.metro && Math.ceil(hotel.metro.meters / 80),
+})
 
 /** A hotel offers free cancellation when at least one of its rates does. */
 export const hasFreeCancellation = (hotel: Hotel): boolean =>

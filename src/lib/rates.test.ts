@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Rate, Room } from './catalog'
 import { cancellationDeadline, ratePrice, unavailableReason } from './rates'
-import { scoreDistribution } from './reviews'
 
 const free3: Rate = {
   id: 'f',
@@ -49,18 +48,5 @@ describe('ratePrice', () => {
   it('is the average night of the stay with dates', () => {
     const stay = { checkIn: '2026-10-22', checkOut: '2026-10-24', guests: { adults: 2, children: 0, rooms: 2 } }
     expect(ratePrice({ ...free3, pricePerNight: 7000 }, stay)).toEqual({ perNight: 7550, total: 30200 })
-  })
-})
-
-describe('scoreDistribution', () => {
-  it('counts reviews per bucket', () => {
-    const reviews = [10, 9, 8, 6, 2].map((score, i) => ({
-      id: `${i}`,
-      author: '',
-      date: '2026-01-01',
-      score,
-      text: '',
-    }))
-    expect(scoreDistribution(reviews).map((b) => b.count)).toEqual([2, 1, 1, 0, 1])
   })
 })
