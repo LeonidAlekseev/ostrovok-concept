@@ -20,7 +20,7 @@ const searchStay = ({ checkIn, checkOut, guests }: Stay): Stay => ({ checkIn, ch
 
 /**
  * A hotel opened from the results map: the hotel page with the dates and guests of the search, its
- * price bar stuck to the bottom of the scrolling area.
+ * photo across the top of the dialog and its price bar stuck to the bottom of the scrolling area.
  */
 export function HotelDialog({ hotel, stay, onClose }: Props) {
   const titleId = useId()
@@ -45,7 +45,7 @@ export function HotelDialog({ hotel, stay, onClose }: Props) {
       >
         {shown && (
           <>
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-(--decor-surface-soft) px-3 pt-3 text-base">
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-(--decor-surface-soft) text-base">
               <HotelPage hotel={shown} titleId={titleId} stay={{ value: local, onChange: setLocal }} />
             </div>
             <div className="flex flex-wrap justify-end gap-2 border-t p-4">

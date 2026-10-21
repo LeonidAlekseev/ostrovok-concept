@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type KeyboardEvent } from 'react'
+import { useRef, useState, type KeyboardEvent } from 'react'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
@@ -8,17 +8,44 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } fr
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import type { Hotel } from '@/lib/catalog'
 
-const GRID_PHOTOS = 5
+interface Props {
+  hotel: Hotel
+  /** Inside the hotel dialog: the photo as wide as the dialog, no header over it. */
+  inDialog?: boolean
+}
 
 /**
- * Five photos, bare of badges and buttons: a swipeable row showing the edge of the next photo up to
- * `md`, a grid from `md`. A photo opens the full-screen viewer.
+ * One large photo across the screen (or the dialog) with a row of thumbnails over its lower edge.
+ * A thumbnail picks the photo, a swipe leafs through them (a native scroll-snapping row), and the
+ * large photo opens the full-screen viewer.
  */
-export function Gallery({ hotel }: { hotel: Hotel }) {
+export function Gallery({ hotel, inDialog = false }: Props) {
   const { name: hotelName, photos } = hotel
-  // `null`: the viewer is closed. Focus goes back to the photo that opened it (Base UI restores the previous focus).
+  const [selected, setSelected] = useState(0)
+  // `null`: the viewer is closed. Focus goes back to the large photo (Base UI restores the previous focus).
   const [current, setCurrent] = useState<number | null>(null)
-  const shown = photos.slice(0, GRID_PHOTOS)
+  const track = useRef<HTMLDivElement>(null)
+  // The photo a thumbnail scrolls to: the photos passed on the way do not select their thumbnails.
+  const target = useRef<number | null>(null)
+
+  const select = (index: number) => {
+    setSelected(index)
+    const row = track.current
+    if (!row) return
+    target.current = index
+    row.scrollTo?.({ left: index * row.clientWidth, behavior: 'smooth' })
+  }
+
+  const onScroll = () => {
+    const row = track.current
+    if (!row || !row.clientWidth) return
+    const index = Math.round(row.scrollLeft / row.clientWidth)
+    if (target.current !== null) {
+      if (index === target.current) target.current = null
+      return
+    }
+    if (index !== selected && photos[index]) setSelected(index)
+  }
 
   const move = (delta: number) => setCurrent((i) => (i === null ? i : (i + delta + photos.length) % photos.length))
   const onKeyDown = (event: KeyboardEvent) => {
@@ -29,22 +56,56 @@ export function Gallery({ hotel }: { hotel: Hotel }) {
   }
 
   return (
-    <section aria-label="Фотографии отеля">
-      <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto md:grid md:h-96 md:grid-cols-4 md:grid-rows-2 md:overflow-visible">
-        {shown.map((photo, index) => (
+    <section aria-label="Фотографии отеля" className="relative">
+      <div
+        ref={track}
+        onScroll={onScroll}
+        className={cn(
+          'flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+          inDialog ? 'h-[clamp(200px,45vw,320px)]' : 'h-[clamp(260px,min(60vh,75vw),640px)]',
+        )}
+      >
+        {photos.map((photo, index) => (
           <button
             key={photo.id}
             type="button"
+            // Only the photo on screen takes focus and clicks; the row still scrolls under a finger.
+            inert={index !== selected}
+            aria-hidden={index !== selected || undefined}
             aria-label={`Открыть фото: ${photo.caption}`}
-            className={cn(
-              'h-56 w-[80%] shrink-0 snap-center overflow-hidden rounded-lg md:h-auto md:w-auto',
-              index === 0 && 'md:col-span-2 md:row-span-2',
-            )}
+            className="h-full w-full shrink-0 snap-center snap-always"
             onClick={() => setCurrent(index)}
           >
-            <PhotoPlaceholder photo={photo} className="size-full transition-opacity hover:opacity-90" />
+            <PhotoPlaceholder photo={photo} className="size-full text-base" />
           </button>
         ))}
+      </div>
+      {/* Shade under the transparent header: its white logo and icons stay readable on a light photo. */}
+      {!inDialog && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-[calc(var(--header-height)+48px)] bg-linear-to-b from-black/50 to-transparent"
+        />
+      )}
+      <div className={cn('relative mx-auto -mt-9 sm:-mt-12', inDialog ? 'px-4' : 'max-w-(--page-max) px-(--page-x)')}>
+        <ul className="flex gap-2 overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {photos.map((photo, index) => (
+            <li key={photo.id} className="shrink-0">
+              <button
+                type="button"
+                aria-label={`Фото ${index + 1}: ${photo.caption}`}
+                aria-pressed={index === selected}
+                className={cn(
+                  'block h-14 w-20 overflow-hidden rounded-lg border-3 transition-colors sm:h-20 sm:w-28',
+                  index === selected ? 'border-primary' : 'border-card',
+                )}
+                onClick={() => select(index)}
+              >
+                <PhotoPlaceholder photo={photo} className="size-full gap-1 text-xs sm:gap-2 sm:text-sm" />
+              </button>
+            </li>
+          ))}
+        </ul>
       </div>
 
       <Dialog open={current !== null} onOpenChange={(open) => !open && setCurrent(null)}>

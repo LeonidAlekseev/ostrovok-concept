@@ -17,6 +17,12 @@ type Panel = 'notifications' | 'account' | 'menu'
 // Below 360 px the four icons take 40 px each: the touch area shrinks a little, the glyph stays 24 px or more.
 const iconButton =
   'text-primary hover:bg-card/35 hover:text-primary-hover aria-expanded:bg-card/35 aria-expanded:text-primary-hover max-[360px]:size-10'
+// White over the photo of the hotel page, under a glaze of the same white.
+const iconButtonOnPhoto =
+  'text-white hover:bg-white/20 hover:text-white aria-expanded:bg-white/20 aria-expanded:text-white max-[360px]:size-10'
+
+/** The hotel page, not its rates: its photo starts under the header. */
+const HOTEL_PAGE = /^\/hotels\/[^/]+$/
 
 // Placement comes from the popover (portaled, aligned to its trigger); only the size and the entrance are here.
 const panelClass =
@@ -58,8 +64,11 @@ export function Header() {
   const [focusWithin, setFocusWithin] = useState(false)
   const { floating, shown, animated } = useStickyHeader(wrapperRef, open !== null || focusWithin)
   // On the home page the docked header is transparent: the hero (and the globe's glow) continues underneath.
+  // On the hotel page too, its logo and icons white over the photo.
   const pathname = usePathname()
-  const transparent = pathname === '/' && !floating
+  const onPhoto = HOTEL_PAGE.test(pathname) && !floating
+  const transparent = (pathname === '/' && !floating) || onPhoto
+  const buttonClass = onPhoto ? iconButtonOnPhoto : iconButton
   // On /search the header follows the results page width on 3xl screens, and its logo and icons align with the search card.
   const wideSearch = pathname === '/search'
 
@@ -88,7 +97,10 @@ export function Header() {
           )}
         >
           <a
-            className="rounded-sm text-[clamp(26px,6.6vw,32px)] leading-none font-extrabold tracking-[-0.035em] text-primary no-underline"
+            className={cn(
+              'rounded-sm text-[clamp(26px,6.6vw,32px)] leading-none font-extrabold tracking-[-0.035em] no-underline',
+              onPhoto ? 'text-white' : 'text-primary',
+            )}
             href="/"
             onClick={close}
             aria-label="Островок! — на главную"
@@ -99,7 +111,7 @@ export function Header() {
           <div className="relative flex items-center gap-[clamp(0px,1vw,14px)] max-[360px]:gap-0">
             <Link
               href="/favorites"
-              className={buttonVariants({ variant: 'ghost', size: 'icon', className: iconButton })}
+              className={buttonVariants({ variant: 'ghost', size: 'icon', className: buttonClass })}
               aria-label="Избранное"
             >
               <Heart className="size-6.5" fill="currentColor" strokeWidth={2} aria-hidden />
@@ -107,7 +119,7 @@ export function Header() {
 
             <Popover {...panelProps('notifications')}>
               <PopoverTrigger
-                render={<Button variant="ghost" size="icon" className={iconButton} aria-label="Уведомления" />}
+                render={<Button variant="ghost" size="icon" className={buttonClass} aria-label="Уведомления" />}
               >
                 <Bell className="size-6.25" fill="currentColor" strokeWidth={2} aria-hidden />
               </PopoverTrigger>
@@ -120,7 +132,7 @@ export function Header() {
               </PopoverContent>
             </Popover>
 
-            <UserMenu buttonClass={iconButton} {...panelProps('account')} />
+            <UserMenu buttonClass={buttonClass} {...panelProps('account')} />
 
             <Popover {...panelProps('menu')}>
               <PopoverTrigger
@@ -128,7 +140,7 @@ export function Header() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={iconButton}
+                    className={buttonClass}
                     aria-label={open === 'menu' ? 'Закрыть меню' : 'Открыть меню'}
                   />
                 }
