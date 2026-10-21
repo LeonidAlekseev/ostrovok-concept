@@ -1,9 +1,11 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { addDays, todayIso } from '../../lib/dates'
 import { StarSearch } from './StarSearch'
 import { StarSearchDialog } from './StarSearchDialog'
+import { ZodiacRing } from './ZodiacRing'
 import { renderReadingVideo } from './starVideo'
 
 // jsdom has no canvas and no MediaRecorder: the recording itself is checked in the browser.
@@ -63,6 +65,23 @@ describe('StarSearch section', () => {
     )
     expect(turning).toHaveLength(1)
     expect(turning[0].getAttribute('class')).toContain('motion-safe:animate-zodiac-spin')
+  })
+
+  // star-search, Requirement: Знаки вращаются с кольцом. The signs sit inside the turning group and carry no
+  // counter-rotation animation; their placement is a fixed, deterministic rotate().
+  it('turns the signs with the circle, with deterministic coordinates', () => {
+    const { container } = render(<StarSearch />)
+    const turning = container.querySelector('#stars svg g[class*="animate-zodiac-spin"]')!
+    const texts = [...turning.querySelectorAll('text')]
+    expect(texts).toHaveLength(12)
+    for (const text of texts) {
+      expect(text.getAttribute('class') ?? '').not.toContain('unspin')
+      expect(text.getAttribute('transform')).toMatch(/^rotate\(/)
+    }
+    expect(texts[0].getAttribute('transform')).toBe('rotate(15 19.8 -73.893)')
+    const html = container.querySelector('#stars svg')!.innerHTML
+    expect(html).not.toMatch(/\d\.\d{4,}/)
+    expect(renderToStaticMarkup(<ZodiacRing />)).toBe(renderToStaticMarkup(<ZodiacRing />))
   })
 })
 
