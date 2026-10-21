@@ -7,9 +7,10 @@
 
 Travel OS «О!Погнали» (видение 2026-10-21, решения 85–96). Этап A — фундамент:
 
+- [ ] Ключи API в репозитории через git-secret, в Vercel один `GIT_SECRET_PRIVATE_KEY` — `git-secret-env`.
 - [ ] Название «О!Погнали» в интерфейсе, метаданных и текстах — `rename-opognali`.
 - [ ] Supabase: клиенты, схема с RLS, загрузка каталога, вход по одноразовой ссылке и демо-аккаунт —
-      `supabase-foundation`. Нужны ключи в `.env.local`.
+      `supabase-foundation`. Нужны ключи (после `git-secret-env`).
 - [ ] Помощник на Vercel AI SDK + OpenRouter (`minimax/minimax-m3.1-flash:free`), отказ к правилам —
       `ai-openrouter-assistant`. Нужен `OPENROUTER_API_KEY`.
 
