@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getHotel } from '@/lib/catalog'
 import { addDays, todayIso } from '@/lib/dates'
 import { toOfferParams } from '@/lib/offer'
-import { bookingsStore, sessionStore } from '@/lib/storage'
+import { sessionStore } from '@/lib/session'
+import { bookingsStore } from '@/lib/storage'
 import { BookingPage } from './BookingPage'
 
 const nav = vi.hoisted(() => ({ query: '', replace: vi.fn() }))

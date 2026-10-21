@@ -14,13 +14,17 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "secrets:reveal": "node scripts/secrets.mjs reveal",
-    "secrets:hide": "node scripts/secrets.mjs hide"
+    "secrets:hide": "node scripts/secrets.mjs hide",
+    "db:push": "node --env-file-if-exists=.env.local scripts/db-push.mjs",
+    "db:seed": "node --env-file-if-exists=.env.local scripts/seed.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
     "@fontsource-variable/onest": "^5.3.1",
     "@fontsource/caveat": "^5.3.0",
     "@openrouter/ai-sdk-provider": "^3.1.0",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.118.0",
     "ai": "^7.0.148",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.0",
@@ -48,6 +52,7 @@
     "pngjs": "^7.0.0",
     "prettier": "^3.9.10",
     "shadcn": "^4.22.1",
+    "supabase": "^2.121.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
     "vitest": "^5.0.5"
