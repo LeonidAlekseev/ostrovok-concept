@@ -195,7 +195,12 @@ describe('ReviewsDialog guest photos', () => {
     const mosaic = screen.getByRole('dialog', { name: /фотографии$/ })
     const guests = within(mosaic).getByRole('tab', { name: 'Фотографии гостей • 4' })
     expect(guests.getAttribute('aria-selected')).toBe('true')
-    expect(document.activeElement?.getAttribute('aria-label')).toBe(`Открыть фото 3: ${shown.guestPhotos[2].caption}`)
+    // The dialog moves focus after it opens, which can lag behind the click on a slow runner.
+    await waitFor(() =>
+      expect(document.activeElement?.getAttribute('aria-label')).toBe(
+        `Открыть фото 3: ${shown.guestPhotos[2].caption}`,
+      ),
+    )
 
     window.history.back()
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /фотографии$/ })).toBeNull())
