@@ -18,4 +18,13 @@ describe('Footer', () => {
     expect(text).toContain(`© ${new Date().getFullYear()} Островок!`)
     expect(text).toContain('Демо-проект: бронирования не настоящие')
   })
+
+  // app-shell, Requirement: Оформление подвала
+  it('is flat: page background, a line on top, no rounding', () => {
+    render(<Footer />)
+    const { className } = screen.getByRole('contentinfo')
+    expect(className).toMatch(/\bborder-t\b/)
+    expect(className).toMatch(/\bbg-background\b/)
+    expect(className).not.toMatch(/rounded|shadow/)
+  })
 })

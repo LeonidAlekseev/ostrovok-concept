@@ -1,6 +1,6 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { signIn } from '@/lib/auth'
 import { favoritesStore, sessionStore } from '@/lib/storage'
 import { Header } from './Header'
@@ -177,126 +177,31 @@ describe('Header', () => {
   })
 })
 
-// jsdom has no `:focus-visible`: pretend the focused header element got focus from the keyboard.
-const focusVisible = () => {
-  const matches = Element.prototype.matches
-  return vi.spyOn(Element.prototype, 'matches').mockImplementation(function (this: Element, selector: string) {
-    return selector === ':focus-visible' ? this === document.activeElement : matches.call(this, selector)
-  })
-}
-
-describe('Header on scroll', () => {
-  const scrollTo = (y: number) => {
-    Object.defineProperty(window, 'scrollY', { value: y, configurable: true })
-    act(() => {
-      window.dispatchEvent(new Event('scroll'))
-    })
-  }
-  const state = () => screen.getByRole('banner').getAttribute('data-sticky')
-  const frame = () => act(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
-  const stateAfter = (expected: string) => waitFor(() => expect(state()).toBe(expected))
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-    scrollTo(0)
-  })
-
-  it('scrolls with the page at the top, hides when fixed, shows on a scroll up far from the top', async () => {
-    setup()
-    expect(state()).toBe('docked')
-    scrollTo(2000)
-    await stateAfter('hidden')
-    scrollTo(1900)
-    await stateAfter('shown')
-    scrollTo(2000)
-    await stateAfter('hidden')
-  })
-
+describe('Header chrome', () => {
   // site-header, Requirement: Оформление шапки
-  it('on the hotel page is transparent with a white logo and icons at the top, green once fixed', async () => {
+  it('on the hotel page is transparent with a white logo and icons', () => {
     window.history.pushState({}, '', '/hotels/prague-old-town-lantern')
     setup()
     const header = screen.getByRole('banner')
-    const logo = screen.getByRole('link', { name: 'Островок! — на главную' })
-    expect(header.className).not.toMatch(/\bbg-chrome\b/)
-    expect(logo.className).toMatch(/\btext-white\b/)
+    expect(header.className).not.toMatch(/\bbg-background\b/)
+    expect(screen.getByRole('link', { name: 'Островок! — на главную' }).className).toMatch(/\btext-white\b/)
     expect(screen.getByRole('link', { name: 'Избранное' }).className).toMatch(/(^|\s)text-white(\s|$)/)
-
-    scrollTo(2000)
-    await stateAfter('hidden')
-    scrollTo(1900)
-    await stateAfter('shown')
-    expect(header.className).toMatch(/\bbg-chrome\b/)
-    expect(header.className).toMatch(/rounded-b-/)
-    expect(logo.className).toMatch(/\btext-primary\b/)
     window.history.pushState({}, '', '/')
   })
 
-  it('keeps the green header on the rates page of a hotel', () => {
+  it('is flat and blue on the rates page of a hotel, never sticky', () => {
     window.history.pushState({}, '', '/hotels/prague-old-town-lantern/rooms')
     setup()
-    expect(screen.getByRole('banner').className).toMatch(/\bbg-chrome\b/)
+    const header = screen.getByRole('banner')
+    expect(header.className).toMatch(/\bbg-background\b/)
+    expect(header.className).not.toMatch(/rounded|shadow|fixed|sticky/)
+    expect(screen.getByRole('link', { name: 'Островок! — на главную' }).className).toMatch(/\btext-primary\b/)
     window.history.pushState({}, '', '/')
   })
 
-  it('does not show on a scroll up closer than half a screen', async () => {
+  it('scrolls with the page', () => {
     setup()
-    scrollTo(300)
-    await stateAfter('hidden')
-    scrollTo(200)
-    await frame()
-    expect(state()).toBe('hidden')
-  })
-
-  const showFar = async () => {
-    scrollTo(2000)
-    await frame()
-    scrollTo(1900)
-    await stateAfter('shown')
-  }
-
-  it('stays shown while the menu is open', async () => {
-    const user = setup()
-    await showFar()
-    await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
-    scrollTo(2100)
-    await frame()
-    expect(state()).toBe('shown')
-    await user.keyboard('{Escape}')
-    await stateAfter('hidden')
-  })
-
-  it('stays shown while keyboard focus is inside and hides once it leaves', async () => {
-    focusVisible()
-    const user = setup()
-    await showFar()
-    await user.tab()
-    expect(screen.getByRole('banner').contains(document.activeElement)).toBe(true)
-    scrollTo(2200)
-    await frame()
-    expect(state()).toBe('shown')
-    ;(document.activeElement as HTMLElement).blur()
-    await stateAfter('hidden')
-  })
-
-  it('hides on a scroll down after a mouse click left focus on a header button', async () => {
-    const user = setup()
-    scrollTo(2000)
-    await frame()
-    scrollTo(1900)
-    await stateAfter('shown')
-    await user.click(screen.getByRole('link', { name: 'Избранное' }))
-    expect(document.activeElement).toBe(screen.getByRole('link', { name: 'Избранное' }))
-    scrollTo(2100)
-    await stateAfter('hidden')
-  })
-
-  it('publishes the offset of the shown header for the sticky blocks', async () => {
-    setup()
-    scrollTo(2000)
-    await frame()
-    scrollTo(1900)
-    await stateAfter('shown')
-    expect(document.documentElement.style.getPropertyValue('--sticky-header-offset')).toBe('var(--header-height)')
+    expect(screen.getByRole('banner').className).toMatch(/\babsolute\b/)
+    expect(screen.getByRole('banner').className).not.toMatch(/\b(fixed|sticky)\b/)
   })
 })
