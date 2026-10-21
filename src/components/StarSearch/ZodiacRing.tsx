@@ -1,11 +1,14 @@
 import { cn } from 'cn'
 
 const signs = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓']
-const polar = (angle: number, r: number) => [Math.sin(angle) * r, -Math.cos(angle) * r] as const
+// Rounded to 3 digits so the server and the client print the same attributes.
+const round = (n: number) => Number(n.toFixed(3))
+const polar = (angle: number, r: number) => [round(Math.sin(angle) * r), round(-Math.cos(angle) * r)] as const
 
 /**
  * The golden zodiac circle around the orb: 12 divisions with their signs, and an orbit with two planets.
- * Decorative. The circle turns slowly unless the user prefers less motion; the orbit stays put.
+ * Decorative. The circle, signs included, turns slowly around the viewBox centre (the orb's centre) unless
+ * the user prefers less motion; the orbit stays put.
  */
 export function ZodiacRing({ className }: { className?: string }) {
   return (
@@ -14,7 +17,7 @@ export function ZodiacRing({ className }: { className?: string }) {
         fill="none"
         stroke="currentColor"
         strokeWidth="0.5"
-        className="origin-center [transform-box:fill-box] motion-safe:animate-zodiac-spin"
+        className="origin-[0_0] [transform-box:view-box] motion-safe:animate-zodiac-spin"
       >
         <circle r="86" />
         <circle r="66" strokeOpacity="0.6" />
@@ -25,11 +28,11 @@ export function ZodiacRing({ className }: { className?: string }) {
           return (
             <g key={sign}>
               <line x1={x1} y1={y1} x2={x2} y2={y2} strokeOpacity="0.7" />
-              {/* Turns back against the circle around its own centre, so the sign stays upright. */}
+              {/* Engraved on the ring: the top of the sign looks outwards and it turns with the circle. */}
               <text
                 x={tx}
                 y={ty}
-                className="origin-center [transform-box:fill-box] motion-safe:animate-zodiac-unspin"
+                transform={`rotate(${(i + 0.5) * 30} ${tx} ${ty})`}
                 fill="currentColor"
                 stroke="none"
                 fontSize="10"
