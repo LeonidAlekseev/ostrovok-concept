@@ -6,14 +6,14 @@ import { stayTotal } from './offer'
 import { MAX_NIGHTS, type Guests, type SearchQuery } from './search'
 
 /**
- * Demo travel assistant: there is no backend, so a free-text wish is read with keyword rules,
- * missing essentials are asked one question at a time, and the "atmosphere" of the trip is
- * decided from what is known. Everything runs locally and instantly.
+ * Travel assistant: a free-text wish is read by the language model behind `POST /api/assistant`
+ * (`askAssistant`), or with keyword rules when the model is unavailable; missing essentials are asked
+ * one question at a time, and the "atmosphere" of the trip is decided from what is known locally.
  */
 
 export type VibeId = 'sea' | 'mountains' | 'europe' | 'romantic' | 'weekend' | 'exotic' | 'metropolis'
 type Mood = 'calm' | 'active'
-type Party = 'solo' | 'couple' | 'family' | 'friends'
+export type Party = 'solo' | 'couple' | 'family' | 'friends'
 /** Zero-based month, or "as soon as possible". `any` means the traveller left it to the assistant. */
 type When = number | 'soon' | 'any'
 
@@ -28,7 +28,7 @@ export interface Brief {
   budget?: number
 }
 
-type QuestionId = 'vibe' | 'when' | 'party'
+export type QuestionId = 'vibe' | 'when' | 'party'
 
 export interface Question {
   id: QuestionId
@@ -167,7 +167,11 @@ export function parseWish(input: string): Brief {
 
 /** Folds a new reply into the brief. A "don't care" answers the question that was asked. */
 export function mergeBrief(brief: Brief, input: string, asked: QuestionId | null): Brief {
-  const parsed = parseWish(input)
+  return foldBrief(brief, parseWish(input), input, asked)
+}
+
+/** `mergeBrief` for a reply already read (by the rules or by the language model). */
+export function foldBrief(brief: Brief, parsed: Brief, input: string, asked: QuestionId | null): Brief {
   const next: Brief = { ...brief }
   for (const key of Object.keys(parsed) as (keyof Brief)[]) {
     if (parsed[key] !== undefined) Object.assign(next, { [key]: parsed[key] })
@@ -351,8 +355,13 @@ export function makePlan(brief: Brief, today: IsoDate): Plan {
   }
 }
 
-const PARTY_LABEL: Record<Party, string> = { solo: 'один', couple: 'вдвоём', family: 'с детьми', friends: 'с друзьями' }
-const VIBE_LABEL: Record<VibeId, string> = {
+export const PARTY_LABEL: Record<Party, string> = {
+  solo: 'один',
+  couple: 'вдвоём',
+  family: 'с детьми',
+  friends: 'с друзьями',
+}
+export const VIBE_LABEL: Record<VibeId, string> = {
   sea: 'море',
   mountains: 'горы',
   europe: 'города Европы',
@@ -375,4 +384,83 @@ export function describeBrief(brief: Brief): string {
   ]
     .filter(Boolean)
     .join(' · ')
+}
+
+const MOODS: readonly Mood[] = ['calm', 'active']
+const intIn = (value: unknown, min: number, max: number) =>
+  typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max ? value : undefined
+
+/**
+ * Keeps only what the assistant understands: a catalog city, known themes and answers, a month 0–11,
+ * 1–30 nights and a whole budget in ₽. Reads untrusted input — the client's brief or the model's answer.
+ */
+export function normalizeBrief(raw: Partial<Record<keyof Brief, unknown>>): Brief {
+  const brief: Brief = {}
+  const { vibe, destinationId, when, nights, party, mood, budget } = raw
+  if (vibe === 'any' || (typeof vibe === 'string' && Object.hasOwn(VIBE_LABEL, vibe))) brief.vibe = vibe as VibeId
+  if (destinations.some((d) => d.id === destinationId)) brief.destinationId = destinationId as string
+  if (when === 'soon' || when === 'any') brief.when = when
+  else if (intIn(when, 0, 11) !== undefined) brief.when = when as number
+  if (typeof nights === 'number' && nights >= 1) brief.nights = Math.min(Math.round(nights), MAX_NIGHTS)
+  if (party === 'any' || (typeof party === 'string' && Object.hasOwn(PARTY_LABEL, party))) brief.party = party as Party
+  if (MOODS.includes(mood as Mood)) brief.mood = mood as Mood
+  if (typeof budget === 'number' && budget >= 1) brief.budget = Math.round(budget)
+  return brief
+}
+
+/** `POST /api/assistant`. Message texts are capped at `MAX_MESSAGE_LENGTH`, the history at `MAX_HISTORY`. */
+export interface AssistantRequest {
+  messages: { role: 'user' | 'assistant'; text: string }[]
+  brief: Brief
+}
+
+export interface AssistantResponse {
+  brief: Brief
+  /** The model's short remark; absent when the rules read the message. */
+  reply?: string
+  source: 'model' | 'rules'
+}
+
+export const MAX_MESSAGE_LENGTH = 500
+export const MAX_HISTORY = 20
+/** The client's own limit; the route gives the model 8 s and answers with the rules after that. */
+const ASSISTANT_TIMEOUT_MS = 9000
+
+/**
+ * Reads the newest message of `messages` into `brief` through the assistant route. Any failure — no
+ * network, a limit, a timeout — falls back to the rules here, so the dialog never shows an error.
+ */
+export async function askAssistant(
+  request: AssistantRequest,
+  asked: QuestionId | null,
+  signal?: AbortSignal,
+): Promise<AssistantResponse> {
+  // A reply with a plan only has no text; long replies of the assistant are cut to the route's limit.
+  const messages = request.messages
+    .filter((m) => m.text.trim())
+    .slice(-MAX_HISTORY)
+    .map((m) => ({ ...m, text: m.text.slice(0, MAX_MESSAGE_LENGTH) }))
+  const body: AssistantRequest = { ...request, messages }
+  try {
+    const response = await fetch('/api/assistant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: signal
+        ? AbortSignal.any([signal, AbortSignal.timeout(ASSISTANT_TIMEOUT_MS)])
+        : AbortSignal.timeout(ASSISTANT_TIMEOUT_MS),
+    })
+    if (response.ok) {
+      const data = (await response.json()) as AssistantResponse
+      return {
+        brief: normalizeBrief(data.brief ?? {}),
+        reply: typeof data.reply === 'string' ? data.reply : undefined,
+        source: data.source === 'model' ? 'model' : 'rules',
+      }
+    }
+  } catch {
+    // Falls through to the rules below.
+  }
+  const input = request.messages.at(-1)?.text ?? ''
+  return { brief: mergeBrief(request.brief, input, asked), source: 'rules' }
 }
