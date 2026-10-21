@@ -8,6 +8,7 @@ import {
   DEFAULT_GUESTS,
   parseGuestParams,
   parseStayParams,
+  setGuestParams,
   setStayParams,
   validateSearch,
   type Guests,
@@ -21,8 +22,13 @@ export interface StayState {
   error: string | undefined
   /** Guests of the stay, or those of the address without dates; the default couple if none or invalid. */
   guests: Guests
-  /** Replaces the address (no new history entry); the first call without dates starts from tomorrow. */
+  /** Replaces the address (no new history entry); the first call that sets one date starts from tomorrow; guests alone never add dates. */
   setStay: (next: Partial<Stay>) => void
+}
+
+const defaultStay = (guests: Guests): Stay => {
+  const tomorrow = addDays(todayIso(), 1)
+  return { checkIn: tomorrow, checkOut: addDays(tomorrow, 1), guests }
 }
 
 /** Dates and guests of the hotel pages, kept in the address (`checkin`, `checkout`, `adults`, `children`, `rooms`). */
@@ -48,9 +54,12 @@ export function useStay(hotel: Hotel): StayState {
 
   const setStay = useCallback(
     (next: Partial<Stay>) => {
-      const tomorrow = addDays(todayIso(), 1)
-      const base: Stay = stay ?? { checkIn: tomorrow, checkOut: addDays(tomorrow, 1), guests }
-      const merged = setStayParams(new URLSearchParams(params), { ...base, ...next })
+      const search = new URLSearchParams(params)
+      // Without dates only the guests are written; the dates are the visitor's to choose.
+      const merged =
+        stay || next.checkIn || next.checkOut
+          ? setStayParams(search, { ...(stay ?? defaultStay(guests)), ...next })
+          : setGuestParams(search, next.guests ?? guests)
       router.replace(`${pathname}?${merged}`, { scroll: false })
     },
     [stay, guests, params, pathname, router],

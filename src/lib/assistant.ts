@@ -322,7 +322,11 @@ export function makePlan(brief: Brief, today: IsoDate): Plan {
         .filter((h) => h.destinationId === destination.id)
         .sort((a, b) => (preferCheap ? a.priceFrom - b.priceFrom : b.rating - a.rating))
       const affordable = hotels.find((h) => !brief.budget || total(h.priceFrom) <= brief.budget)
-      const hotel = affordable ?? hotels[0]
+      const cheapest = hotels.reduce<HotelSummary | undefined>(
+        (min, h) => (!min || total(h.priceFrom) < total(min.priceFrom) ? h : min),
+        undefined,
+      )
+      const hotel = affordable ?? cheapest
       const perNight = hotel?.priceFrom ?? destination.priceFrom
       const sum = total(perNight)
       return { destination, hotel, perNight, total: sum, fitsBudget: !brief.budget || sum <= brief.budget }

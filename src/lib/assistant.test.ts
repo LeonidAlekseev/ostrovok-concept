@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { stayTotal } from './offer'
+import { newHotels } from './catalog'
 import { makePlan, mergeBrief, parseWish } from './assistant'
 
 describe('parseWish', () => {
@@ -112,6 +113,19 @@ describe('makePlan', () => {
     expect(fits[0]).toBe(true)
     for (const o of plan.options)
       expect(o.total).toBe(stayTotal(o.perNight, plan.query.checkIn, plan.query.checkOut, plan.query.guests.rooms))
+  })
+
+  // assistant-search, Requirement: Вариант вне бюджета
+  it('offers the cheapest hotel of the destination when none fits the budget', () => {
+    const { options, overBudget } = makePlan(
+      { destinationId: 'prague', when: 'soon', party: 'couple', budget: 1 },
+      today,
+    )
+    const [option] = options
+    const cheapest = Math.min(...newHotels.filter((h) => h.destinationId === 'prague').map((h) => h.priceFrom))
+    expect(option.fitsBudget).toBe(false)
+    expect(option.perNight).toBe(cheapest)
+    expect(overBudget).toBe(true)
   })
 
   // assistant-search, Requirement: Сумма поездки ассистента

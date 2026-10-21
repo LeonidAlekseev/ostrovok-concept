@@ -5,6 +5,7 @@ import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
 import type { Review } from '@/lib/catalog'
 import { formatLongDate } from '../../lib/dates'
+import { formatDecimal } from '../../lib/format'
 import { scoreDistribution } from '../../lib/reviews'
 import { reviewsLabel } from './reviewsLabel'
 
@@ -34,7 +35,7 @@ export function Reviews({ rating, reviewCount, reviews, className }: Props) {
       </h2>
       <div className="grid gap-6 md:grid-cols-[14rem_1fr]">
         <div>
-          <p className="text-display leading-none font-bold">{rating.toFixed(1)}</p>
+          <p className="text-display leading-none font-bold">{formatDecimal(rating)}</p>
           <p className="mt-2 text-muted-foreground">{reviewsLabel(reviewCount)}</p>
         </div>
         <ul className="flex flex-col gap-1.5" aria-label="Распределение оценок">

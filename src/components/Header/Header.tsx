@@ -6,11 +6,12 @@ import { usePathname } from 'next/navigation'
 import { Bell, Heart, Menu, X } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useSession } from '@/hooks/useStore'
 import { useStickyHeader } from '@/hooks/useStickyHeader'
 import { cn } from '@/lib/utils'
 import { UserMenu } from './UserMenu'
 
-type Panel = 'notifications' | 'menu'
+type Panel = 'notifications' | 'account' | 'menu'
 
 // Blue on the lime hero; the white glaze replaces ghost's grey hover there.
 const iconButton =
@@ -23,11 +24,13 @@ const panelClass =
 const panelTitleClass = 'm-0 mb-1.5 text-base font-[650]'
 const panelTextClass = 'm-0 mb-3.5 text-sm leading-[1.45] text-muted-foreground'
 
-const menuLinks = [
+const menuItemClass =
+  'block w-full rounded-md p-3 text-left font-[550] text-foreground no-underline hover:bg-muted hover:text-primary'
+
+const linksBefore = [
   { href: '/#search', label: 'Поиск отелей' },
   { href: '/trips', label: 'Мои поездки' },
   { href: '/favorites', label: 'Избранное' },
-  { href: '/help', label: 'Поддержка' },
 ]
 
 // A pointer or touch press leaves focus on the button; only keyboard focus should keep the header shown.
@@ -42,6 +45,7 @@ const isKeyboardFocus = (element: Element | null) => {
 export function Header() {
   const [open, setOpen] = useState<Panel | null>(null)
   const close = useCallback(() => setOpen(null), [])
+  const session = useSession()
 
   // Only one panel is open at a time: a panel closing never closes a sibling that already opened.
   const panelProps = (panel: Panel) => ({
@@ -106,7 +110,7 @@ export function Header() {
               </PopoverContent>
             </Popover>
 
-            <UserMenu buttonClass={iconButton} />
+            <UserMenu buttonClass={iconButton} {...panelProps('account')} />
 
             <Popover {...panelProps('menu')}>
               <PopoverTrigger
@@ -128,17 +132,34 @@ export function Header() {
               <PopoverContent align="end" sideOffset={10} aria-label={panelTitle.menu} className={panelClass}>
                 <nav aria-label="Основное меню">
                   <ul className="-m-1.5">
-                    {menuLinks.map((link) => (
+                    {linksBefore.map((link) => (
                       <li key={link.href}>
-                        <Link
-                          className="block rounded-md p-3 font-[550] text-foreground no-underline hover:bg-muted hover:text-primary"
-                          href={link.href}
-                          onClick={close}
-                        >
+                        <Link className={menuItemClass} href={link.href} onClick={close}>
                           {link.label}
                         </Link>
                       </li>
                     ))}
+                    <li>
+                      <button type="button" className={menuItemClass} onClick={() => setOpen('notifications')}>
+                        Уведомления
+                      </button>
+                    </li>
+                    <li>
+                      {session ? (
+                        <button type="button" className={menuItemClass} onClick={() => setOpen('account')}>
+                          Аккаунт
+                        </button>
+                      ) : (
+                        <Link className={menuItemClass} href="/login" onClick={close}>
+                          Войти
+                        </Link>
+                      )}
+                    </li>
+                    <li>
+                      <Link className={menuItemClass} href="/help" onClick={close}>
+                        Поддержка
+                      </Link>
+                    </li>
                   </ul>
                 </nav>
               </PopoverContent>
@@ -152,5 +173,6 @@ export function Header() {
 
 const panelTitle: Record<Panel, string> = {
   notifications: 'Уведомления',
+  account: 'Аккаунт',
   menu: 'Меню',
 }

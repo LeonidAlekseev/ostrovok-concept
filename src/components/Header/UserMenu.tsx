@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
 import { UserRound } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -11,9 +10,14 @@ import { signOut } from '@/lib/auth'
 const linkClass = 'block rounded-md p-3 font-[550] text-foreground no-underline hover:bg-muted hover:text-primary'
 
 /** Account icon: «Войти» link for a guest (also before hydration); the account menu once signed in. */
-export function UserMenu({ buttonClass }: { buttonClass: string }) {
+interface Props {
+  buttonClass: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}
+
+export function UserMenu({ buttonClass, open, onOpenChange }: Props) {
   const session = useSession()
-  const [open, setOpen] = useState(false)
 
   if (!session) {
     return (
@@ -28,7 +32,7 @@ export function UserMenu({ buttonClass }: { buttonClass: string }) {
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger
         render={<Button variant="ghost" size="icon" className={buttonClass} aria-label={`Аккаунт: ${session.name}`} />}
       >
@@ -38,7 +42,7 @@ export function UserMenu({ buttonClass }: { buttonClass: string }) {
         <p className="m-0 truncate px-1.5 font-[650]">{session.name}</p>
         <p className="m-0 mb-1.5 truncate px-1.5 text-sm text-muted-foreground">{session.email}</p>
         <nav aria-label="Аккаунт">
-          <Link className={linkClass} href="/trips" onClick={() => setOpen(false)}>
+          <Link className={linkClass} href="/trips" onClick={() => onOpenChange(false)}>
             Мои поездки
           </Link>
         </nav>
@@ -47,7 +51,7 @@ export function UserMenu({ buttonClass }: { buttonClass: string }) {
           className="mt-2 w-full"
           onClick={() => {
             signOut()
-            setOpen(false)
+            onOpenChange(false)
           }}
         >
           Выйти

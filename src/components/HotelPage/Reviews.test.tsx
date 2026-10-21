@@ -25,4 +25,9 @@ describe('Reviews', () => {
     expect(screen.getAllByText(/^Автор/)).toHaveLength(12)
     expect(screen.queryByRole('button', { name: 'Показать ещё' })).toBeNull()
   })
+
+  it('shows the rating with a decimal comma', () => {
+    render(<Reviews rating={9.1} reviewCount={120} reviews={reviews} />)
+    expect(screen.getByText('9,1')).toBeTruthy()
+  })
 })

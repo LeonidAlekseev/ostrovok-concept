@@ -59,6 +59,7 @@ export function PhotoCarousel({
         ref={strip}
         role="group"
         aria-label={label}
+        tabIndex={-1}
         className={cn(
           'flex size-full snap-x snap-mandatory [scrollbar-width:none]',
           swipe ? 'overflow-x-auto' : 'touch-pan-x overflow-x-hidden',

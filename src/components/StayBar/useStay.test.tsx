@@ -34,4 +34,13 @@ describe('useStay guests without dates', () => {
     setStay({ checkIn: '2099-01-10', checkOut: '2099-01-12' })
     expect(nav.replace.mock.calls.at(-1)![0]).toContain('adults=3')
   })
+
+  it('writes only the guests, no dates, when they are chosen without dates', () => {
+    const { setStay } = guestsFor('')
+    setStay({ guests: { adults: 3, children: 0, rooms: 1 } })
+    const url = nav.replace.mock.calls.at(-1)![0] as string
+    expect(url).toContain('adults=3')
+    expect(url).not.toContain('checkin')
+    expect(url).not.toContain('checkout')
+  })
 })
