@@ -32,7 +32,7 @@ function Booking() {
       <h1 className="text-title font-bold tracking-[-0.02em]">Оформление бронирования</h1>
       <div className="grid items-start gap-8 lg:grid-cols-[1fr_22rem]">
         <BookingForm key={params.toString()} offer={offer} />
-        <div className="lg:sticky lg:top-[calc(var(--sticky-header-offset)+6rem)] transition-[top] duration-200 motion-reduce:transition-none lg:order-last max-lg:-order-1">
+        <div className="lg:sticky lg:top-24 lg:order-last max-lg:-order-1">
           <OrderSummary offer={offer} />
         </div>
       </div>

@@ -19,7 +19,8 @@ interface Props {
 /**
  * The large photo with its thumbnails (under the transparent header on the page, at the top of the
  * dialog), then text and headings straight on the page's background: the hotel, the guests' rating,
- * the dates, the hotel's description and amenities and the rooms, with the price bar stuck to the bottom.
+ * the dates, the hotel's description and amenities and the rooms, then the price bar (stuck to the
+ * bottom of a narrow screen).
  */
 export function HotelPage({ hotel, titleId, stay }: Props) {
   const content = (
@@ -38,7 +39,10 @@ export function HotelPage({ hotel, titleId, stay }: Props) {
         <HotelRooms hotel={hotel} className="flex scroll-mt-3 flex-col gap-4 outline-none" />
         <PriceBar
           hotel={hotel}
-          className={cn('mt-auto rounded-t-2xl px-[clamp(16px,4vw,24px)] py-3', !titleId && 'max-sm:-mx-(--page-x)')}
+          className={cn(
+            'mt-auto py-3 max-md:rounded-t-2xl max-md:px-[clamp(16px,4vw,24px)] md:pb-8',
+            !titleId && 'max-sm:-mx-(--page-x)',
+          )}
         />
       </div>
     </HotelStay>

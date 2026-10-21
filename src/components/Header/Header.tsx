@@ -1,13 +1,12 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Bell, Heart, Menu, X } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useSession } from '@/hooks/useStore'
-import { useStickyHeader } from '@/hooks/useStickyHeader'
 import { cn } from '@/lib/utils'
 import { UserMenu } from './UserMenu'
 
@@ -40,15 +39,6 @@ const linksBefore = [
   { href: '/favorites', label: 'Избранное' },
 ]
 
-// A pointer or touch press leaves focus on the button; only keyboard focus should keep the header shown.
-const isKeyboardFocus = (element: Element | null) => {
-  try {
-    return element?.matches(':focus-visible') ?? false
-  } catch {
-    return false
-  }
-}
-
 export function Header() {
   const [open, setOpen] = useState<Panel | null>(null)
   const close = useCallback(() => setOpen(null), [])
@@ -60,36 +50,19 @@ export function Header() {
     onOpenChange: (next: boolean) => setOpen((current) => (next ? panel : current === panel ? null : current)),
   })
 
-  const wrapperRef = useRef<HTMLDivElement>(null)
-  const [focusWithin, setFocusWithin] = useState(false)
-  const { floating, shown, animated } = useStickyHeader(wrapperRef, open !== null || focusWithin)
-  // On the home page the docked header is transparent: the hero (and the globe's glow) continues underneath.
+  // On the home page the header is transparent: the hero (and the globe's glow) continues underneath.
   // On the hotel page too, its logo and icons white over the photo.
   const pathname = usePathname()
-  const onPhoto = HOTEL_PAGE.test(pathname) && !floating
-  const transparent = (pathname === '/' && !floating) || onPhoto
+  const onPhoto = HOTEL_PAGE.test(pathname)
+  const transparent = pathname === '/' || onPhoto
   const buttonClass = onPhoto ? iconButtonOnPhoto : iconButton
   // On /search the header follows the results page width on 3xl screens, and its logo and icons align with the search card.
   const wideSearch = pathname === '/search'
 
-  // The wrapper keeps the header's place in the flow, so the content does not jump when the header turns fixed.
+  // The wrapper keeps the header's place in the flow; the header scrolls away with the page.
   return (
-    <div ref={wrapperRef} className="relative z-20 h-(--header-height)">
-      <header
-        data-sticky={floating ? (shown ? 'shown' : 'hidden') : 'docked'}
-        onFocus={() => setFocusWithin(isKeyboardFocus(document.activeElement))}
-        onBlur={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget)) setFocusWithin(false)
-        }}
-        className={cn(
-          'inset-x-0 top-0',
-          floating ? 'fixed' : 'absolute',
-          animated && 'transition-transform duration-200 ease-out motion-reduce:transition-none',
-          floating && !shown && '-translate-y-full',
-          floating && shown && 'translate-y-0 shadow-md',
-          !transparent && 'rounded-b-[clamp(20px,5vw,32px)] bg-chrome',
-        )}
-      >
+    <div className="relative z-20 h-(--header-height)">
+      <header className={cn('absolute inset-x-0 top-0', !transparent && 'bg-background')}>
         <div
           className={cn(
             'mx-auto flex h-(--header-height) max-w-(--page-max) items-center justify-between gap-4 px-[calc(var(--page-x)+8px)] max-[360px]:gap-2 max-[360px]:px-3',

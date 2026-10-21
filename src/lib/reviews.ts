@@ -1,3 +1,5 @@
+import type { Review } from './catalog'
+
 const RATING_LABELS = [
   { label: 'Превосходно', min: 9 },
   { label: 'Отлично', min: 8 },
@@ -39,3 +41,27 @@ export function scoreColor(score: number): string {
  * least 3:1, enough for the large bold figure of the badge (see reviews.test.ts).
  */
 export const scoreOnDark = (score: number) => score <= 5.7 || score >= 8.8
+
+export const REVIEW_ORDERS = {
+  helpful: 'Сначала полезные',
+  newest: 'Сначала новые',
+  highest: 'Сначала с высокой оценкой',
+  lowest: 'Сначала с низкой оценкой',
+} as const
+
+export type ReviewOrder = keyof typeof REVIEW_ORDERS
+
+type Sortable = Pick<Review, 'id' | 'date' | 'score' | 'helpful'>
+
+const newestFirst = (a: Sortable, b: Sortable) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id)
+
+const ORDER_COMPARE: Record<ReviewOrder, (a: Sortable, b: Sortable) => number> = {
+  helpful: (a, b) => b.helpful - a.helpful || newestFirst(a, b),
+  newest: newestFirst,
+  highest: (a, b) => b.score - a.score || newestFirst(a, b),
+  lowest: (a, b) => a.score - b.score || newestFirst(a, b),
+}
+
+/** The reviews in one of the orders of «Сортировка отзывов», the newer first among equals. */
+export const sortReviews = <T extends Sortable>(reviews: readonly T[], order: ReviewOrder): T[] =>
+  [...reviews].sort(ORDER_COMPARE[order])
