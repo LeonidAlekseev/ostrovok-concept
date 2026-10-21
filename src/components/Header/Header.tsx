@@ -14,8 +14,9 @@ import { UserMenu } from './UserMenu'
 type Panel = 'notifications' | 'account' | 'menu'
 
 // Blue on the lime hero; the white glaze replaces ghost's grey hover there.
+// Below 360 px the four icons take 40 px each: the touch area shrinks a little, the glyph stays 24 px or more.
 const iconButton =
-  'text-primary hover:bg-card/35 hover:text-primary-hover aria-expanded:bg-card/35 aria-expanded:text-primary-hover'
+  'text-primary hover:bg-card/35 hover:text-primary-hover aria-expanded:bg-card/35 aria-expanded:text-primary-hover max-[360px]:size-10'
 
 // Placement comes from the popover (portaled, aligned to its trigger); only the size and the entrance are here.
 const panelClass =
@@ -57,7 +58,10 @@ export function Header() {
   const [focusWithin, setFocusWithin] = useState(false)
   const { floating, shown, animated } = useStickyHeader(wrapperRef, open !== null || focusWithin)
   // On the home page the docked header is transparent: the hero (and the globe's glow) continues underneath.
-  const transparent = usePathname() === '/' && !floating
+  const pathname = usePathname()
+  const transparent = pathname === '/' && !floating
+  // On /search the header follows the results page width on 3xl screens, and its logo and icons align with the search card.
+  const wideSearch = pathname === '/search'
 
   // The wrapper keeps the header's place in the flow, so the content does not jump when the header turns fixed.
   return (
@@ -77,7 +81,12 @@ export function Header() {
           !transparent && 'rounded-b-[clamp(20px,5vw,32px)] bg-chrome',
         )}
       >
-        <div className="mx-auto flex h-(--header-height) max-w-(--page-max) items-center justify-between gap-4 px-[calc(var(--page-x)+8px)]">
+        <div
+          className={cn(
+            'mx-auto flex h-(--header-height) max-w-(--page-max) items-center justify-between gap-4 px-[calc(var(--page-x)+8px)] max-[360px]:gap-2 max-[360px]:px-3',
+            wideSearch && '3xl:max-w-(--page-max-wide) 3xl:px-(--page-x)',
+          )}
+        >
           <a
             className="rounded-sm text-[clamp(26px,6.6vw,32px)] leading-none font-extrabold tracking-[-0.035em] text-primary no-underline"
             href="/"
@@ -87,7 +96,7 @@ export function Header() {
             Островок!
           </a>
 
-          <div className="relative flex items-center gap-[clamp(0px,1vw,14px)]">
+          <div className="relative flex items-center gap-[clamp(0px,1vw,14px)] max-[360px]:gap-0">
             <Link
               href="/favorites"
               className={buttonVariants({ variant: 'ghost', size: 'icon', className: iconButton })}
