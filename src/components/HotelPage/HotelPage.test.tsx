@@ -60,9 +60,6 @@ describe('HotelHeader location', () => {
   it('in a city with a metro shows the distance to the station and its name with a plain "М"', () => {
     render(<HotelHeader hotel={hotel} />)
     expect(screen.getByText(`${hotel.address}`)).toBeDefined()
-    expect(screen.getByText(/до центра$/).textContent).toBe(
-      `${String(hotel.distanceKm).replace('.', ',')} км до центра`,
-    )
     const tile = screen.getByText(`${hotel.metro!.meters} м`).closest('p')!
     expect(tile.textContent).toContain('до метро')
     expect(tile.textContent).toContain(hotel.metro!.station)
@@ -76,6 +73,14 @@ describe('HotelHeader location', () => {
     render(<HotelHeader hotel={fullHotelsIn('zakynthos')[0]} />)
     expect(screen.getByText(/до остановки транспорта/).textContent).toBe('5 мин до остановки транспорта')
     expect(screen.queryByText(/до метро/)).toBeNull()
+  })
+
+  it('has no tile for the distance to the centre: it stays in the line under the name', () => {
+    render(<HotelHeader hotel={hotel} />)
+    expect(screen.queryByText(/до центра$/)).toBeNull()
+    expect(
+      screen.getByText(`${String(hotel.distanceKm).replace('.', ',')} км от центра`, { exact: false }),
+    ).toBeDefined()
   })
 })
 

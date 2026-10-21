@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { Bus, CarFront, ChevronRight, MapPin, Star } from 'lucide-react'
+import { Bus, ChevronRight, MapPin, Star } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { getDestination, hasFreeCancellation, type Hotel } from '../../lib/catalog'
@@ -43,8 +43,8 @@ function TransportTile({ hotel }: { hotel: Hotel }) {
 /**
  * The hotel on the page's background: the name (the page's `h1`, or an `h2` with `titleId` inside a
  * dialog) with the favourite toggle, the stars, rating, free cancellation and distance to the centre,
- * the address, then the photos (`children`), the guest rating leading to the reviews, the distance and
- * transport and the hotel on the map.
+ * the address, then the photos (`children`), the guest rating leading to the reviews, the transport
+ * and the hotel on the map.
  */
 export function HotelHeader({ hotel, titleId, children }: { hotel: Hotel; titleId?: string; children?: ReactNode }) {
   const Title = titleId ? 'h2' : 'h1'
@@ -100,17 +100,7 @@ export function HotelHeader({ hotel, titleId, children }: { hotel: Hotel; titleI
           <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden />
         </button>
         <Separator />
-        <div className="grid grid-cols-2 gap-4">
-          <p className={tileClass}>
-            <CarFront className="size-6 shrink-0" strokeWidth={1.8} aria-hidden />
-            <span>
-              <b>{distance}</b> до центра
-            </span>
-          </p>
-          <div className="border-l border-border pl-4">
-            <TransportTile hotel={hotel} />
-          </div>
-        </div>
+        <TransportTile hotel={hotel} />
         <HotelMapDialog hotel={hotel} />
       </div>
     </header>
