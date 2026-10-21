@@ -331,7 +331,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
 
             {(desktop || view === 'map') && (
               // `svh`: the phone address bar showing and hiding while scrolling does not resize the map.
-              <div className="h-[70svh] overflow-hidden rounded-2xl shadow-(--shadow-card) lg:sticky lg:top-[calc(var(--sticky-header-offset)+1rem)] transition-[top,height] duration-200 motion-reduce:transition-none lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-[calc(100svh-var(--sticky-header-offset)-2rem)] xl:col-start-3">
+              <div className="h-[70svh] overflow-hidden rounded-2xl shadow-(--shadow-card) lg:sticky lg:top-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-[calc(100svh-2rem)] xl:col-start-3">
                 <SearchMap hotels={items} activeId={activeId} onActivate={setActiveId} onOpen={openHotel} />
               </div>
             )}

@@ -56,9 +56,6 @@
   --success: var(--brand-green);
   --success-soft: var(--brand-green-soft);
   --success-foreground: var(--decor-badge-green);
-  /* Header and footer. */
-  --chrome: var(--brand);
-  --chrome-muted: var(--brand-green-gray);
   --destructive: var(--brand-danger);
   /* The score scale of the hotel page, mixed in between by scoreColor (src/lib/reviews.ts). */
   --score-low: var(--destructive);
@@ -146,8 +143,6 @@
   /* Wider page for /search on 3xl screens only. */
   --page-max-wide: 1760px;
   --header-height: clamp(60px, 15vw, 72px);
-  /* Set by useStickyHeader: how far the shown fixed header covers the top of the screen. */
-  --sticky-header-offset: 0px;
 }
 
 /* Not static: Tailwind emits only the variables that utilities and var() in the CSS use. */
@@ -308,8 +303,6 @@
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-success-foreground: var(--success-foreground);
-  --color-chrome: var(--chrome);
-  --color-chrome-muted: var(--chrome-muted);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
   --color-input: var(--input);
@@ -330,7 +323,7 @@
     line-height: normal;
     color: var(--foreground);
     /* Shows only where Safari uncovers the page edge (its toolbars collapsing): the page background,
-       which the footer (the last block, no fill of its own) stands on. The hero and the browser chrome
+       which the footer stands on. The hero and the browser chrome
        (theme-color) carry the green. */
     background: var(--background);
     font-synthesis: none;
