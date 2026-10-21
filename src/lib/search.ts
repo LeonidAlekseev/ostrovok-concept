@@ -106,13 +106,18 @@ export function validateSearch(query: SearchQuery, today: IsoDate): SearchErrors
 /** Dates and guests of a stay: shared by search and offer URLs. */
 export type Stay = Pick<SearchQuery, 'checkIn' | 'checkOut' | 'guests'>
 
+export function setGuestParams(params: URLSearchParams, guests: Guests): URLSearchParams {
+  params.set('adults', String(guests.adults))
+  if (guests.children) params.set('children', String(guests.children))
+  else params.delete('children')
+  params.set('rooms', String(guests.rooms))
+  return params
+}
+
 export function setStayParams(params: URLSearchParams, { checkIn, checkOut, guests }: Stay): URLSearchParams {
   params.set('checkin', checkIn)
   params.set('checkout', checkOut)
-  params.set('adults', String(guests.adults))
-  if (guests.children) params.set('children', String(guests.children))
-  params.set('rooms', String(guests.rooms))
-  return params
+  return setGuestParams(params, guests)
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/

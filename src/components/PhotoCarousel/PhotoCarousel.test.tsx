@@ -22,6 +22,21 @@ describe('PhotoCarousel', () => {
     expect(counter()).toBe(`${photos.length} / ${photos.length}`)
   })
 
+  // hotel-tile, Requirement: Фокус в карусели фото
+  it('keeps the strip out of the Tab order, so Tab goes from the title to the arrows', async () => {
+    const user = userEvent.setup()
+    render(
+      <>
+        <a href="/h">Название</a>
+        <PhotoCarousel photos={photos} />
+      </>,
+    )
+    expect(screen.getByRole('group').getAttribute('tabindex')).toBe('-1')
+    screen.getByRole('link', { name: 'Название' }).focus()
+    await user.tab()
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Предыдущее фото' }))
+  })
+
   it('shows the arrows on hover and focus only, and none on touch screens', () => {
     render(<PhotoCarousel photos={photos} />)
     for (const name of ['Предыдущее фото', 'Следующее фото']) {

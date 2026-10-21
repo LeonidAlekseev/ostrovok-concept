@@ -80,15 +80,38 @@ describe('Header', () => {
     const user = setup()
     await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
     const nav = screen.getByRole('navigation', { name: 'Основное меню' })
-    const links = [...nav.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href')])
-    expect(links).toEqual([
+    const items = [...nav.querySelectorAll('a, button')].map((el) => [el.textContent, el.getAttribute('href')])
+    expect(items).toEqual([
       ['Поиск отелей', '/#search'],
       ['Мои поездки', '/trips'],
       ['Избранное', '/favorites'],
+      ['Уведомления', null],
+      ['Войти', '/login'],
       ['Поддержка', '/help'],
     ])
     await user.click(screen.getByRole('link', { name: 'Мои поездки' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Меню' })).toBeNull())
+  })
+
+  it('opens the notifications from the menu and closes the menu', async () => {
+    const user = setup()
+    await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
+    await user.click(
+      within(screen.getByRole('navigation', { name: 'Основное меню' })).getByRole('button', { name: 'Уведомления' }),
+    )
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Меню' })).toBeNull())
+    expect(screen.getByRole('dialog', { name: 'Уведомления' })).toBeTruthy()
+  })
+
+  it('opens the account menu from the menu once signed in', async () => {
+    signIn('anna@example.com')
+    const user = setup()
+    await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
+    const nav = screen.getByRole('navigation', { name: 'Основное меню' })
+    expect(within(nav).queryByRole('link', { name: 'Войти' })).toBeNull()
+    await user.click(within(nav).getByRole('button', { name: 'Аккаунт' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Меню' })).toBeNull())
+    expect(screen.getByRole('dialog', { name: 'Аккаунт' })).toBeTruthy()
   })
 
   it('shows an account icon to a guest, linked to /login, without text', () => {
