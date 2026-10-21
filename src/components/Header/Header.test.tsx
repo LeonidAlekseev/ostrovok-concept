@@ -5,6 +5,14 @@ import { signIn } from '@/lib/auth'
 import { favoritesStore, sessionStore } from '@/lib/storage'
 import { Header } from './Header'
 
+vi.mock('next/navigation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('next/navigation')>()
+  return {
+    ...actual,
+    usePathname: () => window.location.pathname,
+  }
+})
+
 beforeEach(() => window.localStorage.clear())
 
 const setup = () => {
@@ -22,6 +30,22 @@ describe('Header', () => {
   it('links the logo to the home page', () => {
     setup()
     expect(screen.getByRole('link', { name: 'Островок! — на главную' }).getAttribute('href')).toBe('/')
+  })
+
+  it('widens the header to the search page width from 3xl only on /search', () => {
+    const logo = () => screen.getByRole('link', { name: 'Островок! — на главную' }).parentElement!.className
+    window.history.pushState({}, '', '/search')
+    setup()
+    expect(logo()).toMatch(/(^|\s)3xl:max-w-\(--page-max-wide\)(\s|$)/)
+    expect(logo()).toMatch(/(^|\s)3xl:px-\(--page-x\)(\s|$)/)
+    window.history.pushState({}, '', '/')
+  })
+
+  it('keeps the header width on other pages', () => {
+    setup()
+    expect(screen.getByRole('link', { name: 'Островок! — на главную' }).parentElement!.className).not.toMatch(
+      /3xl:max-w-/,
+    )
   })
 
   it('links "Избранное" to /favorites instead of opening a panel', () => {
