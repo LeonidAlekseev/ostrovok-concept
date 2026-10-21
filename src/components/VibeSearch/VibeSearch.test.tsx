@@ -236,7 +236,7 @@ describe('VibeSearch picture', () => {
     const user = await finish()
     await user.click(screen.getByRole('button', { name: 'Поделиться' }))
     expect(canShare).toHaveBeenCalledWith({ files: [image] })
-    expect(share).toHaveBeenCalledWith(expect.objectContaining({ files: [image], title: 'Островок! Поиск вайба' }))
+    expect(share).toHaveBeenCalledWith(expect.objectContaining({ files: [image], title: 'О!Погнали Поиск вайба' }))
     expect(await screen.findByText('Картинка отправлена')).toBeTruthy()
   })
 

@@ -163,7 +163,10 @@ describe('Gallery thumbnails', () => {
     expect(large.getAttribute('aria-label')).toBe(`Открыть фото: ${hotel.photos[2].caption}`)
 
     await user.click(large)
-    expect(document.activeElement?.getAttribute('aria-label')).toBe(`Открыть фото 3: ${hotel.photos[2].caption}`)
+    // The dialog moves focus after it opens, which can lag behind the click on a slow runner.
+    await waitFor(() =>
+      expect(document.activeElement?.getAttribute('aria-label')).toBe(`Открыть фото 3: ${hotel.photos[2].caption}`),
+    )
   })
 
   it('a swipe of the large photos selects the photo it stops on', () => {

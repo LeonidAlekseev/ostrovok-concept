@@ -1,6 +1,6 @@
 /** Media to send to friends: a branded canvas frame, a canvas recorded into a video, sending or saving a file. */
 
-export const BRAND_NAME = 'Островок!'
+export const BRAND_NAME = 'О!Погнали'
 export const SLOGAN = 'Найди свой уголок'
 
 /** MP4 where the browser records it (Safari, Chrome 126+), WebM otherwise; `null` without MediaRecorder. */

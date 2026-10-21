@@ -11,7 +11,7 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const hotel = getHotel((await params).hotelId)
-  return { title: hotel ? `${hotel.name} — Островок!` : 'Страница не найдена — Островок!' }
+  return { title: hotel ? hotel.name : 'Страница не найдена' }
 }
 
 export default async function Page({ params }: Props) {

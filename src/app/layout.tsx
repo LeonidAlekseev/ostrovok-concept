@@ -7,8 +7,11 @@ import '@fontsource/caveat/600.css'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Островок! — бронирование отелей',
-  description: 'Островок! — найдите отель для следующего путешествия',
+  title: {
+    default: 'О!Погнали — бронирование отелей',
+    template: '%s — О!Погнали',
+  },
+  description: 'О!Погнали — найдите отель для следующего путешествия',
   icons: {
     icon: [
       { url: '/favicon.svg', type: 'image/svg+xml' },
