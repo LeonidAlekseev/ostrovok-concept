@@ -3,7 +3,6 @@
 import { ArrowRight } from 'lucide-react'
 import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import type { Hotel } from '@/lib/catalog'
 import { nightsBetween, todayIso } from '../../lib/dates'
 import { countRu, formatPrice } from '../../lib/format'
@@ -41,13 +40,8 @@ export function PriceBar({ hotel, className }: { hotel: Hotel; className?: strin
           за {countRu(nights, ['ночь', 'ночи', 'ночей'])}, для {countRu(people, ['гостя', 'гостей', 'гостей'])}
         </p>
       </div>
-      <Separator orientation="vertical" />
-      <Button
-        size="lg"
-        className="ml-auto h-12 min-w-0 flex-1 text-base sm:max-w-60"
-        onClick={() => goToSection('rooms')}
-      >
-        Выбрать номер
+      <Button size="lg" className="h-12 min-w-0 flex-1 px-4 text-base" onClick={() => goToSection('rooms')}>
+        <span className="min-w-0 flex-1 truncate text-center">Выбрать номер</span>
         <ArrowRight aria-hidden />
       </Button>
     </div>

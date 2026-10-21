@@ -55,7 +55,7 @@ export function Header() {
 
   const wrapperRef = useRef<HTMLDivElement>(null)
   const [focusWithin, setFocusWithin] = useState(false)
-  const { floating, shown } = useStickyHeader(wrapperRef, open !== null || focusWithin)
+  const { floating, shown, animated } = useStickyHeader(wrapperRef, open !== null || focusWithin)
   // On the home page the docked header is transparent: the hero (and the globe's glow) continues underneath.
   const transparent = usePathname() === '/' && !floating
 
@@ -70,7 +70,8 @@ export function Header() {
         }}
         className={cn(
           'inset-x-0 top-0',
-          floating ? 'fixed transition-transform duration-200 ease-out motion-reduce:transition-none' : 'absolute',
+          floating ? 'fixed' : 'absolute',
+          animated && 'transition-transform duration-200 ease-out motion-reduce:transition-none',
           floating && !shown && '-translate-y-full',
           floating && shown && 'translate-y-0 shadow-md',
           !transparent && 'rounded-b-[clamp(20px,5vw,32px)] bg-chrome',

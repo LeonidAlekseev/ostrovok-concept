@@ -5,6 +5,11 @@ export type StickyState = {
   floating: boolean
   /** The fixed header is on screen. */
   shown: boolean
+  /**
+   * The header was already `fixed` before this change, so showing and hiding may animate. The switch from
+   * the flow to `fixed` itself must not: it would slide the header in from its docked place.
+   */
+  animated: boolean
 }
 
 /** The page must be scrolled past this share of the screen before the fixed header may appear. */
@@ -12,7 +17,7 @@ export const SHOW_AFTER = 0.5
 /** A direction change counts only after this many pixels the other way, so a trembling finger does not flicker it. */
 export const DIRECTION_GAP = 8
 
-const docked: StickyState = { floating: false, shown: false }
+const docked: StickyState = { floating: false, shown: false, animated: false }
 
 /** The store behind `useStickyHeader`: separate from React so the scroll rules are testable on their own. */
 export function createStickyStore() {
@@ -37,7 +42,7 @@ export function createStickyStore() {
     const shown = (direction === 'up' && y > window.innerHeight * SHOW_AFTER) || (locked && state.shown && y > height)
     const floating = shown || y > height
     if (floating !== state.floating || shown !== state.shown) {
-      state = { floating, shown }
+      state = { floating, shown, animated: state.floating && floating }
       listeners.forEach((listener) => listener())
     }
   }
