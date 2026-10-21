@@ -35,7 +35,7 @@ Vercel определяет проект как Next.js без дополнит�
 
 ## Ключи API
 
-Ключи API (Supabase, OpenRouter) хранятся в репозитории зашифрованными через
+Ключи API (Supabase, OpenRouter, Liveblocks) хранятся в репозитории зашифрованными через
 [git-secret](https://github.com/sobolevn/git-secret): в git лежит только `.env.local.secret`, открытые `.env*`
 (кроме `.env.example` с именами переменных) и закрытые ключи в `.gitignore`. Файл зашифрован для ключа GPG проекта
 `secrets@opognali.local` (без пароля) и ключей людей, добавленных через `git secret tell`.
