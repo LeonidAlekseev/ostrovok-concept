@@ -153,7 +153,7 @@
   --breakpoint-xl: 1240px;
   --breakpoint-3xl: 120rem;
   --font-sans: 'Onest Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-hand: 'Great Vibes', cursive;
+  --font-hand: var(--font-lovelies), cursive;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

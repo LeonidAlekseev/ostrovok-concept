@@ -54,10 +54,9 @@ const initialSourceIds = ['london', 'lisbon', 'tbilisi']
 const hero = [
   // The sphere is much larger than the viewport: it rises from the lower right behind the title.
   // Offsets include the transparent header laid over the top of the hero.
-  '[--globe-size:clamp(540px,144vw,640px)] [--globe-top:calc(var(--header-height)+clamp(24px,8vw,40px))] [--globe-x:88%]',
+  // On phones the globe sits further right than its box: the hint stays on the strip left of its limb, clear of the pins.
+  '[--globe-size:clamp(540px,144vw,640px)] [--globe-top:calc(var(--header-height)+clamp(24px,8vw,40px))] [--globe-x:106%]',
   'md:[--globe-size:clamp(760px,76vw,980px)] md:[--globe-top:calc(var(--header-height)+32px)] md:[--globe-x:64%]',
-  // Up to lg the hint sits on the globe's left limb: the globe moves right so the pins stay clear of it.
-  'md:max-lg:[--globe-x:84%]',
   'relative isolate h-[calc(var(--globe-top)+var(--globe-size)*0.76)] overflow-hidden text-brand-foreground md:h-[calc(var(--globe-top)+var(--globe-size)*0.62)]',
   'bg-brand bg-[radial-gradient(ellipse_60%_45%_at_85%_30%,color-mix(in_srgb,var(--decor-glow)_75%,transparent),transparent_70%)]',
   // A long press on the globe must not start selecting the title or the hint (iOS) or open the callout.
@@ -100,8 +99,8 @@ const pinTooltipShown =
   'group-focus-visible:translate-y-0 group-focus-visible:opacity-100 [.group:hover_&]:translate-y-0 [.group:hover_&]:opacity-100'
 const placeCard = [
   '[--card-dx:22px] [--card-dy:calc(-100%_-_12px)] [--card-lift:0px]',
-  // Not enough room to the right of the pin up to lg (phones, and tablets with the globe moved right), and the title is above it: hang the card below.
-  'max-lg:[--card-dx:-50%] max-lg:[--card-dy:12px]',
+  // Not enough room to the right of the pin on phones, and the title is above it: hang the card below.
+  'max-md:[--card-dx:-50%] max-md:[--card-dy:12px]',
   // Inset of the picture, the same on every side; its size equals the text block's height.
   '[--card-pad:clamp(5px,1.4vw,7px)] [--badge-size:clamp(9px,2.5vw,12px)] [--name-size:clamp(13px,3.5vw,17px)] [--meta-size:clamp(10px,2.75vw,13px)] [--text-gap:2px]',
   'absolute top-0 left-0 z-5 w-max rounded-[clamp(10px,3vw,14px)] border-0 bg-card py-(--card-pad) pr-[calc(var(--card-pad)_+_4px)] pl-(--card-pad) text-left text-foreground',
@@ -402,7 +401,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
 
       <p
         ref={hintRef}
-        className="pointer-events-none relative z-4 mt-[clamp(32px,9vw,64px)] ml-[calc(var(--page-x)+4px)] w-[7em] origin-top-left -rotate-10 font-hand text-[clamp(21px,5.75vw,34px)]/[1.05] text-primary md:ml-[calc(max(0px,(100%-var(--page-max))/2)+var(--page-x)+8px)]"
+        className="pointer-events-none relative z-4 mt-[clamp(40px,11vw,90px)] ml-[calc(var(--page-x)+4px)] w-[5em] origin-top-left -rotate-10 font-hand text-[clamp(17px,2.2vw,24px)]/[1.05] text-primary md:mt-[clamp(40px,10.5vw,90px)] md:ml-[calc(max(0px,(100%-var(--page-max))/2)+var(--page-x)-8px)]"
         aria-hidden
       >
         Вращай глобус — воплощай мечту
