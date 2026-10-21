@@ -41,18 +41,28 @@ describe('createStickyStore', () => {
   it('stays docked at the top and while scrolling down', () => {
     const { store } = setup()
     scrollTo(30)
-    expect(store.getSnapshot()).toEqual({ floating: false, shown: false })
+    expect(store.getSnapshot()).toEqual({ floating: false, shown: false, animated: false })
     scrollTo(2000)
-    expect(store.getSnapshot()).toEqual({ floating: true, shown: false })
+    expect(store.getSnapshot()).toEqual({ floating: true, shown: false, animated: false })
+  })
+
+  it('does not animate the switch to fixed, only the later show and hide', () => {
+    const { store } = setup()
+    scrollTo(2000)
+    expect(store.getSnapshot()).toMatchObject({ floating: true, shown: false, animated: false })
+    scrollTo(1900)
+    expect(store.getSnapshot()).toMatchObject({ shown: true, animated: true })
+    scrollTo(2100)
+    expect(store.getSnapshot()).toMatchObject({ shown: false, animated: true })
   })
 
   it('shows on a scroll up when scrolled past half a screen, and hides on a scroll down', () => {
     const { store } = setup()
     scrollTo(2000)
     scrollTo(1900)
-    expect(store.getSnapshot()).toEqual({ floating: true, shown: true })
+    expect(store.getSnapshot()).toEqual({ floating: true, shown: true, animated: true })
     scrollTo(2000)
-    expect(store.getSnapshot()).toEqual({ floating: true, shown: false })
+    expect(store.getSnapshot()).toEqual({ floating: true, shown: false, animated: true })
   })
 
   it('never shows below half a screen, even on a scroll up', () => {
@@ -71,9 +81,9 @@ describe('createStickyStore', () => {
     scrollTo(1000)
     expect(store.getSnapshot().shown).toBe(true)
     scrollTo(300)
-    expect(store.getSnapshot()).toEqual({ floating: true, shown: false })
+    expect(store.getSnapshot()).toEqual({ floating: true, shown: false, animated: true })
     scrollTo(40)
-    expect(store.getSnapshot()).toEqual({ floating: false, shown: false })
+    expect(store.getSnapshot()).toEqual({ floating: false, shown: false, animated: false })
   })
 
   it('ignores a direction change smaller than 8 px', () => {
