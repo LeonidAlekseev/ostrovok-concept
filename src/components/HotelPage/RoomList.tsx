@@ -26,7 +26,7 @@ function RoomRow({ hotel, room, stay, guests, onPickDates }: Props & { room: Roo
   const href = stay && `/hotels/${hotel.id}/rooms?${setStayParams(new URLSearchParams(), stay)}#${room.id}`
 
   return (
-    <li className="grid gap-4 rounded-lg border border-border bg-card p-4 sm:grid-cols-[12rem_1fr_auto]">
+    <li className="grid gap-4 border-t border-border pt-4 sm:grid-cols-[12rem_1fr_auto]">
       <PhotoPlaceholder photo={room.photos[0]} kind="room" className="h-32 rounded-md sm:h-full" />
       <div className="flex flex-col gap-1">
         <h3 className="text-lg font-bold">{room.name}</h3>
@@ -60,7 +60,7 @@ function RoomRow({ hotel, room, stay, guests, onPickDates }: Props & { room: Roo
 
 export function RoomList(props: Props) {
   return (
-    <ul className="flex flex-col gap-3" aria-label="Номера">
+    <ul className="flex flex-col gap-4" aria-label="Номера">
       {props.hotel.rooms.map((room) => (
         <RoomRow key={room.id} {...props} room={room} />
       ))}
