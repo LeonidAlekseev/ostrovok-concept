@@ -9,6 +9,7 @@ import {
   pageItems,
   parseFilters,
   parsePage,
+  priceBounds,
   runDemoSearch,
   setFilterParams,
   type Filters,
@@ -62,15 +63,17 @@ describe('parseFilters and setFilterParams', () => {
     const set = filters({
       priceMin: 5000,
       priceMax: 20000,
-      stars: [5, 4],
-      rating: 8,
+      stars: [4, 5],
+      ratingMin: 7.5,
+      ratingMax: 9,
       meals: ['breakfast', 'all-inclusive'],
       freeCancel: true,
+      amenities: ['wifi', 'parking'],
       sort: 'price_asc',
     })
     const params = setFilterParams(new URLSearchParams('destination=prague'), set)
     expect(params.toString()).toBe(
-      'destination=prague&price_min=5000&price_max=20000&stars=5%2C4&rating=8&meal=breakfast%2Call-inclusive&free_cancel=1&sort=price_asc',
+      'destination=prague&price_min=5000&price_max=20000&stars=4%2C5&rating_min=7.5&rating_max=9&meal=breakfast%2Call-inclusive&free_cancel=1&amenities=wifi%2Cparking&sort=price_asc',
     )
     expect(parseFilters(params)).toEqual(set)
   })
@@ -83,14 +86,23 @@ describe('parseFilters and setFilterParams', () => {
   it('ignores unknown and malformed values', () => {
     expect(
       parseFilters(
-        new URLSearchParams('price_min=abc&price_max=-5&stars=7,5,x&rating=5&meal=snacks&free_cancel=yes&sort=cheap'),
+        new URLSearchParams(
+          'price_min=abc&price_max=-5&stars=7,5,x&rating_min=7.3&rating_max=11&meal=snacks&free_cancel=yes&amenities=wifi,jacuzzi&sort=cheap',
+        ),
       ),
-    ).toEqual(filters({ stars: [5] }))
+    ).toEqual(filters({ stars: [5], amenities: ['wifi'] }))
+  })
+
+  it('reads the old minimal rating as the lower end of the range and writes the new one', () => {
+    const params = new URLSearchParams('destination=prague&rating=8')
+    expect(parseFilters(params)).toEqual(filters({ ratingMin: 8 }))
+    expect(setFilterParams(params, parseFilters(params)).toString()).toBe('destination=prague&rating_min=8')
   })
 
   it('counts the filters set, without the sorting', () => {
     expect(countFilters(filters({ sort: 'rating' }))).toBe(0)
     expect(countFilters(filters({ priceMin: 1, priceMax: 2, stars: [5, 4], freeCancel: true }))).toBe(3)
+    expect(countFilters(filters({ ratingMax: 9, amenities: ['wifi', 'parking'] }))).toBe(2)
   })
 })
 
@@ -127,11 +139,29 @@ describe('applyFilters', () => {
     for (const { hotel, rate } of applyFilters(prague, NO_FILTERS)) expect(rate.pricePerNight).toBe(hotel.priceFrom)
   })
 
-  it('filters by stars and minimal rating', () => {
+  it('filters by stars and the rating from and to', () => {
     const fiveStars = applyFilters(prague, filters({ stars: [5] }))
     expect(fiveStars.length).toBeGreaterThan(0)
     expect(fiveStars.every((i) => i.hotel.stars === 5)).toBe(true)
-    expect(applyFilters(prague, filters({ rating: 9 })).every((i) => i.hotel.rating >= 9)).toBe(true)
+    expect(applyFilters(prague, filters({ ratingMin: 9 })).every((i) => i.hotel.rating >= 9)).toBe(true)
+    const between = applyFilters(prague, filters({ ratingMin: 8, ratingMax: 9 }))
+    expect(between.length).toBeGreaterThan(0)
+    expect(between.every((i) => i.hotel.rating >= 8 && i.hotel.rating <= 9)).toBe(true)
+    expect(between.length).toBe(prague.filter((h) => h.rating >= 8 && h.rating <= 9).length)
+  })
+
+  it('keeps only the hotels with every chosen amenity', () => {
+    const both = applyFilters(prague, filters({ amenities: ['parking', 'pool'] }))
+    expect(both.length).toBeGreaterThan(0)
+    expect(both.every((i) => i.hotel.amenities.includes('parking') && i.hotel.amenities.includes('pool'))).toBe(true)
+    expect(both.length).toBeLessThan(applyFilters(prague, filters({ amenities: ['parking'] })).length)
+  })
+
+  it('bounds the price slider by the cheapest and the dearest night without filters, in steps of 100 ₽', () => {
+    const [min, max] = priceBounds(prague)
+    const nights = prague.map((h) => h.priceFrom)
+    expect(min).toBe(Math.floor(Math.min(...nights) / 100) * 100)
+    expect(max).toBe(Math.ceil(Math.max(...nights) / 100) * 100)
   })
 
   it('picks the cheapest rate with the chosen meal and free cancellation', () => {
