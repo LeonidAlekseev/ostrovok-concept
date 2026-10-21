@@ -1,7 +1,17 @@
 'use client'
 
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type FocusEvent, type PointerEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FocusEvent,
+  type PointerEvent,
+  type ReactNode,
+} from 'react'
 import { createPortal } from 'react-dom'
 import { LngLatBounds, Map as MapLibreMap, Marker, Popup, type PopupOptions } from 'maplibre-gl'
 import { Star } from 'lucide-react'
@@ -10,7 +20,7 @@ import { Badge } from '@/components/ui/badge'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import type { Hotel } from '../../lib/catalog'
 import { countRu, formatDecimal, formatPrice } from '../../lib/format'
-import { clusterPoints, expansionZoom } from '../../lib/mapClusters'
+import { clusterPoints, expansionZoom, type MapCluster } from '../../lib/mapClusters'
 import { ATTRIBUTION_SHOWN_MS, foldAttribution, MAP_STYLE } from './mapSetup'
 import { MapUnavailable } from './MapUnavailable'
 import type { MapCamera } from './searchView'
@@ -38,7 +48,11 @@ interface Props {
   hotels: MapHotel[]
   activeId: string | null
   /** Hovering or focusing a marker highlights the hotel's card. */
-  onActivate: (id: string | null) => void
+  onActivate?: (id: string | null) => void
+  /** The hotel the map is opened from: its marker is ringed, stands above the rest and joins no group. */
+  currentId?: string
+  /** Stands in for the map when it cannot load. */
+  fallback?: ReactNode
   /** A marker press opens the hotel. */
   onOpen: (id: string) => void
   /** The camera to start with instead of framing the hotels: the one the user left the map with. */
@@ -53,12 +67,33 @@ interface Props {
  * portals into the elements MapLibre positions. A failure before the style loads (offline, no WebGL)
  * shows "Карта недоступна"; the list next to the map does not depend on it.
  */
-export default function SearchMap({ hotels, activeId, onActivate, onOpen, initialCamera, onCameraChange }: Props) {
+export default function SearchMap({
+  hotels,
+  activeId,
+  onActivate,
+  currentId,
+  fallback = <MapUnavailable />,
+  onOpen,
+  initialCamera,
+  onCameraChange,
+}: Props) {
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const [failed, setFailed] = useState(false)
   // The zoom the groups are made for: it changes once a zoom ends, so markers do not regroup mid-gesture.
   const [zoom, setZoom] = useState<number | null>(null)
-  const clusters = useMemo(() => (zoom === null ? [] : clusterPoints(hotels, zoom)), [hotels, zoom])
+  const clusters = useMemo(() => {
+    if (zoom === null) return []
+    const grouped = clusterPoints(
+      hotels.filter(({ hotel }) => hotel.id !== currentId),
+      zoom,
+    )
+    // The current hotel is last: its marker is added last and so stands above the rest.
+    const current = hotels.find(({ hotel }) => hotel.id === currentId)
+    if (!current) return grouped
+    const { hotel, price } = current
+    const own: MapCluster<MapHotel> = { key: hotel.id, members: [current], lon: hotel.lon, lat: hotel.lat, price }
+    return [...grouped, own]
+  }, [hotels, zoom, currentId])
   // One element per marker, created once: MapLibre moves it, React renders the marker into it.
   const [elements] = useState(() => new Map<string, HTMLElement>())
   const elementFor = (key: string) => {
@@ -66,7 +101,7 @@ export default function SearchMap({ hotels, activeId, onActivate, onOpen, initia
     if (!element) {
       element = document.createElement('div')
       // The active marker is lifted above its neighbours.
-      element.className = 'has-data-active:z-1'
+      element.className = 'has-data-active:z-1 has-data-current:z-2'
       elements.set(key, element)
     }
     return element
@@ -172,15 +207,15 @@ export default function SearchMap({ hotels, activeId, onActivate, onOpen, initia
     }
   }, [map, previewed, previewElement])
 
-  if (failed) return <MapUnavailable />
+  if (failed) return fallback
 
   const show = (id: string) => {
     setPreviewId(id)
-    onActivate(id)
+    onActivate?.(id)
   }
   const hide = () => {
     setPreviewId(null)
-    onActivate(null)
+    onActivate?.(null)
   }
 
   return (
@@ -214,6 +249,7 @@ export default function SearchMap({ hotels, activeId, onActivate, onOpen, initia
             )
           const { hotel, price } = cluster.members[0]
           const active = hotel.id === activeId
+          const current = hotel.id === currentId
           return createPortal(
             <button
               type="button"
@@ -221,6 +257,8 @@ export default function SearchMap({ hotels, activeId, onActivate, onOpen, initia
               aria-haspopup="dialog"
               aria-describedby={previewId === hotel.id ? previewDomId : undefined}
               data-active={active || undefined}
+              data-current={current || undefined}
+              aria-current={current || undefined}
               onClick={() => onOpen(hotel.id)}
               // Only a mouse hovers: a tap opens the hotel at once, without the preview.
               onPointerEnter={(e: PointerEvent) => e.pointerType === 'mouse' && show(hotel.id)}
@@ -230,6 +268,7 @@ export default function SearchMap({ hotels, activeId, onActivate, onOpen, initia
               onKeyDown={(e) => e.key === 'Escape' && setPreviewId(null)}
               className={cn(
                 'rounded-full px-2.5 py-1 text-sm/[normal] font-[650] whitespace-nowrap shadow-(--shadow-card) transition-[background-color,color,scale] duration-150',
+                current && 'ring-2 ring-primary',
                 active ? 'scale-110 bg-primary text-primary-foreground' : 'bg-card text-foreground hover:bg-secondary',
               )}
             >
