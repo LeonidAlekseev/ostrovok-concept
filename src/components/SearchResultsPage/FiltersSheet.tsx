@@ -21,10 +21,11 @@ interface Props {
   onChange: (filters: Filters) => void
   /** How many hotels the current filters leave. */
   total: number
+  priceBounds: [number, number]
 }
 
 /** The filters on narrow screens: a bottom sheet with the sorting first and a pinned "Показать N отелей". */
-export function FiltersSheet({ open, onOpenChange, filters, onChange, total }: Props) {
+export function FiltersSheet({ open, onOpenChange, filters, onChange, total, priceBounds }: Props) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" showCloseButton={false}>
@@ -33,7 +34,7 @@ export function FiltersSheet({ open, onOpenChange, filters, onChange, total }: P
           <SheetDescription className="sr-only">Сортировка и фильтры применяются сразу.</SheetDescription>
         </SheetHeader>
         <div className="min-h-0 flex-1 overflow-y-auto px-4">
-          <FiltersPanel filters={filters} onChange={onChange} embedded />
+          <FiltersPanel filters={filters} onChange={onChange} priceBounds={priceBounds} embedded />
         </div>
         <SheetFooter className="mt-0 flex-row border-t">
           {countFilters(filters) > 0 && (

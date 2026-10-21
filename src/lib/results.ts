@@ -1,12 +1,23 @@
 import { destinations, type Destination } from '../data/destinations'
-import { fullHotelsIn, getDestination, MEAL_LABEL, type Hotel, type Meal, type Rate, type Room } from './catalog'
+import {
+  AMENITIES,
+  fullHotelsIn,
+  getDestination,
+  MEAL_LABEL,
+  type Amenity,
+  type Hotel,
+  type Meal,
+  type Rate,
+  type Room,
+} from './catalog'
 import { nightsBetween } from './dates'
 import { averageNight, stayTotal } from './offer'
 import type { SearchQuery, SearchTarget, Stay } from './search'
 
 /**
  * Search results page: the demo search over the hotel catalogue, and the filters and sorting the
- * page keeps in its URL (`price_min`, `price_max`, `stars`, `rating`, `meal`, `free_cancel`, `sort`).
+ * page keeps in its URL (`price_min`, `price_max`, `stars`, `rating_min`, `rating_max`, `meal`, `free_cancel`,
+ * `amenities`, `sort`).
  */
 
 export interface SearchResult {
@@ -56,9 +67,13 @@ export const SORTS = {
 
 export type Sort = keyof typeof SORTS
 
-export const STAR_OPTIONS = [5, 4, 3, 2, 1] as const
-export const RATING_OPTIONS = [9, 8, 7, 6] as const
+export const STAR_OPTIONS = [1, 2, 3, 4, 5] as const
+/** The guest rating slider: from 0 to 10 in halves. */
+export const RATING_SCALE = { min: 0, max: 10, step: 0.5 } as const
 export const MEAL_OPTIONS = Object.keys(MEAL_LABEL) as Meal[]
+export const AMENITY_OPTIONS = Object.keys(AMENITIES) as Amenity[]
+/** The price slider moves in steps of this many roubles. */
+export const PRICE_STEP = 100
 
 export interface Filters {
   /** Price per night of one room, ₽, averaged over the stay; `null` is no bound. */
@@ -66,11 +81,14 @@ export interface Filters {
   priceMax: number | null
   /** Empty: any. */
   stars: number[]
-  /** Minimal guest rating; `null` is any. */
-  rating: number | null
+  /** Guest rating from and to; `null` is no bound. */
+  ratingMin: number | null
+  ratingMax: number | null
   /** Empty: any. */
   meals: Meal[]
   freeCancel: boolean
+  /** The hotel must have every one of them; empty: any. */
+  amenities: Amenity[]
   sort: Sort
 }
 
@@ -78,9 +96,11 @@ export const NO_FILTERS: Filters = {
   priceMin: null,
   priceMax: null,
   stars: [],
-  rating: null,
+  ratingMin: null,
+  ratingMax: null,
   meals: [],
   freeCancel: false,
+  amenities: [],
   sort: 'popular',
 }
 
@@ -89,23 +109,40 @@ export const PAGE_SIZE = 12
 /** The page of the list, `?page=2`; not a filter, but any change of the filters or sorting drops it. */
 export const PAGE_PARAM = 'page'
 
-export const FILTER_PARAMS = ['price_min', 'price_max', 'stars', 'rating', 'meal', 'free_cancel', 'sort'] as const
+/** `rating` is the old minimal rating: read as `rating_min`, never written. */
+export const FILTER_PARAMS = [
+  'price_min',
+  'price_max',
+  'stars',
+  'rating',
+  'rating_min',
+  'rating_max',
+  'meal',
+  'free_cancel',
+  'amenities',
+  'sort',
+] as const
 
 const toPrice = (value: string | null) => (value && /^\d+$/.test(value) ? Number(value) : null)
 const list = (value: string | null) => (value ? value.split(',') : [])
-const isOneOf = <T>(options: readonly T[], value: unknown): value is T => options.includes(value as T)
+const toRating = (value: string | null) => {
+  if (!value || !/^\d+(\.\d+)?$/.test(value)) return null
+  const rating = Number(value)
+  return rating <= RATING_SCALE.max && rating % RATING_SCALE.step === 0 ? rating : null
+}
 
 /** Reads the filters and sorting from the URL; unknown or malformed values are ignored. */
 export function parseFilters(params: Pick<URLSearchParams, 'get'>): Filters {
-  const rating = Number(params.get('rating'))
   const sort = params.get('sort')
   return {
     priceMin: toPrice(params.get('price_min')),
     priceMax: toPrice(params.get('price_max')),
     stars: STAR_OPTIONS.filter((s) => list(params.get('stars')).includes(String(s))),
-    rating: isOneOf(RATING_OPTIONS, rating) ? rating : null,
+    ratingMin: toRating(params.get('rating_min') ?? params.get('rating')),
+    ratingMax: toRating(params.get('rating_max')),
     meals: MEAL_OPTIONS.filter((m) => list(params.get('meal')).includes(m)),
     freeCancel: params.get('free_cancel') === '1',
+    amenities: AMENITY_OPTIONS.filter((a) => list(params.get('amenities')).includes(a)),
     sort: sort && sort in SORTS ? (sort as Sort) : 'popular',
   }
 }
@@ -136,9 +173,11 @@ export function setFilterParams(params: URLSearchParams, filters: Filters): URLS
   if (filters.priceMin !== null) params.set('price_min', String(filters.priceMin))
   if (filters.priceMax !== null) params.set('price_max', String(filters.priceMax))
   if (filters.stars.length) params.set('stars', filters.stars.join(','))
-  if (filters.rating !== null) params.set('rating', String(filters.rating))
+  if (filters.ratingMin !== null) params.set('rating_min', String(filters.ratingMin))
+  if (filters.ratingMax !== null) params.set('rating_max', String(filters.ratingMax))
   if (filters.meals.length) params.set('meal', filters.meals.join(','))
   if (filters.freeCancel) params.set('free_cancel', '1')
+  if (filters.amenities.length) params.set('amenities', filters.amenities.join(','))
   if (filters.sort !== 'popular') params.set('sort', filters.sort)
   return params
 }
@@ -147,9 +186,10 @@ export function setFilterParams(params: URLSearchParams, filters: Filters): URLS
 export const countFilters = (f: Filters) =>
   Number(f.priceMin !== null || f.priceMax !== null) +
   Number(f.stars.length > 0) +
-  Number(f.rating !== null) +
+  Number(f.ratingMin !== null || f.ratingMax !== null) +
   Number(f.meals.length > 0) +
-  Number(f.freeCancel)
+  Number(f.freeCancel) +
+  Number(f.amenities.length > 0)
 
 export interface ResultItem {
   hotel: Hotel
@@ -186,6 +226,21 @@ const compare: Record<Sort, (a: ResultItem, b: ResultItem) => number> = {
   rating: (a, b) => b.hotel.rating - a.hotel.rating || b.hotel.reviewCount - a.hotel.reviewCount,
 }
 
+/** The average night of one room the price filter takes: the offer price over the stay and rooms. */
+const filterPrice = (price: number, stay: Stay | null) =>
+  stay ? averageNight(price, nightsBetween(stay.checkIn, stay.checkOut), stay.guests.rooms) : price
+
+/**
+ * The ends of the price slider: the cheapest and the dearest night among the hotels without filters,
+ * widened to whole steps of the slider.
+ */
+export function priceBounds(hotels: Hotel[], stay: Stay | null = null): [number, number] {
+  const prices = applyFilters(hotels, NO_FILTERS, stay).map((item) => filterPrice(item.price, stay))
+  if (prices.length === 0) return [0, PRICE_STEP]
+  const min = Math.floor(Math.min(...prices) / PRICE_STEP) * PRICE_STEP
+  return [min, Math.max(Math.ceil(Math.max(...prices) / PRICE_STEP) * PRICE_STEP, min + PRICE_STEP)]
+}
+
 /**
  * Hotels that meet the filters, sorted. Each hotel is shown with its cheapest rate for the stay among
  * those with the chosen meals and cancellation; the price filter takes its average night, the price
@@ -195,12 +250,12 @@ export function applyFilters(hotels: Hotel[], f: Filters, stay: Stay | null = nu
   const items: ResultItem[] = []
   for (const hotel of hotels) {
     if (f.stars.length && !f.stars.includes(hotel.stars)) continue
-    if (f.rating !== null && hotel.rating < f.rating) continue
+    if (f.ratingMin !== null && hotel.rating < f.ratingMin) continue
+    if (f.ratingMax !== null && hotel.rating > f.ratingMax) continue
+    if (!f.amenities.every((a) => hotel.amenities.includes(a))) continue
     const best = bestRate(hotel, f, stay)
     if (!best) continue
-    const price = stay
-      ? averageNight(best.price, nightsBetween(stay.checkIn, stay.checkOut), stay.guests.rooms)
-      : best.price
+    const price = filterPrice(best.price, stay)
     if ((f.priceMin !== null && price < f.priceMin) || (f.priceMax !== null && price > f.priceMax)) continue
     items.push({ hotel, destination: getDestination(hotel.destinationId)!, ...best })
   }

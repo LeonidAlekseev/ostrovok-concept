@@ -1,7 +1,7 @@
 'use client'
 
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { useCallback, useEffect, useId, useRef, useState, type FocusEvent, type PointerEvent } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type FocusEvent, type PointerEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { LngLatBounds, Map as MapLibreMap, Marker, Popup, type PopupOptions } from 'maplibre-gl'
 import { Star } from 'lucide-react'
@@ -10,8 +10,10 @@ import { Badge } from '@/components/ui/badge'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import type { Hotel } from '../../lib/catalog'
 import { countRu, formatDecimal, formatPrice } from '../../lib/format'
+import { clusterPoints, expansionZoom } from '../../lib/mapClusters'
 import { ATTRIBUTION_SHOWN_MS, foldAttribution, MAP_STYLE } from './mapSetup'
 import { MapUnavailable } from './MapUnavailable'
+import type { MapCamera } from './searchView'
 
 export interface MapHotel {
   hotel: Hotel
@@ -39,28 +41,42 @@ interface Props {
   onActivate: (id: string | null) => void
   /** A marker press opens the hotel. */
   onOpen: (id: string) => void
+  /** The camera to start with instead of framing the hotels: the one the user left the map with. */
+  initialCamera?: MapCamera | null
+  /** Called after every move of the map. */
+  onCameraChange?: (camera: MapCamera) => void
 }
 
 /**
- * MapLibre map of the results with a price marker per hotel. Markers and the hover preview are React
+ * MapLibre map of the results with a price marker per hotel; markers that would stand close at the
+ * current zoom share one group marker, which zooms in when pressed. Markers and the hover preview are React
  * portals into the elements MapLibre positions. A failure before the style loads (offline, no WebGL)
  * shows "Карта недоступна"; the list next to the map does not depend on it.
  */
-export default function SearchMap({ hotels, activeId, onActivate, onOpen }: Props) {
+export default function SearchMap({ hotels, activeId, onActivate, onOpen, initialCamera, onCameraChange }: Props) {
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const [failed, setFailed] = useState(false)
-  // One element per hotel, created once: MapLibre moves it, React renders the marker into it.
+  // The zoom the groups are made for: it changes once a zoom ends, so markers do not regroup mid-gesture.
+  const [zoom, setZoom] = useState<number | null>(null)
+  const clusters = useMemo(() => (zoom === null ? [] : clusterPoints(hotels, zoom)), [hotels, zoom])
+  // One element per marker, created once: MapLibre moves it, React renders the marker into it.
   const [elements] = useState(() => new Map<string, HTMLElement>())
-  const elementFor = (id: string) => {
-    let element = elements.get(id)
+  const elementFor = (key: string) => {
+    let element = elements.get(key)
     if (!element) {
       element = document.createElement('div')
       // The active marker is lifted above its neighbours.
       element.className = 'has-data-active:z-1'
-      elements.set(id, element)
+      elements.set(key, element)
     }
     return element
   }
+  // The camera to start with is used once; later lists of hotels are framed.
+  const startCamera = useRef(initialCamera)
+  const cameraChange = useRef(onCameraChange)
+  useEffect(() => {
+    cameraChange.current = onCameraChange
+  })
   // The preview card above a hovered or focused marker: one popup, its content rendered by React.
   const [previewElement] = useState(() => document.createElement('div'))
   const popupRef = useRef<Popup | null>(null)
@@ -73,11 +89,12 @@ export default function SearchMap({ hotels, activeId, onActivate, onOpen }: Prop
     if (!container) return
     let instance: MapLibreMap
     try {
+      const camera = startCamera.current
       instance = new MapLibreMap({
         container,
         style: MAP_STYLE,
-        center: [0, 30],
-        zoom: 1,
+        center: camera?.center ?? [0, 30],
+        zoom: camera?.zoom ?? 1,
         attributionControl: { compact: true },
       })
     } catch {
@@ -94,6 +111,7 @@ export default function SearchMap({ hotels, activeId, onActivate, onOpen }: Prop
     instance.on('load', () => {
       loaded = true
       setMap(instance)
+      setZoom(instance.getZoom())
       foldTimer = setTimeout(fold, ATTRIBUTION_SHOWN_MS)
       for (const type of ['mousedown', 'touchstart', 'wheel'] as const) instance.once(type, fold)
     })
@@ -101,23 +119,38 @@ export default function SearchMap({ hotels, activeId, onActivate, onOpen }: Prop
     instance.on('error', () => {
       if (!loaded) setFailed(true)
     })
+    instance.on('zoomend', () => setZoom(instance.getZoom()))
+    instance.on('moveend', () => {
+      const { lng, lat } = instance.getCenter()
+      cameraChange.current?.({ center: [lng, lat], zoom: instance.getZoom() })
+    })
     return () => {
       clearTimeout(foldTimer)
       instance.remove()
     }
   }, [])
 
-  // Markers follow the hotel list; the camera frames them.
+  // The camera frames the hotels of every new list, except the first one when a camera is kept.
   useEffect(() => {
     if (!map || hotels.length === 0) return
-    const markers = hotels.map(({ hotel }) =>
-      new Marker({ element: elements.get(hotel.id), anchor: 'bottom' }).setLngLat([hotel.lon, hotel.lat]).addTo(map),
-    )
+    if (startCamera.current) {
+      startCamera.current = null
+      return
+    }
     const bounds = new LngLatBounds()
     for (const { hotel } of hotels) bounds.extend([hotel.lon, hotel.lat])
     map.fitBounds(bounds, { padding: 56, maxZoom: 14, duration: 0 })
+    setZoom(map.getZoom())
+  }, [map, hotels])
+
+  // Markers follow the groups. A marker of the same hotel or group keeps its element, so it does not blink.
+  useEffect(() => {
+    if (!map) return
+    const markers = clusters.map(({ key, lon, lat }) =>
+      new Marker({ element: elements.get(key), anchor: 'bottom' }).setLngLat([lon, lat]).addTo(map),
+    )
     return () => markers.forEach((marker) => marker.remove())
-  }, [map, hotels, elements])
+  }, [map, clusters, elements])
 
   const previewed = hotels.find(({ hotel }) => hotel.id === previewId)
   useEffect(() => {
@@ -153,7 +186,33 @@ export default function SearchMap({ hotels, activeId, onActivate, onOpen }: Prop
   return (
     <div ref={containerRef} className="size-full" aria-label="Карта отелей" role="region">
       {map &&
-        hotels.map(({ hotel, price }) => {
+        clusters.map((cluster) => {
+          if (cluster.members.length > 1)
+            return createPortal(
+              <button
+                type="button"
+                aria-label={`${countRu(cluster.members.length, ['отель', 'отеля', 'отелей'])}, от ${formatPrice(cluster.price)}, приблизить`}
+                data-active={cluster.members.some(({ hotel }) => hotel.id === activeId) || undefined}
+                onClick={() =>
+                  map.easeTo({
+                    center: [cluster.lon, cluster.lat],
+                    zoom: expansionZoom(cluster.members, map.getZoom()),
+                  })
+                }
+                className={cn(
+                  'group flex items-center gap-1.5 rounded-full py-1 pr-2.5 pl-1 text-sm/[normal] font-[650] whitespace-nowrap shadow-(--shadow-card) transition-[background-color,color,scale] duration-150',
+                  'bg-card text-foreground hover:bg-secondary data-active:scale-110 data-active:bg-primary data-active:text-primary-foreground',
+                )}
+              >
+                <span className="flex size-5.5 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground group-data-active:bg-primary-foreground group-data-active:text-primary">
+                  {cluster.members.length}
+                </span>{' '}
+                от {formatPrice(cluster.price)}
+              </button>,
+              elementFor(cluster.key),
+              cluster.key,
+            )
+          const { hotel, price } = cluster.members[0]
           const active = hotel.id === activeId
           return createPortal(
             <button

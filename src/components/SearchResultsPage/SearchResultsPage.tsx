@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import dynamic from 'next/dynamic'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { List, LoaderCircle, MapPin, SlidersVertical } from 'lucide-react'
 import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
@@ -21,6 +21,7 @@ import {
   pageCount,
   parseFilters,
   parsePage,
+  priceBounds,
   runDemoSearch,
   setFilterParams,
   type Filters,
@@ -29,11 +30,13 @@ import {
 import {
   fromSearchParams,
   resolveTarget,
+  setStayParams,
   validateSearch,
   withStartDates,
   type SearchErrors,
   type SearchQuery,
   type SearchTarget,
+  type Stay,
 } from '../../lib/search'
 import { SearchForm } from '../SearchForm/SearchForm'
 import { FiltersPanel } from './FiltersPanel'
@@ -42,6 +45,7 @@ import { HotelDialog } from './HotelDialog'
 import { Pagination } from './Pagination'
 import { ResultTile } from './ResultTile'
 import { MapUnavailable } from './MapUnavailable'
+import { saveCamera, saveView, searchViewKey, useSearchView } from './searchView'
 
 // MapLibre is loaded only here and only in the browser; a failed chunk load reads as an unavailable map.
 const SearchMap = dynamic(() => import('./SearchMap').catch(() => ({ default: MapUnavailable })), {
@@ -51,6 +55,9 @@ const SearchMap = dynamic(() => import('./SearchMap').catch(() => ({ default: Ma
 
 /** The hotel opened from the map, `?hotel=<id>`: one history entry, so "Назад" closes it. */
 const HOTEL_PARAM = 'hotel'
+
+/** The hotel page with the dates and guests of the search. */
+const hotelHref = (id: string, stay: Stay) => `/hotels/${id}?${setStayParams(new URLSearchParams(), stay)}`
 
 type Status = { state: 'loading' } | { state: 'done'; result: SearchResult } | { state: 'error'; message: string }
 
@@ -78,18 +85,14 @@ export function SearchResultsFallback() {
 }
 
 const DESKTOP = '(min-width: 64rem)'
+const isDesktop = () => window.matchMedia?.(DESKTOP).matches ?? false
 const subscribeDesktop = (onChange: () => void) => {
   const query = window.matchMedia?.(DESKTOP)
   query?.addEventListener('change', onChange)
   return () => query?.removeEventListener('change', onChange)
 }
 /** `lg` and wider: the list and the map side by side. */
-const useDesktop = () =>
-  useSyncExternalStore(
-    subscribeDesktop,
-    () => window.matchMedia?.(DESKTOP).matches ?? false,
-    () => false,
-  )
+const useDesktop = () => useSyncExternalStore(subscribeDesktop, isDesktop, () => false)
 
 /** The results page `/search`: reads the query, filters and sorting from the URL. */
 export function SearchResultsPage() {
@@ -149,15 +152,25 @@ interface ResultsProps {
 
 function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
   const params = useSearchParams()
+  const router = useRouter()
   const [status, setStatus] = useState<Status>({ state: 'loading' })
   const [filters, setFilters] = useState(initialFilters)
   const [editing, setEditing] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [view, setView] = useState<'list' | 'map'>('list')
   const [activeId, setActiveId] = useState<string | null>(null)
   // Whether the open hotel has its own history entry: closing then goes back to the results.
   const pushedHotel = useRef(false)
   const desktop = useDesktop()
+  // The list or the map, and the camera, live outside the page: "Назад" from a hotel page returns to them.
+  // The key follows the filters of this render, not the URL that Next updates a moment later.
+  const viewKey = searchViewKey(setFilterParams(new URLSearchParams(params.toString()), filters), [HOTEL_PARAM])
+  const kept = useSearchView(viewKey)
+  const view = kept?.view ?? 'list'
+
+  // Narrow screens have no hotel dialog: a link with the hotel opens its page instead.
+  useEffect(() => {
+    if (hotelId && getHotel(hotelId) && !isDesktop()) router.replace(hotelHref(hotelId, query))
+  }, [hotelId, query, router])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -173,6 +186,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
 
   const result = status.state === 'done' ? status.result : null
   const items = useMemo(() => (result ? applyFilters(result.hotels, filters, query) : []), [result, filters, query])
+  const bounds = useMemo(() => (result ? priceBounds(result.hotels, query) : null), [result, query])
   const pages = pageCount(items.length)
   const page = parsePage(params, pages)
   const visible = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -202,12 +216,18 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
   /** Filters and sorting go to the URL without a new history entry. */
   const updateFilters = (next: Filters) => {
     setFilters(next)
-    const url = new URLSearchParams(window.location.search)
-    window.history.replaceState(null, '', `?${setFilterParams(url, next)}`)
+    const url = setFilterParams(new URLSearchParams(window.location.search), next)
+    // The new filters are a new search for the kept view: the map stays, its camera frames the new list.
+    saveView(searchViewKey(url, [HOTEL_PARAM]), view)
+    window.history.replaceState(null, '', `?${url}`)
   }
 
-  /** Opens a hotel over the results in a new history entry. */
+  /** Opens a hotel over the results in a new history entry; narrow screens go to the hotel page. */
   const openHotel = (id: string) => {
+    if (!desktop) {
+      router.push(hotelHref(id, query))
+      return
+    }
     const url = new URLSearchParams(window.location.search)
     url.set(HOTEL_PARAM, id)
     pushedHotel.current = true
@@ -271,7 +291,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
             <Button
               variant="outline"
               className={iconButton}
-              onClick={() => setView((v) => (v === 'list' ? 'map' : 'list'))}
+              onClick={() => saveView(viewKey, view === 'list' ? 'map' : 'list')}
               aria-label={view === 'list' ? 'Карта' : 'Список'}
             >
               {view === 'list' ? <MapPin aria-hidden /> : <List aria-hidden />}
@@ -296,7 +316,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
           <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_minmax(0,1fr)] 3xl:grid-cols-[15rem_minmax(0,1.6fr)_minmax(0,1fr)]">
             {desktop && (
               <aside aria-label="Фильтры" className="lg:col-start-1 lg:row-start-1">
-                <FiltersPanel filters={filters} onChange={updateFilters} />
+                <FiltersPanel filters={filters} onChange={updateFilters} priceBounds={bounds ?? [0, 0]} />
               </aside>
             )}
 
@@ -332,7 +352,14 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
             {(desktop || view === 'map') && (
               // `svh`: the phone address bar showing and hiding while scrolling does not resize the map.
               <div className="h-[70svh] overflow-hidden rounded-2xl shadow-(--shadow-card) lg:sticky lg:top-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-[calc(100svh-2rem)] xl:col-start-3">
-                <SearchMap hotels={items} activeId={activeId} onActivate={setActiveId} onOpen={openHotel} />
+                <SearchMap
+                  hotels={items}
+                  activeId={activeId}
+                  onActivate={setActiveId}
+                  onOpen={openHotel}
+                  initialCamera={kept?.camera}
+                  onCameraChange={(camera) => saveCamera(viewKey, camera)}
+                />
               </div>
             )}
           </div>
@@ -344,8 +371,9 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
         filters={filters}
         onChange={updateFilters}
         total={items.length}
+        priceBounds={bounds ?? [0, 0]}
       />
-      <HotelDialog hotel={hotelId ? getHotel(hotelId) : undefined} stay={query} onClose={closeHotel} />
+      <HotelDialog hotel={hotelId && desktop ? getHotel(hotelId) : undefined} stay={query} onClose={closeHotel} />
     </main>
   )
 }

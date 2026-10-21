@@ -2,12 +2,15 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fullHotelsIn, MEAL_LABEL } from '../../lib/catalog'
-import { applyFilters, NO_FILTERS } from '../../lib/results'
+import { countRu, formatPrice } from '../../lib/format'
+import { applyFilters, NO_FILTERS, priceBounds } from '../../lib/results'
+import { resetSearchView } from './searchView'
 import { SearchResultsPage } from './SearchResultsPage'
 
 // The page reads the URL through Next's hooks; here they read jsdom's location and, like Next,
 // follow `pushState`, `replaceState` and "Назад".
 const push = vi.fn()
+const replace = vi.fn()
 vi.mock('next/navigation', async () => {
   const { useSyncExternalStore } = await import('react')
   const subscribe = (onChange: () => void) => {
@@ -28,7 +31,7 @@ vi.mock('next/navigation', async () => {
         ),
       ),
     usePathname: () => window.location.pathname,
-    useRouter: () => ({ push, replace: vi.fn() }),
+    useRouter: () => ({ push, replace }),
   }
 })
 for (const method of ['pushState', 'replaceState'] as const) {
@@ -45,6 +48,11 @@ const mapMock = vi.hoisted(() => ({
   fail: false,
   options: [] as unknown[],
   last: null as { fire(type: string): void } | null,
+  /** The zoom the map reports: far enough by default for every hotel to have its own marker. */
+  zoom: 18,
+  center: { lng: 14.42, lat: 50.08 },
+  eased: [] as unknown[],
+  fitted: 0,
 }))
 vi.mock('maplibre-gl', () => {
   type Handler = () => void
@@ -81,7 +89,18 @@ vi.mock('maplibre-gl', () => {
     getContainer() {
       return this.container
     }
-    fitBounds() {}
+    getZoom() {
+      return mapMock.zoom
+    }
+    getCenter() {
+      return mapMock.center
+    }
+    easeTo(options: unknown) {
+      mapMock.eased.push(options)
+    }
+    fitBounds() {
+      mapMock.fitted++
+    }
     remove() {}
   }
   class Popup {
@@ -143,6 +162,13 @@ function open(search: string, { desktop = false } = {}) {
 /** Waits for the demo search to finish. */
 const results = () => screen.findByText(/Найдено \d+|Ничего не нашлось/, {}, { timeout: 3000 })
 const cards = () => screen.queryAllByRole('article')
+// Base UI keeps the thumbs invisible until it measures the track, which jsdom never lays out, so their
+// names are not computed: the thumb is found by its label.
+const slider = (name: string) => {
+  const thumb = screen.getAllByRole('slider', { hidden: true }).find((s) => s.getAttribute('aria-label') === name)
+  if (!thumb) throw new Error(`No slider "${name}"`)
+  return thumb
+}
 const cardNames = () => cards().map((card) => within(card).getByRole('heading').textContent)
 // The regular price comes before the GURU one.
 const priceOf = (card: HTMLElement) => within(card).getAllByText(/^[\d\s]+₽$/)[0].textContent!
@@ -153,12 +179,17 @@ beforeEach(() => {
   vi.setSystemTime(NOW)
   mapMock.fail = false
   mapMock.options = []
+  mapMock.zoom = 18
+  mapMock.eased = []
+  mapMock.fitted = 0
+  resetSearchView()
 })
 
 afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
   push.mockClear()
+  replace.mockClear()
 })
 
 // search-results-page, Requirement: Страница результатов
@@ -296,7 +327,7 @@ describe('SearchResultsPage filters', () => {
     await results()
     const pushState = vi.spyOn(window.history, 'pushState')
 
-    await user.click(screen.getByRole('checkbox', { name: '5 звёзд' }))
+    await user.click(screen.getByRole('button', { name: '5 звёзд' }))
     expect(window.location.search).toContain('stars=5')
     expect(cards().length).toBeGreaterThan(0)
     for (const card of cards()) expect(within(card).getByLabelText('5 звёзд')).toBeDefined()
@@ -311,14 +342,108 @@ describe('SearchResultsPage filters', () => {
     open(`${PRAGUE}&stars=5,4&rating=8&free_cancel=1&sort=price_desc`, { desktop: true })
     await results()
 
-    expect(screen.getByRole('checkbox', { name: '5 звёзд' }).getAttribute('aria-checked')).toBe('true')
-    expect(screen.getByRole('checkbox', { name: '4 звезды' }).getAttribute('aria-checked')).toBe('true')
-    expect(screen.getByRole('checkbox', { name: '3 звезды' }).getAttribute('aria-checked')).toBe('false')
-    expect(screen.getByRole('radio', { name: 'от 8' }).getAttribute('aria-checked')).toBe('true')
-    expect(screen.getByRole('checkbox', { name: 'Бесплатная отмена' }).getAttribute('aria-checked')).toBe('true')
+    const pressed = (name: string) => screen.getByRole('button', { name }).getAttribute('aria-pressed')
+    expect(pressed('5 звёзд')).toBe('true')
+    expect(pressed('4 звезды')).toBe('true')
+    expect(pressed('3 звезды')).toBe('false')
+    // The old `rating=8` is the lower end of the rating range.
+    expect(slider('Рейтинг от').getAttribute('aria-valuenow')).toBe('8')
+    expect(slider('Рейтинг до').getAttribute('aria-valuenow')).toBe('10')
+    expect(screen.getByText('от 8 до 10')).toBeDefined()
+    expect(pressed('Бесплатная отмена')).toBe('true')
     expect((screen.getByLabelText('Сортировка') as HTMLSelectElement).value).toBe('price_desc')
     expect(prices()).toEqual([...prices()].sort((a, b) => b - a))
     for (const card of cards()) expect(within(card).getByText('Бесплатная отмена')).toBeDefined()
+  })
+
+  it('shows the stars as chips from 1 to 5, the meals and the free cancellation as chips too', async () => {
+    open(PRAGUE, { desktop: true })
+    await results()
+    const aside = screen.getByRole('complementary', { name: 'Фильтры' })
+
+    expect(within(aside).queryAllByRole('checkbox')).toHaveLength(0)
+    expect(within(aside).queryAllByRole('radio')).toHaveLength(0)
+    const stars = within(within(aside).getByRole('group', { name: 'Звёзды' })).getAllByRole('button')
+    expect(stars.map((b) => b.getAttribute('aria-label'))).toEqual([
+      '1 звезда',
+      '2 звезды',
+      '3 звезды',
+      '4 звезды',
+      '5 звёзд',
+    ])
+    // The first "Питание" is the meals; the amenities have a section of the same name.
+    const meals = within(within(aside).getAllByRole('group', { name: 'Питание' })[0]).getAllByRole('button')
+    expect(meals.map((b) => b.textContent)).toEqual(Object.values(MEAL_LABEL))
+    expect(meals.every((b) => b.getAttribute('aria-pressed') === 'false')).toBe(true)
+  })
+
+  it('narrows the guest rating with the slider "от–до" and writes both ends into the URL', async () => {
+    open(PRAGUE, { desktop: true })
+    await results()
+    const from = slider('Рейтинг от')
+    const to = slider('Рейтинг до')
+    expect([from, to].map((s) => [s.getAttribute('min'), s.getAttribute('max')])).toEqual([
+      ['0', '10'],
+      ['0', '10'],
+    ])
+
+    fireEvent.change(from, { target: { value: '8' } })
+    fireEvent.change(to, { target: { value: '9' } })
+    expect(window.location.search).toContain('rating_min=8')
+    expect(window.location.search).toContain('rating_max=9')
+    expect(screen.getByText('от 8 до 9')).toBeDefined()
+    const expected = applyFilters(fullHotelsIn('prague'), { ...NO_FILTERS, ratingMin: 8, ratingMax: 9 })
+    expect(screen.getByText(/^Найдено/).textContent).toContain(String(expected.length))
+    expect(expected.every(({ hotel }) => hotel.rating >= 8 && hotel.rating <= 9)).toBe(true)
+
+    fireEvent.keyDown(from, { key: 'ArrowLeft' })
+    expect(window.location.search).toContain('rating_min=7.5')
+    expect(screen.getByText('от 7,5 до 9')).toBeDefined()
+  })
+
+  it('bounds the price slider by the cheapest and the dearest night of the results, its fields follow', async () => {
+    open(PRAGUE, { desktop: true })
+    await results()
+    const [low, high] = priceBounds(fullHotelsIn('prague'), {
+      checkIn: '2026-10-20',
+      checkOut: '2026-10-23',
+      guests: { adults: 2, children: 0, rooms: 1 },
+    })
+    const from = slider('Цена за ночь от')
+    expect(from.getAttribute('min')).toBe(String(low))
+    expect(from.getAttribute('max')).toBe(String(high))
+    expect(screen.getByRole('textbox', { name: 'Цена за ночь от' }).getAttribute('placeholder')).toBe(
+      `от ${formatPrice(low)}`,
+    )
+
+    fireEvent.change(from, { target: { value: String(low + 1000) } })
+    expect(window.location.search).toContain(`price_min=${low + 1000}`)
+    expect((screen.getByRole('textbox', { name: 'Цена за ночь от' }) as HTMLInputElement).value).toBe(
+      String(low + 1000),
+    )
+  })
+
+  it('keeps only the hotels with every chosen amenity, by the sections of the catalogue', async () => {
+    const user = userEvent.setup()
+    open(PRAGUE, { desktop: true })
+    await results()
+    const amenities = screen.getByRole('group', { name: 'Удобства' })
+    expect(within(amenities).getByRole('group', { name: 'Парковка' })).toBeDefined()
+
+    await user.click(within(amenities).getByRole('button', { name: 'Парковка' }))
+    await user.click(within(amenities).getByRole('button', { name: 'Крытый бассейн' }))
+    expect(within(amenities).getByRole('button', { name: 'Парковка' }).getAttribute('aria-pressed')).toBe('true')
+    expect(new URLSearchParams(window.location.search).get('amenities')).toBe('parking,pool')
+
+    const expected = applyFilters(fullHotelsIn('prague'), { ...NO_FILTERS, amenities: ['parking', 'pool'] })
+    expect(expected.length).toBeGreaterThan(0)
+    expect(screen.getByText(/^Найдено/).textContent).toContain(String(expected.length))
+    expect(cardNames().sort()).toEqual(
+      expected
+        .slice(0, 12)
+        .map(({ hotel }) => hotel.name)
+        .sort(),
+    )
   })
 
   it('shows "Ничего не нашлось" and resets the filters', async () => {
@@ -372,6 +497,13 @@ describe('SearchResultsPage compact bar', () => {
     expect(button.textContent).toBe('2')
   })
 
+  it('counts the rating range and the amenities among the enabled filters', async () => {
+    open(`${PRAGUE}&rating_min=7&amenities=wifi,parking`)
+    await results()
+
+    expect(screen.getByRole('button', { name: 'Фильтры, включено 2' })).toBeDefined()
+  })
+
   it('toggles between "Карта" and "Список" with the icon', async () => {
     const user = userEvent.setup()
     open(PRAGUE)
@@ -394,7 +526,7 @@ describe('SearchResultsPage compact bar', () => {
     await user.click(screen.getByRole('button', { name: 'Фильтры' }))
     const dialog = sheet()
     expect(dialog.querySelector('select')).toBe(within(dialog).getByLabelText('Сортировка'))
-    await user.click(within(dialog).getByRole('checkbox', { name: '5 звёзд' }))
+    await user.click(within(dialog).getByRole('button', { name: '5 звёзд' }))
 
     expect(window.location.search).toContain('stars=5')
     expect(pushState).not.toHaveBeenCalled()
@@ -474,7 +606,7 @@ describe('SearchResultsPage map', () => {
     await results()
 
     expect(await screen.findByText('Карта недоступна', {}, { timeout: 3000 })).toBeDefined()
-    await user.click(screen.getByRole('checkbox', { name: '5 звёзд' }))
+    await user.click(screen.getByRole('button', { name: '5 звёзд' }))
     await waitFor(() => expect(window.location.search).toContain('stars=5'))
     expect(cards().length).toBeGreaterThan(0)
   })
@@ -631,7 +763,7 @@ describe('SearchResultsPage hotel dialog', () => {
 
   it('opens the dialog right away from a link with the hotel, and closes it in place', async () => {
     const user = userEvent.setup()
-    open(`${PRAGUE}&hotel=${hotel.id}`)
+    open(`${PRAGUE}&hotel=${hotel.id}`, { desktop: true })
     await results()
 
     const dialog = await screen.findByRole('dialog', { name: hotel.name })
@@ -643,7 +775,7 @@ describe('SearchResultsPage hotel dialog', () => {
   })
 
   it('starts the dialog with the start dates of a search without dates', async () => {
-    open(`destination=prague&hotel=${hotel.id}`)
+    open(`destination=prague&hotel=${hotel.id}`, { desktop: true })
     await results()
 
     const dialog = await screen.findByRole('dialog', { name: hotel.name })
@@ -656,7 +788,7 @@ describe('SearchResultsPage hotel dialog', () => {
 
   it('changes the stay in the dialog only: the address and the list stay and the links follow', async () => {
     const user = userEvent.setup()
-    open(`${PRAGUE}&hotel=${hotel.id}`)
+    open(`${PRAGUE}&hotel=${hotel.id}`, { desktop: true })
     await results()
     const before = cardNames()
     const search = window.location.search
@@ -679,7 +811,7 @@ describe('SearchResultsPage hotel dialog', () => {
   // search-results-page, Requirement: Панель цены в окне отеля
   it('keeps the price bar of the hotel page at the bottom of the scrolling dialog, with its dates and guests', async () => {
     const user = userEvent.setup()
-    open(`${PRAGUE}&hotel=${hotel.id}`)
+    open(`${PRAGUE}&hotel=${hotel.id}`, { desktop: true })
     await results()
     const dialog = await screen.findByRole('dialog', { name: hotel.name })
     const bar = within(dialog).getByRole('region', { name: 'Цена' })
@@ -702,18 +834,145 @@ describe('SearchResultsPage hotel dialog', () => {
     expect(cards().length).toBeGreaterThan(0)
   })
 
-  it('opens the dialog from a marker on narrow screens and stays on the map', async () => {
+  it('opens the hotel page from a marker on narrow screens, with the dates and guests of the search', async () => {
     const user = userEvent.setup()
     open(PRAGUE)
     await results()
     await user.click(screen.getByRole('button', { name: 'Карта' }))
     const [marker] = await markers()
+    const hotel = fullHotelsIn('prague').find((h) => marker.getAttribute('aria-label')!.startsWith(`${h.name}, `))!
 
     await user.click(marker)
 
-    expect(await screen.findByRole('dialog')).toBeDefined()
-    // The page behind the modal dialog is hidden from assistive technology.
+    expect(push).toHaveBeenCalledWith(`/hotels/${hotel.id}?${STAY}`)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(window.location.search).not.toContain('hotel=')
+  })
+
+  it('opens the hotel page instead of the dialog for a link with the hotel on narrow screens', async () => {
+    const hotel = fullHotelsIn('prague')[0]
+    open(`${PRAGUE}&hotel=${hotel.id}`)
+    await results()
+
+    expect(replace).toHaveBeenCalledWith(`/hotels/${hotel.id}?${STAY}`)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+})
+
+// search-results-page, Requirement: Окно отеля с карты, Scenario: Телефон
+describe('SearchResultsPage back from the hotel page', () => {
+  const markers = () => screen.findAllByRole('button', { name: /, [\d\s]+₽$/ }, { timeout: 3000 })
+
+  it('returns to the map with the same centre and zoom after "Назад" from the hotel page', async () => {
+    const user = userEvent.setup()
+    const { unmount } = open(PRAGUE)
+    await results()
+    await user.click(screen.getByRole('button', { name: 'Карта' }))
+    const [marker] = await markers()
+    expect(mapMock.fitted).toBe(1)
+
+    // The user zooms in and moves the map.
+    mapMock.center = { lng: 14.41, lat: 50.09 }
+    mapMock.zoom = 17
+    act(() => mapMock.last!.fire('moveend'))
+    await user.click(marker)
+    expect(push).toHaveBeenCalled()
+
+    // The hotel page replaces the results; "Назад" renders them anew.
+    unmount()
+    mapMock.options = []
+    mapMock.fitted = 0
+    open(PRAGUE)
+    await results()
+
+    expect(screen.getByRole('button', { name: 'Список' })).toBeDefined()
+    await markers()
+    expect(mapMock.options).toHaveLength(1)
+    expect(mapMock.options[0]).toMatchObject({ center: [14.41, 50.09], zoom: 17 })
+    expect(mapMock.fitted).toBe(0)
+  })
+
+  it('starts another search on the list, its map framing the hotels', async () => {
+    const user = userEvent.setup()
+    const { unmount } = open(PRAGUE)
+    await results()
+    await user.click(screen.getByRole('button', { name: 'Карта' }))
+    await markers()
+    unmount()
+
+    open(`${PRAGUE}&stars=5`)
+    await results()
+    expect(screen.getByRole('button', { name: 'Карта' })).toBeDefined()
+  })
+
+  it('keeps the map when the filters change on it', async () => {
+    const user = userEvent.setup()
+    open(PRAGUE)
+    await results()
+    await user.click(screen.getByRole('button', { name: 'Карта' }))
+    await markers()
+
+    await user.click(screen.getByRole('button', { name: 'Фильтры' }))
+    await user.click(within(screen.getByRole('dialog', { name: 'Фильтры' })).getByRole('button', { name: '5 звёзд' }))
+
+    expect(window.location.search).toContain('stars=5')
     expect(screen.getByRole('button', { name: 'Список', hidden: true })).toBeDefined()
+    expect(mapMock.options).toHaveLength(1)
+  })
+})
+
+// search-results-page, Requirement: Карта результатов поиска, Scenario: Группа
+describe('SearchResultsPage map groups', () => {
+  const groups = () => screen.findAllByRole('button', { name: /приблизить$/ }, { timeout: 3000 })
+
+  it('groups close markers into "N от X ₽" with the cheapest price, and zooms in when pressed', async () => {
+    const user = userEvent.setup()
+    mapMock.zoom = 8
+    open(PRAGUE, { desktop: true })
+    await results()
+
+    const [group] = await groups()
+    const all = applyFilters(fullHotelsIn('prague'), NO_FILTERS, {
+      checkIn: '2026-10-20',
+      checkOut: '2026-10-23',
+      guests: { adults: 2, children: 0, rooms: 1 },
+    })
+    // At zoom 8 the whole city is one group.
+    const cheapest = formatPrice(Math.min(...all.map((i) => i.price)))
+    const count = all.length
+    expect(group.getAttribute('aria-label')).toBe(
+      `${countRu(count, ['отель', 'отеля', 'отелей'])}, от ${cheapest}, приблизить`,
+    )
+    expect(group.textContent).toBe(`${count} от ${cheapest}`)
+    expect(screen.queryAllByRole('button', { name: /, [\d\s]+₽$/ })).toHaveLength(0)
+
+    await user.click(group)
+    expect(mapMock.eased).toHaveLength(1)
+    expect((mapMock.eased[0] as { zoom: number }).zoom).toBeGreaterThan(8)
+  })
+
+  it('highlights the group of a hovered card', async () => {
+    const user = userEvent.setup()
+    mapMock.zoom = 8
+    open(PRAGUE, { desktop: true })
+    await results()
+    const [group] = await groups()
+    expect(group.hasAttribute('data-active')).toBe(false)
+
+    await user.hover(cards()[0])
+    expect(group.hasAttribute('data-active')).toBe(true)
+  })
+
+  it('regroups the markers once a zoom ends', async () => {
+    mapMock.zoom = 8
+    open(PRAGUE, { desktop: true })
+    await results()
+    await groups()
+
+    mapMock.zoom = 18
+    act(() => mapMock.last!.fire('zoomend'))
+    expect(screen.queryAllByRole('button', { name: /приблизить$/ })).toHaveLength(0)
+    expect(screen.getAllByRole('button', { name: /, [\d\s]+₽$/ })).toHaveLength(cards().length)
   })
 })
 
@@ -739,12 +998,13 @@ describe('SearchResultsPage pages', () => {
     open(EUROPE)
     await results()
     const first = cardNames()
-    const length = window.history.length
+    // The length of jsdom's history depends on the entries earlier tests left after the current one.
+    const pushState = vi.spyOn(window.history, 'pushState')
 
     await user.click(within(pagination()).getByRole('link', { name: 'Страница 2' }))
 
     expect(window.location.search).toContain('page=2')
-    expect(window.history.length).toBe(length + 1)
+    expect(pushState).toHaveBeenCalledTimes(1)
     expect(cardNames()).toHaveLength(Math.min(12, total() - 12))
     expect(cardNames().some((name) => first.includes(name))).toBe(false)
     expect(within(pagination()).getByRole('link', { name: 'Страница 2' }).getAttribute('aria-current')).toBe('page')
