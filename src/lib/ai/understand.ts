@@ -63,7 +63,7 @@ function instructions(brief: Brief, today: IsoDate, destinations: readonly Desti
 }
 
 /** A letter outside Cyrillic. */
-const OTHER_SCRIPT = /(?!\p{Script=Cyrillic})\p{L}/u
+export const OTHER_SCRIPT = /(?!\p{Script=Cyrillic})\p{L}/u
 
 /**
  * Without reasoning the model fills fields the traveller never mentioned, and then the assistant skips its

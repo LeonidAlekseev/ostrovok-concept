@@ -10,6 +10,8 @@ import { waitForCatalog } from '@/test/waitForCatalog'
 
 const nav = vi.hoisted(() => ({ query: '' }))
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(nav.query) }))
+// «Мои планы» delete with a server action; MyPlans.test covers them.
+vi.mock('@/app/trip/actions', () => ({ deleteTripPlan: vi.fn() }))
 
 const signIn = () => sessionStore.set({ name: 'Анна Петрова', email: 'anna@example.com' })
 

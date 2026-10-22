@@ -128,7 +128,7 @@ describe('demo account', () => {
     render(<AuthPage mode="login" />)
     await user.click(screen.getByRole('button', { name: 'Войти в демо-аккаунт' }))
     await waitFor(() => expect(nav.replace).toHaveBeenCalledWith('/trips'))
-    expect(demo.signInDemo).toHaveBeenCalledTimes(1)
+    expect(demo.signInDemo).toHaveBeenCalledWith('/trips')
     expect(demo.reload).toHaveBeenCalledTimes(1)
   })
 
