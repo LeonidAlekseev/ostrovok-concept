@@ -1,0 +1,73 @@
+[
+  {
+    "destinationId": "tbilisi",
+    "name": "Vera Backpackers Hostel",
+    "stayType": "hostel",
+    "stars": 2,
+    "rating": 9.1,
+    "priceFrom": 4000,
+    "wifiMbps": 90
+  },
+  {
+    "destinationId": "lisbon",
+    "name": "Lisbon Work Loft",
+    "stayType": "apartments",
+    "stars": 3,
+    "rating": 9,
+    "priceFrom": 11800,
+    "wifiMbps": 500,
+    "workspace": true
+  },
+  {
+    "destinationId": "rome",
+    "name": "Palazzo Navona Grand Suites",
+    "stayType": "hotel",
+    "stars": 5,
+    "rating": 9.6,
+    "priceFrom": 34000
+  },
+  {
+    "destinationId": "dubai",
+    "name": "Palm Royal Villa",
+    "stayType": "villa",
+    "stars": 4,
+    "rating": 9.7,
+    "priceFrom": 46000
+  },
+  {
+    "destinationId": "marrakesh",
+    "name": "Riad Al Andalous",
+    "stayType": "hotel",
+    "stars": 5,
+    "rating": 9.5,
+    "priceFrom": 22000
+  },
+  {
+    "destinationId": "almaty",
+    "name": "Almaty Peak Coworking Lodge",
+    "stayType": "hotel",
+    "stars": 4,
+    "rating": 9,
+    "priceFrom": 8200,
+    "wifiMbps": 300,
+    "workspace": true
+  },
+  {
+    "destinationId": "barcelona",
+    "name": "Gràcia Desk Apartments",
+    "stayType": "apartments",
+    "stars": 3,
+    "rating": 9.2,
+    "priceFrom": 13400,
+    "wifiMbps": 500,
+    "workspace": true
+  },
+  {
+    "destinationId": "tokyo",
+    "name": "Yanaka Machiya Ryokan",
+    "stayType": "hotel",
+    "stars": 4,
+    "rating": 9.3,
+    "priceFrom": 18900
+  }
+]

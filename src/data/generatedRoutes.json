@@ -1,0 +1,972 @@
+[
+  {
+    "id": "tbilisi-student",
+    "persona": "student",
+    "destinationId": "tbilisi",
+    "title": "Тбилиси за копейки: хостел, хачапури и бани",
+    "author": {
+      "kind": "person",
+      "name": "Дарья Ковалёва"
+    },
+    "description": "Четыре ночи в тёплом хостеле и две ночи в апартаментах с кухней. Прогулки по Старому городу, серные бани, канатная дорога и ужины, которые не бьют по кошельку.",
+    "cover": {
+      "id": "tbilisi-student-cover",
+      "caption": "Крыши Старого Тбилиси и крепость Нарикала",
+      "tone": 0
+    },
+    "arrival": {
+      "name": "Аэропорт Тбилиси имени Шота Руставели",
+      "lat": 41.6692,
+      "lon": 44.9547,
+      "time": "09:40"
+    },
+    "departure": {
+      "name": "Аэропорт Тбилиси имени Шота Руставели",
+      "lat": 41.6692,
+      "lon": 44.9547,
+      "time": "20:10"
+    },
+    "stops": [
+      {
+        "hotelId": "tbilisi-vera-backpackers-hostel",
+        "nights": 4
+      },
+      {
+        "hotelId": "tbilisi-park-apartments",
+        "nights": 2
+      }
+    ],
+    "transfers": ["taxi", "walk", "taxi"],
+    "leisure": [
+      {
+        "title": "Пешая прогулка по Старому городу и мосту Мира",
+        "category": "Прогулка",
+        "day": 1,
+        "time": "16:30",
+        "minutes": 150,
+        "price": 0
+      },
+      {
+        "title": "Канатная дорога к крепости Нарикала",
+        "category": "Прогулка",
+        "day": 2,
+        "time": "11:00",
+        "minutes": 120,
+        "price": 300
+      },
+      {
+        "title": "Серные бани Абанотубани",
+        "category": "Спа",
+        "day": 2,
+        "time": "17:00",
+        "minutes": 90,
+        "price": 1800
+      },
+      {
+        "title": "Хачапури и хинкали в «Пурис Сахли»",
+        "category": "Гастрономия",
+        "day": 3,
+        "time": "14:00",
+        "minutes": 90,
+        "price": 1200
+      },
+      {
+        "title": "Сухой мост и блошиный рынок",
+        "category": "Шопинг",
+        "day": 4,
+        "time": "11:00",
+        "minutes": 120,
+        "price": 0
+      },
+      {
+        "title": "Поездка в Мцхету на маршрутке",
+        "category": "Экскурсия",
+        "day": 5,
+        "time": "10:00",
+        "minutes": 300,
+        "price": 600
+      }
+    ]
+  },
+  {
+    "id": "istanbul-student",
+    "persona": "student",
+    "destinationId": "istanbul",
+    "title": "Стамбул без лишних лир: паромы, рынки и виды",
+    "author": {
+      "kind": "editor"
+    },
+    "description": "Пять ночей в хостеле на Босфоре. Паром между Европой и Азией вместо экскурсий, Гранд-базар, уличный симит и закат с моста — на всё хватит студенческого бюджета.",
+    "cover": {
+      "id": "istanbul-student-cover",
+      "caption": "Паром на Босфоре у мечети Ортакёй",
+      "tone": 1
+    },
+    "arrival": {
+      "name": "Аэропорт Стамбул",
+      "lat": 41.2753,
+      "lon": 28.7519,
+      "time": "10:15"
+    },
+    "departure": {
+      "name": "Аэропорт Стамбул",
+      "lat": 41.2753,
+      "lon": 28.7519,
+      "time": "19:30"
+    },
+    "stops": [
+      {
+        "hotelId": "istanbul-harbour-hostel",
+        "nights": 3
+      },
+      {
+        "hotelId": "istanbul-market-square-hostel",
+        "nights": 2
+      }
+    ],
+    "transfers": ["transfer", "walk", "transfer"],
+    "leisure": [
+      {
+        "title": "Паром по Босфору до Кадыкёя",
+        "category": "Прогулка",
+        "day": 2,
+        "time": "10:30",
+        "minutes": 180,
+        "price": 150
+      },
+      {
+        "title": "Гранд-базар и Египетский рынок",
+        "category": "Шопинг",
+        "day": 2,
+        "time": "15:00",
+        "minutes": 180,
+        "price": 0
+      },
+      {
+        "title": "Мечеть Султанахмет и Святая София снаружи",
+        "category": "Экскурсия",
+        "day": 3,
+        "time": "11:00",
+        "minutes": 120,
+        "price": 0
+      },
+      {
+        "title": "Ужин из рыбного бутерброда у Галатского моста",
+        "category": "Гастрономия",
+        "day": 3,
+        "time": "19:00",
+        "minutes": 60,
+        "price": 500
+      },
+      {
+        "title": "Башня Галата на закате",
+        "category": "Достопримечательность",
+        "day": 4,
+        "time": "17:30",
+        "minutes": 90,
+        "price": 1100
+      },
+      {
+        "title": "Хаммам Чемберлиташ",
+        "category": "Спа",
+        "day": 5,
+        "time": "11:00",
+        "minutes": 90,
+        "price": 2200
+      }
+    ]
+  },
+  {
+    "id": "lisbon-student",
+    "persona": "student",
+    "destinationId": "lisbon",
+    "title": "Лиссабон на волне: хостел, трамвай и сёрф",
+    "author": {
+      "kind": "person",
+      "name": "Артём Волков"
+    },
+    "description": "Четыре ночи в хостеле в центре: трамвай №28, паштейш де ната, Алфама на рассвете и день на пляже Карколавелуш. Недорого, но с океаном.",
+    "cover": {
+      "id": "lisbon-student-cover",
+      "caption": "Жёлтый трамвай на улочках Алфамы",
+      "tone": 2
+    },
+    "arrival": {
+      "name": "Аэропорт Лиссабон",
+      "lat": 38.7742,
+      "lon": -9.1342,
+      "time": "11:20"
+    },
+    "departure": {
+      "name": "Аэропорт Лиссабон",
+      "lat": 38.7742,
+      "lon": -9.1342,
+      "time": "18:50"
+    },
+    "stops": [
+      {
+        "hotelId": "lisbon-central-hostel",
+        "nights": 4
+      }
+    ],
+    "transfers": ["taxi", "taxi"],
+    "leisure": [
+      {
+        "title": "Паштейш де ната в Белене",
+        "category": "Гастрономия",
+        "day": 1,
+        "time": "16:30",
+        "minutes": 60,
+        "price": 450
+      },
+      {
+        "title": "Трамвай №28 и смотровая Санта-Лузия",
+        "category": "Прогулка",
+        "day": 2,
+        "time": "10:00",
+        "minutes": 150,
+        "price": 350
+      },
+      {
+        "title": "Серф-урок на пляже Карколавелуш",
+        "category": "Спорт",
+        "day": 3,
+        "time": "09:30",
+        "minutes": 180,
+        "price": 4200
+      },
+      {
+        "title": "Рыбная таверна в Алфаме",
+        "category": "Гастрономия",
+        "day": 3,
+        "time": "20:00",
+        "minutes": 90,
+        "price": 2400
+      },
+      {
+        "title": "Закат на смотровой Сан-Педру-де-Алкантара",
+        "category": "Прогулка",
+        "day": 4,
+        "time": "19:00",
+        "minutes": 90,
+        "price": 0
+      }
+    ]
+  },
+  {
+    "id": "rome-luxury",
+    "persona": "luxury",
+    "destinationId": "rome",
+    "title": "Рим для двоих: палаццо, частный Ватикан и ужин при свечах",
+    "author": {
+      "kind": "editor"
+    },
+    "description": "Четыре ночи в палаццо у Пьяцца Навона и три в вилле с садом. Ранний вход в Ватикан без очередей, частный водитель, мастер-класс по пасте и ужин на террасе с видом на купол.",
+    "cover": {
+      "id": "rome-luxury-cover",
+      "caption": "Купол собора Святого Петра на рассвете",
+      "tone": 3
+    },
+    "arrival": {
+      "name": "Аэропорт Фьюмичино",
+      "lat": 41.8003,
+      "lon": 12.2389,
+      "time": "13:10"
+    },
+    "departure": {
+      "name": "Аэропорт Фьюмичино",
+      "lat": 41.8003,
+      "lon": 12.2389,
+      "time": "19:20"
+    },
+    "stops": [
+      {
+        "hotelId": "rome-palazzo-navona-grand-suites",
+        "nights": 4
+      },
+      {
+        "hotelId": "rome-villa-mira",
+        "nights": 3
+      }
+    ],
+    "transfers": ["transfer", "taxi", "transfer"],
+    "leisure": [
+      {
+        "title": "Ужин в Roscioli на двоих",
+        "category": "Гастрономия",
+        "day": 1,
+        "time": "20:30",
+        "minutes": 120,
+        "price": 14000
+      },
+      {
+        "title": "Ранний частный вход в Ватикан",
+        "category": "Экскурсия",
+        "day": 2,
+        "time": "07:30",
+        "minutes": 210,
+        "price": 22000
+      },
+      {
+        "title": "Мастер-класс по пасте с шефом",
+        "category": "Гастрономия",
+        "day": 3,
+        "time": "12:00",
+        "minutes": 150,
+        "price": 9500
+      },
+      {
+        "title": "Колизей и Форум с гидом-историком",
+        "category": "Экскурсия",
+        "day": 4,
+        "time": "09:30",
+        "minutes": 210,
+        "price": 16000
+      },
+      {
+        "title": "Спа-ритуал для двоих",
+        "category": "Спа",
+        "day": 5,
+        "time": "15:00",
+        "minutes": 150,
+        "price": 18000
+      },
+      {
+        "title": "Ужин на террасе с видом на купол",
+        "category": "Гастрономия",
+        "day": 6,
+        "time": "20:00",
+        "minutes": 150,
+        "price": 21000
+      },
+      {
+        "title": "Прогулка по Аппиевой дороге на электрокаре",
+        "category": "Прогулка",
+        "day": 7,
+        "time": "10:00",
+        "minutes": 180,
+        "price": 12000
+      }
+    ]
+  },
+  {
+    "id": "dubai-luxury",
+    "persona": "luxury",
+    "destinationId": "dubai",
+    "title": "Дубай на максимум: яхта, пустыня и небоскрёб",
+    "author": {
+      "kind": "person",
+      "name": "Марина Левина"
+    },
+    "description": "Три ночи в пятизвёздочном отеле в Марине и две на вилле на Пальме. Закат на яхте, сафари на внедорожнике, спа и ужин на 122-м этаже.",
+    "cover": {
+      "id": "dubai-luxury-cover",
+      "caption": "Небоскрёбы Дубай-Марины на закате",
+      "tone": 0
+    },
+    "arrival": {
+      "name": "Международный аэропорт Дубая",
+      "lat": 25.2532,
+      "lon": 55.3657,
+      "time": "14:30"
+    },
+    "departure": {
+      "name": "Международный аэропорт Дубая",
+      "lat": 25.2532,
+      "lon": 55.3657,
+      "time": "21:40"
+    },
+    "stops": [
+      {
+        "hotelId": "dubai-marina-skyline",
+        "nights": 3
+      },
+      {
+        "hotelId": "dubai-palm-royal-villa",
+        "nights": 2
+      }
+    ],
+    "transfers": ["transfer", "taxi", "transfer"],
+    "leisure": [
+      {
+        "title": "Ужин в ресторане At.mosphere на Бурдж-Халифа",
+        "category": "Гастрономия",
+        "day": 1,
+        "time": "20:00",
+        "minutes": 120,
+        "price": 24000
+      },
+      {
+        "title": "Закат на частной яхте по Марине",
+        "category": "Прогулка",
+        "day": 2,
+        "time": "17:00",
+        "minutes": 150,
+        "price": 38000
+      },
+      {
+        "title": "Спа-день в отеле",
+        "category": "Спа",
+        "day": 3,
+        "time": "11:00",
+        "minutes": 210,
+        "price": 16000
+      },
+      {
+        "title": "Вечернее сафари в пустыне с ужином",
+        "category": "Экскурсия",
+        "day": 3,
+        "time": "15:30",
+        "minutes": 300,
+        "price": 14000
+      },
+      {
+        "title": "Брюнч на Пальме",
+        "category": "Гастрономия",
+        "day": 5,
+        "time": "11:30",
+        "minutes": 150,
+        "price": 9500
+      },
+      {
+        "title": "Шопинг в Dubai Mall с персональным стилистом",
+        "category": "Шопинг",
+        "day": 5,
+        "time": "16:30",
+        "minutes": 180,
+        "price": 6000
+      }
+    ]
+  },
+  {
+    "id": "marrakesh-luxury",
+    "persona": "luxury",
+    "destinationId": "marrakesh",
+    "title": "Марракеш: риад, хаммам и ужин под звёздами",
+    "author": {
+      "kind": "editor"
+    },
+    "description": "Три ночи в роскошном риаде в медине и две — в вилле среди пальм. Частный гид по базарам, хаммам с аргановым маслом и ужин на крыше под вечерний призыв к молитве.",
+    "cover": {
+      "id": "marrakesh-luxury-cover",
+      "caption": "Внутренний двор риада в Марракеше",
+      "tone": 1
+    },
+    "arrival": {
+      "name": "Аэропорт Марракеш-Менара",
+      "lat": 31.6069,
+      "lon": -8.0363,
+      "time": "12:40"
+    },
+    "departure": {
+      "name": "Аэропорт Марракеш-Менара",
+      "lat": 31.6069,
+      "lon": -8.0363,
+      "time": "18:15"
+    },
+    "stops": [
+      {
+        "hotelId": "marrakesh-riad-al-andalous",
+        "nights": 3
+      },
+      {
+        "hotelId": "marrakesh-villa-aurora",
+        "nights": 2
+      }
+    ],
+    "transfers": ["transfer", "transfer", "transfer"],
+    "leisure": [
+      {
+        "title": "Ужин на крыше риада",
+        "category": "Гастрономия",
+        "day": 1,
+        "time": "20:00",
+        "minutes": 120,
+        "price": 6500
+      },
+      {
+        "title": "Частный гид по медине и базарам",
+        "category": "Экскурсия",
+        "day": 2,
+        "time": "10:00",
+        "minutes": 240,
+        "price": 9000
+      },
+      {
+        "title": "Хаммам с аргановым маслом",
+        "category": "Спа",
+        "day": 2,
+        "time": "16:30",
+        "minutes": 120,
+        "price": 7500
+      },
+      {
+        "title": "Сады Мажорель и музей Ива Сен-Лорана",
+        "category": "Музей",
+        "day": 3,
+        "time": "10:30",
+        "minutes": 150,
+        "price": 2400
+      },
+      {
+        "title": "Рассвет на воздушном шаре над Атласом",
+        "category": "Приключение",
+        "day": 4,
+        "time": "05:30",
+        "minutes": 180,
+        "price": 21000
+      },
+      {
+        "title": "Мастер-класс по тажину",
+        "category": "Гастрономия",
+        "day": 5,
+        "time": "10:00",
+        "minutes": 150,
+        "price": 4500
+      }
+    ]
+  },
+  {
+    "id": "lisbon-workation",
+    "persona": "workation",
+    "destinationId": "lisbon",
+    "title": "Лиссабон: девять ночей с ноутбуком и океаном",
+    "author": {
+      "kind": "person",
+      "name": "Игорь Назаров"
+    },
+    "description": "Пять ночей в лофте с рабочим столом и быстрым Wi‑Fi, потом ещё четыре — в апартаментах в центре. Утро — работа в кафе и коворкинге, вечер — набережная, сёрф и ужины с видом на Тежу.",
+    "cover": {
+      "id": "lisbon-workation-cover",
+      "caption": "Набережная Тежу в вечернем свете",
+      "tone": 2
+    },
+    "arrival": {
+      "name": "Аэропорт Лиссабон",
+      "lat": 38.7742,
+      "lon": -9.1342,
+      "time": "10:50"
+    },
+    "departure": {
+      "name": "Аэропорт Лиссабон",
+      "lat": 38.7742,
+      "lon": -9.1342,
+      "time": "17:30"
+    },
+    "stops": [
+      {
+        "hotelId": "lisbon-lisbon-work-loft",
+        "nights": 5
+      },
+      {
+        "hotelId": "lisbon-old-quarter-apartments",
+        "nights": 4
+      }
+    ],
+    "transfers": ["taxi", "taxi", "taxi"],
+    "leisure": [
+      {
+        "title": "Коворкинг Second Home Lisboa",
+        "category": "Работа",
+        "day": 2,
+        "time": "09:00",
+        "minutes": 300,
+        "price": 2200
+      },
+      {
+        "title": "Кофе и пастель-де-ната на Праса-ду-Комерсиу",
+        "category": "Гастрономия",
+        "day": 3,
+        "time": "16:00",
+        "minutes": 60,
+        "price": 500
+      },
+      {
+        "title": "Вечерняя прогулка по набережной Тежу",
+        "category": "Прогулка",
+        "day": 4,
+        "time": "19:00",
+        "minutes": 90,
+        "price": 0
+      },
+      {
+        "title": "Серф-утро в Эрисейре",
+        "category": "Спорт",
+        "day": 6,
+        "time": "08:00",
+        "minutes": 240,
+        "price": 5200
+      },
+      {
+        "title": "Поездка в Синтру",
+        "category": "Экскурсия",
+        "day": 7,
+        "time": "10:00",
+        "minutes": 360,
+        "price": 3800
+      },
+      {
+        "title": "Ужин с фаду в Алфаме",
+        "category": "Концерт",
+        "day": 9,
+        "time": "20:30",
+        "minutes": 150,
+        "price": 5400
+      }
+    ]
+  },
+  {
+    "id": "almaty-workation",
+    "persona": "workation",
+    "destinationId": "almaty",
+    "title": "Алматы: неделя работы и гор",
+    "author": {
+      "kind": "editor"
+    },
+    "description": "Четыре ночи в лодже с рабочими зонами и интернетом 300 Мбит/с, затем три — в апартаментах рядом с парком Первого президента. По утрам работа, после обеда Кок-Тобе, Медео и Чарынский каньон на выходных.",
+    "cover": {
+      "id": "almaty-workation-cover",
+      "caption": "Заснеженные горы Заилийского Алатау над городом",
+      "tone": 3
+    },
+    "arrival": {
+      "name": "Аэропорт Алматы",
+      "lat": 43.3521,
+      "lon": 77.0405,
+      "time": "08:30"
+    },
+    "departure": {
+      "name": "Аэропорт Алматы",
+      "lat": 43.3521,
+      "lon": 77.0405,
+      "time": "22:10"
+    },
+    "stops": [
+      {
+        "hotelId": "almaty-almaty-peak-coworking-lodge",
+        "nights": 4
+      },
+      {
+        "hotelId": "almaty-market-square-apartments",
+        "nights": 3
+      }
+    ],
+    "transfers": ["taxi", "taxi", "taxi"],
+    "leisure": [
+      {
+        "title": "Канатная дорога на Кок-Тобе",
+        "category": "Прогулка",
+        "day": 2,
+        "time": "18:00",
+        "minutes": 120,
+        "price": 1800
+      },
+      {
+        "title": "Кофейня-коворкинг Coffee Boom",
+        "category": "Работа",
+        "day": 3,
+        "time": "09:00",
+        "minutes": 240,
+        "price": 900
+      },
+      {
+        "title": "Каток Медео и Шымбулак",
+        "category": "Спорт",
+        "day": 4,
+        "time": "17:00",
+        "minutes": 180,
+        "price": 3800
+      },
+      {
+        "title": "Зелёный базар и дегустация казы",
+        "category": "Гастрономия",
+        "day": 5,
+        "time": "12:00",
+        "minutes": 120,
+        "price": 2200
+      },
+      {
+        "title": "Чарынский каньон на целый день",
+        "category": "Экскурсия",
+        "day": 6,
+        "time": "08:00",
+        "minutes": 600,
+        "price": 6500
+      }
+    ]
+  },
+  {
+    "id": "barcelona-workation",
+    "persona": "workation",
+    "destinationId": "barcelona",
+    "title": "Барселона: десять дней между столом и пляжем",
+    "author": {
+      "kind": "person",
+      "name": "Екатерина Орлова"
+    },
+    "description": "Пять ночей в апартаментах с настоящим рабочим столом в Грасии и четыре в квартире у моря. Работа до обеда, после — Барселонета, вермут на площади и вечерние тапас.",
+    "cover": {
+      "id": "barcelona-workation-cover",
+      "caption": "Крыши Грасии и шпили Саграда Фамилия",
+      "tone": 0
+    },
+    "arrival": {
+      "name": "Аэропорт Барселона-Эль-Прат",
+      "lat": 41.2974,
+      "lon": 2.0833,
+      "time": "09:20"
+    },
+    "departure": {
+      "name": "Аэропорт Барселона-Эль-Прат",
+      "lat": 41.2974,
+      "lon": 2.0833,
+      "time": "16:45"
+    },
+    "stops": [
+      {
+        "hotelId": "barcelona-gracia-desk-apartments",
+        "nights": 5
+      },
+      {
+        "hotelId": "barcelona-boulevard-apartments",
+        "nights": 4
+      }
+    ],
+    "transfers": ["transfer", "taxi", "transfer"],
+    "leisure": [
+      {
+        "title": "Коворкинг Mob в Борне",
+        "category": "Работа",
+        "day": 2,
+        "time": "09:00",
+        "minutes": 300,
+        "price": 2600
+      },
+      {
+        "title": "Пляж Барселонета после работы",
+        "category": "Прогулка",
+        "day": 3,
+        "time": "17:30",
+        "minutes": 120,
+        "price": 0
+      },
+      {
+        "title": "Тапас-тур по Грасии",
+        "category": "Гастрономия",
+        "day": 4,
+        "time": "19:30",
+        "minutes": 150,
+        "price": 4800
+      },
+      {
+        "title": "Саграда Фамилия с аудиогидом",
+        "category": "Экскурсия",
+        "day": 6,
+        "time": "10:00",
+        "minutes": 150,
+        "price": 3600
+      },
+      {
+        "title": "Горы Монсеррат на целый день",
+        "category": "Экскурсия",
+        "day": 8,
+        "time": "08:30",
+        "minutes": 420,
+        "price": 5200
+      },
+      {
+        "title": "Закат в бункерах Кармель",
+        "category": "Прогулка",
+        "day": 9,
+        "time": "18:30",
+        "minutes": 120,
+        "price": 0
+      }
+    ]
+  },
+  {
+    "id": "florence-culture",
+    "persona": "culture",
+    "destinationId": "florence",
+    "title": "Флоренция: Ренессанс шаг за шагом",
+    "author": {
+      "kind": "person",
+      "name": "Сергей Бельский"
+    },
+    "description": "Пять ночей между Дуомо и Ольтрарно. Галерея Уффици без очереди, мастерская по золоту, Давид Микеланджело и ужин с кьянти. Для тех, кто хочет не пробежаться по списку, а прожить искусство.",
+    "cover": {
+      "id": "florence-culture-cover",
+      "caption": "Купол Брунеллески над черепичными крышами",
+      "tone": 1
+    },
+    "arrival": {
+      "name": "Вокзал Санта-Мария-Новелла",
+      "lat": 43.7764,
+      "lon": 11.2481,
+      "time": "11:10"
+    },
+    "departure": {
+      "name": "Вокзал Санта-Мария-Новелла",
+      "lat": 43.7764,
+      "lon": 11.2481,
+      "time": "18:40"
+    },
+    "stops": [
+      {
+        "hotelId": "florence-riverside-lodge",
+        "nights": 3
+      },
+      {
+        "hotelId": "florence-harbour-house",
+        "nights": 2
+      }
+    ],
+    "transfers": ["walk", "taxi", "walk"],
+    "leisure": [
+      {
+        "title": "Купол Брунеллески и баптистерий",
+        "category": "Достопримечательность",
+        "day": 2,
+        "time": "09:30",
+        "minutes": 150,
+        "price": 3200
+      },
+      {
+        "title": "Галерея Уффици с гидом",
+        "category": "Музей",
+        "day": 2,
+        "time": "14:30",
+        "minutes": 150,
+        "price": 4800
+      },
+      {
+        "title": "Галерея Академии: Давид Микеланджело",
+        "category": "Музей",
+        "day": 3,
+        "time": "10:00",
+        "minutes": 90,
+        "price": 2400
+      },
+      {
+        "title": "Мастерская флорентийской мозаики",
+        "category": "Мастер-класс",
+        "day": 4,
+        "time": "11:00",
+        "minutes": 150,
+        "price": 5500
+      },
+      {
+        "title": "Дегустация вин в Кьянти",
+        "category": "Гастрономия",
+        "day": 5,
+        "time": "15:00",
+        "minutes": 240,
+        "price": 8500
+      },
+      {
+        "title": "Палаццо Питти и сад Боболи",
+        "category": "Музей",
+        "day": 6,
+        "time": "10:00",
+        "minutes": 180,
+        "price": 2200
+      }
+    ]
+  },
+  {
+    "id": "tokyo-culture",
+    "persona": "culture",
+    "destinationId": "tokyo",
+    "title": "Токио: храмы, чай и театр кабуки",
+    "author": {
+      "kind": "editor"
+    },
+    "description": "Шесть ночей между Асакусой и Гинзой. Утренний Сэнсо-дзи, чайная церемония, театр кабуки, музей Нэдзу и старые улочки Янаки — Токио, который остался вне небоскрёбов.",
+    "cover": {
+      "id": "tokyo-culture-cover",
+      "caption": "Ворота Каминаримон в Асакусе",
+      "tone": 2
+    },
+    "arrival": {
+      "name": "Аэропорт Ханеда",
+      "lat": 35.5494,
+      "lon": 139.7798,
+      "time": "07:50"
+    },
+    "departure": {
+      "name": "Аэропорт Ханеда",
+      "lat": 35.5494,
+      "lon": 139.7798,
+      "time": "19:40"
+    },
+    "stops": [
+      {
+        "hotelId": "tokyo-yanaka-machiya-ryokan",
+        "nights": 3
+      },
+      {
+        "hotelId": "tokyo-asakusa-ryokan-sakura",
+        "nights": 3
+      }
+    ],
+    "transfers": ["transfer", "taxi", "transfer"],
+    "leisure": [
+      {
+        "title": "Храм Сэнсо-дзи на рассвете",
+        "category": "Достопримечательность",
+        "day": 2,
+        "time": "07:30",
+        "minutes": 120,
+        "price": 0
+      },
+      {
+        "title": "Чайная церемония в саду Хамарикю",
+        "category": "Мастер-класс",
+        "day": 2,
+        "time": "14:00",
+        "minutes": 90,
+        "price": 4200
+      },
+      {
+        "title": "Театр кабуки Кабуки-дза, один акт",
+        "category": "Концерт",
+        "day": 3,
+        "time": "17:00",
+        "minutes": 120,
+        "price": 3800
+      },
+      {
+        "title": "Музей Нэдзу и сад",
+        "category": "Музей",
+        "day": 4,
+        "time": "10:30",
+        "minutes": 150,
+        "price": 2400
+      },
+      {
+        "title": "Старые улочки Янаки и рынок",
+        "category": "Прогулка",
+        "day": 5,
+        "time": "11:00",
+        "minutes": 180,
+        "price": 0
+      },
+      {
+        "title": "Ужин кайсэки на двоих",
+        "category": "Гастрономия",
+        "day": 6,
+        "time": "19:00",
+        "minutes": 150,
+        "price": 12000
+      },
+      {
+        "title": "Национальный музей Токио",
+        "category": "Музей",
+        "day": 7,
+        "time": "10:00",
+        "minutes": 150,
+        "price": 1500
+      }
+    ]
+  }
+]
