@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { getAssistantModel } from '@/lib/ai/model'
 import { allowRequest, clientIp } from '@/lib/ai/rateLimit'
+import { SEMANTIC_TIMEOUT_MS, semanticSearch } from '@/lib/ai/semantic'
 import { understandWish } from '@/lib/ai/understand'
 import {
   MAX_HISTORY,
@@ -9,10 +10,14 @@ import {
   mergeBrief,
   nextQuestion,
   normalizeBrief,
+  planCities,
   type AssistantResponse,
+  type Brief,
 } from '@/lib/assistant'
-import { loadDestinations } from '@/lib/db/catalog'
-import { todayIso } from '@/lib/dates'
+import type { Destination } from '@/data/destinations'
+import type { HotelSummary } from '@/lib/catalog'
+import { loadDestinations, loadHotelSummaries } from '@/lib/db/catalog'
+import { todayIso, type IsoDate } from '@/lib/dates'
 
 const requestSchema = z.object({
   messages: z
@@ -23,11 +28,41 @@ const requestSchema = z.object({
   brief: z.record(z.string(), z.unknown()).default({}),
 })
 
+/** The answer is due in 14 s: the client waits 15. The semantic search gets what the model left, if enough. */
+const ANSWER_BUDGET_MS = 14_000
+const MIN_SEMANTIC_MS = 1500
+/** Hotels the semantic search hands to the plan. */
+const MATCHES = 6
+
+/**
+ * Hotels for the traveller's words — all their messages, so «тихо» from the first one still counts — in the
+ * plan's cities, once the brief is complete and the plan is due; `undefined` keeps the plan on the rules.
+ */
+async function findMatches(
+  brief: Brief,
+  wish: string,
+  today: IsoDate,
+  destinations: readonly Destination[],
+  deadline: number,
+  signal: AbortSignal,
+): Promise<HotelSummary[] | undefined> {
+  const timeoutMs = Math.min(deadline - Date.now(), SEMANTIC_TIMEOUT_MS)
+  if (nextQuestion(brief, today) || timeoutMs < MIN_SEMANTIC_MS) return undefined
+  const destinationIds = planCities(brief, today, destinations).map((d) => d.id)
+  const hits = await semanticSearch(wish, { kind: 'hotel', destinationIds, k: MATCHES, timeoutMs, signal })
+  if (!hits) return undefined
+  const summaries = new Map((await loadHotelSummaries().catch(() => [])).map((h) => [h.id, h]))
+  const matches = hits.flatMap((hit) => summaries.get(hit.id) ?? [])
+  return matches.length ? matches : undefined
+}
+
 /**
  * Reads the traveller's newest message into the brief with the language model; without a key, on a model
- * error or after 8 s — with the rules, so the dialog goes on either way.
+ * error or after 8 s — with the rules, so the dialog goes on either way. Once the brief is complete, adds the
+ * hotels the semantic search finds for the traveller's words (`matches`); without them the plan keeps the rules.
  */
 export async function POST(request: Request) {
+  const deadline = Date.now() + ANSWER_BUDGET_MS
   if (!allowRequest(clientIp(request))) return Response.json({ error: 'Too many requests' }, { status: 429 })
   const parsedBody = requestSchema.safeParse(await request.json().catch(() => null))
   if (!parsedBody.success) return Response.json({ error: 'Invalid request' }, { status: 400 })
@@ -40,15 +75,22 @@ export async function POST(request: Request) {
   const input = messages[messages.length - 1].text
   // The question the client showed is the one the brief still lacks.
   const asked = nextQuestion(brief, today)?.id ?? null
+  const wish = messages
+    .filter((m) => m.role === 'user')
+    .map((m) => m.text)
+    .join('. ')
+  const withMatches = async (next: Brief) => findMatches(next, wish, today, destinations, deadline, request.signal)
 
   const model = await getAssistantModel()
   if (model) {
     try {
       const { parsed, reply } = await understandWish(model, { messages, brief }, today, destinations, request.signal)
+      const next = foldBrief(brief, parsed, input, asked)
       return Response.json({
-        brief: foldBrief(brief, parsed, input, asked),
+        brief: next,
         reply,
         source: 'model',
+        matches: await withMatches(next),
       } satisfies AssistantResponse)
     } catch (error) {
       // The kind and the provider's short message; never the request itself.
@@ -56,8 +98,10 @@ export async function POST(request: Request) {
       console.warn(`assistant: model failed, using the rules (${reason})`)
     }
   }
+  const next = mergeBrief(brief, input, asked, destinations)
   return Response.json({
-    brief: mergeBrief(brief, input, asked, destinations),
+    brief: next,
     source: 'rules',
+    matches: await withMatches(next),
   } satisfies AssistantResponse)
 }

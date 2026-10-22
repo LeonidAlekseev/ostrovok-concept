@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { stayTotal } from './offer'
-import { newHotels } from './catalogGenerator'
+import { hotels, newHotels } from './catalogGenerator'
 import { destinations } from '../data/destinations'
 import { makePlan, mergeBrief, parseWish } from './assistant'
 
@@ -184,5 +184,44 @@ describe('makePlan', () => {
     expect(makePlan({ vibe: 'sea', when: 6, party: 'solo', nights: 45 }, today, destinations, newHotels).nights).toBe(
       30,
     )
+  })
+})
+
+describe('makePlan with the semantic matches', () => {
+  const today = '2026-10-19'
+  const inCity = (id: string) => hotels.filter((h) => h.destinationId === id)
+
+  it('leads a named city’s plan with up to three matches in their order', () => {
+    const [a, b, c, d] = inCity('prague')
+    const plan = makePlan({ destinationId: 'prague', when: 5, party: 'solo' }, today, destinations, newHotels, [
+      c,
+      a,
+      d,
+      b,
+    ])
+    expect(plan.options.map((o) => o.hotel?.id)).toEqual([c.id, a.id, d.id])
+    expect(plan.options.every((o) => o.destination.id === 'prague')).toBe(true)
+  })
+
+  it('takes one match a city of the plan and fills the rest by the rules', () => {
+    const brief = { vibe: 'sea', when: 6, party: 'couple' } as const
+    const cities = makePlan(brief, today, destinations, newHotels).options.map((o) => o.destination.id)
+    const [first, second] = inCity(cities[1])
+    const elsewhere = hotels.find((h) => !cities.includes(h.destinationId) && h.destinationId !== 'prague')!
+    const plan = makePlan(brief, today, destinations, newHotels, [elsewhere, first, second])
+    expect(plan.options[0].hotel?.id).toBe(first.id)
+    expect(plan.options.map((o) => o.destination.id)).not.toContain(elsewhere.destinationId)
+    expect(new Set(plan.options.map((o) => o.destination.id)).size).toBe(plan.options.length)
+    expect(plan.options).toHaveLength(3)
+  })
+
+  it('puts the matches within the budget first', () => {
+    const [cheap, dear] = [...inCity('prague')]
+      .sort((x, y) => x.priceFrom - y.priceFrom)
+      .filter((_, i, l) => i === 0 || i === l.length - 1)
+    const brief = { destinationId: 'prague', when: 5, party: 'solo', nights: 2, budget: cheap.priceFrom * 3 } as const
+    const plan = makePlan(brief, today, destinations, newHotels, [dear, cheap])
+    expect(plan.options.map((o) => o.hotel?.id)).toEqual([cheap.id, dear.id])
+    expect(plan.options[1].fitsBudget).toBe(false)
   })
 })

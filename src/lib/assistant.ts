@@ -308,31 +308,65 @@ function travelDates(brief: Brief, nights: number, today: IsoDate): IsoDate {
 const tripMonth = (brief: Brief, today: IsoDate) =>
   typeof brief.when === 'number' ? brief.when : fromIso(addDays(today, brief.when === 'soon' ? 3 : 14)).getMonth()
 
-/** The plan over the `destinations`, with a hotel from `hotels` (the "recently added" ones) where a city has one. */
-export function makePlan(
-  brief: Brief,
-  today: IsoDate,
-  destinations: readonly Destination[],
-  hotels: readonly HotelSummary[],
-): Plan {
+/** The theme of the plan (the traveller's, the named city's or the assistant's own pick) and its cities. */
+function planScope(brief: Brief, today: IsoDate, destinations: readonly Destination[]) {
   const month = tripMonth(brief, today)
   const named = destinations.find((d) => d.id === brief.destinationId)
   const own = brief.vibe && brief.vibe !== 'any' ? { vibe: brief.vibe, reason: '' } : null
   const fallbackVibe = named?.scenarios[0] ?? 'europe'
   const { vibe, reason } = own ?? (named ? { vibe: fallbackVibe, reason: '' } : chooseVibe(brief, month))
+  return { vibe, reason, named, pool: named ? [named] : candidatesFor(vibe, month, destinations) }
+}
+
+/** The cities the plan of a complete `brief` picks from: the semantic search looks for hotels there. */
+export const planCities = (brief: Brief, today: IsoDate, destinations: readonly Destination[]): Destination[] =>
+  planScope(brief, today, destinations).pool
+
+/** Options in a plan. */
+const PLAN_OPTIONS = 3
+
+/**
+ * The plan over the `destinations`, with a hotel from `hotels` (the "recently added" ones) where a city has
+ * one. `matches` are the hotels the semantic search found for the traveller's words, best first: they lead
+ * the plan — up to three in a named city, otherwise one a city, the rest by the rules.
+ */
+export function makePlan(
+  brief: Brief,
+  today: IsoDate,
+  destinations: readonly Destination[],
+  hotels: readonly HotelSummary[],
+  matches: readonly HotelSummary[] = [],
+): Plan {
+  const { vibe, reason, named, pool } = planScope(brief, today, destinations)
   const [emoji, atmosphere, text] = ATMOSPHERES[vibe][brief.mood ?? 'default']
 
   const nights = Math.min(brief.nights ?? (vibe === 'weekend' ? 2 : brief.party === 'family' ? 7 : 5), MAX_NIGHTS)
   const guests = PARTY_GUESTS[brief.party && brief.party !== 'any' ? brief.party : 'couple']
   const checkIn = travelDates(brief, nights, today)
 
-  const pool = named ? [named] : candidatesFor(vibe, month, destinations)
   // Quiet and romantic trips get the best-rated hotel; active ones and tight budgets the cheaper good one.
   const preferCheap = brief.mood === 'active' || brief.party === 'friends'
   const checkOut = addDays(checkIn, nights)
   const total = (perNight: number) => stayTotal(perNight, checkIn, checkOut, guests.rooms)
-  const options = pool
-    .map((destination): AssistantOption => {
+  const option = (destination: Destination, hotel: HotelSummary | undefined): AssistantOption => {
+    const perNight = hotel?.priceFrom ?? destination.priceFrom
+    const sum = total(perNight)
+    return { destination, hotel, perNight, total: sum, fitsBudget: !brief.budget || sum <= brief.budget }
+  }
+
+  // The semantic matches in the plan's cities keep their order, within the budget first.
+  const cityOf = new Map(pool.map((d) => [d.id, d]))
+  const found: AssistantOption[] = []
+  for (const hotel of matches) {
+    const destination = cityOf.get(hotel.destinationId)
+    if (!destination || (!named && found.some((o) => o.destination.id === destination.id))) continue
+    found.push(option(destination, hotel))
+  }
+  found.sort((a, b) => Number(b.fitsBudget) - Number(a.fitsBudget))
+
+  const ruled = pool
+    .filter((destination) => !found.some((o) => o.destination.id === destination.id))
+    .map((destination) => {
       const cityHotels = hotels
         .filter((h) => h.destinationId === destination.id)
         .sort((a, b) => (preferCheap ? a.priceFrom - b.priceFrom : b.rating - a.rating))
@@ -341,10 +375,7 @@ export function makePlan(
         (min, h) => (!min || total(h.priceFrom) < total(min.priceFrom) ? h : min),
         undefined,
       )
-      const hotel = affordable ?? cheapest
-      const perNight = hotel?.priceFrom ?? destination.priceFrom
-      const sum = total(perNight)
-      return { destination, hotel, perNight, total: sum, fitsBudget: !brief.budget || sum <= brief.budget }
+      return option(destination, affordable ?? cheapest)
     })
     .sort(
       (a, b) =>
@@ -352,7 +383,7 @@ export function makePlan(
         (b.hotel?.rating ?? 8) - (a.hotel?.rating ?? 8) ||
         a.total - b.total,
     )
-    .slice(0, 3)
+  const options = [...found, ...ruled].slice(0, PLAN_OPTIONS)
 
   const why = reason ? `Выбрал сам: ${reason}. Значит, ${text}.` : `${text[0].toLocaleUpperCase('ru')}${text.slice(1)}.`
   return {
@@ -433,12 +464,17 @@ export interface AssistantResponse {
   /** The model's short remark; absent when the rules read the message. */
   reply?: string
   source: 'model' | 'rules'
+  /** Hotels the semantic search found for the traveller's words once the brief is complete, best first. */
+  matches?: HotelSummary[]
 }
 
 export const MAX_MESSAGE_LENGTH = 500
 export const MAX_HISTORY = 20
-/** The client's own limit; the route gives the model 8 s and answers with the rules after that. */
-const ASSISTANT_TIMEOUT_MS = 9000
+/**
+ * The client's own limit: the route gives the model 8 s (the rules after that) and answers within 14 s with
+ * the semantic search's hotels, when the plan is due.
+ */
+const ASSISTANT_TIMEOUT_MS = 15_000
 
 /**
  * Reads the newest message of `messages` into `brief` through the assistant route. Any failure — no
@@ -471,6 +507,7 @@ export async function askAssistant(
         brief: normalizeBrief(data.brief ?? {}, destinations),
         reply: typeof data.reply === 'string' ? data.reply : undefined,
         source: data.source === 'model' ? 'model' : 'rules',
+        matches: Array.isArray(data.matches) ? data.matches : undefined,
       }
     }
   } catch {

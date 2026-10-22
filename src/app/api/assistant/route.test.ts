@@ -2,10 +2,12 @@ import type { LanguageModel } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getAssistantModel } from '@/lib/ai/model'
+import { semanticSearch } from '@/lib/ai/semantic'
 import { nextQuestion } from '@/lib/assistant'
 import { POST } from './route'
 
 vi.mock('@/lib/ai/model', () => ({ getAssistantModel: vi.fn() }))
+vi.mock('@/lib/ai/semantic', () => ({ SEMANTIC_TIMEOUT_MS: 8000, semanticSearch: vi.fn() }))
 vi.mock('@/lib/db/catalog', () => import('@/test/catalog'))
 
 const usage = {
@@ -55,6 +57,7 @@ const ask = (text: string, brief = {}) => post({ messages: [{ role: 'user', text
 
 beforeEach(() => {
   vi.spyOn(console, 'warn').mockImplementation(() => {})
+  vi.mocked(semanticSearch).mockResolvedValue(null)
 })
 afterEach(() => {
   vi.restoreAllMocks()
@@ -230,5 +233,46 @@ describe('POST /api/assistant', () => {
     for (let i = 0; i < 20; i++) expect((await post(body, '192.0.2.1')).status).toBe(200)
     expect((await post(body, '192.0.2.1')).status).toBe(429)
     expect((await post(body, '192.0.2.2')).status).toBe(200)
+  })
+})
+
+describe('POST /api/assistant: the semantic search', () => {
+  const complete = { destinationId: 'prague', when: 5, party: 'solo' }
+  const hit = (id: string) => ({ id, destinationId: 'prague', score: 0.9 })
+
+  it('adds the hotels found for all the traveller’s words in the plan’s cities once the plan is due', async () => {
+    setModel(undefined)
+    vi.mocked(semanticSearch).mockResolvedValue([
+      hit('prague-skyline-hostel'),
+      hit('unknown'),
+      hit('prague-central-hostel'),
+    ])
+    const response = await post({
+      messages: [
+        { role: 'user', text: 'тихий хостел с быстрым Wi‑Fi' },
+        { role: 'assistant', text: 'Куда?' },
+        { role: 'user', text: 'в Прагу' },
+      ],
+      brief: complete,
+    })
+    const { matches } = await response.json()
+    expect(matches.map((h: { id: string }) => h.id)).toEqual(['prague-skyline-hostel', 'prague-central-hostel'])
+    const [text, options] = vi.mocked(semanticSearch).mock.calls[0]
+    expect(text).toBe('тихий хостел с быстрым Wi‑Fi. в Прагу')
+    expect(options).toMatchObject({ kind: 'hotel', destinationIds: ['prague'] })
+  })
+
+  it('does not search while the assistant still has a question', async () => {
+    setModel(undefined)
+    expect((await (await ask('море')).json()).matches).toBeUndefined()
+    expect(semanticSearch).not.toHaveBeenCalled()
+  })
+
+  it('answers by the rules when the search is unavailable', async () => {
+    setModel(undefined)
+    const body = await (await ask('тихо', complete)).json()
+    expect(semanticSearch).toHaveBeenCalledTimes(1)
+    expect(body.matches).toBeUndefined()
+    expect(body.source).toBe('rules')
   })
 })
