@@ -241,7 +241,10 @@ describe('hasFreeCancellation', () => {
 
   it('is false for exactly every second hotel of a city, by id', () => {
     const onlyHotels = catalog.filter((h) => h.stayType === 'hotel')
-    expect(onlyHotels.filter((h) => !hasFreeCancellation(h))).toHaveLength(Math.floor(onlyHotels.length / 2))
+    const perCity = destinations.map((d) => onlyHotels.filter((h) => h.destinationId === d.id).length)
+    expect(onlyHotels.filter((h) => !hasFreeCancellation(h))).toHaveLength(
+      perCity.reduce((sum, count) => sum + Math.floor(count / 2), 0),
+    )
     for (const d of destinations) {
       const own = onlyHotels.filter((h) => h.destinationId === d.id).sort((a, b) => a.id.localeCompare(b.id))
       own.forEach((h, i) => expect(hasFreeCancellation(h), h.id).toBe(i % 2 === 0))

@@ -1,4 +1,6 @@
+import { z } from 'zod'
 import { destinations, type Destination } from '../data/destinations'
+import extraHotelData from '../data/extraHotels.json' with { type: 'json' }
 import { newHotelSeeds, type HotelSeed } from '../data/hotels'
 import {
   AMENITIES,
@@ -134,10 +136,48 @@ const summaryOf = (
   reviewCount: number,
   isNew: boolean,
   stayType: StayType = 'hotel',
+  work: Partial<Pick<HotelSummary, 'wifiMbps' | 'workspace'>> = {},
 ): HotelSummary => {
   const id = idOf(seed.destinationId, seed.name)
-  return { id, ...seed, stayType, ...workTraits(id, stayType), reviewCount, isNew }
+  return { id, ...seed, stayType, ...workTraits(id, stayType), ...work, reviewCount, isNew }
 }
+
+/**
+ * A place the route generator (`npm run routes:generate`) proposed for a route when the city had none
+ * that fit the persona: it is kept in src/data/extraHotels.json and joins the catalogue after the generated stays.
+ */
+export const extraHotelSchema = z.object({
+  destinationId: z.string().min(1),
+  name: z.string().min(2).max(60),
+  stayType: z.enum(['hotel', 'hostel', 'apartments', 'villa']),
+  stars: z.number().int().min(1).max(5),
+  rating: z.number().min(6).max(9.9),
+  priceFrom: z.number().int().positive(),
+  wifiMbps: z.number().int().min(10).max(1000).optional(),
+  workspace: z.boolean().optional(),
+})
+export type ExtraHotel = z.infer<typeof extraHotelSchema>
+
+/** The extra hotels of the file, checked: a known city, a price not below the city's minimum. */
+export function parseExtraHotels(data: unknown): ExtraHotel[] {
+  return z
+    .array(extraHotelSchema)
+    .parse(data)
+    .map((extra) => {
+      const destination = destinations.find((d) => d.id === extra.destinationId)
+      if (!destination) throw new Error(`extraHotels: города ${extra.destinationId} нет в каталоге`)
+      const [min, max] = WIFI_MBPS[extra.stayType]
+      if (extra.wifiMbps !== undefined && (extra.wifiMbps < min || extra.wifiMbps > max || extra.wifiMbps % 10))
+        throw new Error(`extraHotels: Wi‑Fi ${extra.name} вне ${min}–${max} Мбит/с или не кратен 10`)
+      if (extra.workspace && !WORKSPACE_SHARE[extra.stayType])
+        throw new Error(`extraHotels: у ${extra.name} (${extra.stayType}) не бывает рабочего места`)
+      if (extra.priceFrom < destination.priceFrom)
+        throw new Error(`extraHotels: ${extra.name} дешевле минимальной цены города ${destination.name}`)
+      return extra
+    })
+}
+
+const extraHotels = parseExtraHotels(extraHotelData)
 
 /** Every city has this many of each of its extra stays: hostels, apartments and villas. */
 export const STAYS_PER_DESTINATION: Record<Exclude<StayType, 'hotel'>, number> = { hostel: 2, apartments: 2, villa: 1 }
@@ -230,6 +270,16 @@ function buildSummaries() {
     for (const seed of extra) all.push(summaryOf(seed, reviewCountOf(idOf(seed.destinationId, seed.name)), false))
     for (const { stayType, ...seed } of generateStays(destination, [...own, ...extra]))
       all.push(summaryOf(seed, reviewCountOf(idOf(seed.destinationId, seed.name)), false, stayType))
+    for (const { stayType, wifiMbps, workspace, ...seed } of extraHotels.filter(
+      (h) => h.destinationId === destination.id,
+    )) {
+      const id = idOf(seed.destinationId, seed.name)
+      if (all.some((h) => h.id === id)) throw new Error(`extraHotels: ${id} уже есть в каталоге`)
+      const work = { ...(wifiMbps !== undefined && { wifiMbps }), ...(workspace !== undefined && { workspace }) }
+      all.push(
+        summaryOf({ ...seed, stars: seed.stars as HotelSeed['stars'] }, reviewCountOf(id), false, stayType, work),
+      )
+    }
   }
   return { all, newOnes: newHotelSeeds.map((seed) => fromSeed.get(seed)!) }
 }

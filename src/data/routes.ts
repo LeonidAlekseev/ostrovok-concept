@@ -1,10 +1,12 @@
 import type { Route } from '../lib/routes'
+import generatedRoutes from './generatedRoutes.json' with { type: 'json' }
 
 /**
- * The routes `npm run db:seed` loads into the `routes` table: one for development. The rest come from
- * `generate-demo-routes`; the site reads every route from the database (src/lib/db/routes.ts).
+ * The routes `npm run db:seed` loads into the `routes` table: the hand-written one, then the routes of
+ * `npm run routes:generate` (src/data/generatedRoutes.json, read and committed, not made in the build).
+ * The site reads every route from the database (src/lib/db/routes.ts).
  */
-export const seedRoutes: Route[] = [
+const handWritten: Route[] = [
   {
     id: 'prague-culture',
     persona: 'culture',
@@ -66,3 +68,5 @@ export const seedRoutes: Route[] = [
     ],
   },
 ]
+
+export const seedRoutes: Route[] = [...handWritten, ...(generatedRoutes as Route[])]
