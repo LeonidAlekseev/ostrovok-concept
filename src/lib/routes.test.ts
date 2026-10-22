@@ -12,6 +12,7 @@ import {
   legPrice,
   parseRoute,
   parseRouteState,
+  previewPlan,
   toRouteParams,
   type Route,
   type RouteState,
@@ -107,7 +108,7 @@ describe('legs', () => {
   })
 })
 
-// routes, Requirements: Страница маршрута, Ночи в точках, Трансферы в таймлайне
+// routes, Requirements: Расчёт ночей, Расчёт трансферов
 describe('buildPlan', () => {
   const plan = buildPlan(route, hotels, state())
 
@@ -194,5 +195,20 @@ describe('buildPlan', () => {
     const early: Route = { ...route, arrival: { ...route.arrival, time: '08:00' } }
     const checkIn = buildPlan(early, hotels, state()).days[0].items.find((item) => item.kind === 'check-in')!
     expect(checkIn.start).toBe(14 * 60)
+  })
+})
+
+// routes, Requirement: Оценка цены маршрута
+describe('previewPlan', () => {
+  it('estimates the route as published at weekday prices', () => {
+    const preview = previewPlan(route, hotels)
+    expect(preview.nights).toBe(5)
+    expect(preview.days).toHaveLength(6)
+    expect(preview.stays.map((stay) => stay.price)).toEqual(
+      route.stops.map((stop) => cheapestRate(hotels[stop.hotelId]).rate.pricePerNight * stop.nights),
+    )
+    const transfers = transfersOf(preview).reduce((total, item) => total + item.price, 0)
+    expect(preview.main).toBe(preview.stays[0].price + preview.stays[1].price + transfers)
+    expect(preview.extras).toBe(route.leisure.reduce((total, item) => total + item.price, 0))
   })
 })

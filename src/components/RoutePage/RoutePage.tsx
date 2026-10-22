@@ -1,16 +1,10 @@
-'use client'
-
-import { Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import type { Hotel } from '@/lib/catalog'
-import { authorName, PERSONA_LABEL, type Route } from '@/lib/routes'
-import { DateField } from '../SearchForm/DateField'
+import { authorName, PERSONA_LABEL, previewPlan, type Route } from '@/lib/routes'
 import { RouteMap } from './RouteMap'
 import { RouteSummary } from './RouteSummary'
 import { RouteTimeline } from './RouteTimeline'
-import { useRoutePlan } from './useRoutePlan'
 
 interface Props {
   route: Route
@@ -18,10 +12,12 @@ interface Props {
   hotels: Record<string, Hotel>
 }
 
-const NO_EDITS = new URLSearchParams()
-
-function RouteView({ route, hotels, params }: Props & { params: Pick<URLSearchParams, 'get'> }) {
-  const { state, plan, edit } = useRoutePlan(route, hotels, params)
+/**
+ * The route page, for viewing: header, the flat map of the stops, the door-to-door plan by relative day
+ * and the estimate. Dates, nights, transfers and leisure are edited in a copy («Повторить маршрут»).
+ */
+export function RoutePage({ route, hotels }: Props) {
+  const plan = previewPlan(route, hotels)
   return (
     <main className="mx-auto flex w-full max-w-(--page-max) flex-1 flex-col gap-6 px-(--page-x) py-[clamp(20px,5vw,40px)]">
       <header className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] md:items-center">
@@ -44,53 +40,16 @@ function RouteView({ route, hotels, params }: Props & { params: Pick<URLSearchPa
             <RouteMap stays={plan.stays} />
           </section>
           <section aria-labelledby="route-plan" className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <h2 id="route-plan" className="text-heading font-bold">
-                План от двери до двери
-              </h2>
-              <div className="flex w-full flex-col gap-1 sm:w-80">
-                <p className="text-sm font-semibold">Начало</p>
-                <DateField
-                  single
-                  checkIn={state.start}
-                  checkOut={state.start}
-                  onChange={(start) => edit((s) => ({ ...s, start }))}
-                />
-              </div>
-            </div>
-            <RouteTimeline
-              plan={plan}
-              defaults={route.transfers}
-              transfers={state.transfers}
-              onNights={(stop, nights) =>
-                edit((s) => ({ ...s, nights: s.nights.map((n, i) => (i === stop ? nights : n)) }))
-              }
-              onTransfer={(leg, mode) =>
-                edit((s) => ({ ...s, transfers: s.transfers.map((m, i) => (i === leg ? mode : m)) }))
-              }
-            />
+            <h2 id="route-plan" className="text-heading font-bold">
+              План от двери до двери
+            </h2>
+            <RouteTimeline plan={plan} />
           </section>
         </div>
         <aside className="lg:sticky lg:top-4">
-          <RouteSummary route={route} plan={plan} />
+          <RouteSummary routeId={route.id} plan={plan} />
         </aside>
       </div>
     </main>
-  )
-}
-
-function AddressRoute(props: Props) {
-  return <RouteView {...props} params={useSearchParams()} />
-}
-
-/**
- * The route page: header, the flat map of the stops, the door-to-door plan by day with the edits (start,
- * nights, transfers) and the two totals. The edits depend on the address, so a prerender shows the route as is.
- */
-export function RoutePage(props: Props) {
-  return (
-    <Suspense fallback={<RouteView {...props} params={NO_EDITS} />}>
-      <AddressRoute {...props} />
-    </Suspense>
   )
 }

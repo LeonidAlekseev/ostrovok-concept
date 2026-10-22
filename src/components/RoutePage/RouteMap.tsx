@@ -13,13 +13,16 @@ const SearchMap = dynamic(
   { ssr: false, loading: () => <div className="size-full animate-pulse bg-muted" aria-hidden /> },
 )
 
-/** The flat map of the route: a marker per stop with the price of its nights; a marker opens the hotel with those dates. */
+/** The flat map of the route: a marker per stop with the estimate of its nights; a marker opens the hotel. */
 export function RouteMap({ stays }: { stays: readonly PlanStay[] }) {
   const router = useRouter()
   const hotels = useMemo(() => stays.map(({ hotel, price }) => ({ hotel, price })), [stays])
-  const open = (id: string) => {
-    const stay = stays.find(({ hotel }) => hotel.id === id)
-    if (stay) router.push(hotelHref(id, stay))
-  }
-  return <SearchMap hotels={hotels} activeId={null} onOpen={open} fallback={<HotelMapUnavailable />} />
+  return (
+    <SearchMap
+      hotels={hotels}
+      activeId={null}
+      onOpen={(id) => router.push(hotelHref(id))}
+      fallback={<HotelMapUnavailable />}
+    />
+  )
 }

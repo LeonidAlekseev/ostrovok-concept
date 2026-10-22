@@ -230,8 +230,16 @@ export const toMinutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Numbe
 export const formatTime = (minutes: number) =>
   `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
 
-/** The door-to-door plan of the route with the edits: stays, transfers, leisure by day, and the two totals. */
-export function buildPlan(route: Route, hotels: Readonly<Record<string, Hotel>>, state: RouteState): RoutePlan {
+/**
+ * The door-to-door plan of the route with the edits: stays, transfers, leisure by day, and the two totals.
+ * With `weekdayPrices` every night costs the rate's weekday price, for an estimate without real dates.
+ */
+export function buildPlan(
+  route: Route,
+  hotels: Readonly<Record<string, Hotel>>,
+  state: RouteState,
+  { weekdayPrices = false } = {},
+): RoutePlan {
   const items: PlanItem[] = []
   const stays: PlanStay[] = []
   let date = state.start
@@ -245,7 +253,7 @@ export function buildPlan(route: Route, hotels: Readonly<Record<string, Hotel>>,
       checkIn: date,
       checkOut,
       nights: state.nights[i],
-      price: stayTotal(rate, date, checkOut, 1),
+      price: weekdayPrices ? rate * state.nights[i] : stayTotal(rate, date, checkOut, 1),
     })
     date = checkOut
   })
@@ -346,6 +354,16 @@ export function buildPlan(route: Route, hotels: Readonly<Record<string, Hotel>>,
   const extras = sum(items.map((item) => (item.kind === 'leisure' ? item.leisure.price : 0)))
   return { start: state.start, end, nights, stays, days, carRental, main, extras }
 }
+
+/** Any start: the preview shows relative days only, and weekday prices do not depend on the dates. */
+const PREVIEW_START = '2026-01-05'
+
+/**
+ * The route as published, for viewing: its own nights and transfers, days counted from the arrival
+ * («День 1», «День 2»…), the totals an estimate at weekday prices. The edits come with a copy of the route.
+ */
+export const previewPlan = (route: Route, hotels: Readonly<Record<string, Hotel>>): RoutePlan =>
+  buildPlan(route, hotels, { ...defaultState(route, PREVIEW_START), start: PREVIEW_START }, { weekdayPrices: true })
 
 // ---------------------------------------------------------------------------------------------
 // Calendar export

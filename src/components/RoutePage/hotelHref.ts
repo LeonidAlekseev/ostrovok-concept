@@ -1,9 +1,5 @@
-import { DEFAULT_GUESTS, setGuestParams, setStayParams } from '@/lib/search'
+import { DEFAULT_GUESTS, setGuestParams } from '@/lib/search'
 
-/** The hotel page with the dates of a stay of the plan, two adults in one room. */
-export function hotelHref(hotelId: string, stay: { checkIn: string; checkOut: string } | null): string {
-  const params = stay
-    ? setStayParams(new URLSearchParams(), { checkIn: stay.checkIn, checkOut: stay.checkOut, guests: DEFAULT_GUESTS })
-    : setGuestParams(new URLSearchParams(), DEFAULT_GUESTS)
-  return `/hotels/${hotelId}?${params}`
-}
+/** The hotel page without dates, for two adults in one room: the dates are chosen in a copy of the route. */
+export const hotelHref = (hotelId: string) =>
+  `/hotels/${hotelId}?${setGuestParams(new URLSearchParams(), DEFAULT_GUESTS)}`
