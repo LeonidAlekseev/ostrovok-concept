@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AMENITIES, cheapestRate, POPULAR_AMENITIES } from '@/lib/catalog'
+import { AMENITIES, cheapestRate, POPULAR_AMENITIES, workLabels } from '@/lib/catalog'
 import { fullHotelsIn, getHotel } from '@/lib/catalogGenerator'
 import { formatPrice } from '@/lib/format'
 import { guruPrice, stayTotal } from '@/lib/offer'
@@ -114,9 +114,13 @@ describe('travel times', () => {
 describe('AboutHotel', () => {
   it('shows the first 6 popular amenities of the hotel, in their order', () => {
     render(<AboutHotel hotel={hotel} />)
-    const expected = POPULAR_AMENITIES.filter((key) => hotel.amenities.includes(key))
-      .slice(0, 6)
-      .map((key) => AMENITIES[key].label)
+    const work = workLabels(hotel)
+    const expected = [
+      ...work,
+      ...POPULAR_AMENITIES.filter((key) => key !== 'wifi' && hotel.amenities.includes(key))
+        .slice(0, 6 - work.length)
+        .map((key) => AMENITIES[key].label),
+    ]
     const list = screen.getByRole('list', { name: 'Удобства' })
     expect(
       within(list)
@@ -141,7 +145,7 @@ describe('AboutHotel', () => {
     const items = within(dialog)
       .getAllByRole('listitem')
       .map((li) => li.textContent!.replace('оплачивается отдельно', ''))
-    expect(items).toEqual(paidHotel.amenities.map((key) => AMENITIES[key].label))
+    expect(items).toEqual([...workLabels(paidHotel), ...paidHotel.amenities.map((key) => AMENITIES[key].label)])
     const transfer = within(dialog).getByRole('region', { name: 'Трансфер' })
     expect(within(transfer).getByText('Трансфер из аэропорта').textContent).toContain('оплачивается отдельно')
     const internet = within(dialog).getByRole('region', { name: 'Интернет' })
@@ -260,6 +264,15 @@ describe('HotelPage', () => {
     expect(header.textContent).not.toContain('9,5')
     expect(header.textContent).not.toContain('от центра')
     expect(screen.queryByText('Бесплатная отмена')).toBeNull()
+  })
+
+  it('names the kind of a stay that is not a hotel, and shows no stars for apartments', () => {
+    const villa = fullHotelsIn('prague').find((h) => h.stayType === 'villa')!
+    render(<HotelPage hotel={villa} />)
+    const header = screen.getByRole('heading', { level: 1 }).closest('header')!
+    expect(header.textContent).toContain('Вилла')
+    expect(header.textContent).not.toContain('звёздочный')
+    expect(within(header).queryByRole('img')).toBeNull()
   })
 
   it('goes photo, name, rating, dates, about, rooms in one column', () => {

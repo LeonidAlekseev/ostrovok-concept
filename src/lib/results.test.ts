@@ -81,17 +81,20 @@ describe('parseFilters and setFilterParams', () => {
     const set = filters({
       priceMin: 5000,
       priceMax: 20000,
+      types: ['hostel', 'apartments'],
       stars: [4, 5],
       ratingMin: 7.5,
       ratingMax: 9,
       meals: ['breakfast', 'all-inclusive'],
       freeCancel: true,
       amenities: ['wifi', 'parking'],
+      workspace: true,
+      wifiMin: 200,
       sort: 'price_asc',
     })
     const params = setFilterParams(new URLSearchParams('destination=prague'), set)
     expect(params.toString()).toBe(
-      'destination=prague&price_min=5000&price_max=20000&stars=4%2C5&rating_min=7.5&rating_max=9&meal=breakfast%2Call-inclusive&free_cancel=1&amenities=wifi%2Cparking&sort=price_asc',
+      'destination=prague&price_min=5000&price_max=20000&types=hostel%2Capartments&stars=4%2C5&rating_min=7.5&rating_max=9&meal=breakfast%2Call-inclusive&free_cancel=1&amenities=wifi%2Cparking&workspace=1&wifi_min=200&sort=price_asc',
     )
     expect(parseFilters(params)).toEqual(set)
   })
@@ -105,10 +108,10 @@ describe('parseFilters and setFilterParams', () => {
     expect(
       parseFilters(
         new URLSearchParams(
-          'price_min=abc&price_max=-5&stars=7,5,x&rating_min=7.3&rating_max=11&meal=snacks&free_cancel=yes&amenities=wifi,jacuzzi&sort=cheap',
+          'price_min=abc&price_max=-5&stars=7,5,x&rating_min=7.3&rating_max=11&meal=snacks&free_cancel=yes&amenities=wifi,jacuzzi&types=castle,villa&workspace=0&wifi_min=fast&sort=cheap',
         ),
       ),
-    ).toEqual(filters({ stars: [5], amenities: ['wifi'] }))
+    ).toEqual(filters({ stars: [5], amenities: ['wifi'], types: ['villa'] }))
   })
 
   it('reads the old minimal rating as the lower end of the range and writes the new one', () => {
@@ -121,6 +124,7 @@ describe('parseFilters and setFilterParams', () => {
     expect(countFilters(filters({ sort: 'rating' }))).toBe(0)
     expect(countFilters(filters({ priceMin: 1, priceMax: 2, stars: [5, 4], freeCancel: true }))).toBe(3)
     expect(countFilters(filters({ ratingMax: 9, amenities: ['wifi', 'parking'] }))).toBe(2)
+    expect(countFilters(filters({ types: ['hostel', 'villa'], workspace: true, wifiMin: 100 }))).toBe(3)
   })
 })
 
@@ -166,6 +170,26 @@ describe('applyFilters', () => {
     expect(between.length).toBeGreaterThan(0)
     expect(between.every((i) => i.hotel.rating >= 8 && i.hotel.rating <= 9)).toBe(true)
     expect(between.length).toBe(prague.filter((h) => h.rating >= 8 && h.rating <= 9).length)
+  })
+
+  // search-results-page, Requirement: Фильтр типа жилья и работы
+  it('keeps the chosen kinds of stay, any of them, and drops apartments and villas from a star filter', () => {
+    const both = applyFilters(prague, filters({ types: ['hostel', 'apartments'] }))
+    expect(both.length).toBeGreaterThan(2)
+    expect(both.every((i) => ['hostel', 'apartments'].includes(i.hotel.stayType))).toBe(true)
+    expect(both.length).toBe(prague.filter((h) => h.stayType === 'hostel' || h.stayType === 'apartments').length)
+    const starred = applyFilters(prague, filters({ stars: [1, 2, 3, 4, 5] }))
+    expect(starred.every((i) => i.hotel.stayType === 'hotel' || i.hotel.stayType === 'hostel')).toBe(true)
+  })
+
+  it('keeps the hotels with a workspace and a Wi‑Fi of the chosen speed or faster', () => {
+    const work = applyFilters(prague, filters({ workspace: true }))
+    expect(work.length).toBeGreaterThan(0)
+    expect(work.every((i) => i.hotel.workspace)).toBe(true)
+    const fast = applyFilters(prague, filters({ wifiMin: 200 }))
+    expect(fast.length).toBeGreaterThan(0)
+    expect(fast.every((i) => i.hotel.wifiMbps >= 200)).toBe(true)
+    expect(fast.length).toBe(prague.filter((h) => h.wifiMbps >= 200).length)
   })
 
   it('keeps only the hotels with every chosen amenity', () => {

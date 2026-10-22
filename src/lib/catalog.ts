@@ -18,6 +18,19 @@ export const MEAL_LABEL: Record<Meal, string> = {
   'all-inclusive': 'Всё включено',
 }
 
+/** The kinds of a place to stay, with their labels. */
+export const STAY_TYPES = {
+  hotel: 'Отель',
+  hostel: 'Хостел',
+  apartments: 'Апартаменты',
+  villa: 'Вилла',
+} as const
+
+export type StayType = keyof typeof STAY_TYPES
+
+/** Hotels and hostels are rated in stars; apartments and villas have none in the interface. */
+export const hasStars = (type: StayType) => type === 'hotel' || type === 'hostel'
+
 export const PAYMENT_LABEL: Record<Payment, string> = { now: 'Оплата сейчас', 'at-hotel': 'Оплата в отеле' }
 
 /** Sections of the amenities, in the order the hotel page lists them. */
@@ -203,12 +216,18 @@ export interface HotelSummary {
   id: string
   destinationId: string
   name: string
+  stayType: StayType
+  /** 1…5. Apartments and villas keep a value only to satisfy the table and the sorting: see `hasStars`. */
   stars: 1 | 2 | 3 | 4 | 5
   /** Guest rating, 0…10. */
   rating: number
   reviewCount: number
   /** Cheapest rate per night, ₽. */
   priceFrom: number
+  /** Speed of the Wi‑Fi, Мбит/с. */
+  wifiMbps: number
+  /** There is a place to work. */
+  workspace: boolean
   /** One of the hand-picked "recently added" hotels the hero globe spotlights. */
   isNew: boolean
 }
@@ -257,6 +276,12 @@ export function cheapestRate(hotel: Hotel): { room: Room; rate: Rate } {
   return best
 }
 
+/** Wi‑Fi speed and the workspace as the lines of the hotel page's amenities, the Wi‑Fi first. */
+export const workLabels = (hotel: Pick<Hotel, 'wifiMbps' | 'workspace'>): string[] => [
+  `Wi‑Fi ${hotel.wifiMbps} Мбит/с`,
+  ...(hotel.workspace ? ['Рабочая зона'] : []),
+]
+
 /** Travel times from the hotel, minutes. */
 export interface TravelTimes {
   /** By car to the city centre: 3 minutes a kilometre, at least 1. */
@@ -284,13 +309,14 @@ export const TILE_PHOTOS = 5
 /** What a hotel card (HotelTile) shows: a list of cards gets only this from the server, not the whole hotel. */
 export type TileHotel = Pick<
   Hotel,
-  'id' | 'destinationId' | 'name' | 'stars' | 'rating' | 'priceFrom' | 'distanceKm' | 'photos' | 'rooms'
+  'id' | 'destinationId' | 'name' | 'stayType' | 'stars' | 'rating' | 'priceFrom' | 'distanceKm' | 'photos' | 'rooms'
 >
 
 export const tileHotel = ({
   id,
   destinationId,
   name,
+  stayType,
   stars,
   rating,
   priceFrom,
@@ -301,6 +327,7 @@ export const tileHotel = ({
   id,
   destinationId,
   name,
+  stayType,
   stars,
   rating,
   priceFrom,

@@ -357,6 +357,30 @@ describe('SearchResultsPage filters', () => {
     for (const card of cards()) expect(within(card).getByText('Бесплатная отмена')).toBeDefined()
   })
 
+  // search-results-page, Requirement: Фильтр типа жилья и работы
+  it('filters by the kind of stay, any of the chosen, and writes them into the URL', async () => {
+    const user = userEvent.setup()
+    open(PRAGUE, { desktop: true })
+    await results()
+    await user.click(screen.getByRole('button', { name: 'Хостел' }))
+    await user.click(screen.getByRole('button', { name: 'Апартаменты' }))
+    expect(window.location.search).toContain('types=hostel%2Capartments')
+    expect(cards().length).toBeGreaterThan(0)
+    for (const card of cards()) expect(within(card).getByText(/^(Хостел|Апартаменты) ·$/)).toBeDefined()
+  })
+
+  it('filters by the workspace and the Wi‑Fi speed from', async () => {
+    const user = userEvent.setup()
+    open(PRAGUE, { desktop: true })
+    await results()
+    const all = cards().length
+    await user.click(screen.getByRole('button', { name: 'Рабочая зона' }))
+    expect(window.location.search).toContain('workspace=1')
+    await user.click(screen.getByRole('button', { name: 'Wi‑Fi от 200 Мбит/с' }))
+    expect(window.location.search).toContain('wifi_min=200')
+    expect(cards().length).toBeLessThan(all)
+  })
+
   it('shows the stars as chips from 1 to 5, the meals and the free cancellation as chips too', async () => {
     open(PRAGUE, { desktop: true })
     await results()

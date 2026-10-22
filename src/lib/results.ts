@@ -1,13 +1,24 @@
 import type { Destination } from '../data/destinations'
-import { AMENITIES, MEAL_LABEL, type Amenity, type Hotel, type Meal, type Rate, type Room } from './catalog'
+import {
+  AMENITIES,
+  hasStars,
+  MEAL_LABEL,
+  STAY_TYPES,
+  type Amenity,
+  type Hotel,
+  type Meal,
+  type Rate,
+  type Room,
+  type StayType,
+} from './catalog'
 import { nightsBetween } from './dates'
 import { averageNight, stayTotal } from './offer'
 import type { SearchQuery, SearchTarget, Stay } from './search'
 
 /**
  * Search results page: the demo search over the hotel catalogue, and the filters and sorting the
- * page keeps in its URL (`price_min`, `price_max`, `stars`, `rating_min`, `rating_max`, `meal`, `free_cancel`,
- * `amenities`, `sort`).
+ * page keeps in its URL (`price_min`, `price_max`, `types`, `stars`, `rating_min`, `rating_max`, `meal`, `free_cancel`,
+ * `amenities`, `workspace`, `wifi_min`, `sort`).
  */
 
 export interface SearchResult {
@@ -62,6 +73,9 @@ export type Sort = keyof typeof SORTS
 export const STAR_OPTIONS = [1, 2, 3, 4, 5] as const
 /** The guest rating slider: from 0 to 10 in halves. */
 export const RATING_SCALE = { min: 0, max: 10, step: 0.5 } as const
+export const STAY_TYPE_OPTIONS = Object.keys(STAY_TYPES) as StayType[]
+/** «Wi‑Fi от N Мбит/с»: the steps of the filter. */
+export const WIFI_OPTIONS = [50, 100, 200, 300] as const
 export const MEAL_OPTIONS = Object.keys(MEAL_LABEL) as Meal[]
 export const AMENITY_OPTIONS = Object.keys(AMENITIES) as Amenity[]
 /** The price slider moves in steps of this many roubles. */
@@ -71,7 +85,9 @@ export interface Filters {
   /** Price per night of one room, ₽, averaged over the stay; `null` is no bound. */
   priceMin: number | null
   priceMax: number | null
-  /** Empty: any. */
+  /** Empty: any; several: any of them. */
+  types: StayType[]
+  /** Empty: any. Apartments and villas have no stars, so a star filter drops them. */
   stars: number[]
   /** Guest rating from and to; `null` is no bound. */
   ratingMin: number | null
@@ -81,18 +97,25 @@ export interface Filters {
   freeCancel: boolean
   /** The hotel must have every one of them; empty: any. */
   amenities: Amenity[]
+  /** The hotel must have a place to work. */
+  workspace: boolean
+  /** Wi‑Fi speed from, Мбит/с; `null` is no bound. */
+  wifiMin: number | null
   sort: Sort
 }
 
 export const NO_FILTERS: Filters = {
   priceMin: null,
   priceMax: null,
+  types: [],
   stars: [],
   ratingMin: null,
   ratingMax: null,
   meals: [],
   freeCancel: false,
   amenities: [],
+  workspace: false,
+  wifiMin: null,
   sort: 'popular',
 }
 
@@ -105,6 +128,7 @@ export const PAGE_PARAM = 'page'
 export const FILTER_PARAMS = [
   'price_min',
   'price_max',
+  'types',
   'stars',
   'rating',
   'rating_min',
@@ -112,6 +136,8 @@ export const FILTER_PARAMS = [
   'meal',
   'free_cancel',
   'amenities',
+  'workspace',
+  'wifi_min',
   'sort',
 ] as const
 
@@ -129,12 +155,15 @@ export function parseFilters(params: Pick<URLSearchParams, 'get'>): Filters {
   return {
     priceMin: toPrice(params.get('price_min')),
     priceMax: toPrice(params.get('price_max')),
+    types: STAY_TYPE_OPTIONS.filter((t) => list(params.get('types')).includes(t)),
     stars: STAR_OPTIONS.filter((s) => list(params.get('stars')).includes(String(s))),
     ratingMin: toRating(params.get('rating_min') ?? params.get('rating')),
     ratingMax: toRating(params.get('rating_max')),
     meals: MEAL_OPTIONS.filter((m) => list(params.get('meal')).includes(m)),
     freeCancel: params.get('free_cancel') === '1',
     amenities: AMENITY_OPTIONS.filter((a) => list(params.get('amenities')).includes(a)),
+    workspace: params.get('workspace') === '1',
+    wifiMin: toPrice(params.get('wifi_min')),
     sort: sort && sort in SORTS ? (sort as Sort) : 'popular',
   }
 }
@@ -164,12 +193,15 @@ export function setFilterParams(params: URLSearchParams, filters: Filters): URLS
   for (const name of [...FILTER_PARAMS, PAGE_PARAM]) params.delete(name)
   if (filters.priceMin !== null) params.set('price_min', String(filters.priceMin))
   if (filters.priceMax !== null) params.set('price_max', String(filters.priceMax))
+  if (filters.types.length) params.set('types', filters.types.join(','))
   if (filters.stars.length) params.set('stars', filters.stars.join(','))
   if (filters.ratingMin !== null) params.set('rating_min', String(filters.ratingMin))
   if (filters.ratingMax !== null) params.set('rating_max', String(filters.ratingMax))
   if (filters.meals.length) params.set('meal', filters.meals.join(','))
   if (filters.freeCancel) params.set('free_cancel', '1')
   if (filters.amenities.length) params.set('amenities', filters.amenities.join(','))
+  if (filters.workspace) params.set('workspace', '1')
+  if (filters.wifiMin !== null) params.set('wifi_min', String(filters.wifiMin))
   if (filters.sort !== 'popular') params.set('sort', filters.sort)
   return params
 }
@@ -177,11 +209,14 @@ export function setFilterParams(params: URLSearchParams, filters: Filters): URLS
 /** How many filters are set; the sorting does not count. */
 export const countFilters = (f: Filters) =>
   Number(f.priceMin !== null || f.priceMax !== null) +
+  Number(f.types.length > 0) +
   Number(f.stars.length > 0) +
   Number(f.ratingMin !== null || f.ratingMax !== null) +
   Number(f.meals.length > 0) +
   Number(f.freeCancel) +
-  Number(f.amenities.length > 0)
+  Number(f.amenities.length > 0) +
+  Number(f.workspace) +
+  Number(f.wifiMin !== null)
 
 export interface ResultItem {
   hotel: Hotel
@@ -240,7 +275,10 @@ export function priceBounds(hotels: Hotel[], stay: Stay | null = null): [number,
 export function applyFilters(hotels: Hotel[], f: Filters, stay: Stay | null = null): ResultItem[] {
   const items: ResultItem[] = []
   for (const hotel of hotels) {
-    if (f.stars.length && !f.stars.includes(hotel.stars)) continue
+    if (f.types.length && !f.types.includes(hotel.stayType)) continue
+    if (f.stars.length && !(hasStars(hotel.stayType) && f.stars.includes(hotel.stars))) continue
+    if (f.workspace && !hotel.workspace) continue
+    if (f.wifiMin !== null && hotel.wifiMbps < f.wifiMin) continue
     if (f.ratingMin !== null && hotel.rating < f.ratingMin) continue
     if (f.ratingMax !== null && hotel.rating > f.ratingMax) continue
     if (!f.amenities.every((a) => hotel.amenities.includes(a))) continue

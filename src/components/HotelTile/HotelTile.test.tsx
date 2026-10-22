@@ -1,7 +1,7 @@
 import { getDefaultNormalizer, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { type Hotel } from '../../lib/catalog'
-import { getHotel } from '../../lib/catalogGenerator'
+import { fullHotelsIn, getHotel } from '../../lib/catalogGenerator'
 import { countRu, formatDecimal, formatPrice } from '../../lib/format'
 import { HotelTile } from './HotelTile'
 
@@ -54,6 +54,20 @@ describe('HotelTile photo', () => {
     expect(top.firstElementChild).toBe(within(carousel).getByText('Бесплатная отмена'))
     expect(rating.className).toMatch(/\bml-auto\b/)
     expect(top.lastElementChild).toBe(button)
+  })
+})
+
+describe('HotelTile kind of stay', () => {
+  it('labels a hostel with its type and stars, an apartment without stars, and a hotel with neither', () => {
+    const find = (type: string) => fullHotelsIn('prague').find((h) => h.stayType === type)!
+    const { rerender } = render(<HotelTile hotel={hotel} href="/h" />)
+    expect(screen.queryByText(/^(Отель|Хостел|Апартаменты|Вилла) ·$/)).toBeNull()
+    rerender(<HotelTile hotel={find('hostel')} href="/h" />)
+    expect(screen.getByText('Хостел ·')).toBeDefined()
+    expect(screen.getByRole('img', { name: /звезд|звёзд/ })).toBeDefined()
+    rerender(<HotelTile hotel={find('apartments')} href="/h" />)
+    expect(screen.getByText('Апартаменты ·')).toBeDefined()
+    expect(screen.queryByRole('img', { name: /звезд|звёзд/ })).toBeNull()
   })
 })
 

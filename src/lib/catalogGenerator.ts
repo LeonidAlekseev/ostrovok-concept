@@ -14,6 +14,7 @@ import {
   type Review,
   type Room,
   type SectionScore,
+  type StayType,
 } from './catalog'
 import { addDays, type IsoDate } from './dates'
 
@@ -112,12 +113,84 @@ const GENERATED_STARS = [2, 3, 3, 3, 4, 4, 4, 5] as const
 
 const idOf = (destinationId: string, name: string) => `${destinationId}-${slugify(name)}`
 
-const summaryOf = (seed: HotelSeed, reviewCount: number, isNew: boolean): HotelSummary => ({
-  id: idOf(seed.destinationId, seed.name),
-  ...seed,
-  reviewCount,
-  isNew,
-})
+/** Wi‑Fi speed range, Мбит/с, and the share with a workspace of each kind of stay. */
+const WIFI_MBPS: Record<StayType, [number, number]> = {
+  hotel: [50, 300],
+  hostel: [30, 100],
+  apartments: [100, 500],
+  villa: [50, 200],
+}
+const WORKSPACE_SHARE: Record<StayType, number> = { hotel: 0.35, hostel: 0, apartments: 0.6, villa: 0 }
+
+/** Wi‑Fi speed to 10 Мбит/с and the workspace: a seed of their own, so the rest of the hotel stays as it was. */
+function workTraits(id: string, type: StayType) {
+  const rng = seeded(`work:${id}`)
+  const [min, max] = WIFI_MBPS[type]
+  return { wifiMbps: Math.round(rng.int(min, max) / 10) * 10, workspace: rng.next() < WORKSPACE_SHARE[type] }
+}
+
+const summaryOf = (
+  seed: HotelSeed,
+  reviewCount: number,
+  isNew: boolean,
+  stayType: StayType = 'hotel',
+): HotelSummary => {
+  const id = idOf(seed.destinationId, seed.name)
+  return { id, ...seed, stayType, ...workTraits(id, stayType), reviewCount, isNew }
+}
+
+/** Every city has this many of each of its extra stays: hostels, apartments and villas. */
+export const STAYS_PER_DESTINATION: Record<Exclude<StayType, 'hotel'>, number> = { hostel: 2, apartments: 2, villa: 1 }
+
+const STAY_NAMES = {
+  hostel: { ru: ['Попутчик', 'Рюкзак', 'Станция', 'Гнездо', 'Перекрёсток', 'Привал'], foreign: 'Hostel' },
+  apartments: { ru: ['Сити', 'Лофт', 'Уют', 'Центр', 'Набережная', 'Двор'], foreign: 'Apartments' },
+  villa: { ru: ['Эдельвейс', 'Олива', 'Кипарис', 'Заря', 'Сосны', 'Лагуна'], foreign: 'Villa' },
+} as const
+const VILLA_NAMES = ['Aurora', 'Bella', 'Serena', 'Solara', 'Mira', 'Oliva']
+const STAY_RU_PREFIX = { hostel: 'Хостел', apartments: 'Апартаменты', villa: 'Вилла' } as const
+
+/**
+ * The rating, the price of the cheapest night against the city's advertised minimum and the stars of each
+ * extra kind. Hostels cost the least, villas the most; apartments and villas keep a star value only for the
+ * table and the sorting (see `hasStars`). No price is below the city's minimum: it stays the cheapest hotel's.
+ */
+const STAY_PROFILE = {
+  hostel: { rating: [7.6, 9], price: [1, 1.15], stars: [1, 2] },
+  apartments: { rating: [8, 9.4], price: [1.1, 1.5], stars: [3, 3] },
+  villa: { rating: [8.6, 9.7], price: [2.2, 3.2], stars: [4, 4] },
+} as const
+
+function generateStays(destination: Destination, taken: HotelSeed[]): (HotelSeed & { stayType: StayType })[] {
+  const names = new Set(taken.map((h) => h.name))
+  const stays: (HotelSeed & { stayType: StayType })[] = []
+  for (const stayType of ['hostel', 'apartments', 'villa'] as const) {
+    const rng = seeded(`stay:${stayType}:${destination.id}`)
+    const profile = STAY_PROFILE[stayType]
+    for (let made = 0; made < STAYS_PER_DESTINATION[stayType];) {
+      const ru = destination.country === 'Россия'
+      const name = ru
+        ? `${STAY_RU_PREFIX[stayType]} ${rng.pick(STAY_NAMES[stayType].ru)}`
+        : stayType === 'villa'
+          ? `Villa ${rng.pick(VILLA_NAMES)}`
+          : `${rng.pick(NAME_FIRST)} ${STAY_NAMES[stayType].foreign}`
+      if (names.has(name)) continue
+      names.add(name)
+      made++
+      stays.push({
+        stayType,
+        destinationId: destination.id,
+        name,
+        stars: rng.pick(profile.stars as readonly (1 | 2 | 3 | 4)[]),
+        rating: round1(profile.rating[0] + rng.next() * (profile.rating[1] - profile.rating[0])),
+        priceFrom: roundUp100(
+          destination.priceFrom * (profile.price[0] + rng.next() * (profile.price[1] - profile.price[0])),
+        ),
+      })
+    }
+  }
+  return stays
+}
 
 function generateSeeds(destination: Destination, taken: HotelSeed[], count: number): HotelSeed[] {
   const rng = seeded(`generated:${destination.id}`)
@@ -155,6 +228,8 @@ function buildSummaries() {
     }
     const extra = generateSeeds(destination, own, Math.max(0, MIN_HOTELS_PER_DESTINATION - own.length))
     for (const seed of extra) all.push(summaryOf(seed, reviewCountOf(idOf(seed.destinationId, seed.name)), false))
+    for (const { stayType, ...seed } of generateStays(destination, [...own, ...extra]))
+      all.push(summaryOf(seed, reviewCountOf(idOf(seed.destinationId, seed.name)), false, stayType))
   }
   return { all, newOnes: newHotelSeeds.map((seed) => fromSeed.get(seed)!) }
 }
@@ -166,11 +241,11 @@ export const hotels: HotelSummary[] = summaries.all
 /** The hand-picked "recently added" hotels, in their original order. */
 export const newHotels: HotelSummary[] = summaries.newOnes
 
-/** Every second hotel of a city (by id) sells only non-refundable rates. */
+/** Every second hotel of a city (by id; stays of other kinds do not count) sells only non-refundable rates. */
 const nonRefundableIds = new Set(
   destinations.flatMap((d) =>
     hotels
-      .filter((h) => h.destinationId === d.id)
+      .filter((h) => h.destinationId === d.id && h.stayType === 'hotel')
       .map((h) => h.id)
       .sort()
       .filter((_, index) => index % 2 === 1),
@@ -198,6 +273,49 @@ const DESCRIPTION_SERVICE = [
   'Утром в ресторане сервируют завтрак, вечером работает бар.',
   'Отель подходит и для деловых поездок, и для отдыха с семьёй.',
 ]
+/** The description's sentences of the stays other than hotels. */
+const STAY_TEXTS = {
+  hostel: {
+    noun: 'хостел',
+    rooms: [
+      'В общих номерах капсульные кровати со шторками, розеткой и лампой, у каждого гостя свой шкафчик.',
+      'Есть общие номера на 4–8 мест и несколько приватных комнат.',
+      'Рядом — кафе, магазины и остановки общественного транспорта.',
+    ],
+    service: [
+      'На общей кухне можно готовить, а по вечерам собираются попутчики со всего мира.',
+      'Стойка регистрации работает круглосуточно, сотрудники подскажут маршруты.',
+      'Хостел подходит студентам и тем, кто путешествует с рюкзаком и небольшим бюджетом.',
+    ],
+  },
+  apartments: {
+    noun: 'апартаменты',
+    rooms: [
+      'В апартаментах есть кухня с посудой, стиральная машина и удобная зона для работы.',
+      'Просторные комнаты с большими окнами, всё необходимое для долгого проживания.',
+      'Рядом — кафе, магазины и остановки общественного транспорта.',
+    ],
+    service: [
+      'Заселение по коду, поддержка на связи в любое время.',
+      'Уборка по запросу, бельё и полотенца уже в апартаментах.',
+      'Апартаменты подходят для workation и для поездок на неделю и дольше.',
+    ],
+  },
+  villa: {
+    noun: 'вилла',
+    rooms: [
+      'В вилле несколько спален, просторная гостиная и кухня на всю компанию.',
+      'Во дворе терраса с мангалом, зона отдыха и место для парковки.',
+      'Рядом — магазины, кафе и тихие прогулочные маршруты.',
+    ],
+    service: [
+      'Хозяева встретят и покажут дом, а по просьбе организуют трансфер.',
+      'Вилла подходит большой компании или семье из нескольких поколений.',
+      'Здесь удобно собраться на праздник и работать на свежем воздухе.',
+    ],
+  },
+} as const
+
 /** The first amenities of the catalogue: their draw comes first, so their choice stays as it was. */
 const OPTIONAL_AMENITIES: Amenity[] = [
   'air-conditioning',
@@ -210,6 +328,36 @@ const OPTIONAL_AMENITIES: Amenity[] = [
   'shuttle',
   'pets',
   'family',
+]
+/** What the optional amenities and the extra ones of a hostel, apartments or a villa are drawn from. */
+const STAY_OPTIONAL: Record<Exclude<StayType, 'hotel'>, Amenity[]> = {
+  hostel: ['air-conditioning', 'bar', 'family', 'pets'],
+  apartments: ['air-conditioning', 'parking', 'family', 'pets', 'gym'],
+  villa: ['air-conditioning', 'pool', 'parking', 'pets', 'family', 'sauna', 'bar'],
+}
+const STAY_EXTRAS: Amenity[] = [
+  'computer',
+  'heating',
+  'security',
+  'fire-extinguisher',
+  'early-check-in',
+  'late-check-out',
+  'private-check-in',
+  'non-smoking-rooms',
+  'allergy-free-rooms',
+  'fridge',
+  'tv',
+  'safe',
+  'phone',
+  'iron',
+  'ironing-kit',
+  'laundry',
+  'luggage-storage',
+  'tea-coffee',
+  'first-aid',
+  'celebrations',
+  'staff-ru',
+  'staff-en',
 ]
 /** Every hotel has these. */
 const BASE_AMENITIES: Amenity[] = ['wifi', 'front-desk']
@@ -225,6 +373,7 @@ const amenityOrder = new Map((Object.keys(AMENITIES) as Amenity[]).map((key, ind
  */
 function extraAmenities(summary: HotelSummary): Amenity[] {
   const rng = seeded(`amenities:${summary.id}`)
+  if (summary.stayType !== 'hotel') return rng.sample(STAY_EXTRAS, rng.int(8, 14))
   return rng.sample(EXTRA_AMENITIES, rng.int(6, 10) + summary.stars * 4)
 }
 
@@ -237,7 +386,14 @@ function sectionScores(summary: HotelSummary): SectionScore[] {
   }))
 }
 
-const HOTEL_PHOTOS = ['Фасад', 'Лобби', 'Ресторан', 'Терраса', 'Вид из окна']
+/** The captions of the first five photos of each kind of stay. */
+const STAY_PHOTOS: Record<StayType, string[]> = {
+  hotel: ['Фасад', 'Лобби', 'Ресторан', 'Терраса', 'Вид из окна'],
+  hostel: ['Фасад', 'Общая зона', 'Кухня', 'Спальня', 'Вид из окна'],
+  apartments: ['Фасад', 'Гостиная', 'Кухня', 'Спальня', 'Вид из окна'],
+  villa: ['Фасад', 'Гостиная', 'Бассейн', 'Терраса', 'Вид из окна'],
+}
+const PHOTOS_BEFORE_MORE = STAY_PHOTOS.hotel.length
 /** Captions of the photos after the first five, and of the guests' photos. */
 const MORE_PHOTOS = ['Номер', 'Ванная', 'Вид', 'Завтрак', 'Бассейн', 'Холл', 'Терраса', 'Ресторан', 'Улица', 'Бар']
 
@@ -263,6 +419,92 @@ const ROOM_TYPES = [
   },
   { id: 'suite', name: 'Люкс', area: [45, 70], beds: '1 кровать king-size и диван', capacity: 3, factor: 2.8 },
 ] as const
+
+type RoomType = {
+  id: string
+  name: string
+  area: readonly [number, number]
+  beds: string
+  capacity: number
+  factor: number
+}
+
+/** The rooms of each kind of stay: the first is the cheapest and always offered; a villa sleeps 6–10. */
+const STAY_ROOM_TYPES: Record<StayType, readonly RoomType[]> = {
+  hotel: ROOM_TYPES,
+  hostel: [
+    {
+      id: 'dorm-8',
+      name: 'Место в общем номере на 8 человек',
+      area: [18, 24],
+      beds: '1 место на двухъярусной кровати',
+      capacity: 1,
+      factor: 1,
+    },
+    {
+      id: 'dorm-4',
+      name: 'Место в общем номере на 4 человека',
+      area: [12, 16],
+      beds: '1 место на двухъярусной кровати',
+      capacity: 1,
+      factor: 1.25,
+    },
+    {
+      id: 'private',
+      name: 'Двухместный номер с общей ванной',
+      area: [10, 14],
+      beds: '1 двуспальная кровать',
+      capacity: 2,
+      factor: 2.4,
+    },
+    { id: 'family', name: 'Семейный номер', area: [16, 22], beds: '2 двухъярусные кровати', capacity: 4, factor: 3.6 },
+  ],
+  apartments: [
+    { id: 'studio', name: 'Студия', area: [24, 34], beds: '1 двуспальная кровать', capacity: 2, factor: 1 },
+    {
+      id: 'one-bedroom',
+      name: 'Апартаменты с 1 спальней',
+      area: [38, 52],
+      beds: '1 двуспальная кровать и диван',
+      capacity: 3,
+      factor: 1.4,
+    },
+    {
+      id: 'two-bedroom',
+      name: 'Апартаменты с 2 спальнями',
+      area: [60, 80],
+      beds: '2 двуспальные кровати и диван',
+      capacity: 5,
+      factor: 2,
+    },
+  ],
+  villa: [
+    {
+      id: 'villa-3',
+      name: 'Вилла с 3 спальнями',
+      area: [120, 150],
+      beds: '3 двуспальные кровати',
+      capacity: 6,
+      factor: 1,
+    },
+    {
+      id: 'villa-4',
+      name: 'Вилла с 4 спальнями',
+      area: [160, 200],
+      beds: '4 двуспальные кровати',
+      capacity: 8,
+      factor: 1.25,
+    },
+    {
+      id: 'villa-5',
+      name: 'Вилла с 5 спальнями и бассейном',
+      area: [210, 280],
+      beds: '5 двуспальных кроватей',
+      capacity: 10,
+      factor: 1.6,
+    },
+  ],
+}
 
 const RATE_TYPES: (Omit<Rate, 'pricePerNight'> & { factor: number })[] = [
   { id: 'basic', meal: 'none', cancellation: { kind: 'non-refundable' }, payment: 'now', factor: 1 },
@@ -351,8 +593,8 @@ function nearestStation(hotelId: string, stations: string[] | undefined): Neares
 /** The photos after the first five, 7–25 of them: a seed of their own, so the rest of the hotel stays as it was. */
 function morePhotos(hotelId: string): Photo[] {
   const rng = seeded(`photos:${hotelId}`)
-  return Array.from({ length: rng.int(12, 30) - HOTEL_PHOTOS.length }, (_, i) => ({
-    id: `photo-${HOTEL_PHOTOS.length + i + 1}`,
+  return Array.from({ length: rng.int(12, 30) - PHOTOS_BEFORE_MORE }, (_, i) => ({
+    id: `photo-${PHOTOS_BEFORE_MORE + i + 1}`,
     caption: rng.pick(MORE_PHOTOS),
     tone: rng.int(0, PHOTO_TONE_COUNT - 1),
   }))
@@ -398,11 +640,14 @@ function buildHotel(summary: HotelSummary): Hotel {
 
   const amenities: Amenity[] = [
     ...BASE_AMENITIES,
-    ...rng.sample(OPTIONAL_AMENITIES, rng.int(2, 3) + Math.max(0, summary.stars - 2)),
+    ...(summary.stayType === 'hotel'
+      ? rng.sample(OPTIONAL_AMENITIES, rng.int(2, 3) + Math.max(0, summary.stars - 2))
+      : rng.sample(STAY_OPTIONAL[summary.stayType], rng.int(2, 3))),
     ...extraAmenities(summary),
   ].sort((a, b) => amenityOrder.get(a)! - amenityOrder.get(b)!)
 
-  const roomTypes = [ROOM_TYPES[0], ...rng.sample(ROOM_TYPES.slice(1), rng.int(2, ROOM_TYPES.length - 1))]
+  const available = STAY_ROOM_TYPES[summary.stayType]
+  const roomTypes = [available[0], ...rng.sample(available.slice(1), rng.int(2, available.length - 1))]
   const rooms = roomTypes.map((type, index): Room => {
     // Every room has its own cheapest rate; the first room's cheapest rate is the hotel's `priceFrom`.
     const base = index === 0 ? summary.priceFrom : roundUp100(summary.priceFrom * type.factor)
@@ -439,6 +684,11 @@ function buildHotel(summary: HotelSummary): Hotel {
     .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id))
 
   const distance = `${distanceKm.toLocaleString('ru-RU')} км`
+  const texts =
+    summary.stayType === 'hotel'
+      ? { rooms: DESCRIPTION_ROOMS, service: DESCRIPTION_SERVICE }
+      : STAY_TEXTS[summary.stayType]
+  const kind = summary.stayType === 'hotel' ? `${summary.stars}-звёздочный отель` : STAY_TEXTS[summary.stayType].noun
   return {
     ...summary,
     address: `${destination.name}, ${district}, д. ${rng.int(1, 120)}`,
@@ -449,13 +699,16 @@ function buildHotel(summary: HotelSummary): Hotel {
     amenities,
     sectionScores: sectionScores(summary),
     description: [
-      `${summary.name} — ${summary.stars}-звёздочный отель в районе «${district}», в ${distance} от центра.`,
-      rng.pick(DESCRIPTION_ROOMS),
-      rng.pick(DESCRIPTION_SERVICE),
+      `${summary.name} — ${kind} в районе «${district}», в ${distance} от центра.`,
+      rng.pick(texts.rooms),
+      rng.pick(texts.service),
     ].join(' '),
     checkInTime: '14:00',
     checkOutTime: '12:00',
-    photos: [...HOTEL_PHOTOS.map((caption, i) => photo(`photo-${i + 1}`, caption)), ...morePhotos(summary.id)],
+    photos: [
+      ...STAY_PHOTOS[summary.stayType].map((caption, i) => photo(`photo-${i + 1}`, caption)),
+      ...morePhotos(summary.id),
+    ],
     guestPhotos: guestPhotos(summary.id),
     rooms,
     reviews,

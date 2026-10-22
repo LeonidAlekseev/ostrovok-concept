@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Slider } from '@/components/ui/slider'
-import { AMENITIES, AMENITY_SECTIONS, MEAL_LABEL, type AmenitySection } from '../../lib/catalog'
+import { AMENITIES, AMENITY_SECTIONS, MEAL_LABEL, STAY_TYPES, type AmenitySection } from '../../lib/catalog'
 import { countRu, formatPrice } from '../../lib/format'
 import {
   AMENITY_OPTIONS,
@@ -16,6 +16,8 @@ import {
   RATING_SCALE,
   SORTS,
   STAR_OPTIONS,
+  STAY_TYPE_OPTIONS,
+  WIFI_OPTIONS,
   type Filters,
   type Sort,
 } from '../../lib/results'
@@ -87,7 +89,7 @@ function Chip({
 const chips = 'flex flex-wrap gap-1.5'
 
 /**
- * Sorting first, then price per night and guest rating on sliders; stars, meals, free cancellation and
+ * Sorting first, then price per night and guest rating on sliders; the type of stay, stars, meals, free cancellation and
  * the amenities by their section are chips.
  */
 export function FiltersPanel({ filters, onChange, priceBounds, embedded = false }: Props) {
@@ -149,6 +151,20 @@ export function FiltersPanel({ filters, onChange, priceBounds, embedded = false 
         </div>
       </Group>
 
+      <Group legend="Тип жилья">
+        <div className={chips}>
+          {STAY_TYPE_OPTIONS.map((type) => (
+            <Chip
+              key={type}
+              pressed={filters.types.includes(type)}
+              onPress={() => set({ types: toggle(filters.types, type) })}
+            >
+              {STAY_TYPES[type]}
+            </Chip>
+          ))}
+        </div>
+      </Group>
+
       <Group legend="Звёзды">
         {/* One row even in the narrow side panel. */}
         <div className="grid grid-cols-5 gap-1.5">
@@ -207,6 +223,23 @@ export function FiltersPanel({ filters, onChange, priceBounds, embedded = false 
       </Group>
 
       <Group legend="Удобства" className="gap-4">
+        <fieldset className="flex min-w-0 flex-col gap-2">
+          <legend className="mb-2 text-sm/[normal] text-muted-foreground">Работа</legend>
+          <div className={chips}>
+            <Chip pressed={filters.workspace} onPress={() => set({ workspace: !filters.workspace })}>
+              Рабочая зона
+            </Chip>
+            {WIFI_OPTIONS.map((mbps) => (
+              <Chip
+                key={mbps}
+                pressed={filters.wifiMin === mbps}
+                onPress={() => set({ wifiMin: filters.wifiMin === mbps ? null : mbps })}
+              >
+                Wi‑Fi от {mbps} Мбит/с
+              </Chip>
+            ))}
+          </div>
+        </fieldset>
         {AMENITY_GROUPS.map(({ section, amenities }) => (
           <fieldset key={section} className="flex min-w-0 flex-col gap-2">
             <legend className="mb-2 text-sm/[normal] text-muted-foreground">{AMENITY_SECTIONS[section]}</legend>
