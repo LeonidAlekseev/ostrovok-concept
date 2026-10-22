@@ -1,14 +1,16 @@
 import { cancellationLabel } from '@/lib/booking'
 import { findRate, findRoom, MEAL_LABEL } from '@/lib/catalog'
-import { loadHotel } from '@/lib/catalogSource'
 import { formatDateRange, nightsBetween } from '@/lib/dates'
 import { countRu, formatPrice, guestsLabel } from '@/lib/format'
+import type { Hotel } from '@/lib/catalog'
 import type { Booking } from '@/lib/storage'
 
 const nightForms: [string, string, string] = ['ночь', 'ночи', 'ночей']
 
 interface Props {
   booking: Booking
+  /** The booked hotel; `undefined` while it loads or when it is gone from the catalogue. */
+  hotel: Hotel | undefined
   /** Rows above the hotel: the booking's number, dates and status. */
   leadingRows?: [string, string][]
   /** The term of the cancellation row, which differs between the pages. */
@@ -16,8 +18,7 @@ interface Props {
 }
 
 /** The details of a booking and its total: the confirmation page and the trip details. */
-export function BookingDetails({ booking, leadingRows = [], cancellationTerm }: Props) {
-  const hotel = loadHotel(booking.hotelId)
+export function BookingDetails({ booking, hotel, leadingRows = [], cancellationTerm }: Props) {
   const room = hotel && findRoom(hotel, booking.roomId)
   const rate = room && findRate(room, booking.rateId)
   const rows: [string, string][] = [

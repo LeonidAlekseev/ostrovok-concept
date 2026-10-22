@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { seedRoutes } from '../data/routes'
-import { cheapestRate, getHotel, type Hotel } from './catalog'
+import { cheapestRate, type Hotel } from './catalog'
+import { getHotel } from './catalogGenerator'
 import { addDays } from './dates'
 import { stayTotal } from './offer'
 import {

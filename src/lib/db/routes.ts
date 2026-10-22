@@ -2,8 +2,8 @@ import 'server-only'
 import { createClient } from '@supabase/supabase-js'
 import { unstable_cache } from 'next/cache'
 import type { Hotel } from '../catalog'
-import { loadHotel } from '../catalogSource'
 import { parseRoute, type Route } from '../routes'
+import { loadHotels } from './catalog'
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '../supabase/config'
 
 /** The cache tag of the routes: revalidate it after the table changes. */
@@ -32,7 +32,9 @@ export interface LoadedRoute {
 export async function loadRoute(id: string): Promise<LoadedRoute | null> {
   const data = await loadRouteData(id)
   if (data === null) return null
-  const route = parseRoute(data, (hotelId) => loadHotel(hotelId) !== undefined)
-  const hotels = Object.fromEntries(route.stops.map(({ hotelId }) => [hotelId, loadHotel(hotelId)!]))
+  // The shape first, then the stops' hotels, which must all be in the catalog.
+  const { stops } = parseRoute(data, () => true)
+  const hotels = Object.fromEntries((await loadHotels(stops.map((stop) => stop.hotelId))).map((h) => [h.id, h]))
+  const route = parseRoute(data, (hotelId) => hotelId in hotels)
   return { route, hotels }
 }

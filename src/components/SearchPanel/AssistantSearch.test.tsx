@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { newHotels } from '../../lib/catalogGenerator'
 import { AssistantSearch } from './AssistantSearch'
 
 const fetchMock = vi.fn<typeof fetch>()
@@ -12,7 +13,7 @@ afterEach(() => {
 
 function renderAssistant() {
   vi.stubGlobal('fetch', fetchMock)
-  render(<AssistantSearch onPreview={() => {}} onChoose={() => ({})} />)
+  render(<AssistantSearch newHotels={newHotels} onPreview={() => {}} onChoose={() => ({})} />)
   return userEvent.setup()
 }
 

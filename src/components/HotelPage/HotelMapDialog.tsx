@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Map as MapIcon } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import type { Hotel } from '@/lib/catalog'
-import { loadCityHotels } from '@/lib/catalogSource'
+import { useHotels } from '@/hooks/useHotels'
 import { lowestPrice } from '@/lib/offer'
 import { setGuestParams, setStayParams } from '@/lib/search'
 import { todayIso } from '@/lib/dates'
@@ -31,13 +31,15 @@ const ZOOM = 12
 function HotelMap({ hotel }: { hotel: Hotel }) {
   const router = useRouter()
   const { stay, guests } = useHotelStay()
+  // The neighbours are loaded when the map opens; until then, or without them, the map shows this hotel alone.
+  const city = useHotels({ destinations: [hotel.destinationId] })
   const hotels = useMemo(
     () =>
-      loadCityHotels([hotel.destinationId]).map((h) => ({
+      (city.status === 'done' ? city.hotels : [hotel]).map((h) => ({
         hotel: h,
         price: lowestPrice(h, stay, guests.rooms, todayIso()),
       })),
-    [hotel.destinationId, stay, guests.rooms],
+    [city, hotel, stay, guests.rooms],
   )
   const camera = useMemo<MapCamera>(() => ({ center: [hotel.lon, hotel.lat], zoom: ZOOM }), [hotel.lon, hotel.lat])
 

@@ -1,14 +1,16 @@
-import { describe, expect, it } from 'vitest'
-import { hotels } from '@/lib/catalog'
+import { describe, expect, it, vi } from 'vitest'
+import { hotels } from '@/lib/catalogGenerator'
 import RatesRoute from './rooms/page'
 import HotelRoute, { generateStaticParams } from './page'
+
+vi.mock('@/lib/db/catalog', () => import('@/test/catalog'))
 
 const params = (hotelId: string) => ({ params: Promise.resolve({ hotelId }) })
 
 // hotel-page, Requirement: Страница отеля
 describe('hotel routes', () => {
-  it('prerender every catalogue hotel', () => {
-    expect(generateStaticParams()).toHaveLength(hotels.length)
+  it('prerender every catalogue hotel', async () => {
+    expect(await generateStaticParams()).toHaveLength(hotels.length)
   })
 
   it('call notFound for an unknown id', async () => {

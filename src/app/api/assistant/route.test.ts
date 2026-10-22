@@ -6,6 +6,7 @@ import { nextQuestion } from '@/lib/assistant'
 import { POST } from './route'
 
 vi.mock('@/lib/ai/model', () => ({ getAssistantModel: vi.fn() }))
+vi.mock('@/lib/db/catalog', () => import('@/test/catalog'))
 
 const usage = {
   inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },

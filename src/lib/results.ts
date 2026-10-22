@@ -26,21 +26,25 @@ export const targetDestinations = (target: SearchTarget, destinations: readonly 
     ? [target.destination]
     : destinations.filter((d) => d.scenarios.includes(target.scenario))
 
-/** Demo search: there is no backend, so it answers with the given hotels of the target after a short delay. */
+/**
+ * Demo search: there are no live prices, so it answers with the given hotels of the target (loaded meanwhile)
+ * after a short delay at least.
+ */
 export async function runDemoSearch(
   query: SearchQuery,
   target: SearchTarget,
-  hotels: Hotel[],
+  hotels: Hotel[] | Promise<Hotel[]>,
   signal?: AbortSignal,
 ): Promise<SearchResult> {
-  await new Promise<void>((resolve, reject) => {
+  const delay = new Promise<void>((resolve, reject) => {
     const timer = setTimeout(resolve, DEMO_SEARCH_MS)
     signal?.addEventListener('abort', () => {
       clearTimeout(timer)
       reject(new DOMException('Aborted', 'AbortError'))
     })
   })
-  return { query, target, nights: nightsBetween(query.checkIn, query.checkOut), hotels }
+  const [, list] = await Promise.all([delay, hotels])
+  return { query, target, nights: nightsBetween(query.checkIn, query.checkOut), hotels: list }
 }
 
 // ---------------------------------------------------------------------------------------------

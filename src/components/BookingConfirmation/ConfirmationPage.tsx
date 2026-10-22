@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { CircleCheck } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import { BookingDetails } from '@/components/BookingDetails/BookingDetails'
+import { useHotel } from '@/hooks/useHotels'
 import { useHydrated } from '@/hooks/useHydrated'
 import { useBookings } from '@/hooks/useStore'
 import { findBooking } from '@/lib/storage'
@@ -14,6 +15,7 @@ function Confirmation() {
   const id = useSearchParams().get('id') ?? ''
   const hydrated = useHydrated()
   const booking = findBooking(useBookings(), id)
+  const { hotel } = useHotel(booking?.hotelId)
 
   // Bookings come from the browser's storage: until hydration "not found" would flash.
   if (!hydrated) return <p className="text-muted-foreground">Загружаем бронирование…</p>
@@ -39,7 +41,7 @@ function Confirmation() {
         </p>
         <h1 className="text-title font-bold tracking-[-0.02em]">Номер бронирования {booking.id}</h1>
       </header>
-      <BookingDetails booking={booking} cancellationTerm="Отмена" />
+      <BookingDetails booking={booking} hotel={hotel} cancellationTerm="Отмена" />
       <p className="rounded-lg bg-muted p-4 text-sm">
         Бронирование демонстрационное: оно хранится только в этом браузере, деньги не списывались, письмо не
         отправлялось.

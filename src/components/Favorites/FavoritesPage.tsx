@@ -1,21 +1,28 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { HotelTile } from '@/components/HotelTile/HotelTile'
 import { buttonVariants } from '@/components/ui/button'
+import { useHotels } from '@/hooks/useHotels'
 import { useHydrated } from '@/hooks/useHydrated'
 import { useFavorites } from '@/hooks/useStore'
 import { useToday } from '@/hooks/useToday'
-import { loadHotels } from '@/lib/catalogSource'
 import { setStayParams, startStay } from '@/lib/search'
 import { pageClass } from '@/components/Trips/TripsGate'
 
 function Favorites() {
   const hydrated = useHydrated()
-  const hotels = loadHotels(useFavorites())
+  const favorites = useFavorites()
+  // The loaded set grows only: an unset heart hides its hotel without loading the rest again.
+  const [requested, setRequested] = useState(favorites)
+  if (favorites.some((id) => !requested.includes(id))) setRequested(favorites)
+  const loaded = useHotels(hydrated ? { ids: requested } : null)
   const stay = startStay(useToday())
 
-  if (!hydrated) return <p className="text-muted-foreground">Загружаем избранное…</p>
+  if (loaded.status === 'error') return <p role="alert">{loaded.message}. Обновите страницу.</p>
+  if (!hydrated || loaded.status === 'loading') return <p className="text-muted-foreground">Загружаем избранное…</p>
+  const hotels = favorites.flatMap((id) => loaded.hotels.find((h) => h.id === id) ?? [])
   if (hotels.length === 0) {
     return (
       <div className="flex flex-col items-start gap-3">

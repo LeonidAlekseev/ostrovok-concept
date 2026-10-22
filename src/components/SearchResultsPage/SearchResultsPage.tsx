@@ -8,7 +8,7 @@ import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
 import { useHotelSearch } from '../../hooks/useHotelSearch'
 import { useToday } from '../../hooks/useToday'
-import { loadCityHotels, loadDestinations, loadHotel } from '../../lib/catalogSource'
+import { fetchHotels } from '../../hooks/useHotels'
 import { formatShortRange } from '../../lib/dates'
 import { countRu } from '../../lib/format'
 import {
@@ -39,6 +39,7 @@ import {
   type SearchTarget,
   type Stay,
 } from '../../lib/search'
+import { useDestinations } from '../Catalog/useDestinations'
 import { SearchForm } from '../SearchForm/SearchForm'
 import { FiltersPanel } from './FiltersPanel'
 import { FiltersSheet } from './FiltersSheet'
@@ -99,6 +100,7 @@ const useDesktop = () => useSyncExternalStore(subscribeDesktop, isDesktop, () =>
 export function SearchResultsPage() {
   const params = useSearchParams()
   const today = useToday()
+  const destinations = useDestinations()
   // The query part of the URL; the filters, the page and the opened hotel change without a new search.
   const request = useMemo(() => {
     const next = new URLSearchParams(params.toString())
@@ -106,13 +108,13 @@ export function SearchResultsPage() {
     return next.toString()
   }, [params])
   const query = useMemo(
-    () => withStartDates(fromSearchParams(new URLSearchParams(request), loadDestinations()), today),
-    [request, today],
+    () => withStartDates(fromSearchParams(new URLSearchParams(request), destinations), today),
+    [request, today, destinations],
   )
 
   if (!today) return <SearchResultsFallback />
-  const errors = validateSearch(query, today, loadDestinations())
-  const target = resolveTarget(query.destination, loadDestinations())
+  const errors = validateSearch(query, today, destinations)
+  const target = resolveTarget(query.destination, destinations)
   if (Object.keys(errors).length > 0 || !target) return <InvalidQuery key={request} query={query} errors={errors} />
   return (
     <Results
@@ -171,14 +173,19 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
   const kept = useSearchView(viewKey)
   const view = kept?.view ?? 'list'
 
+  const destinations = useDestinations()
+  const result = status.state === 'done' ? status.result : null
+  // The opened hotel is one of the results: the browser has only the hotels of the searched cities.
+  const openedHotel = hotelId ? result?.hotels.find((h) => h.id === hotelId) : undefined
+
   // Narrow screens have no hotel dialog: a link with the hotel opens its page instead.
   useEffect(() => {
-    if (hotelId && loadHotel(hotelId) && !isDesktop()) router.replace(hotelHref(hotelId, query))
-  }, [hotelId, query, router])
+    if (openedHotel && !isDesktop()) router.replace(hotelHref(openedHotel.id, query))
+  }, [openedHotel, query, router])
 
   useEffect(() => {
     const controller = new AbortController()
-    const hotels = loadCityHotels(targetDestinations(target, loadDestinations()).map((d) => d.id))
+    const hotels = fetchHotels({ destinations: targetDestinations(target, destinations).map((d) => d.id) })
     runDemoSearch(query, target, hotels, controller.signal).then(
       (result) => setStatus({ state: 'done', result }),
       (error: unknown) => {
@@ -187,9 +194,8 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
       },
     )
     return () => controller.abort()
-  }, [query, target])
+  }, [query, target, destinations])
 
-  const result = status.state === 'done' ? status.result : null
   const items = useMemo(() => (result ? applyFilters(result.hotels, filters, query) : []), [result, filters, query])
   const bounds = useMemo(() => (result ? priceBounds(result.hotels, query) : null), [result, query])
   const pages = pageCount(items.length)
@@ -378,7 +384,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
         total={items.length}
         priceBounds={bounds ?? [0, 0]}
       />
-      <HotelDialog hotel={hotelId && desktop ? loadHotel(hotelId) : undefined} stay={query} onClose={closeHotel} />
+      <HotelDialog hotel={desktop ? openedHotel : undefined} stay={query} onClose={closeHotel} />
     </main>
   )
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { seedRoutes } from '../data/routes'
-import { getHotel, type Hotel } from './catalog'
+import type { Hotel } from './catalog'
+import { getHotel } from './catalogGenerator'
 import { escapeText, foldLine, toIcs, type CalendarEvent } from './ics'
 import { buildPlan, defaultState, planEvents } from './routes'
 

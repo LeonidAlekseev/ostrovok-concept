@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { seedRoutes } from '@/data/routes'
-import { getHotel } from '@/lib/catalog'
+import { getHotel } from '@/lib/catalogGenerator'
 import RouteRoute, { generateMetadata } from './page'
 
 vi.mock('@/lib/db/routes', () => ({

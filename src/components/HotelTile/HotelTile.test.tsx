@@ -1,6 +1,7 @@
 import { getDefaultNormalizer, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { getHotel, type Hotel } from '../../lib/catalog'
+import { type Hotel } from '../../lib/catalog'
+import { getHotel } from '../../lib/catalogGenerator'
 import { countRu, formatDecimal, formatPrice } from '../../lib/format'
 import { HotelTile } from './HotelTile'
 

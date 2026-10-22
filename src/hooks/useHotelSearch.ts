@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { loadDestinations } from '../lib/catalogSource'
+import { useDestinations } from '../components/Catalog/useDestinations'
 import { todayIso } from '../lib/dates'
 import {
   DEFAULT_GUESTS,
@@ -34,6 +34,7 @@ interface Options {
 export function useHotelSearch({ query: startQuery = initialQuery, errors: startErrors = {} }: Options = {}) {
   const router = useRouter()
   const today = useToday()
+  const destinations = useDestinations()
   const [chosen, setChosen] = useState<SearchQuery>(startQuery)
   const query = useMemo(() => withStartDates(chosen, today), [chosen, today])
   const [errors, setErrors] = useState<SearchErrors>(startErrors)
@@ -58,14 +59,14 @@ export function useHotelSearch({ query: startQuery = initialQuery, errors: start
   const run = useCallback(
     (q: SearchQuery): SearchErrors => {
       // Same `today` snapshot the form used for its start dates; todayIso() only while that snapshot is empty.
-      const found = validateSearch(q, today || todayIso(), loadDestinations())
+      const found = validateSearch(q, today || todayIso(), destinations)
       setErrors(found)
-      const target = resolveTarget(q.destination, loadDestinations())
+      const target = resolveTarget(q.destination, destinations)
       if (Object.keys(found).length === 0 && target)
         startTransition(() => router.push(`/search?${toSearchParams(q, target)}`))
       return found
     },
-    [today, router],
+    [today, router, destinations],
   )
 
   /** Returns validation errors so the caller can move focus to the first invalid field. */

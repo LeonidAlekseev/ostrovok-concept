@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { destinations } from '../data/destinations'
-import { cheapestRate, getHotel } from './catalog'
+import { cheapestRate } from './catalog'
+import { getHotel } from './catalogGenerator'
 import {
   averageNight,
   freeCancellationUntil,

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { getHotel } from '@/lib/catalog'
+import { getHotel } from '@/lib/catalogGenerator'
 import { formatDecimal } from '@/lib/format'
 import { Gallery } from './Gallery'
 

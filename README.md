@@ -59,15 +59,31 @@ Vercel определяет проект как Next.js без дополнит�
 
 ## Supabase
 
-Постоянные данные — в Supabase: аккаунты (`profiles`) и каталог (`destinations`, `hotels`: ключевые колонки и весь
-объект в `data jsonb`). Схема с RLS — `supabase/migrations/`: каталог читают все, пишет только сервисный ключ,
-профиль читает и меняет владелец. Интерфейс пока берёт каталог из кода.
+Постоянные данные — в Supabase: аккаунты (`profiles`) и каталог (`destinations`, `hotels`: ключевые колонки, порядок
+`position` и весь объект в `data jsonb`). Схема с RLS — `supabase/migrations/`: каталог читают все, пишет только
+сервисный ключ, профиль читает и меняет владелец.
+
+**Каталог в Supabase.** Интерфейс читает его на сервере через `src/lib/db/catalog.ts` (`server-only`, anon-ключ под
+RLS): `loadDestinations`, `loadHotelSummaries`, `loadNewHotels`, `loadHotel`, `loadHotels(ids)`,
+`loadCityHotels(destinationIds)`, `loadAllHotels`. Чтения кешируются `unstable_cache` с тегом `catalog` на час
+(`CATALOG_LIFETIME`; полные отели — по городу на запись кеша); страницы с ними перестраиваются в фоне так же часто.
+Ошибка базы — `CatalogUnavailableError`: страница показывает «Не удалось загрузить страницу» с «Повторить»
+(`src/app/error.tsx`, `global-error.tsx`), API — 503. Клиент получает только нужное: направления — из корневого
+layout (`CatalogProvider`, `useDestinations`), главная — новые отели и подборки пропсами, «Поиск вайба» и «Поиск по
+звёздам» считают на сервере (server actions), остальное — `GET /api/hotels?ids=a,b` (избранное, поездки, бронь) или
+`?destinations=x,y` (результаты, карта отеля): до 60 `id`, полные отели, `Cache-Control: s-maxage=300`. Отель,
+добавленный в базу после сборки, открывается без пересборки: `/hotels/<id>` рендерится при первом запросе и
+кешируется. Генератор `src/lib/catalogGenerator.ts` — источник `db:seed` и фикстура тестов (`src/test/catalog.ts`),
+в бандлы сайта не попадает. **После изменения данных** — `npm run db:seed`, затем ревалидация:
+`npm run db:seed -- --revalidate https://<сайт>` (или `POST /api/revalidate` с `Authorization: Bearer
+<SUPABASE_SERVICE_ROLE_KEY>`), иначе сайт обновится сам в течение часа. Сборка читает базу: без ключей она
+останавливается с «нет NEXT_PUBLIC_SUPABASE_URL…: npm run secrets:reveal».
 
 - `npm run db:push` — применяет миграции (`supabase db push --db-url "$SUPABASE_DB_URL"`, строка из `.env.local`).
   Прямой адрес `db.<ref>.supabase.co` доступен только по IPv6; без IPv6 подставьте строку пулера
   (Dashboard → Connect → Transaction pooler, порт 6543) в `SUPABASE_DB_URL` окружения.
 - `npm run db:seed` — `scripts/seed.ts` (Node исполняет TypeScript сам): строит каталог генератором
-  `src/lib/catalog.ts`, делает upsert пачками по 100 и печатает число строк; повторный запуск оставляет те же строки.
+  `src/lib/catalogGenerator.ts` (с порядком `position`), делает upsert пачками по 100 и печатает число строк; повторный запуск оставляет те же строки.
   Создаёт демо-аккаунт «Демо-путешественник» из `DEMO_USER_EMAIL`/`DEMO_USER_PASSWORD`, если его нет.
   `SUPABASE_SERVICE_ROLE_KEY` читают только этот скрипт и сервер, никогда клиент.
 
@@ -193,22 +209,22 @@ node scripts/screenshots.mjs --label after --against before --mask canvas / /sea
 
 Поиск работает без бэкенда: валидирует форму и открывает страницу результатов с параметрами запроса
 (`/search?destination=…&checkin=…&checkout=…&adults=…&rooms=…`, для сценария — `scenario=…`);
-отели и цены берутся из локального каталога.
+отели и цены берутся из каталога в Supabase.
 Страницы прототипа (поиск, отель, оформление, вход, поездки) строятся на основе ниже.
 
 ### Маршруты
 
 Шапка (`src/components/Header`) и подвал (`src/components/Footer`) рендерятся в
 `src/app/layout.tsx` на каждой странице; страница сама рендерит свой `main`. Сейчас есть `/`,
-`/search` (результаты поиска), `/hotels/<id>`, `/hotels/<id>/rooms`, `/booking`, `/booking/confirmation`, `/login`, `/register`, `/trips`, `/trips/booking`, `/favorites`, `/help`, `/legal/terms`, `/legal/privacy`, `/legal/cookies`, `/auth/callback` (обработчик ссылки из письма) и страница 404 (`src/app/not-found.tsx`). Шапка и подвал ссылаются на разделы. Все страницы пререндерятся статически.
+`/search` (результаты поиска), `/hotels/<id>`, `/hotels/<id>/rooms`, `/booking`, `/booking/confirmation`, `/login`, `/register`, `/trips`, `/trips/booking`, `/favorites`, `/help`, `/legal/terms`, `/legal/privacy`, `/legal/cookies`, `/auth/callback` (обработчик ссылки из письма) и страница 404 (`src/app/not-found.tsx`). Шапка и подвал ссылаются на разделы. Все страницы пререндерятся статически и перестраиваются в фоне раз в час (каталог, см. «Supabase»).
 
 ### Каталог
 
-`src/lib/catalog.ts` — демо-каталог: у каждого направления не меньше 6 отелей — отобранные
+`src/lib/catalog.ts` — типы, подписи и помощники каталога; `src/lib/catalogGenerator.ts` — генератор
+демо-каталога, который `npm run db:seed` загружает в Supabase: у каждого направления не меньше 6 отелей — отобранные
 вручную из `src/data/hotels.ts` (их показывает глобус, `isNew`) плюс сгенерированные. Номера,
 тарифы (питание, отмена, оплата, цена за ночь), отзывы, адрес и координаты генерируются
-детерминированно (PRNG с seed по id отеля): каталог одинаков при каждой сборке, на сервере и в
-браузере. `hotels`/`newHotels` — краткие карточки, `getHotel(id)` строит полный отель при первом
+детерминированно (PRNG с seed по id отеля): каталог одинаков при каждом запуске. `hotels`/`newHotels` — краткие карточки, `getHotel(id)` строит полный отель при первом
 запросе. Минимальная цена направления (`priceFrom`) равна минимальному тарифу его отелей. Фото
 нет: `PhotoPlaceholder` рисует градиент из палитры, иконку и подпись.
 
@@ -259,7 +275,8 @@ Escape, фокус возвращается на фото), название с 
 (`AMENITIES` в `src/lib/catalog.ts`). `/hotels/<id>/rooms` (`src/components/RatesPage`) — все тарифы номеров:
 питание, условия отмены и оплаты, цена за срок и за ночь; номер, где гостей на номер больше
 вместимости, недоступен; «Забронировать» ведёт на `/booking?…` с параметрами предложения.
-Оба маршрута пререндерятся по `generateStaticParams` для каждого отеля каталога, неизвестный `id` — 404. Даты и гости (`checkin`, `checkout`, `adults`, `children`, `rooms`) читает `useStay`
+Оба маршрута пререндерятся по `generateStaticParams` для каждого отеля базы, новый отель базы рендерится при первом
+запросе, неизвестный `id` — 404. Даты и гости (`checkin`, `checkout`, `adults`, `children`, `rooms`) читает `useStay`
 (`src/components/StayBar`) из адреса на клиенте; изменение заменяет адрес без новой записи
 истории. Без дат (или с неверными) цены показаны за ночь, а вместо «Выбрать» и «Забронировать» —
 «Выберите даты». Тариф, у которого дата бесплатной отмены уже прошла, показан невозвратным

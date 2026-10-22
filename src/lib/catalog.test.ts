@@ -4,20 +4,22 @@ import { newHotelSeeds } from '../data/hotels'
 import {
   AMENITIES,
   AMENITY_SECTIONS,
-  buildCatalog,
   cheapestRate,
+  hasFreeCancellation,
+  POPULAR_AMENITIES,
+  SCORE_SECTIONS,
+  travelTimes,
+} from './catalog'
+import {
+  buildCatalog,
   fullHotelsIn,
   getHotel,
-  hasFreeCancellation,
   hotels,
   hotelsIn,
   MIN_HOTELS_PER_DESTINATION,
   newHotels,
-  POPULAR_AMENITIES,
-  SCORE_SECTIONS,
   slugify,
-  travelTimes,
-} from './catalog'
+} from './catalogGenerator'
 
 const catalog = buildCatalog()
 

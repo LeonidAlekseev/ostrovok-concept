@@ -6,6 +6,7 @@ const db = vi.hoisted(() => ({
   error: null as { message: string } | null,
   id: '',
 }))
+vi.mock('./catalog', () => import('@/test/catalog'))
 vi.mock('next/cache', () => ({ unstable_cache: <T>(fn: T) => fn }))
 vi.mock('../supabase/config', () => ({
   isSupabaseConfigured: true,

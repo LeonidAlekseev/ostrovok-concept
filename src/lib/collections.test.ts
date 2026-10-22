@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildCatalog, hotels as summaries } from './catalog'
+import { buildCatalog, hotels as summaries } from './catalogGenerator'
 import { COLLECTION_SIZE, COLLECTIONS, homeCollections, pickCollection } from './collections'
 
 const catalogue = buildCatalog()

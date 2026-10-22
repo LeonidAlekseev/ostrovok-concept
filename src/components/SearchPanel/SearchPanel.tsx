@@ -2,6 +2,7 @@ import type { RefObject } from 'react'
 import { SlidersHorizontal, Sparkles, type LucideIcon } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { Destination } from '../../data/destinations'
+import type { HotelSummary } from '../../lib/catalog'
 import type { HotelSearch } from '../../hooks/useHotelSearch'
 import { SearchForm } from '../SearchForm/SearchForm'
 import { AssistantSearch } from './AssistantSearch'
@@ -35,9 +36,20 @@ interface Props {
   onPreview: (destination: Destination) => void
   /** Searches for the assistant's choice: opens the results page. */
   onChoose: HotelSearch['searchFor']
+  /** The "recently added" hotels the assistant suggests. */
+  newHotels: readonly HotelSummary[]
 }
 
-export function SearchPanel({ mode, onModeChange, search, destinationRef, submitRef, onPreview, onChoose }: Props) {
+export function SearchPanel({
+  mode,
+  onModeChange,
+  search,
+  destinationRef,
+  submitRef,
+  onPreview,
+  onChoose,
+  newHotels,
+}: Props) {
   return (
     <Tabs
       value={mode}
@@ -75,7 +87,9 @@ export function SearchPanel({ mode, onModeChange, search, destinationRef, submit
           keepMounted
           className="rounded-b-[inherit] bg-card p-(--pad) animate-in fade-in slide-in-from-bottom-1 animation-duration-250 ease-out [--pad:clamp(14px,3.6vw,22px)]"
         >
-          {modeId === 'assistant' && <AssistantSearch onPreview={onPreview} onChoose={onChoose} />}
+          {modeId === 'assistant' && (
+            <AssistantSearch newHotels={newHotels} onPreview={onPreview} onChoose={onChoose} />
+          )}
           {modeId === 'manual' && <SearchForm search={search} destinationRef={destinationRef} submitRef={submitRef} />}
         </TabsContent>
       ))}

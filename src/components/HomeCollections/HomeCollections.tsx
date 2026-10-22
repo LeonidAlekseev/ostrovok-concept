@@ -2,18 +2,23 @@
 
 import { useMemo } from 'react'
 import { cn } from 'cn'
-import { loadAllHotels } from '../../lib/catalogSource'
-import { homeCollections } from '../../lib/collections'
+import type { TileHotel } from '../../lib/catalog'
+import type { Collection } from '../../lib/collections'
 import { setStayParams, startStay } from '../../lib/search'
 import { useToday } from '../../hooks/useToday'
 import { HotelTile } from '../HotelTile/HotelTile'
 
+/** A collection as the server picked it: without its rule, which cannot reach the browser. */
+export interface ShownCollection {
+  collection: Pick<Collection, 'id' | 'title' | 'description'>
+  hotels: TileHotel[]
+}
+
 /** Four collections of hotels; a row of cards on desktop, a snapping scroll row on mobile. */
-export function HomeCollections() {
+export function HomeCollections({ collections }: { collections: readonly ShownCollection[] }) {
   const today = useToday()
   // Starts are tomorrow and the day after, as in the search form; empty until the date is known.
   const stay = useMemo(() => startStay(today), [today])
-  const collections = useMemo(() => homeCollections(loadAllHotels()), [])
 
   return (
     <section id="collections" aria-labelledby="collections-title">

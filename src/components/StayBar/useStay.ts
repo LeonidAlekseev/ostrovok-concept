@@ -3,7 +3,7 @@
 import { useCallback } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { Hotel } from '../../lib/catalog'
-import { loadDestination, loadDestinations } from '../../lib/catalogSource'
+import { useDestinations } from '../Catalog/useDestinations'
 import { addDays, todayIso } from '../../lib/dates'
 import {
   DEFAULT_GUESTS,
@@ -38,9 +38,10 @@ export function useStay(hotel: Hotel): StayState {
   const pathname = usePathname()
   const router = useRouter()
 
+  const destinations = useDestinations()
   const parsed = parseStayParams(params)
-  const destination = loadDestination(hotel.destinationId)!.name
-  const errors = parsed ? validateSearch({ destination, ...parsed }, todayIso(), loadDestinations()) : {}
+  const destination = destinations.find((d) => d.id === hotel.destinationId)!.name
+  const errors = parsed ? validateSearch({ destination, ...parsed }, todayIso(), destinations) : {}
   const error = errors.dates ?? errors.guests
   const stay = parsed && !error ? parsed : null
 
@@ -49,8 +50,7 @@ export function useStay(hotel: Hotel): StayState {
   const guests =
     stay?.guests ??
     (addressGuests &&
-    !validateSearch({ destination, checkIn: '', checkOut: '', guests: addressGuests }, todayIso(), loadDestinations())
-      .guests
+    !validateSearch({ destination, checkIn: '', checkOut: '', guests: addressGuests }, todayIso(), destinations).guests
       ? addressGuests
       : DEFAULT_GUESTS)
 
@@ -72,8 +72,9 @@ export function useStay(hotel: Hotel): StayState {
 
 /** Dates and guests held by the caller (the hotel dialog): the address is left alone. */
 export function useLocalStay(hotel: Hotel, stay: Stay, onChange: (next: Stay) => void): StayState {
-  const destination = loadDestination(hotel.destinationId)!.name
-  const errors = validateSearch({ destination, ...stay }, todayIso(), loadDestinations())
+  const destinations = useDestinations()
+  const destination = destinations.find((d) => d.id === hotel.destinationId)!.name
+  const errors = validateSearch({ destination, ...stay }, todayIso(), destinations)
   const error = errors.dates ?? errors.guests
   return { stay: error ? null : stay, error, guests: stay.guests, setStay: (next) => onChange({ ...stay, ...next }) }
 }
