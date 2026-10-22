@@ -16,11 +16,15 @@ const share = vi.fn()
 const nav = navigator as unknown as Record<string, unknown>
 
 beforeEach(() => {
+  // Tuesday, 20 October 2026: the calendar's past days and the +10 day check-in stay in one month.
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(2026, 9, 20, 12))
   URL.createObjectURL = vi.fn(() => 'blob:video')
   URL.revokeObjectURL = vi.fn()
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
   share.mockReset()
   delete nav.share

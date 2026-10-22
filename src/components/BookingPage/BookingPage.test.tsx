@@ -18,9 +18,10 @@ const hotel = getHotel('prague-old-town-lantern')!
 const room = hotel.rooms[0]
 const nowRate = room.rates.find((r) => r.payment === 'now')!
 const hotelRate = room.rates.find((r) => r.payment === 'at-hotel')!
-const checkIn = addDays(todayIso(), 20)
-const offerQuery = (rateId: string, rooms = 1) =>
-  toOfferParams({
+const offerQuery = (rateId: string, rooms = 1) => {
+  // Tuesday, 20 October 2026 + 20 days: Monday 9 November to Thursday 12, no Friday or Saturday night.
+  const checkIn = addDays(todayIso(), 20)
+  return toOfferParams({
     hotelId: hotel.id,
     roomId: room.id,
     rateId,
@@ -28,11 +29,18 @@ const offerQuery = (rateId: string, rooms = 1) =>
     checkOut: addDays(checkIn, 3),
     guests: { adults: 2 * rooms, children: 0, rooms },
   }).toString()
+}
 
 beforeEach(() => {
+  // The weekend markup depends on the weekdays of the stay: the date is fixed, as in HotelPage.test.tsx.
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(2026, 9, 20, 12))
   nav.replace.mockClear()
 })
-afterEach(() => localStorage.clear())
+afterEach(() => {
+  vi.useRealTimers()
+  localStorage.clear()
+})
 
 // booking-checkout, Requirement: Сводка заказа
 describe('BookingPage summary', () => {
