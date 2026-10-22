@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { stayTotal } from './offer'
-import { newHotels } from './catalog'
+import { newHotels } from './catalogGenerator'
 import { destinations } from '../data/destinations'
 import { makePlan, mergeBrief, parseWish } from './assistant'
 

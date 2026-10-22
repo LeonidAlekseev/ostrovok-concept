@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { destinations } from '../data/destinations'
-import { hotels, getHotel } from './catalog'
+import { hotels, getHotel } from './catalogGenerator'
 import {
   axisShares,
   BALANCE,

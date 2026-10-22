@@ -11,7 +11,7 @@ import {
   normalizeBrief,
   type AssistantResponse,
 } from '@/lib/assistant'
-import { loadDestinations } from '@/lib/catalogSource'
+import { loadDestinations } from '@/lib/db/catalog'
 import { todayIso } from '@/lib/dates'
 
 const requestSchema = z.object({
@@ -33,7 +33,8 @@ export async function POST(request: Request) {
   if (!parsedBody.success) return Response.json({ error: 'Invalid request' }, { status: 400 })
 
   const { messages } = parsedBody.data
-  const destinations = loadDestinations()
+  const destinations = await loadDestinations().catch(() => null)
+  if (!destinations) return Response.json({ error: 'Catalog unavailable' }, { status: 503 })
   const brief = normalizeBrief(parsedBody.data.brief, destinations)
   const today = todayIso()
   const input = messages[messages.length - 1].text

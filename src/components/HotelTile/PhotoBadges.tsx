@@ -1,11 +1,11 @@
 import { CalendarDays, Star } from 'lucide-react'
 import { cn } from 'cn'
-import { hasFreeCancellation, type Hotel } from '../../lib/catalog'
+import { hasFreeCancellation, type TileHotel } from '../../lib/catalog'
 import { countRu, formatDecimal } from '../../lib/format'
 import { FavoriteButton } from '../FavoriteButton/FavoriteButton'
 
 interface Props {
-  hotel: Hotel
+  hotel: TileHotel
   /** The "Бесплатная отмена" badge; by default, when any rate of the hotel has it. */
   freeCancellation?: boolean
 }

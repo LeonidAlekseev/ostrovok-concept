@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { buttonVariants, Button } from '@/components/ui/button'
 import { BookingDetails } from '@/components/BookingDetails/BookingDetails'
+import { useHotel } from '@/hooks/useHotels'
 import { useBookings } from '@/hooks/useStore'
 import { formatLongDate, todayIso } from '@/lib/dates'
 import { formatPrice } from '@/lib/format'
@@ -24,7 +25,8 @@ function Details({ booking }: { booking: Booking }) {
     leadingRows.push(['Отменено', formatLongDate(booking.cancelledAt.slice(0, 10))])
     leadingRows.push(['Удержано при отмене', formatPrice(booking.cancellationFee ?? 0)])
   }
-  return <BookingDetails booking={booking} leadingRows={leadingRows} cancellationTerm="Условия отмены" />
+  const { hotel } = useHotel(booking.hotelId)
+  return <BookingDetails booking={booking} hotel={hotel} leadingRows={leadingRows} cancellationTerm="Условия отмены" />
 }
 
 function BookingView({ booking }: { booking: Booking }) {

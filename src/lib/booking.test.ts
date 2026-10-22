@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { destinations } from '../data/destinations'
-import { getHotel } from './catalog'
+import { getHotel } from './catalogGenerator'
 import {
   cancellationLabel,
   createBooking,

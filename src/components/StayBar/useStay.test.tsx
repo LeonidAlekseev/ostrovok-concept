@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { getHotel, hotels } from '@/lib/catalog'
+import { getHotel, hotels } from '@/lib/catalogGenerator'
 import { DEFAULT_GUESTS } from '@/lib/search'
 import { useStay } from './useStay'
 

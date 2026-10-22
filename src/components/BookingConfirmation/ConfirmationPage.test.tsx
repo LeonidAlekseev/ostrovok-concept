@@ -2,11 +2,12 @@ import { render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createBooking, EMPTY_CARD } from '@/lib/booking'
 import { destinations } from '@/data/destinations'
-import { getHotel } from '@/lib/catalog'
+import { getHotel } from '@/lib/catalogGenerator'
 import { addDays, todayIso } from '@/lib/dates'
 import { parseOffer, toOfferParams } from '@/lib/offer'
 import { saveBooking } from '@/lib/storage'
 import { ConfirmationPage } from './ConfirmationPage'
+import { waitForCatalog } from '@/test/waitForCatalog'
 
 const nav = vi.hoisted(() => ({ query: '' }))
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(nav.query) }))
@@ -54,10 +55,11 @@ afterEach(() => localStorage.clear())
 
 // booking-confirmation
 describe('ConfirmationPage', () => {
-  it('shows the status, number and the card of the booking', () => {
+  it('shows the status, number and the card of the booking', async () => {
     save('now', 'OS-ABC123')
     nav.query = 'id=OS-ABC123'
     render(<ConfirmationPage />)
+    await waitForCatalog()
     expect(screen.getByText('Бронирование подтверждено')).toBeTruthy()
     expect(screen.getByRole('heading', { name: /OS-ABC123/ })).toBeTruthy()
     expect(screen.getByText(hotel.name)).toBeTruthy()
@@ -68,17 +70,19 @@ describe('ConfirmationPage', () => {
     expect(screen.getByRole('link', { name: 'На главную' }).getAttribute('href')).toBe('/')
   })
 
-  it('shows payment at the hotel without a card', () => {
+  it('shows payment at the hotel without a card', async () => {
     save('at-hotel', 'OS-HOTEL1')
     nav.query = 'id=OS-HOTEL1'
     render(<ConfirmationPage />)
+    await waitForCatalog()
     expect(screen.getByText('Оплата в отеле при заселении')).toBeTruthy()
     expect(screen.queryByText(/Карта ••••/)).toBeNull()
   })
 
-  it('says "Бронирование не найдено" for an unknown number', () => {
+  it('says "Бронирование не найдено" for an unknown number', async () => {
     nav.query = 'id=OS-NOPE00'
     render(<ConfirmationPage />)
+    await waitForCatalog()
     expect(screen.getByRole('heading', { name: 'Бронирование не найдено' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Мои поездки' }).getAttribute('href')).toBe('/trips')
   })

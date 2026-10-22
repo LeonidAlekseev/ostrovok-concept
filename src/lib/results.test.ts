@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { destinations } from '../data/destinations'
-import { fullHotelsIn, type Hotel } from './catalog'
-import { loadCityHotels } from './catalogSource'
+import { type Hotel } from './catalog'
+import { fullHotelsIn } from './catalogGenerator'
 import {
   applyFilters,
   countFilters,
@@ -40,7 +40,7 @@ describe('runDemoSearch', () => {
   it('returns the hotels of a city after the demo delay', async () => {
     const target = resolveTarget('Прага', destinations)!
     const ids = targetDestinations(target, destinations).map((d) => d.id)
-    const pending = runDemoSearch(query, target, loadCityHotels(ids))
+    const pending = runDemoSearch(query, target, ids.flatMap(fullHotelsIn))
     await vi.advanceTimersByTimeAsync(DEMO_SEARCH_MS)
     const result = await pending
     expect(result.nights).toBe(3)

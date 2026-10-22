@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
+import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToday } from '../../hooks/useToday'
-import { loadAllHotels, loadDestinations } from '../../lib/catalogSource'
 import { addDays } from '../../lib/dates'
-import { readStars, type Reading } from '../../lib/horoscope'
+import { sunSign, type Reading } from '../../lib/horoscope'
 import { DEFAULT_GUESTS, startStay, type Stay } from '../../lib/search'
+import { readStarsAction } from './actions'
 import { MagicOrb } from './MagicOrb'
 import { StarForm, type StarAnswers } from './StarForm'
 import { StarResult } from './StarResult'
@@ -16,7 +17,23 @@ export const READING_MS = 2500
 /** The stay of a reading: as in the search, two adults in one room; two nights from the check-in. */
 const NIGHTS = 2
 
-type Step = { kind: 'form' } | { kind: 'reading' | 'result'; reading: Reading; stay: Stay; name: string }
+/**
+ * The reading: the orb swirls while the server reads the stars; the result shows once both are done.
+ * `reading` is `null` until the server answers, `failed` when it could not.
+ */
+type Step =
+  | { kind: 'form' }
+  | {
+      kind: 'reading'
+      symbol: string
+      stay: Stay
+      name: string
+      reading: Reading | null
+      failed: boolean
+      swirled: boolean
+    }
+
+const READING_ERROR = 'Звёзды не ответили. Попробуйте ещё раз.'
 
 const emptyAnswers: StarAnswers = {
   name: '',
@@ -46,28 +63,34 @@ export function StarSearchDialog({ open, onOpenChange }: Props) {
   const read = () => {
     const checkIn = answers.checkIn || defaultCheckIn
     const name = answers.name.trim()
-    const reading = readStars(
-      {
-        name,
-        birthMonth: Number(answers.birthMonth),
-        birthDay: Number(answers.birthDay),
-        checkIn,
-        company: answers.company,
-        partnerSignId: answers.partnerSignId || undefined,
-      },
-      loadDestinations(),
-      loadAllHotels(),
-    )
+    const input = {
+      name,
+      birthMonth: Number(answers.birthMonth),
+      birthDay: Number(answers.birthDay),
+      checkIn,
+      company: answers.company,
+      partnerSignId: answers.partnerSignId || undefined,
+    }
     const stay = { checkIn, checkOut: addDays(checkIn, NIGHTS), guests: DEFAULT_GUESTS }
-    setStep({ kind: prefersReducedMotion() ? 'result' : 'reading', reading, stay, name })
+    const symbol = sunSign(input.birthMonth, input.birthDay).symbol
+    setStep({ kind: 'reading', symbol, stay, name, reading: null, failed: false, swirled: prefersReducedMotion() })
+    // Only the reading still on screen takes the answer: «Заново» or a new reading drop the old one.
+    const settle = (patch: Partial<Step>) =>
+      setStep((current) => (current.kind === 'reading' && current.stay === stay ? { ...current, ...patch } : current))
+    readStarsAction(input).then(
+      (reading) => settle({ reading }),
+      () => settle({ failed: true }),
+    )
   }
 
-  const status =
-    step.kind === 'reading'
-      ? 'Звёзды совещаются…'
-      : step.kind === 'result'
-        ? `Звёзды выбрали: ${step.reading.hotels[0].name}, ${step.reading.city.name}`
-        : ''
+  const result = step.kind === 'reading' && step.reading && step.swirled ? step.reading : null
+  const status = result
+    ? `Звёзды выбрали: ${result.hotels[0].name}, ${result.city.name}`
+    : step.kind === 'reading'
+      ? step.failed
+        ? READING_ERROR
+        : 'Звёзды совещаются…'
+      : ''
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -92,16 +115,20 @@ export function StarSearchDialog({ open, onOpenChange }: Props) {
             defaultCheckIn={defaultCheckIn}
           />
         )}
-        {step.kind === 'reading' && (
-          <StarReading symbol={step.reading.sign.symbol} onDone={() => setStep({ ...step, kind: 'result' })} />
+        {step.kind === 'reading' && step.failed && (
+          <div className="flex flex-col items-start gap-4">
+            <p className="text-muted-foreground">{READING_ERROR}</p>
+            <Button onClick={() => setStep({ kind: 'form' })}>Попробовать снова</Button>
+          </div>
         )}
-        {step.kind === 'result' && (
-          <StarResult
-            reading={step.reading}
-            stay={step.stay}
-            name={step.name}
-            onRestart={() => setStep({ kind: 'form' })}
+        {step.kind === 'reading' && !step.failed && !result && (
+          <StarReading
+            symbol={step.symbol}
+            onDone={() => setStep((current) => (current.kind === 'reading' ? { ...current, swirled: true } : current))}
           />
+        )}
+        {step.kind === 'reading' && result && (
+          <StarResult reading={result} stay={step.stay} name={step.name} onRestart={() => setStep({ kind: 'form' })} />
         )}
 
         <p className="sr-only" role="status">

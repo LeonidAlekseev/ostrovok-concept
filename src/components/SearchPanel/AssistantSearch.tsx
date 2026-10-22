@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import type { Destination } from '@/data/destinations'
 import type { HotelSearch } from '@/hooks/useHotelSearch'
+import type { HotelSummary } from '@/lib/catalog'
 import {
   MAX_MESSAGE_LENGTH,
   askAssistant,
@@ -16,9 +17,9 @@ import {
   type Plan,
   type Question,
 } from '../../lib/assistant'
-import { loadDestinations, loadNewHotels } from '../../lib/catalogSource'
 import { formatDateRange, todayIso } from '../../lib/dates'
 import { countRu, formatPrice, guestsLabel } from '../../lib/format'
+import { useDestinations } from '../Catalog/useDestinations'
 import { RobotAvatar } from './RobotAvatar'
 
 interface Message {
@@ -28,6 +29,8 @@ interface Message {
 }
 
 interface Props {
+  /** The "recently added" hotels the plan's options suggest. */
+  newHotels: readonly HotelSummary[]
   onPreview: (destination: Destination) => void
   onChoose: HotelSearch['searchFor']
 }
@@ -44,7 +47,8 @@ const messageAvatarClass = 'size-8 flex-none max-sm:hidden'
 const messageTextClass = 'leading-[1.45] whitespace-pre-wrap'
 const hintClass = 'block text-xs/[normal] font-normal text-muted-foreground'
 
-export function AssistantSearch({ onPreview, onChoose }: Props) {
+export function AssistantSearch({ newHotels, onPreview, onChoose }: Props) {
+  const destinations = useDestinations()
   const [messages, setMessages] = useState<Message[]>([])
   const [brief, setBrief] = useState<Brief>({})
   const [question, setQuestion] = useState<Question | null>(null)
@@ -86,7 +90,7 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
         brief,
       },
       question?.id ?? null,
-      loadDestinations(),
+      destinations,
       pending.signal,
     )
     clearTimeout(timerRef.current)
@@ -96,7 +100,7 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
       setBrief(next)
       const today = todayIso()
       const ask = nextQuestion(next, today)
-      const understood = describeBrief(next, loadDestinations())
+      const understood = describeBrief(next, destinations)
       setThinking(false)
       setQuestion(ask)
       if (ask) {
@@ -105,7 +109,7 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
         setMessages((list) => [...list, { from: 'agent', text: lead ? `${lead} ${ask.text}` : ask.text }])
         return
       }
-      const plan = makePlan(next, today, loadDestinations(), loadNewHotels())
+      const plan = makePlan(next, today, destinations, newHotels)
       setMessages((list) => [...list, { from: 'agent', text: understood ? `Записал: ${understood}.` : '', plan }])
       if (plan.options[0]) onPreview(plan.options[0].destination)
     }, THINK_MS)

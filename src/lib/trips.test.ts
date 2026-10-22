@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { getHotel, type Hotel } from './catalog'
+import { type Hotel } from './catalog'
+import { getHotel } from './catalogGenerator'
 import { cancelBooking, cancellationFee, tripsIn, tripTab } from './trips'
 import type { Booking } from './storage'
 

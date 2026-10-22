@@ -3,16 +3,16 @@ import type { ComponentProps } from 'react'
 import { MapPin } from 'lucide-react'
 import { cn } from 'cn'
 import { Separator } from '@/components/ui/separator'
-import { hasFreeCancellation, type Hotel } from '../../lib/catalog'
-import { loadDestination } from '../../lib/catalogSource'
+import { hasFreeCancellation, TILE_PHOTOS, type TileHotel } from '../../lib/catalog'
 import { formatDecimal, formatPrice } from '../../lib/format'
 import { guruPrice } from '../../lib/offer'
+import { useDestination } from '../Catalog/useDestinations'
 import { GuruLogo } from '../GuruLogo/GuruLogo'
 import { PhotoCarousel } from '../PhotoCarousel/PhotoCarousel'
 import { PhotoBadges } from './PhotoBadges'
 
 interface Props extends Omit<ComponentProps<'article'>, 'children'> {
-  hotel: Hotel
+  hotel: TileHotel
   href: string
   /** The regular price; the hotel's lowest price per night by default. */
   price?: number
@@ -23,9 +23,6 @@ interface Props extends Omit<ComponentProps<'article'>, 'children'> {
   /** Photos turn by the arrows only, so a swipe on them goes to a scrolling row around the card. */
   swipePhotos?: boolean
 }
-
-/** The photos a tile leafs through. */
-const TILE_PHOTOS = 5
 
 /**
  * The hotel card of collections, favourites and search results: the photo carousel with the free
@@ -42,6 +39,7 @@ export function HotelTile({
   className,
   ...props
 }: Props) {
+  const destination = useDestination(hotel.destinationId)
   return (
     <article
       {...props}
@@ -73,7 +71,7 @@ export function HotelTile({
         </Heading>
         <p className="flex items-center gap-1 text-sm/[normal] text-muted-foreground">
           <MapPin className="size-4 shrink-0" aria-hidden />
-          {formatDecimal(hotel.distanceKm)} км от центра {loadDestination(hotel.destinationId)?.genitive}
+          {formatDecimal(hotel.distanceKm)} км от центра {destination?.genitive}
         </p>
         <div className="mt-auto flex flex-col gap-2 pt-2">
           <Separator />

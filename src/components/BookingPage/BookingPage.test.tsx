@@ -1,12 +1,13 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getHotel } from '@/lib/catalog'
+import { getHotel } from '@/lib/catalogGenerator'
 import { addDays, todayIso } from '@/lib/dates'
 import { toOfferParams } from '@/lib/offer'
 import { sessionStore } from '@/lib/session'
 import { bookingsStore } from '@/lib/storage'
 import { BookingPage } from './BookingPage'
+import { waitForCatalog } from '@/test/waitForCatalog'
 
 const nav = vi.hoisted(() => ({ query: '', replace: vi.fn() }))
 vi.mock('next/navigation', () => ({
@@ -44,9 +45,10 @@ afterEach(() => {
 
 // booking-checkout, Requirement: Сводка заказа
 describe('BookingPage summary', () => {
-  it('shows the order and its total', () => {
+  it('shows the order and its total', async () => {
     nav.query = offerQuery(nowRate.id)
     render(<BookingPage />)
+    await waitForCatalog()
     expect(screen.getByRole('heading', { name: 'Оформление бронирования' })).toBeTruthy()
     const summary = screen.getByRole('complementary')
     expect(summary.textContent).toContain(hotel.name)
@@ -55,9 +57,10 @@ describe('BookingPage summary', () => {
     expect(summary.textContent).toContain('Оплата сейчас')
   })
 
-  it('says the offer is not found for an unknown rate', () => {
+  it('says the offer is not found for an unknown rate', async () => {
     nav.query = offerQuery('nope')
     render(<BookingPage />)
+    await waitForCatalog()
     expect(screen.getByRole('heading', { name: 'Предложение не найдено' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Найти отель' }).getAttribute('href')).toBe('/#search')
   })
@@ -68,6 +71,7 @@ describe('BookingPage form', () => {
   it('shows errors and focuses the first invalid field on an empty form', async () => {
     nav.query = offerQuery(hotelRate.id)
     render(<BookingPage />)
+    await waitForCatalog()
     await userEvent.click(screen.getByRole('button', { name: 'Забронировать' }))
     expect(screen.getByText('Введите имя')).toBeTruthy()
     expect(screen.getByText('Введите фамилию')).toBeTruthy()
@@ -81,6 +85,7 @@ describe('BookingPage form', () => {
   it('focuses the consent box when it is the only error', async () => {
     nav.query = offerQuery(hotelRate.id)
     render(<BookingPage />)
+    await waitForCatalog()
     const user = userEvent.setup()
     await user.type(screen.getByLabelText('Имя'), 'Анна')
     await user.type(screen.getByLabelText('Фамилия'), 'Петрова')
@@ -90,17 +95,19 @@ describe('BookingPage form', () => {
     expect(document.activeElement).toBe(screen.getByRole('checkbox'))
   })
 
-  it('asks for the main guest of every room', () => {
+  it('asks for the main guest of every room', async () => {
     nav.query = offerQuery(hotelRate.id, 2)
     render(<BookingPage />)
+    await waitForCatalog()
     expect(screen.getAllByLabelText('Имя')).toHaveLength(2)
     expect(screen.getByText('Номер 2: основной гость')).toBeTruthy()
   })
 
-  it('fills the first guest and email from the session', () => {
+  it('fills the first guest and email from the session', async () => {
     sessionStore.set({ name: 'Анна Петрова', email: 'anna@example.com' })
     nav.query = offerQuery(hotelRate.id)
     render(<BookingPage />)
+    await waitForCatalog()
     expect((screen.getByLabelText('Имя') as HTMLInputElement).value).toBe('Анна')
     expect((screen.getByLabelText('Фамилия') as HTMLInputElement).value).toBe('Петрова')
     expect((screen.getByLabelText('Email') as HTMLInputElement).value).toBe('anna@example.com')
@@ -109,17 +116,19 @@ describe('BookingPage form', () => {
 
 // booking-checkout, Requirement: Демо-оплата
 describe('BookingPage payment', () => {
-  it('shows the card form and the demo note for "Оплата сейчас"', () => {
+  it('shows the card form and the demo note for "Оплата сейчас"', async () => {
     nav.query = offerQuery(nowRate.id)
     render(<BookingPage />)
+    await waitForCatalog()
     expect(screen.getByLabelText('Номер карты')).toBeTruthy()
     expect(screen.getByText(/деньги не списываются/)).toBeTruthy()
     expect(screen.queryByText('Оплата в отеле при заселении')).toBeNull()
   })
 
-  it('has no card fields for "Оплата в отеле"', () => {
+  it('has no card fields for "Оплата в отеле"', async () => {
     nav.query = offerQuery(hotelRate.id)
     render(<BookingPage />)
+    await waitForCatalog()
     expect(screen.queryByLabelText('Номер карты')).toBeNull()
     expect(screen.getByText('Оплата в отеле при заселении')).toBeTruthy()
     expect(screen.getByText(/деньги не списываются/)).toBeTruthy()
@@ -128,6 +137,7 @@ describe('BookingPage payment', () => {
   it('rejects a card number that fails Luhn', async () => {
     nav.query = offerQuery(nowRate.id)
     render(<BookingPage />)
+    await waitForCatalog()
     await userEvent.type(screen.getByLabelText('Номер карты'), '4242424242424241')
     await userEvent.click(screen.getByRole('button', { name: 'Забронировать' }))
     expect(screen.getByText('Проверьте номер карты')).toBeTruthy()
@@ -139,6 +149,7 @@ describe('BookingPage submit', () => {
   it('stores the booking without card data and replaces the address', async () => {
     nav.query = offerQuery(nowRate.id)
     render(<BookingPage />)
+    await waitForCatalog()
     const user = userEvent.setup()
     await user.type(screen.getByLabelText('Имя'), 'Анна')
     await user.type(screen.getByLabelText('Фамилия'), 'Петрова')

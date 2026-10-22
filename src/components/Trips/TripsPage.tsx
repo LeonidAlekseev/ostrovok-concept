@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useHotels } from '@/hooks/useHotels'
 import { useBookings } from '@/hooks/useStore'
 import { todayIso } from '@/lib/dates'
 import { tripsIn, type TripTab } from '@/lib/trips'
@@ -18,9 +19,13 @@ const TABS: { value: TripTab; label: string; empty: string }[] = [
 function Trips() {
   const bookings = useBookings()
   const today = todayIso()
+  // The hotels of all the bookings in one request; the cards wait for it rather than flash «Отель».
+  const loaded = useHotels({ ids: [...new Set(bookings.map((b) => b.hotelId))] })
+  const hotelOf = (id: string) => (loaded.status === 'done' ? loaded.hotels.find((h) => h.id === id) : undefined)
   return (
     <>
       <h1 className="text-title font-bold tracking-[-0.02em]">Мои поездки</h1>
+      {loaded.status === 'error' && <p role="alert">{loaded.message}: показываем поездки без фото.</p>}
       <Tabs defaultValue="upcoming">
         <TabsList className="mb-4 flex gap-1 border-b border-border">
           {TABS.map(({ value, label }) => (
@@ -44,10 +49,12 @@ function Trips() {
                     Найти отель
                   </Link>
                 </div>
+              ) : loaded.status === 'loading' ? (
+                <p className="text-muted-foreground">Загружаем поездки…</p>
               ) : (
                 <ul className="flex flex-col gap-3">
                   {list.map((booking) => (
-                    <TripCard key={booking.id} booking={booking} tab={value} />
+                    <TripCard key={booking.id} booking={booking} hotel={hotelOf(booking.hotelId)} tab={value} />
                   ))}
                 </ul>
               )}
