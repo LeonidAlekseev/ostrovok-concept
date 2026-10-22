@@ -31,6 +31,7 @@ import {
   AMENITY_SECTIONS,
   POPULAR_AMENITIES,
   travelTimes,
+  workLabels,
   type Amenity,
   type AmenitySection,
   type Hotel,
@@ -119,6 +120,7 @@ function AmenitiesDialog({ hotel }: { hotel: Hotel }) {
   const sections = (Object.keys(AMENITY_SECTIONS) as AmenitySection[])
     .map((section) => ({ section, items: hotel.amenities.filter((key) => AMENITIES[key].section === section) }))
     .filter(({ items }) => items.length > 0)
+  const [wifi, ...workspace] = workLabels(hotel)
   return (
     <Dialog>
       <DialogButton icon={LayoutGrid}>Все удобства</DialogButton>
@@ -138,6 +140,8 @@ function AmenitiesDialog({ hotel }: { hotel: Hotel }) {
                     {AMENITY_SECTIONS[section]}
                   </h3>
                   <ul className="flex flex-col gap-1.5 pl-7">
+                    {section === 'internet' && <li>{wifi}</li>}
+                    {section === 'internet' && workspace.map((label) => <li key={label}>{label}</li>)}
                     {items.map((key) => {
                       const amenity: { label: string; paid?: true } = AMENITIES[key]
                       return (
@@ -163,7 +167,14 @@ function AmenitiesDialog({ hotel }: { hotel: Hotel }) {
 
 /** "Об отеле": the description, the travel times, the first popular amenities and all of them in a dialog. */
 export function AboutHotel({ hotel }: { hotel: Hotel }) {
-  const preview = POPULAR_AMENITIES.filter((key) => hotel.amenities.includes(key)).slice(0, PREVIEW)
+  const [wifi, ...workspace] = workLabels(hotel)
+  const work = [
+    { key: 'wifi-speed', label: wifi, Icon: Wifi },
+    ...workspace.map((label) => ({ key: 'workspace', label, Icon: Briefcase })),
+  ]
+  const preview = POPULAR_AMENITIES.filter((key) => key !== 'wifi' && hotel.amenities.includes(key))
+    .slice(0, PREVIEW - work.length)
+    .map((key) => ({ key, label: AMENITIES[key].label, Icon: iconOf(key) }))
   return (
     <section aria-labelledby="about-title" className="flex flex-col gap-5">
       <h2 id="about-title" className="text-heading font-bold">
@@ -172,17 +183,14 @@ export function AboutHotel({ hotel }: { hotel: Hotel }) {
       <p className="max-w-3xl">{hotel.description}</p>
       <TravelTiles hotel={hotel} />
       <ul className="grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-3" aria-label="Удобства">
-        {preview.map((key) => {
-          const AmenityIcon = iconOf(key)
-          return (
-            <li key={key} className="flex min-w-0 items-center gap-2.5">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-success-soft">
-                <AmenityIcon className="size-5 text-success-foreground" aria-hidden />
-              </span>
-              <span className="min-w-0 text-sm/snug sm:text-base/snug">{AMENITIES[key].label}</span>
-            </li>
-          )
-        })}
+        {[...work, ...preview].map(({ key, label, Icon: AmenityIcon }) => (
+          <li key={key} className="flex min-w-0 items-center gap-2.5">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-success-soft">
+              <AmenityIcon className="size-5 text-success-foreground" aria-hidden />
+            </span>
+            <span className="min-w-0 text-sm/snug sm:text-base/snug">{label}</span>
+          </li>
+        ))}
       </ul>
       <AmenitiesDialog hotel={hotel} />
     </section>

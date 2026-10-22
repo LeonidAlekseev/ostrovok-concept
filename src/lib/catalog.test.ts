@@ -23,6 +23,57 @@ import {
 
 const catalog = buildCatalog()
 
+// hotel-catalog, Requirement: Типы жилья
+describe('stay types', () => {
+  const ofType = (destinationId: string, type: string) =>
+    catalog.filter((h) => h.destinationId === destinationId && h.stayType === type)
+
+  it('gives every city 2 hostels, 2 apartments and 1 villa', () => {
+    for (const d of destinations) {
+      expect(ofType(d.id, 'hostel').length, d.id).toBeGreaterThanOrEqual(2)
+      expect(ofType(d.id, 'apartments').length, d.id).toBeGreaterThanOrEqual(2)
+      expect(ofType(d.id, 'villa').length, d.id).toBeGreaterThanOrEqual(1)
+    }
+  })
+
+  it('keeps the old hotels as hotels with their prices', () => {
+    const lantern = getHotel('prague-old-town-lantern')!
+    expect(lantern.stayType).toBe('hotel')
+    expect(lantern.priceFrom).toBe(7400)
+    expect(cheapestRate(lantern).rate.pricePerNight).toBe(7400)
+    for (const seed of newHotelSeeds)
+      expect(getHotel(`${seed.destinationId}-${slugify(seed.name)}`)?.stayType).toBe('hotel')
+  })
+
+  it('sets Wi‑Fi by the kind of stay, to 10 Мбит/с, and a workspace only in some hotels and apartments', () => {
+    const range = { hostel: [30, 100], hotel: [50, 300], apartments: [100, 500], villa: [50, 200] } as const
+    for (const h of catalog) {
+      const [min, max] = range[h.stayType]
+      expect(h.wifiMbps, h.id).toBeGreaterThanOrEqual(min)
+      expect(h.wifiMbps, h.id).toBeLessThanOrEqual(max)
+      expect(h.wifiMbps % 10, h.id).toBe(0)
+      if (h.stayType === 'hostel' || h.stayType === 'villa') expect(h.workspace, h.id).toBe(false)
+    }
+    for (const type of ['hotel', 'apartments']) {
+      expect(
+        catalog.some((h) => h.stayType === type && h.workspace),
+        type,
+      ).toBe(true)
+      expect(
+        catalog.some((h) => h.stayType === type && !h.workspace),
+        type,
+      ).toBe(true)
+    }
+  })
+
+  it('sleeps 6–10 in a villa room and prices every stay from its cheapest rate', () => {
+    for (const h of catalog.filter((x) => x.stayType === 'villa'))
+      for (const room of h.rooms) expect(room.capacity, h.id).toBeGreaterThanOrEqual(6)
+    const city = (type: string) => ofType('prague', type).map((h) => h.priceFrom)
+    expect(Math.min(...city('villa'))).toBeGreaterThan(Math.max(...city('hostel')))
+  })
+})
+
 describe('catalogue', () => {
   it('is the same every time it is built', () => {
     expect(buildCatalog()).toEqual(catalog)
@@ -114,13 +165,9 @@ describe('hotel and guest photos', () => {
     for (const hotel of catalog) {
       expect(hotel.photos.length).toBeGreaterThanOrEqual(12)
       expect(hotel.photos.length).toBeLessThanOrEqual(30)
-      expect(hotel.photos.slice(0, 5).map((p) => p.caption)).toEqual([
-        'Фасад',
-        'Лобби',
-        'Ресторан',
-        'Терраса',
-        'Вид из окна',
-      ])
+      const first = hotel.photos.slice(0, 5).map((p) => p.caption)
+      if (hotel.stayType === 'hotel') expect(first).toEqual(['Фасад', 'Лобби', 'Ресторан', 'Терраса', 'Вид из окна'])
+      else expect([first[0], first[4]]).toEqual(['Фасад', 'Вид из окна'])
       expect(new Set(hotel.photos.map((p) => p.id)).size).toBe(hotel.photos.length)
       expect(hotel.guestPhotos.length).toBeLessThanOrEqual(40)
       expect(new Set(hotel.guestPhotos.map((p) => p.id)).size).toBe(hotel.guestPhotos.length)
@@ -193,9 +240,10 @@ describe('hasFreeCancellation', () => {
   })
 
   it('is false for exactly every second hotel of a city, by id', () => {
-    expect(catalog.filter((h) => !hasFreeCancellation(h))).toHaveLength(Math.floor(catalog.length / 2))
+    const onlyHotels = catalog.filter((h) => h.stayType === 'hotel')
+    expect(onlyHotels.filter((h) => !hasFreeCancellation(h))).toHaveLength(Math.floor(onlyHotels.length / 2))
     for (const d of destinations) {
-      const own = catalog.filter((h) => h.destinationId === d.id).sort((a, b) => a.id.localeCompare(b.id))
+      const own = onlyHotels.filter((h) => h.destinationId === d.id).sort((a, b) => a.id.localeCompare(b.id))
       own.forEach((h, i) => expect(hasFreeCancellation(h), h.id).toBe(i % 2 === 0))
       if (own.length > 1) expect(own.some(hasFreeCancellation), d.id).toBe(true)
     }

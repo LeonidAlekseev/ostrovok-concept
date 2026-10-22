@@ -1,6 +1,6 @@
 import { CalendarDays, Star } from 'lucide-react'
 import { cn } from 'cn'
-import { hasFreeCancellation, type TileHotel } from '../../lib/catalog'
+import { hasFreeCancellation, hasStars, type TileHotel } from '../../lib/catalog'
 import { countRu, formatDecimal } from '../../lib/format'
 import { FavoriteButton } from '../FavoriteButton/FavoriteButton'
 
@@ -15,7 +15,7 @@ const badgeClass = 'bg-success-soft/90 text-success-foreground backdrop-blur-sm'
 
 /**
  * The badges laid over a hotel photo inside an `@container`: the free cancellation, the guest rating
- * and the favourite toggle on top, the stars in the bottom right corner. Only the toggle takes clicks.
+ * and the favourite toggle on top, the stars in the bottom right corner; none for apartments and villas. Only the toggle takes clicks.
  */
 export function PhotoBadges({ hotel, freeCancellation = hasFreeCancellation(hotel) }: Props) {
   return (
@@ -50,15 +50,17 @@ export function PhotoBadges({ hotel, freeCancellation = hasFreeCancellation(hote
           )}
         />
       </div>
-      <span
-        role="img"
-        aria-label={countRu(hotel.stars, ['звезда', 'звезды', 'звёзд'])}
-        className="pointer-events-none absolute right-2 bottom-2 flex gap-0.5 rounded-full bg-black/45 px-2 py-1 text-(--decor-star) backdrop-blur-sm"
-      >
-        {Array.from({ length: hotel.stars }, (_, i) => (
-          <Star key={i} className="size-3.5" fill="currentColor" strokeWidth={0} aria-hidden />
-        ))}
-      </span>
+      {hasStars(hotel.stayType) && (
+        <span
+          role="img"
+          aria-label={countRu(hotel.stars, ['звезда', 'звезды', 'звёзд'])}
+          className="pointer-events-none absolute right-2 bottom-2 flex gap-0.5 rounded-full bg-black/45 px-2 py-1 text-(--decor-star) backdrop-blur-sm"
+        >
+          {Array.from({ length: hotel.stars }, (_, i) => (
+            <Star key={i} className="size-3.5" fill="currentColor" strokeWidth={0} aria-hidden />
+          ))}
+        </span>
+      )}
     </>
   )
 }

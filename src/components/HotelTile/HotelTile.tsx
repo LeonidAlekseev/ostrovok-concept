@@ -3,7 +3,7 @@ import type { ComponentProps } from 'react'
 import { MapPin } from 'lucide-react'
 import { cn } from 'cn'
 import { Separator } from '@/components/ui/separator'
-import { hasFreeCancellation, TILE_PHOTOS, type TileHotel } from '../../lib/catalog'
+import { hasFreeCancellation, STAY_TYPES, TILE_PHOTOS, type TileHotel } from '../../lib/catalog'
 import { formatDecimal, formatPrice } from '../../lib/format'
 import { guruPrice } from '../../lib/offer'
 import { useDestination } from '../Catalog/useDestinations'
@@ -27,7 +27,7 @@ interface Props extends Omit<ComponentProps<'article'>, 'children'> {
 /**
  * The hotel card of collections, favourites and search results: the photo carousel with the free
  * cancellation, the guest rating, the favourite toggle and the stars on it, then the name, the
- * distance to the city centre and the regular and GURU prices.
+ * kind of stay if it is not a hotel with the distance to the city centre and the regular and GURU prices.
  */
 export function HotelTile({
   hotel,
@@ -71,6 +71,9 @@ export function HotelTile({
         </Heading>
         <p className="flex items-center gap-1 text-sm/[normal] text-muted-foreground">
           <MapPin className="size-4 shrink-0" aria-hidden />
+          {hotel.stayType !== 'hotel' && (
+            <span className="font-semibold text-foreground">{STAY_TYPES[hotel.stayType]} ·</span>
+          )}
           {formatDecimal(hotel.distanceKm)} км от центра {destination?.genitive}
         </p>
         <div className="mt-auto flex flex-col gap-2 pt-2">

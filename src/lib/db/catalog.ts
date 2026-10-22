@@ -42,7 +42,7 @@ const cached = <Args extends unknown[], Result>(name: string, read: (...args: Ar
 
 /** The summary columns of a hotel; the full hotel is its `data`. */
 const SUMMARY =
-  'id, destinationId:destination_id, name:data->>name, stars, rating, reviewCount:data->reviewCount, priceFrom:price_from, isNew:data->isNew'
+  'id, destinationId:destination_id, name:data->>name, stayType:stay_type, stars, rating, reviewCount:data->reviewCount, priceFrom:price_from, wifiMbps:wifi_mbps, workspace, isNew:data->isNew'
 
 /** All destinations, in the catalogue's order. */
 export const loadDestinations: () => Promise<Destination[]> = cached('destinations', async () =>

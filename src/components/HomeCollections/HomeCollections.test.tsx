@@ -28,8 +28,9 @@ describe('HomeCollections', () => {
       const list = heading.parentElement!.querySelector('ul')!
       expect(within(list).getAllByRole('listitem')).toHaveLength(hotels.length)
       for (const hotel of hotels) {
-        const link = within(list).getByRole('link', { name: hotel.name })
-        expect(link.getAttribute('href')).toMatch(new RegExp(`^/hotels/${hotel.id}\\?`))
+        const link = list.querySelector(`a[href^="/hotels/${hotel.id}?"]`)
+        expect(link, hotel.id).not.toBeNull()
+        expect(list.textContent, hotel.id).toContain(hotel.name)
       }
     }
   })
@@ -50,10 +51,8 @@ describe('HomeCollections', () => {
   it('links to the hotel with starts tomorrow, the day after, for two adults in one room', () => {
     render(<HomeCollections collections={collections} />)
     const hotel = collections[0].hotels[0]
-    const href = within(firstList(screen.getByRole('region', { name: 'Подборки' })))
-      .getByRole('link', {
-        name: hotel.name,
-      })
+    const href = firstList(screen.getByRole('region', { name: 'Подборки' }))
+      .querySelector(`a[href^="/hotels/${hotel.id}?"]`)!
       .getAttribute('href')!
     const params = new URL(href, 'http://localhost').searchParams
     const today = todayIso()
@@ -67,8 +66,8 @@ describe('HomeCollections', () => {
     const user = userEvent.setup()
     render(<HomeCollections collections={collections} />)
     const hotel = collections[0].hotels[0]
-    const card = within(firstList(screen.getByRole('region', { name: 'Подборки' })))
-      .getByRole('link', { name: hotel.name })
+    const card = firstList(screen.getByRole('region', { name: 'Подборки' }))
+      .querySelector(`a[href^="/hotels/${hotel.id}?"]`)!
       .closest('article')!
     await user.click(within(card).getByRole('button', { name: 'Добавить в избранное' }))
     expect(favoritesStore.get()).toEqual([hotel.id])
