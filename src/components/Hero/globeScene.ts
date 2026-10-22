@@ -6,8 +6,8 @@ import { arc, routePath } from './globeGeometry'
 /** A city's ready-made route highlighted on the globe, with flight routes arriving at the city. */
 export interface Spotlight {
   destination: Destination
-  /** One route while the spotlight moves on; all the city's routes once its pin is chosen; none without routes. */
-  routes: RouteCardData[]
+  /** The travel idea shown: one of the city's routes; none without routes. */
+  route: RouteCardData | null
   /** Cities the routes start from. */
   sources: Destination[]
 }
@@ -56,6 +56,16 @@ export function createRouteFeed(routes: readonly RouteCardData[]) {
       return list[i % list.length]
     },
   }
+}
+
+/** A random item of `list`, other than `previousId` while there is a choice; `random` as Math.random(). */
+export function pickOther<T extends { id: string }>(
+  list: readonly T[],
+  previousId?: string,
+  random: () => number = Math.random,
+): T | undefined {
+  const choice = list.length > 1 ? list.filter((item) => item.id !== previousId) : list
+  return choice[Math.floor(random() * choice.length)]
 }
 
 /** Screen-space limits for a spotlight: the card must clear the text, the faded bottom and the sides. */
