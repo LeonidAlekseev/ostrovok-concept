@@ -11,16 +11,16 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
 // home-page, Requirement: Состав и порядок секций
 describe('HomePage', () => {
-  it('renders the sections in order: search, personas, routes, vibe, stars, banner', () => {
+  it('renders the sections in order: search, personas, routes, vibe, stars, draw, banner', () => {
     const { container } = render(<HomePage newHotels={newHotels} routes={routeCards()} />)
     const ids = Array.from(container.querySelectorAll('section[id]')).map((s) => s.id)
-    expect(ids).toEqual(['search', 'personas', 'routes', 'vibe', 'stars', 'explore'])
+    expect(ids).toEqual(['search', 'personas', 'routes', 'vibe', 'stars', 'draw', 'explore'])
   })
 
   it('hides the personas and the routes without routes', () => {
     const { container } = render(<HomePage newHotels={newHotels} routes={[]} />)
     const ids = Array.from(container.querySelectorAll('section[id]')).map((s) => s.id)
-    expect(ids).toEqual(['search', 'vibe', 'stars', 'explore'])
+    expect(ids).toEqual(['search', 'vibe', 'stars', 'draw', 'explore'])
   })
 })
 
