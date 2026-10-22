@@ -2,7 +2,7 @@ import { revalidateTag } from 'next/cache'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { POST } from './route'
 
-vi.mock('next/cache', () => ({ revalidateTag: vi.fn() }))
+vi.mock('next/cache', () => ({ revalidateTag: vi.fn(), unstable_cache: <T>(read: T) => read }))
 vi.mock('@/lib/db/catalog', () => import('@/test/catalog'))
 vi.mock('@/lib/secrets', () => ({
   getSecret: async (name: string) => (name === 'SUPABASE_SERVICE_ROLE_KEY' ? 'service' : undefined),
@@ -16,10 +16,11 @@ const post = (authorization?: string) =>
 beforeEach(() => vi.mocked(revalidateTag).mockClear())
 
 describe('POST /api/revalidate', () => {
-  it('drops the cached catalogue for the bearer of the service key', async () => {
+  it('drops the cached catalogue and routes for the bearer of the service key', async () => {
     const response = await post('Bearer service')
     expect(response.status).toBe(200)
     expect(revalidateTag).toHaveBeenCalledWith('catalog', { expire: 0 })
+    expect(revalidateTag).toHaveBeenCalledWith('routes', { expire: 0 })
   })
 
   it.each([
