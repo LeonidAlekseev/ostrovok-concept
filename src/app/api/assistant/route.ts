@@ -11,6 +11,7 @@ import {
   normalizeBrief,
   type AssistantResponse,
 } from '@/lib/assistant'
+import { loadDestinations } from '@/lib/catalogSource'
 import { todayIso } from '@/lib/dates'
 
 const requestSchema = z.object({
@@ -32,7 +33,8 @@ export async function POST(request: Request) {
   if (!parsedBody.success) return Response.json({ error: 'Invalid request' }, { status: 400 })
 
   const { messages } = parsedBody.data
-  const brief = normalizeBrief(parsedBody.data.brief)
+  const destinations = loadDestinations()
+  const brief = normalizeBrief(parsedBody.data.brief, destinations)
   const today = todayIso()
   const input = messages[messages.length - 1].text
   // The question the client showed is the one the brief still lacks.
@@ -41,7 +43,7 @@ export async function POST(request: Request) {
   const model = await getAssistantModel()
   if (model) {
     try {
-      const { parsed, reply } = await understandWish(model, { messages, brief }, today, request.signal)
+      const { parsed, reply } = await understandWish(model, { messages, brief }, today, destinations, request.signal)
       return Response.json({
         brief: foldBrief(brief, parsed, input, asked),
         reply,
@@ -53,5 +55,8 @@ export async function POST(request: Request) {
       console.warn(`assistant: model failed, using the rules (${reason})`)
     }
   }
-  return Response.json({ brief: mergeBrief(brief, input, asked), source: 'rules' } satisfies AssistantResponse)
+  return Response.json({
+    brief: mergeBrief(brief, input, asked, destinations),
+    source: 'rules',
+  } satisfies AssistantResponse)
 }

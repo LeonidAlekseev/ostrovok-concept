@@ -2,8 +2,9 @@
 
 import { useCallback } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import type { Hotel } from '../../lib/catalog'
+import { loadDestination, loadDestinations } from '../../lib/catalogSource'
 import { addDays, todayIso } from '../../lib/dates'
-import { getDestination, type Hotel } from '../../lib/catalog'
 import {
   DEFAULT_GUESTS,
   parseGuestParams,
@@ -38,8 +39,8 @@ export function useStay(hotel: Hotel): StayState {
   const router = useRouter()
 
   const parsed = parseStayParams(params)
-  const destination = getDestination(hotel.destinationId)!.name
-  const errors = parsed ? validateSearch({ destination, ...parsed }, todayIso()) : {}
+  const destination = loadDestination(hotel.destinationId)!.name
+  const errors = parsed ? validateSearch({ destination, ...parsed }, todayIso(), loadDestinations()) : {}
   const error = errors.dates ?? errors.guests
   const stay = parsed && !error ? parsed : null
 
@@ -48,7 +49,8 @@ export function useStay(hotel: Hotel): StayState {
   const guests =
     stay?.guests ??
     (addressGuests &&
-    !validateSearch({ destination, checkIn: '', checkOut: '', guests: addressGuests }, todayIso()).guests
+    !validateSearch({ destination, checkIn: '', checkOut: '', guests: addressGuests }, todayIso(), loadDestinations())
+      .guests
       ? addressGuests
       : DEFAULT_GUESTS)
 
@@ -70,8 +72,8 @@ export function useStay(hotel: Hotel): StayState {
 
 /** Dates and guests held by the caller (the hotel dialog): the address is left alone. */
 export function useLocalStay(hotel: Hotel, stay: Stay, onChange: (next: Stay) => void): StayState {
-  const destination = getDestination(hotel.destinationId)!.name
-  const errors = validateSearch({ destination, ...stay }, todayIso())
+  const destination = loadDestination(hotel.destinationId)!.name
+  const errors = validateSearch({ destination, ...stay }, todayIso(), loadDestinations())
   const error = errors.dates ?? errors.guests
   return { stay: error ? null : stay, error, guests: stay.guests, setStay: (next) => onChange({ ...stay, ...next }) }
 }

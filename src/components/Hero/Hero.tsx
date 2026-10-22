@@ -13,7 +13,7 @@ import { StatsPanel, type StatsPanelHandle } from './StatsPanel'
 
 interface Props {
   markers: Destination[]
-  hotels: HotelSummary[]
+  hotels: readonly HotelSummary[]
   /** City spotlighted first (and in the server-rendered page). */
   featured: Destination
   selectedId: string | null

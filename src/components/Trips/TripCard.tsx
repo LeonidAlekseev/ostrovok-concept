@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
-import { getHotel } from '@/lib/catalog'
+import { loadHotel } from '@/lib/catalogSource'
 import { formatDateRange, nightsBetween } from '@/lib/dates'
 import { countRu, formatPrice, guestsLabel } from '@/lib/format'
 import type { Booking } from '@/lib/storage'
@@ -12,7 +12,7 @@ const nightForms: [string, string, string] = ['ночь', 'ночи', 'ноче�
 const BADGE = { upcoming: 'success', past: 'secondary', cancelled: 'destructive' } as const
 
 export function TripCard({ booking, tab }: { booking: Booking; tab: TripTab }) {
-  const hotel = getHotel(booking.hotelId)
+  const hotel = loadHotel(booking.hotelId)
   return (
     <li>
       <Link

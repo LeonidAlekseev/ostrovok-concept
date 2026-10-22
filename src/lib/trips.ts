@@ -1,4 +1,4 @@
-import { findRate, findRoom, getHotel } from './catalog'
+import { findRate, findRoom, type Hotel } from './catalog'
 import { nightsBetween, type IsoDate } from './dates'
 import { formatPrice } from './format'
 import { freeCancellationUntil, nightPrice } from './offer'
@@ -23,9 +23,8 @@ type FeeBooking = Pick<
   'hotelId' | 'roomId' | 'rateId' | 'cancellation' | 'checkIn' | 'checkOut' | 'guests' | 'total'
 >
 
-/** The first night of the stay for all rooms, ₽, at the price of the booked rate. */
-function firstNight(booking: FeeBooking): number {
-  const hotel = getHotel(booking.hotelId)
+/** The first night of the stay for all rooms, ₽, at the price of the booked rate of the booked `hotel`. */
+function firstNight(booking: FeeBooking, hotel: Hotel | undefined): number {
   const room = hotel && findRoom(hotel, booking.roomId)
   const rate = room && findRate(room, booking.rateId)
   // A rate no longer in the catalogue: an average night of the paid total.
@@ -35,21 +34,21 @@ function firstNight(booking: FeeBooking): number {
 
 /**
  * What cancelling at `today` withholds, ₽: nothing up to the last free day, the first night after it,
- * everything for a non-refundable rate.
+ * everything for a non-refundable rate. `hotel` is the booked one, `undefined` once it left the catalogue.
  */
-export function cancellationFee(booking: FeeBooking, today: IsoDate) {
+export function cancellationFee(booking: FeeBooking, today: IsoDate, hotel: Hotel | undefined) {
   const until = freeCancellationUntil(booking, booking.checkIn)
   if (until === null) return booking.total
   if (until >= today) return 0
-  return firstNight(booking)
+  return firstNight(booking, hotel)
 }
 
-export function cancelBooking(booking: Booking, now: Date, today: IsoDate): Booking {
+export function cancelBooking(booking: Booking, now: Date, today: IsoDate, hotel: Hotel | undefined): Booking {
   return {
     ...booking,
     status: 'cancelled',
     cancelledAt: now.toISOString(),
-    cancellationFee: cancellationFee(booking, today),
+    cancellationFee: cancellationFee(booking, today, hotel),
   }
 }
 

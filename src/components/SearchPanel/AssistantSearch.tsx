@@ -16,6 +16,7 @@ import {
   type Plan,
   type Question,
 } from '../../lib/assistant'
+import { loadDestinations, loadNewHotels } from '../../lib/catalogSource'
 import { formatDateRange, todayIso } from '../../lib/dates'
 import { countRu, formatPrice, guestsLabel } from '../../lib/format'
 import { RobotAvatar } from './RobotAvatar'
@@ -85,6 +86,7 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
         brief,
       },
       question?.id ?? null,
+      loadDestinations(),
       pending.signal,
     )
     clearTimeout(timerRef.current)
@@ -94,7 +96,7 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
       setBrief(next)
       const today = todayIso()
       const ask = nextQuestion(next, today)
-      const understood = describeBrief(next)
+      const understood = describeBrief(next, loadDestinations())
       setThinking(false)
       setQuestion(ask)
       if (ask) {
@@ -103,7 +105,7 @@ export function AssistantSearch({ onPreview, onChoose }: Props) {
         setMessages((list) => [...list, { from: 'agent', text: lead ? `${lead} ${ask.text}` : ask.text }])
         return
       }
-      const plan = makePlan(next, today)
+      const plan = makePlan(next, today, loadDestinations(), loadNewHotels())
       setMessages((list) => [...list, { from: 'agent', text: understood ? `Записал: ${understood}.` : '', plan }])
       if (plan.options[0]) onPreview(plan.options[0].destination)
     }, THINK_MS)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hotelsIn } from './catalog'
+import { buildCatalog, hotelsIn } from './catalog'
 import { destinations } from '../data/destinations'
 import {
   aspectBetween,
@@ -120,17 +120,18 @@ describe('aspectBetween', () => {
 
 describe('readStars', () => {
   const input: ReadingInput = { name: 'Анна', birthMonth: 3, birthDay: 21, checkIn: '2026-10-26', company: 'solo' }
+  const catalogue = buildCatalog()
 
   it('gives every catalogue city a sign', () => {
     for (const city of destinations) expect(zodiac.map((z) => z.id)).toContain(citySigns[city.id])
   })
 
   it('is deterministic', () => {
-    expect(readStars(input)).toEqual(readStars(input))
+    expect(readStars(input, destinations, catalogue)).toEqual(readStars(input, destinations, catalogue))
   })
 
   it('reads the sign, the transit and the Moon of the check-in day', () => {
-    const reading = readStars(input)
+    const reading = readStars(input, destinations, catalogue)
     expect(reading.sign.id).toBe('aries')
     expect(reading.sunTransit.id).toBe('scorpio')
     expect(reading.moon.phase.name).toBe('Полнолуние')
@@ -140,7 +141,7 @@ describe('readStars', () => {
   })
 
   it('picks the best hotel of the best city and the best of two other cities', () => {
-    const { hotels, city } = readStars(input)
+    const { hotels, city } = readStars(input, destinations, catalogue)
     expect(hotels).toHaveLength(3)
     expect(hotels[0].destinationId).toBe(city.id)
     expect(new Set(hotels.map((h) => h.destinationId)).size).toBe(3)
@@ -149,7 +150,9 @@ describe('readStars', () => {
   })
 
   it('lets a companion sign change the score', () => {
-    const results = new Set(zodiac.map((z) => readStars({ ...input, company: 'pair', partnerSignId: z.id }).city.id))
+    const results = new Set(
+      zodiac.map((z) => readStars({ ...input, company: 'pair', partnerSignId: z.id }, destinations, catalogue).city.id),
+    )
     expect(results.size).toBeGreaterThan(1)
   })
 })

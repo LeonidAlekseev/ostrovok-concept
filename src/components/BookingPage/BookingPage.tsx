@@ -4,6 +4,7 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { buttonVariants } from '@/components/ui/button'
+import { loadDestinations, loadHotels } from '@/lib/catalogSource'
 import { todayIso } from '@/lib/dates'
 import { parseOffer } from '@/lib/offer'
 import { BookingForm } from './BookingForm'
@@ -11,7 +12,7 @@ import { OrderSummary } from './OrderSummary'
 
 function Booking() {
   const params = useSearchParams()
-  const result = parseOffer(params, todayIso())
+  const result = parseOffer(params, todayIso(), loadHotels([params.get('hotel') ?? '']), loadDestinations())
 
   if (!result.ok) {
     return (

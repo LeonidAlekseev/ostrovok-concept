@@ -11,12 +11,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { loadHotel } from '@/lib/catalogSource'
 import { todayIso } from '@/lib/dates'
 import { cancelBooking, cancellationFee, feeLabel } from '@/lib/trips'
 import { saveBooking, type Booking } from '@/lib/storage'
 
 export function CancelDialog({ booking }: { booking: Booking }) {
-  const fee = cancellationFee(booking, todayIso())
+  const hotel = loadHotel(booking.hotelId)
+  const fee = cancellationFee(booking, todayIso(), hotel)
   return (
     <Dialog>
       <DialogTrigger render={<Button variant="outline" />}>Отменить бронирование</DialogTrigger>
@@ -28,7 +30,10 @@ export function CancelDialog({ booking }: { booking: Booking }) {
         <p className="text-lg font-bold">{feeLabel(fee)}</p>
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Оставить бронирование</DialogClose>
-          <Button variant="destructive" onClick={() => saveBooking(cancelBooking(booking, new Date(), todayIso()))}>
+          <Button
+            variant="destructive"
+            onClick={() => saveBooking(cancelBooking(booking, new Date(), todayIso(), hotel))}
+          >
             Подтвердить отмену
           </Button>
         </DialogFooter>

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { destinations } from '../data/destinations'
 import { fullHotelsIn, type Hotel } from './catalog'
+import { loadCityHotels } from './catalogSource'
 import {
   applyFilters,
   countFilters,
@@ -12,6 +14,7 @@ import {
   priceBounds,
   runDemoSearch,
   setFilterParams,
+  targetDestinations,
   type Filters,
 } from './results'
 import { nightPrice, stayTotal } from './offer'
@@ -35,7 +38,9 @@ describe('runDemoSearch', () => {
   })
 
   it('returns the hotels of a city after the demo delay', async () => {
-    const pending = runDemoSearch(query, resolveTarget('Прага')!)
+    const target = resolveTarget('Прага', destinations)!
+    const ids = targetDestinations(target, destinations).map((d) => d.id)
+    const pending = runDemoSearch(query, target, loadCityHotels(ids))
     await vi.advanceTimersByTimeAsync(DEMO_SEARCH_MS)
     const result = await pending
     expect(result.nights).toBe(3)
@@ -43,18 +48,31 @@ describe('runDemoSearch', () => {
     expect(result.hotels.every((h) => h.destinationId === 'prague')).toBe(true)
   })
 
-  it('returns the hotels of every destination of a scenario', async () => {
-    const pending = runDemoSearch({ ...query, destination: 'У моря' }, resolveTarget('У моря')!)
+  // hotel-catalog, Requirement: Один источник каталога
+  it('answers with the given hotels only', async () => {
+    const two = prague.slice(0, 2)
+    const pending = runDemoSearch(query, resolveTarget('Прага', destinations)!, two)
     await vi.advanceTimersByTimeAsync(DEMO_SEARCH_MS)
-    const { hotels } = await pending
-    expect(new Set(hotels.map((h) => h.destinationId)).size).toBeGreaterThan(1)
+    expect((await pending).hotels.map((h) => h.id)).toEqual(two.map((h) => h.id))
   })
 
   it('rejects with AbortError when aborted', async () => {
     const controller = new AbortController()
-    const pending = runDemoSearch(query, resolveTarget('Прага')!, controller.signal)
+    const pending = runDemoSearch(query, resolveTarget('Прага', destinations)!, prague, controller.signal)
     controller.abort()
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+  })
+})
+
+describe('targetDestinations', () => {
+  it('is the destination itself', () => {
+    expect(targetDestinations(resolveTarget('Прага', destinations)!, destinations).map((d) => d.id)).toEqual(['prague'])
+  })
+
+  it('is every destination of a scenario', () => {
+    const cities = targetDestinations(resolveTarget('У моря', destinations)!, destinations)
+    expect(cities.length).toBeGreaterThan(1)
+    expect(cities.every((d) => d.scenarios.includes('sea'))).toBe(true)
   })
 })
 

@@ -1,5 +1,5 @@
-import { destinations, type Destination } from '../data/destinations'
-import { newHotels, type HotelSummary } from './catalog'
+import type { Destination } from '../data/destinations'
+import type { HotelSummary } from './catalog'
 import { addDays, fromIso, toIso, type IsoDate } from './dates'
 import { countRu, formatPrice } from './format'
 import { stayTotal } from './offer'
@@ -124,7 +124,7 @@ const ANY = word('не важно|неважно|вс[её] равно|любо[
 const normalize = (s: string) => s.toLocaleLowerCase('ru').replace(/ /g, ' ')
 
 /** Reads whatever the text says about the trip; fields it does not mention stay undefined. */
-export function parseWish(input: string): Brief {
+export function parseWish(input: string, destinations: readonly Destination[]): Brief {
   const text = normalize(input)
   const brief: Brief = {}
 
@@ -166,8 +166,13 @@ export function parseWish(input: string): Brief {
 }
 
 /** Folds a new reply into the brief. A "don't care" answers the question that was asked. */
-export function mergeBrief(brief: Brief, input: string, asked: QuestionId | null): Brief {
-  return foldBrief(brief, parseWish(input), input, asked)
+export function mergeBrief(
+  brief: Brief,
+  input: string,
+  asked: QuestionId | null,
+  destinations: readonly Destination[],
+): Brief {
+  return foldBrief(brief, parseWish(input, destinations), input, asked)
 }
 
 /** `mergeBrief` for a reply already read (by the rules or by the language model). */
@@ -218,7 +223,7 @@ const VIBE_DESTINATIONS: Partial<Record<VibeId, string[]>> = {
 const WARM_IN_WINTER = new Set(['dubai', 'cancun', 'honolulu', 'miami'])
 const isWinter = (month: number) => month >= 10 || month <= 2
 
-function candidatesFor(vibe: VibeId, month: number): Destination[] {
+function candidatesFor(vibe: VibeId, month: number, destinations: readonly Destination[]): Destination[] {
   const ids = VIBE_DESTINATIONS[vibe]
   const list = ids
     ? ids.flatMap((id) => destinations.find((d) => d.id === id) ?? [])
@@ -303,7 +308,13 @@ function travelDates(brief: Brief, nights: number, today: IsoDate): IsoDate {
 const tripMonth = (brief: Brief, today: IsoDate) =>
   typeof brief.when === 'number' ? brief.when : fromIso(addDays(today, brief.when === 'soon' ? 3 : 14)).getMonth()
 
-export function makePlan(brief: Brief, today: IsoDate): Plan {
+/** The plan over the `destinations`, with a hotel from `hotels` (the "recently added" ones) where a city has one. */
+export function makePlan(
+  brief: Brief,
+  today: IsoDate,
+  destinations: readonly Destination[],
+  hotels: readonly HotelSummary[],
+): Plan {
   const month = tripMonth(brief, today)
   const named = destinations.find((d) => d.id === brief.destinationId)
   const own = brief.vibe && brief.vibe !== 'any' ? { vibe: brief.vibe, reason: '' } : null
@@ -315,18 +326,18 @@ export function makePlan(brief: Brief, today: IsoDate): Plan {
   const guests = PARTY_GUESTS[brief.party && brief.party !== 'any' ? brief.party : 'couple']
   const checkIn = travelDates(brief, nights, today)
 
-  const pool = named ? [named] : candidatesFor(vibe, month)
+  const pool = named ? [named] : candidatesFor(vibe, month, destinations)
   // Quiet and romantic trips get the best-rated hotel; active ones and tight budgets the cheaper good one.
   const preferCheap = brief.mood === 'active' || brief.party === 'friends'
   const checkOut = addDays(checkIn, nights)
   const total = (perNight: number) => stayTotal(perNight, checkIn, checkOut, guests.rooms)
   const options = pool
     .map((destination): AssistantOption => {
-      const hotels = newHotels
+      const cityHotels = hotels
         .filter((h) => h.destinationId === destination.id)
         .sort((a, b) => (preferCheap ? a.priceFrom - b.priceFrom : b.rating - a.rating))
-      const affordable = hotels.find((h) => !brief.budget || total(h.priceFrom) <= brief.budget)
-      const cheapest = hotels.reduce<HotelSummary | undefined>(
+      const affordable = cityHotels.find((h) => !brief.budget || total(h.priceFrom) <= brief.budget)
+      const cheapest = cityHotels.reduce<HotelSummary | undefined>(
         (min, h) => (!min || total(h.priceFrom) < total(min.priceFrom) ? h : min),
         undefined,
       )
@@ -372,7 +383,7 @@ export const VIBE_LABEL: Record<VibeId, string> = {
 }
 
 /** What the assistant has understood so far, e.g. "море · в октябре · до 70 000 ₽". */
-export function describeBrief(brief: Brief): string {
+export function describeBrief(brief: Brief, destinations: readonly Destination[]): string {
   const named = destinations.find((d) => d.id === brief.destinationId)
   return [
     named?.name ?? (brief.vibe && brief.vibe !== 'any' ? VIBE_LABEL[brief.vibe] : null),
@@ -394,7 +405,10 @@ const intIn = (value: unknown, min: number, max: number) =>
  * Keeps only what the assistant understands: a catalog city, known themes and answers, a month 0–11,
  * 1–30 nights and a whole budget in ₽. Reads untrusted input — the client's brief or the model's answer.
  */
-export function normalizeBrief(raw: Partial<Record<keyof Brief, unknown>>): Brief {
+export function normalizeBrief(
+  raw: Partial<Record<keyof Brief, unknown>>,
+  destinations: readonly Destination[],
+): Brief {
   const brief: Brief = {}
   const { vibe, destinationId, when, nights, party, mood, budget } = raw
   if (vibe === 'any' || (typeof vibe === 'string' && Object.hasOwn(VIBE_LABEL, vibe))) brief.vibe = vibe as VibeId
@@ -433,6 +447,7 @@ const ASSISTANT_TIMEOUT_MS = 9000
 export async function askAssistant(
   request: AssistantRequest,
   asked: QuestionId | null,
+  destinations: readonly Destination[],
   signal?: AbortSignal,
 ): Promise<AssistantResponse> {
   // A reply with a plan only has no text; long replies of the assistant are cut to the route's limit.
@@ -453,7 +468,7 @@ export async function askAssistant(
     if (response.ok) {
       const data = (await response.json()) as AssistantResponse
       return {
-        brief: normalizeBrief(data.brief ?? {}),
+        brief: normalizeBrief(data.brief ?? {}, destinations),
         reply: typeof data.reply === 'string' ? data.reply : undefined,
         source: data.source === 'model' ? 'model' : 'rules',
       }
@@ -462,5 +477,5 @@ export async function askAssistant(
     // Falls through to the rules below.
   }
   const input = request.messages.at(-1)?.text ?? ''
-  return { brief: mergeBrief(request.brief, input, asked), source: 'rules' }
+  return { brief: mergeBrief(request.brief, input, asked, destinations), source: 'rules' }
 }

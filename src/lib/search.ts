@@ -1,4 +1,4 @@
-import { destinations, scenarios, type Destination, type Scenario, type ScenarioId } from '../data/destinations'
+import { scenarios, type Destination, type Scenario, type ScenarioId } from '../data/destinations'
 import { addDays, fromIso, nightsBetween, toIso, type IsoDate } from './dates'
 
 export const GUEST_LIMITS = {
@@ -55,7 +55,7 @@ export function findScenario(text: string): Scenario | undefined {
   return q ? scenarios.find((s) => normalize(s.title) === q) : undefined
 }
 
-export function resolveTarget(text: string): SearchTarget | null {
+export function resolveTarget(text: string, destinations: readonly Destination[]): SearchTarget | null {
   const q = normalize(text)
   if (!q) return null
   const destination = destinations.find((d) => normalize(d.name) === q)
@@ -65,7 +65,7 @@ export function resolveTarget(text: string): SearchTarget | null {
   return null
 }
 
-export function suggestDestinations(text: string, limit = 6): Destination[] {
+export function suggestDestinations(text: string, destinations: readonly Destination[], limit = 6): Destination[] {
   const q = normalize(text)
   if (!q) return destinations.filter((d) => d.onGlobe).slice(0, limit)
   const scenario = findScenario(q)
@@ -79,11 +79,11 @@ export function suggestDestinations(text: string, limit = 6): Destination[] {
 
 const inLimits = (n: number, { min, max }: { min: number; max: number }) => Number.isInteger(n) && n >= min && n <= max
 
-export function validateSearch(query: SearchQuery, today: IsoDate): SearchErrors {
+export function validateSearch(query: SearchQuery, today: IsoDate, destinations: readonly Destination[]): SearchErrors {
   const errors: SearchErrors = {}
   if (!query.destination.trim()) {
     errors.destination = 'Укажите, куда вы хотите поехать'
-  } else if (!resolveTarget(query.destination)) {
+  } else if (!resolveTarget(query.destination, destinations)) {
     errors.destination = 'Выберите направление из списка подсказок'
   }
 
@@ -165,7 +165,10 @@ export function toSearchParams(query: SearchQuery, target: SearchTarget): URLSea
  * `DEFAULT_GUESTS` without dates. An unknown id becomes an empty destination; malformed guest
  * counts are kept (NaN) for `validateSearch` to report.
  */
-export function fromSearchParams(params: Pick<URLSearchParams, 'get'>): SearchQuery {
+export function fromSearchParams(
+  params: Pick<URLSearchParams, 'get'>,
+  destinations: readonly Destination[],
+): SearchQuery {
   const destinationId = params.get('destination')
   const scenarioId = params.get('scenario')
   const destination = destinationId

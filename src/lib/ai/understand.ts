@@ -1,7 +1,7 @@
 import 'server-only'
 import { generateText, Output, type LanguageModel } from 'ai'
 import { z } from 'zod'
-import { destinations } from '../../data/destinations'
+import type { Destination } from '../../data/destinations'
 import {
   PARTY_LABEL,
   VIBE_LABEL,
@@ -45,8 +45,8 @@ const list = (labels: Record<string, string>) =>
     .map(([id, label]) => `${id} — ${label}`)
     .join('; ')
 
-function instructions(brief: Brief, today: IsoDate) {
-  const known = describeBrief(brief)
+function instructions(brief: Brief, today: IsoDate, destinations: readonly Destination[]) {
+  const known = describeBrief(brief, destinations)
   return [
     'Ты помощник сервиса путешествий «О!Погнали». Пользователь описывает поездку своими словами.',
     'Извлеки из ПОСЛЕДНЕГО сообщения пользователя только то, что в нём сказано или ясно следует по смыслу',
@@ -71,27 +71,28 @@ const OTHER_SCRIPT = /(?!\p{Script=Cyrillic})\p{L}/u
  * when it is named; who goes, the dates, the length and the mood only when the rules see them in the same text
  * (a bare number is not enough for the length: it may be the budget).
  */
-function grounded(key: keyof Brief, parsed: Brief, input: string): boolean {
+function grounded(key: keyof Brief, parsed: Brief, input: string, destinations: readonly Destination[]): boolean {
   if (key === 'vibe' || key === 'budget') return true
   const text = input.toLocaleLowerCase('ru')
   if (key === 'destinationId') {
     const name = destinations.find((d) => d.id === parsed.destinationId)?.name.toLocaleLowerCase('ru') ?? ''
     return name !== '' && text.includes(name.slice(0, Math.max(4, name.length - 2)))
   }
-  return parseWish(input)[key] !== undefined
+  return parseWish(input, destinations)[key] !== undefined
 }
 
-/** Reads the newest message with the model. Throws on any model error, timeout or abort. */
+/** Reads the newest message with the model; the cities are the `destinations`. Throws on any model error, timeout or abort. */
 export async function understandWish(
   model: LanguageModel,
   { messages, brief }: AssistantRequest,
   today: IsoDate,
+  destinations: readonly Destination[],
   signal?: AbortSignal,
 ): Promise<{ parsed: Brief; reply?: string }> {
   const timeout = AbortSignal.timeout(MODEL_TIMEOUT_MS)
   const { output } = await generateText({
     model,
-    instructions: instructions(brief, today),
+    instructions: instructions(brief, today, destinations),
     messages: messages.map(({ role, text }) => ({ role, content: text })),
     output: Output.object({ schema: wishSchema }),
     // A one-shot extraction: thinking only spends the 8 seconds. OpenRouter takes it as a provider option,
@@ -104,10 +105,10 @@ export async function understandWish(
   const when = Number.isInteger(month) && month >= 1 && month <= 12 ? month - 1 : output.when
   // A remark with letters of other scripts (the model slips into Chinese or Korean) is dropped whole.
   const reply = output.reply?.trim().slice(0, 200)
-  const parsed = normalizeBrief({ ...output, when })
+  const parsed = normalizeBrief({ ...output, when }, destinations)
   const input = messages.at(-1)?.text ?? ''
   // "не важно" for the asked question is the rules' call in `foldBrief`: the model hands questions over too eagerly.
   for (const key of Object.keys(parsed) as (keyof Brief)[])
-    if (parsed[key] === 'any' || !grounded(key, parsed, input)) delete parsed[key]
+    if (parsed[key] === 'any' || !grounded(key, parsed, input, destinations)) delete parsed[key]
   return { parsed, reply: reply && !OTHER_SCRIPT.test(reply) ? reply : undefined }
 }

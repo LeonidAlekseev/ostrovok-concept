@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { useToday } from '../../hooks/useToday'
+import { loadAllHotels, loadDestinations } from '../../lib/catalogSource'
 import { DEFAULT_GUESTS, withStartDates, type Stay } from '../../lib/search'
 import { poleImage, readVibe, VIBE_AXES, VIBE_STEPS, type Answer } from '../../lib/vibe'
 import { SmartImage } from '../ui/SmartImage'
@@ -58,7 +59,7 @@ export function VibeSearchDialog({ open, onOpenChange }: Props) {
   const leftRef = useRef<HTMLButtonElement>(null)
   const rightRef = useRef<HTMLButtonElement>(null)
   const done = step === VIBE_STEPS
-  const vibe = useMemo(() => (done ? readVibe(answers) : null), [done, answers])
+  const vibe = useMemo(() => (done ? readVibe(answers, loadAllHotels(), loadDestinations()) : null), [done, answers])
   // The links start tomorrow and the day after, as in the collections.
   const stay = useMemo<Stay | null>(() => {
     if (!today) return null

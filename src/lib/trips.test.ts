@@ -1,15 +1,13 @@
-import { describe, expect, it, vi } from 'vitest'
-import type { Hotel } from './catalog'
+import { describe, expect, it } from 'vitest'
+import { getHotel, type Hotel } from './catalog'
 import { cancelBooking, cancellationFee, tripsIn, tripTab } from './trips'
 import type { Booking } from './storage'
 
-// A booked rate at 7 000 ₽ a night; the other ids are not in the catalogue.
-vi.mock('./catalog', async (importOriginal) => {
-  const catalog = await importOriginal<typeof import('./catalog')>()
-  const rate = { id: 'rate-7000', pricePerNight: 7000 }
-  const hotel = { id: 'hotel-7000', rooms: [{ id: 'room-7000', rates: [rate] }] } as unknown as Hotel
-  return { ...catalog, getHotel: (id: string) => (id === hotel.id ? hotel : catalog.getHotel(id)) }
-})
+// A booked rate at 7 000 ₽ a night; the room and rate ids of `base` are not in its hotel.
+const hotel7000 = {
+  id: 'hotel-7000',
+  rooms: [{ id: 'room-7000', rates: [{ id: 'rate-7000', pricePerNight: 7000 }] }],
+} as unknown as Hotel
 
 const base: Booking = {
   id: 'OS-AAAAAA',
@@ -29,6 +27,7 @@ const base: Booking = {
   total: 20000,
   cancellation: { kind: 'free', daysBefore: 2 },
 }
+const lantern = getHotel(base.hotelId)
 
 describe('tripTab', () => {
   it('splits by status and check-out', () => {
@@ -49,11 +48,11 @@ describe('tripsIn', () => {
 
 describe('cancellationFee', () => {
   it('is 0 up to the last free day', () => {
-    expect(cancellationFee(base, '2026-10-19')).toBe(0)
-    expect(cancellationFee(base, '2026-11-08')).toBe(0)
+    expect(cancellationFee(base, '2026-10-19', lantern)).toBe(0)
+    expect(cancellationFee(base, '2026-11-08', lantern)).toBe(0)
   })
   it('is the first night after the free period', () => {
-    expect(cancellationFee(base, '2026-11-09')).toBe(10000)
+    expect(cancellationFee(base, '2026-11-09', lantern)).toBe(10000)
   })
   // trips: the first night of the booked rate, at the weekend price from Friday, for every room
   describe('at the price of the booked rate', () => {
@@ -65,24 +64,30 @@ describe('cancellationFee', () => {
       guests: { adults: 2, children: 0, rooms },
     })
     it('takes the weekend price for a Friday check-in', () => {
-      expect(cancellationFee({ ...stay('2026-11-06', '2026-11-08'), total: 16_200 }, '2026-11-05')).toBe(8100)
+      expect(cancellationFee({ ...stay('2026-11-06', '2026-11-08'), total: 16_200 }, '2026-11-05', hotel7000)).toBe(
+        8100,
+      )
     })
     it('takes the weekday price for a Thursday check-in', () => {
-      expect(cancellationFee({ ...stay('2026-11-05', '2026-11-07'), total: 15_100 }, '2026-11-04')).toBe(7000)
+      expect(cancellationFee({ ...stay('2026-11-05', '2026-11-07'), total: 15_100 }, '2026-11-04', hotel7000)).toBe(
+        7000,
+      )
     })
     it('counts every room', () => {
-      expect(cancellationFee({ ...stay('2026-11-06', '2026-11-08', 2), total: 32_400 }, '2026-11-05')).toBe(16_200)
+      expect(cancellationFee({ ...stay('2026-11-06', '2026-11-08', 2), total: 32_400 }, '2026-11-05', hotel7000)).toBe(
+        16_200,
+      )
     })
   })
   it('is the whole amount for a non-refundable rate', () => {
-    expect(cancellationFee({ ...base, cancellation: { kind: 'non-refundable' } }, '2026-10-19')).toBe(20000)
+    expect(cancellationFee({ ...base, cancellation: { kind: 'non-refundable' } }, '2026-10-19', lantern)).toBe(20000)
   })
 })
 
 describe('cancelBooking', () => {
   it('marks the booking cancelled with date and fee', () => {
     const now = new Date('2026-11-09T09:00:00Z')
-    expect(cancelBooking(base, now, '2026-11-09')).toMatchObject({
+    expect(cancelBooking(base, now, '2026-11-09', lantern)).toMatchObject({
       status: 'cancelled',
       cancelledAt: now.toISOString(),
       cancellationFee: 10000,

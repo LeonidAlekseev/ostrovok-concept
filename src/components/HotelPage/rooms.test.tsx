@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { destinations } from '@/data/destinations'
 import { getHotel } from '@/lib/catalog'
 import { parseOffer } from '@/lib/offer'
 import { RoomRates } from '../RatesPage/RoomRates'
@@ -44,7 +45,7 @@ describe('RoomRates', () => {
     expect(links).toHaveLength(room.rates.length)
     const url = new URL(links[0].getAttribute('href')!, 'http://x')
     expect(url.pathname).toBe('/booking')
-    const result = parseOffer(url.searchParams, future(0))
+    const result = parseOffer(url.searchParams, future(0), [hotel], destinations)
     expect(result.ok && [result.offer.hotelId, result.offer.roomId, result.offer.rateId]).toEqual([
       hotel.id,
       room.id,

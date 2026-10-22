@@ -1,4 +1,4 @@
-import { getHotel, hotels, type Hotel, type Meal } from './catalog'
+import type { Hotel, Meal } from './catalog'
 
 /** Hotels per collection. */
 export const COLLECTION_SIZE = 4
@@ -73,21 +73,12 @@ export interface HomeCollection {
   hotels: Hotel[]
 }
 
-let home: readonly HomeCollection[] | undefined
-
-/**
- * The home page collections over the whole catalogue, in order; a hotel appears in one collection only.
- * Picked on the first call, not when the module is imported, and kept after.
- */
-export function getHomeCollections(): readonly HomeCollection[] {
-  if (!home) {
-    const catalogue = hotels.map((summary) => getHotel(summary.id)!)
-    const shown = new Set<string>()
-    home = COLLECTIONS.map((collection) => {
-      const picked = pickCollection(collection, catalogue, shown)
-      for (const hotel of picked) shown.add(hotel.id)
-      return { collection, hotels: picked }
-    })
-  }
-  return home
+/** The home page collections over the catalogue, in order; a hotel appears in one collection only. */
+export function homeCollections(catalogue: readonly Hotel[]): HomeCollection[] {
+  const shown = new Set<string>()
+  return COLLECTIONS.map((collection) => {
+    const picked = pickCollection(collection, catalogue, shown)
+    for (const hotel of picked) shown.add(hotel.id)
+    return { collection, hotels: picked }
+  })
 }

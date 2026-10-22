@@ -17,21 +17,27 @@ const ids = (list: { id: string }[]) => list.map((d) => d.id)
 
 describe('resolveTarget', () => {
   it('returns null for empty text', () => {
-    expect(resolveTarget('   ')).toBeNull()
+    expect(resolveTarget('   ', destinations)).toBeNull()
   })
 
   it('finds a destination by its exact name ignoring case, outer spaces and ё/е', () => {
-    expect(resolveTarget('  пРАГА ')).toMatchObject({ kind: 'destination', destination: { id: 'prague' } })
-    expect(resolveTarget('Хёльсинки')).toMatchObject({ kind: 'destination', destination: { id: 'helsinki' } })
+    expect(resolveTarget('  пРАГА ', destinations)).toMatchObject({
+      kind: 'destination',
+      destination: { id: 'prague' },
+    })
+    expect(resolveTarget('Хёльсинки', destinations)).toMatchObject({
+      kind: 'destination',
+      destination: { id: 'helsinki' },
+    })
   })
 
   it('finds a scenario by its exact title', () => {
-    expect(resolveTarget('у моря')).toEqual({ kind: 'scenario', scenario: 'sea', title: 'У моря' })
+    expect(resolveTarget('у моря', destinations)).toEqual({ kind: 'scenario', scenario: 'sea', title: 'У моря' })
   })
 
   it('does not resolve partial names or countries', () => {
-    expect(resolveTarget('Праг')).toBeNull()
-    expect(resolveTarget('Чехия')).toBeNull()
+    expect(resolveTarget('Праг', destinations)).toBeNull()
+    expect(resolveTarget('Чехия', destinations)).toBeNull()
   })
 })
 
@@ -50,31 +56,44 @@ describe('findScenario', () => {
 describe('suggestDestinations', () => {
   it('suggests globe destinations for empty input', () => {
     const expected = destinations.filter((d) => d.onGlobe).slice(0, 6)
-    expect(suggestDestinations('  ')).toEqual(expected)
-    expect(ids(suggestDestinations(''))).toEqual(['prague', 'london', 'oslo', 'helsinki', 'rome', 'madrid'])
+    expect(suggestDestinations('  ', destinations)).toEqual(expected)
+    expect(ids(suggestDestinations('', destinations))).toEqual([
+      'prague',
+      'london',
+      'oslo',
+      'helsinki',
+      'rome',
+      'madrid',
+    ])
   })
 
   it('suggests the scenario destinations when the text is a scenario title', () => {
     const sea = destinations.filter((d) => d.scenarios.includes('sea')).slice(0, 6)
-    expect(suggestDestinations('  У МОРЯ ')).toEqual(sea)
+    expect(suggestDestinations('  У МОРЯ ', destinations)).toEqual(sea)
   })
 
   it('puts matches by name or country start before matches inside the text', () => {
     // "ис" starts "Испания" (Madrid, Barcelona) and "Исландия" (Reykjavik), and occurs inside the others.
-    expect(ids(suggestDestinations('ис'))).toEqual(['madrid', 'barcelona', 'reykjavik', 'lisbon', 'tbilisi'])
+    expect(ids(suggestDestinations('ис', destinations))).toEqual([
+      'madrid',
+      'barcelona',
+      'reykjavik',
+      'lisbon',
+      'tbilisi',
+    ])
   })
 
   it('matches by country', () => {
-    expect(ids(suggestDestinations('сша'))).toEqual(['new-york', 'miami', 'los-angeles', 'honolulu'])
+    expect(ids(suggestDestinations('сша', destinations))).toEqual(['new-york', 'miami', 'los-angeles', 'honolulu'])
   })
 
   it('limits the number of suggestions', () => {
-    expect(suggestDestinations('а')).toHaveLength(6)
-    expect(suggestDestinations('а', 2)).toHaveLength(2)
+    expect(suggestDestinations('а', destinations)).toHaveLength(6)
+    expect(suggestDestinations('а', destinations, 2)).toHaveLength(2)
   })
 
   it('returns nothing when no destination matches', () => {
-    expect(suggestDestinations('zzz')).toEqual([])
+    expect(suggestDestinations('zzz', destinations)).toEqual([])
   })
 })
 
@@ -86,7 +105,7 @@ describe('validateSearch', () => {
     checkOut: '2026-10-21',
     guests: { adults: 2, children: 0, rooms: 1 },
   }
-  const check = (patch: Partial<SearchQuery>) => validateSearch({ ...valid, ...patch }, today)
+  const check = (patch: Partial<SearchQuery>) => validateSearch({ ...valid, ...patch }, today, destinations)
 
   it('accepts a valid query, including a scenario and check-in today', () => {
     expect(check({})).toEqual({})
@@ -148,13 +167,13 @@ describe('fromSearchParams', () => {
   }
 
   it('reads back what toSearchParams wrote, for a city and a scenario', () => {
-    expect(fromSearchParams(toSearchParams(query, resolveTarget('Прага')!))).toEqual(query)
+    expect(fromSearchParams(toSearchParams(query, resolveTarget('Прага', destinations)!), destinations)).toEqual(query)
     const sea = { ...query, destination: 'У моря' }
-    expect(fromSearchParams(toSearchParams(sea, resolveTarget('У моря')!))).toEqual(sea)
+    expect(fromSearchParams(toSearchParams(sea, resolveTarget('У моря', destinations)!), destinations)).toEqual(sea)
   })
 
   it('leaves an unknown or missing destination and missing dates empty, with default guests', () => {
-    expect(fromSearchParams(new URLSearchParams('destination=atlantis'))).toEqual({
+    expect(fromSearchParams(new URLSearchParams('destination=atlantis'), destinations)).toEqual({
       destination: '',
       checkIn: '',
       checkOut: '',
@@ -165,9 +184,10 @@ describe('fromSearchParams', () => {
   it('keeps malformed guest counts for validation to report', () => {
     const read = fromSearchParams(
       new URLSearchParams('destination=prague&checkin=2026-10-20&checkout=2026-10-21&adults=x&rooms=1'),
+      destinations,
     )
     expect(read.guests.adults).toBeNaN()
-    expect(validateSearch(read, '2026-10-19').guests).toBe('Проверьте количество гостей')
+    expect(validateSearch(read, '2026-10-19', destinations).guests).toBe('Проверьте количество гостей')
   })
 })
 

@@ -4,9 +4,9 @@ import { useCallback, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { destinations, FEATURED_DESTINATION_ID, scenarios, type Destination } from '@/data/destinations'
-import { newHotels } from '../lib/catalog'
+import { FEATURED_DESTINATION_ID, scenarios, type Destination } from '@/data/destinations'
 import { useHotelSearch } from '../hooks/useHotelSearch'
+import { loadDestinations, loadNewHotels } from '../lib/catalogSource'
 import { formatPrice } from '../lib/format'
 import { resolveTarget } from '../lib/search'
 import { DestinationCard } from './DestinationCard/DestinationCard'
@@ -17,6 +17,7 @@ import { StarSearch } from './StarSearch/StarSearch'
 import { TravelBanner } from './TravelBanner/TravelBanner'
 import { VibeSearch } from './VibeSearch/VibeSearch'
 
+const destinations = loadDestinations()
 const featured = destinations.find((d) => d.id === FEATURED_DESTINATION_ID)!
 const globeDestinations = destinations.filter((d) => d.onGlobe)
 const scenarioPrices = new Map(
@@ -65,7 +66,7 @@ export function HomePage() {
     [openManual, searchFor],
   )
 
-  const target = resolveTarget(search.query.destination)
+  const target = resolveTarget(search.query.destination, destinations)
   const selectedDestinationId = target?.kind === 'destination' ? target.destination.id : null
   const selectedScenarioId = target?.kind === 'scenario' ? target.scenario : null
 
@@ -74,7 +75,7 @@ export function HomePage() {
     <main className="-mt-(--header-height) bg-background pb-[clamp(24px,6vw,56px)]">
       <Hero
         markers={globeDestinations}
-        hotels={newHotels}
+        hotels={loadNewHotels()}
         featured={featured}
         selectedId={selectedDestinationId}
         onSelect={(d: Destination) => applyToSearch(d.name)}
