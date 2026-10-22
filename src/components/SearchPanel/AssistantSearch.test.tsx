@@ -3,11 +3,13 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { newHotels } from '../../lib/catalogGenerator'
 import { routeCards } from '../../test/catalog'
+import { DIALOG_KEY } from '../../lib/assistantDialog'
 import { AssistantSearch } from './AssistantSearch'
 
 const fetchMock = vi.fn<typeof fetch>()
 
 afterEach(() => {
+  window.sessionStorage.clear()
   fetchMock.mockReset()
   vi.unstubAllGlobals()
 })
@@ -18,7 +20,7 @@ function renderAssistant() {
   return userEvent.setup()
 }
 
-const log = () => screen.getByRole('list', { name: 'Диалог с ассистентом' })
+const log = () => screen.getByRole('list', { name: 'Диалог с Эвалом' })
 
 // assistant-search, Requirement: Разбор пожелания
 describe('AssistantSearch with the model', () => {
@@ -106,7 +108,7 @@ describe('AssistantSearch with the model', () => {
     answer(Response.json({ brief: { vibe: 'mountains' }, source: 'model' }))
     await new Promise((resolve) => setTimeout(resolve, 900))
 
-    expect(screen.queryByRole('list', { name: 'Диалог с ассистентом' })).toBeNull()
+    expect(screen.queryByRole('list', { name: 'Диалог с Эвалом' })).toBeNull()
     expect(screen.getByText('О каком путешествии вы мечтаете?')).toBeTruthy()
   })
 
@@ -135,5 +137,62 @@ describe('AssistantSearch ready-made route', () => {
     await user.type(screen.getByLabelText('Опишите поездку'), 'Поработать с ноутбуком в Лиссабоне{Enter}')
     expect((await readyLink()).getAttribute('href')).toBe('/routes/lisbon-workation')
     expect(log().textContent).not.toMatch(/ошибк/i)
+  })
+})
+
+// assistant-search, Requirement: Диалог после перезагрузки
+describe('AssistantSearch after a reload', () => {
+  const remount = (view: ReturnType<typeof render>) => {
+    view.unmount()
+    return render(<AssistantSearch newHotels={newHotels} routes={routeCards()} onChoose={() => ({})} />)
+  }
+
+  it('restores the dialog, the brief and the question (Scenario: Перезагрузка после «Записал»)', async () => {
+    fetchMock
+      .mockResolvedValueOnce(Response.json({ brief: { vibe: 'sea' }, source: 'model' }))
+      .mockResolvedValueOnce(Response.json({ brief: { vibe: 'sea', when: 9 }, source: 'model' }))
+    vi.stubGlobal('fetch', fetchMock)
+    const view = render(<AssistantSearch newHotels={newHotels} routes={routeCards()} onChoose={() => ({})} />)
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Опишите поездку'), 'к морю{Enter}')
+    await screen.findByText('Записал: море. Когда планируете поехать?', {}, { timeout: 2000 })
+
+    remount(view)
+
+    expect(await screen.findByText('Записал: море. Когда планируете поехать?')).toBeTruthy()
+    expect(screen.queryByLabelText('Эвал думает')).toBeNull()
+    await user.type(screen.getByLabelText('Опишите поездку'), 'в октябре{Enter}')
+    await screen.findByText(/С кем едете/, {}, { timeout: 2000 })
+    expect(JSON.parse(fetchMock.mock.calls[1][1]?.body as string).brief).toEqual({ vibe: 'sea' })
+  })
+
+  it('forgets the dialog on «Заново» (Scenario: Сброс стирает сохранённое)', async () => {
+    fetchMock.mockResolvedValue(Response.json({ brief: { vibe: 'sea' }, source: 'model' }))
+    vi.stubGlobal('fetch', fetchMock)
+    const view = render(<AssistantSearch newHotels={newHotels} routes={routeCards()} onChoose={() => ({})} />)
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Опишите поездку'), 'к морю{Enter}')
+    await screen.findByText(/Когда планируете поехать/, {}, { timeout: 2000 })
+    await user.click(screen.getByRole('button', { name: 'Заново' }))
+
+    expect(window.sessionStorage.getItem(DIALOG_KEY)).toBeNull()
+    remount(view)
+    expect(screen.queryByRole('list', { name: 'Диалог с Эвалом' })).toBeNull()
+    expect(screen.getByText('О каком путешествии вы мечтаете?')).toBeTruthy()
+  })
+
+  it.each([['not json'], [JSON.stringify({ messages: [{ from: 'bot', text: 1 }], brief: {}, question: null })]])(
+    'ignores damaged data %# (Scenario: Битые данные)',
+    (raw) => {
+      window.sessionStorage.setItem(DIALOG_KEY, raw)
+      renderAssistant()
+      expect(screen.queryByRole('list', { name: 'Диалог с Эвалом' })).toBeNull()
+      expect(screen.getByText('О каком путешествии вы мечтаете?')).toBeTruthy()
+    },
+  )
+
+  it('shows the Эвал avatar on the start screen', () => {
+    renderAssistant()
+    expect(screen.getByAltText('Эвал')).toBeTruthy()
   })
 })

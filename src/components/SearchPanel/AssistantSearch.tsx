@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { ChevronRight, RotateCcw, SendHorizontal, Sparkles, Star } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
@@ -22,15 +23,9 @@ import { countRu, formatPrice, guestsLabel } from '../../lib/format'
 import { bestRoute, type RouteCardData } from '../../lib/routes'
 import { useDestinations } from '../Catalog/useDestinations'
 import { ReadyRoute } from '../RouteCard/ReadyRoute'
-import { RobotAvatar } from './RobotAvatar'
+import { loadDialog, saveDialog, type DialogMessage } from '../../lib/assistantDialog'
 
-interface Message {
-  from: 'agent' | 'user'
-  text: string
-  plan?: Plan
-  /** The ready-made route over the plan's options. */
-  route?: RouteCardData | null
-}
+type Message = DialogMessage
 
 interface Props {
   /** The "recently added" hotels the plan's options suggest. */
@@ -50,6 +45,7 @@ const userBubble = 'min-w-0 max-w-[85%] rounded-[18px_18px_6px] bg-primary px-3.
 /** Phones hide the agent's avatar: the bubbles need the width. */
 const messageAvatarClass = 'size-8 flex-none max-sm:hidden'
 const messageTextClass = 'leading-[1.45] whitespace-pre-wrap'
+const avatarSrc = '/assistant/eval.webp'
 const hintClass = 'block text-xs/[normal] font-normal text-muted-foreground'
 
 export function AssistantSearch({ newHotels, routes, onChoose }: Props) {
@@ -57,6 +53,8 @@ export function AssistantSearch({ newHotels, routes, onChoose }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [brief, setBrief] = useState<Brief>({})
   const [question, setQuestion] = useState<Question | null>(null)
+  // Restored after mount from sessionStorage: reading it during render would break hydration.
+  const [hydrated, setHydrated] = useState(false)
   const [thinking, setThinking] = useState(false)
   const [text, setText] = useState('')
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -72,6 +70,21 @@ export function AssistantSearch({ newHotels, routes, onChoose }: Props) {
     },
     [],
   )
+
+  useEffect(() => {
+    const saved = loadDialog()
+    if (saved) {
+      // oxlint-disable-next-line react/set-state-in-effect -- sessionStorage exists only on the client
+      setMessages(saved.messages)
+      setBrief(saved.brief)
+      setQuestion(saved.question)
+    }
+    setHydrated(true)
+  }, [])
+
+  useEffect(() => {
+    if (hydrated) saveDialog({ messages, brief, question })
+  }, [hydrated, messages, brief, question])
 
   // Keep the newest message in view inside the log (not the page: that would yank the scroll).
   useEffect(() => {
@@ -158,7 +171,14 @@ export function AssistantSearch({ newHotels, routes, onChoose }: Props) {
   return (
     <div className="flex flex-col gap-[clamp(12px,3vw,18px)]">
       <div className="flex items-center gap-[clamp(12px,3.4vw,22px)]">
-        <RobotAvatar className={`flex-none ${started ? 'size-12' : 'size-[clamp(64px,18vw,104px)]'}`} />
+        <Image
+          src={avatarSrc}
+          alt={started ? '' : 'Эвал'}
+          width={256}
+          height={256}
+          priority
+          className={`flex-none rounded-full ${started ? 'size-12' : 'size-[clamp(64px,18vw,104px)]'}`}
+        />
         <div className="min-w-0 flex-1">
           <h2
             className={`leading-[1.25] font-bold tracking-[-0.01em] ${started ? 'text-[clamp(15px,4vw,18px)]' : 'text-(length:--text-heading)'}`}
@@ -189,11 +209,11 @@ export function AssistantSearch({ newHotels, routes, onChoose }: Props) {
           ref={logRef}
           className="flex max-h-[min(420px,55vh)] flex-col gap-2.5 overflow-y-auto overscroll-contain px-0.5 pt-0.5 pb-1"
           aria-live="polite"
-          aria-label="Диалог с ассистентом"
+          aria-label="Диалог с Эвалом"
         >
           {messages.map((message, i) => (
             <li key={i} className={message.from === 'user' ? `${messageClass} justify-end` : messageClass}>
-              {message.from === 'agent' && <RobotAvatar className={messageAvatarClass} />}
+              {message.from === 'agent' && <EvalAvatar />}
               {/* The agent's bubble with a plan takes the full width, on a lighter surface. */}
               <div
                 className={
@@ -209,10 +229,10 @@ export function AssistantSearch({ newHotels, routes, onChoose }: Props) {
           ))}
           {thinking && (
             <li className={messageClass}>
-              <RobotAvatar className={messageAvatarClass} />
+              <EvalAvatar />
               <div
                 className="flex gap-1 rounded-[18px_18px_18px_6px] bg-muted px-4 py-3.5"
-                aria-label="Ассистент думает"
+                aria-label="Эвал думает"
               >
                 {[0, 0.15, 0.3].map((delay) => (
                   <span
@@ -370,4 +390,8 @@ function PlanView({ plan, route, onChoose }: PlanProps) {
       )}
     </div>
   )
+}
+
+function EvalAvatar() {
+  return <Image src={avatarSrc} alt="" width={64} height={64} className={`${messageAvatarClass} rounded-full`} />
 }

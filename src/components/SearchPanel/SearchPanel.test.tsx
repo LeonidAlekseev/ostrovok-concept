@@ -9,7 +9,10 @@ import { SearchPanel } from './SearchPanel'
 const push = vi.fn()
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
 
-afterEach(() => push.mockClear())
+afterEach(() => {
+  push.mockClear()
+  window.sessionStorage.clear()
+})
 
 function Harness({ routes = routeCards() }) {
   const search = useHotelSearch()
