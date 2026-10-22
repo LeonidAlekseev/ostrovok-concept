@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { destinations } from '@/data/destinations'
-import { getHotel } from '@/lib/catalog'
+import { getHotel } from '@/lib/catalogGenerator'
 import { parseOffer } from '@/lib/offer'
 import { RoomRates } from '../RatesPage/RoomRates'
 import { RoomList } from './RoomList'

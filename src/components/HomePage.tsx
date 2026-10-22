@@ -1,33 +1,44 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { FEATURED_DESTINATION_ID, scenarios, type Destination } from '@/data/destinations'
 import { useHotelSearch } from '../hooks/useHotelSearch'
-import { loadDestinations, loadNewHotels } from '../lib/catalogSource'
+import type { HotelSummary } from '../lib/catalog'
 import { formatPrice } from '../lib/format'
 import { resolveTarget } from '../lib/search'
+import { useDestinations } from './Catalog/useDestinations'
 import { DestinationCard } from './DestinationCard/DestinationCard'
-import { HomeCollections } from './HomeCollections/HomeCollections'
+import { HomeCollections, type ShownCollection } from './HomeCollections/HomeCollections'
 import { Hero } from './Hero/Hero'
 import { SearchPanel, type SearchMode } from './SearchPanel/SearchPanel'
 import { StarSearch } from './StarSearch/StarSearch'
 import { TravelBanner } from './TravelBanner/TravelBanner'
 import { VibeSearch } from './VibeSearch/VibeSearch'
 
-const destinations = loadDestinations()
-const featured = destinations.find((d) => d.id === FEATURED_DESTINATION_ID)!
-const globeDestinations = destinations.filter((d) => d.onGlobe)
-const scenarioPrices = new Map(
-  scenarios.map((s) => [
-    s.id,
-    formatPrice(Math.min(...destinations.filter((d) => d.scenarios.includes(s.id)).map((d) => d.priceFrom))),
-  ]),
-)
+interface Props {
+  /** The "recently added" hotels: the globe's feed and the assistant's suggestions. */
+  newHotels: readonly HotelSummary[]
+  collections: readonly ShownCollection[]
+}
 
-export function HomePage() {
+export function HomePage({ newHotels, collections }: Props) {
+  const destinations = useDestinations()
+  const { featured, globeDestinations, scenarioPrices } = useMemo(
+    () => ({
+      featured: destinations.find((d) => d.id === FEATURED_DESTINATION_ID)!,
+      globeDestinations: destinations.filter((d) => d.onGlobe),
+      scenarioPrices: new Map(
+        scenarios.map((s) => [
+          s.id,
+          formatPrice(Math.min(...destinations.filter((d) => d.scenarios.includes(s.id)).map((d) => d.priceFrom))),
+        ]),
+      ),
+    }),
+    [destinations],
+  )
   const search = useHotelSearch()
   const destinationRef = useRef<HTMLInputElement>(null)
   const submitRef = useRef<HTMLButtonElement>(null)
@@ -75,7 +86,7 @@ export function HomePage() {
     <main className="-mt-(--header-height) bg-background pb-[clamp(24px,6vw,56px)]">
       <Hero
         markers={globeDestinations}
-        hotels={loadNewHotels()}
+        hotels={newHotels}
         featured={featured}
         selectedId={selectedDestinationId}
         onSelect={(d: Destination) => applyToSearch(d.name)}
@@ -95,6 +106,7 @@ export function HomePage() {
             submitRef={submitRef}
             onPreview={(d) => setDestination(d.name)}
             onChoose={chooseFromAssistant}
+            newHotels={newHotels}
           />
         </section>
 
@@ -134,7 +146,7 @@ export function HomePage() {
 
         <StarSearch />
 
-        <HomeCollections />
+        <HomeCollections collections={collections} />
 
         <TravelBanner />
       </div>

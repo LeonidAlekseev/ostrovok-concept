@@ -2,11 +2,11 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { hasFreeCancellation } from '../../lib/catalog'
-import { loadAllHotels } from '../../lib/catalogSource'
 import { homeCollections } from '../../lib/collections'
 import { formatPrice } from '../../lib/format'
 import { addDays, todayIso } from '../../lib/dates'
 import { favoritesStore } from '../../lib/storage'
+import { allHotels } from '../../test/catalog'
 import { HomeCollections } from './HomeCollections'
 
 afterEach(() => localStorage.clear())
@@ -14,13 +14,16 @@ afterEach(() => localStorage.clear())
 /** The first collection's hotels: a hotel can be in several collections, so queries stay inside one. */
 const firstList = (section: HTMLElement) => section.querySelector('ul')!
 
+/** The collections as the home page picks them on the server. */
+const collections = homeCollections(allHotels())
+
 describe('HomeCollections', () => {
   it('shows every collection with its hotels as links to the hotel page', () => {
-    render(<HomeCollections />)
+    render(<HomeCollections collections={collections} />)
     const section = screen.getByRole('region', { name: 'Подборки' })
     expect(section.id).toBe('collections')
 
-    for (const { collection, hotels } of homeCollections(loadAllHotels())) {
+    for (const { collection, hotels } of collections) {
       const heading = within(section).getByRole('heading', { level: 3, name: collection.title })
       const list = heading.parentElement!.querySelector('ul')!
       expect(within(list).getAllByRole('listitem')).toHaveLength(hotels.length)
@@ -33,8 +36,8 @@ describe('HomeCollections', () => {
 
   // home-page, Requirement: Карточка отеля в подборке; hotel-tile, Requirement: Бесплатная отмена на карточке
   it('prices the hotels without "от" and marks free cancellation by the hotel', () => {
-    render(<HomeCollections />)
-    const [{ hotels }] = homeCollections(loadAllHotels())
+    render(<HomeCollections collections={collections} />)
+    const [{ hotels }] = collections
     const list = firstList(screen.getByRole('region', { name: 'Подборки' }))
     for (const [i, card] of within(list).getAllByRole('article').entries()) {
       const hotel = hotels[i]
@@ -45,8 +48,8 @@ describe('HomeCollections', () => {
   })
 
   it('links to the hotel with starts tomorrow, the day after, for two adults in one room', () => {
-    render(<HomeCollections />)
-    const hotel = homeCollections(loadAllHotels())[0].hotels[0]
+    render(<HomeCollections collections={collections} />)
+    const hotel = collections[0].hotels[0]
     const href = within(firstList(screen.getByRole('region', { name: 'Подборки' })))
       .getByRole('link', {
         name: hotel.name,
@@ -62,8 +65,8 @@ describe('HomeCollections', () => {
 
   it('toggles a hotel in favourites without opening it', async () => {
     const user = userEvent.setup()
-    render(<HomeCollections />)
-    const hotel = homeCollections(loadAllHotels())[0].hotels[0]
+    render(<HomeCollections collections={collections} />)
+    const hotel = collections[0].hotels[0]
     const card = within(firstList(screen.getByRole('region', { name: 'Подборки' })))
       .getByRole('link', { name: hotel.name })
       .closest('article')!

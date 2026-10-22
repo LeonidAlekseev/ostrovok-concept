@@ -1,7 +1,8 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { getHotel, type Review } from '@/lib/catalog'
+import { type Review } from '@/lib/catalog'
+import { getHotel } from '@/lib/catalogGenerator'
 import { ReviewsDialog } from './Reviews'
 
 const lantern = getHotel('prague-old-town-lantern')!

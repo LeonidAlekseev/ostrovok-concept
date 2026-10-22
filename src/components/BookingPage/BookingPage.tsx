@@ -4,7 +4,8 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { buttonVariants } from '@/components/ui/button'
-import { loadDestinations, loadHotels } from '@/lib/catalogSource'
+import { useDestinations } from '@/components/Catalog/useDestinations'
+import { useHotel } from '@/hooks/useHotels'
 import { todayIso } from '@/lib/dates'
 import { parseOffer } from '@/lib/offer'
 import { BookingForm } from './BookingForm'
@@ -12,7 +13,12 @@ import { OrderSummary } from './OrderSummary'
 
 function Booking() {
   const params = useSearchParams()
-  const result = parseOffer(params, todayIso(), loadHotels([params.get('hotel') ?? '']), loadDestinations())
+  const destinations = useDestinations()
+  const { status, hotel } = useHotel(params.get('hotel') || undefined)
+
+  if (status === 'loading') return <p className="text-muted-foreground">Загружаем предложение…</p>
+  if (status === 'error') return <p role="alert">Не удалось загрузить отель. Обновите страницу.</p>
+  const result = parseOffer(params, todayIso(), hotel ? [hotel] : [], destinations)
 
   if (!result.ok) {
     return (

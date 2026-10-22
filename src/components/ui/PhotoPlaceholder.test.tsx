@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { getHotel } from '@/lib/catalog'
+import { getHotel } from '@/lib/catalogGenerator'
 import { PhotoPlaceholder } from './PhotoPlaceholder'
 
 describe('PhotoPlaceholder', () => {

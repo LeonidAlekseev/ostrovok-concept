@@ -6,6 +6,7 @@ import { bookingsStore, saveBooking } from '@/lib/storage'
 import { BookingDetailsPage } from './BookingDetailsPage'
 import { makeBooking } from './testBooking'
 import { TripsPage } from './TripsPage'
+import { waitForCatalog } from '@/test/waitForCatalog'
 
 const nav = vi.hoisted(() => ({ query: '' }))
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(nav.query) }))
@@ -16,18 +17,20 @@ afterEach(() => localStorage.clear())
 
 // trips
 describe('TripsPage', () => {
-  it('asks a guest to sign in and returns to /trips', () => {
+  it('asks a guest to sign in and returns to /trips', async () => {
     render(<TripsPage />)
+    await waitForCatalog()
     expect(screen.getByText('Войдите, чтобы увидеть поездки')).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Войти' }).getAttribute('href')).toBe('/login?next=%2Ftrips')
   })
 
-  it('lists an upcoming trip in the first tab with a link to its details', () => {
+  it('lists an upcoming trip in the first tab with a link to its details', async () => {
     signIn()
     saveBooking(makeBooking('OS-UP0001', 7))
     saveBooking(makeBooking('OS-PAST01', -10))
     saveBooking(makeBooking('OS-CANC01', 7, { status: 'cancelled' }))
     render(<TripsPage />)
+    await waitForCatalog()
     const panel = screen.getByRole('tabpanel')
     expect(within(panel).getByText('Бронирование OS-UP0001')).toBeTruthy()
     expect(within(panel).queryByText('Бронирование OS-PAST01')).toBeNull()
@@ -40,15 +43,17 @@ describe('TripsPage', () => {
     saveBooking(makeBooking('OS-PAST01', -10))
     saveBooking(makeBooking('OS-CANC01', 7, { status: 'cancelled' }))
     render(<TripsPage />)
+    await waitForCatalog()
     await user.click(screen.getByRole('tab', { name: /Завершённые/ }))
     expect(screen.getByText('Бронирование OS-PAST01')).toBeTruthy()
     await user.click(screen.getByRole('tab', { name: /Отменённые/ }))
     expect(screen.getByText('Бронирование OS-CANC01')).toBeTruthy()
   })
 
-  it('shows a message and a search link in an empty tab', () => {
+  it('shows a message and a search link in an empty tab', async () => {
     signIn()
     render(<TripsPage />)
+    await waitForCatalog()
     expect(screen.getByText('Предстоящих поездок пока нет')).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Найти отель' }).getAttribute('href')).toBe('/')
   })

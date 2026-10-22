@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useHotelSearch } from '../../hooks/useHotelSearch'
+import { newHotels } from '../../lib/catalogGenerator'
 import { SearchPanel, type SearchMode } from './SearchPanel'
 
 const push = vi.fn()
@@ -24,6 +25,7 @@ function Harness() {
       submitRef={submitRef}
       onPreview={() => {}}
       onChoose={search.searchFor}
+      newHotels={newHotels}
     />
   )
 }

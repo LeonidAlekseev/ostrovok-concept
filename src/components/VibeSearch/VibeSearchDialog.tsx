@@ -14,10 +14,10 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { useToday } from '../../hooks/useToday'
-import { loadAllHotels, loadDestinations } from '../../lib/catalogSource'
 import { DEFAULT_GUESTS, withStartDates, type Stay } from '../../lib/search'
-import { poleImage, readVibe, VIBE_AXES, VIBE_STEPS, type Answer } from '../../lib/vibe'
+import { axisShares, poleImage, VIBE_AXES, VIBE_STEPS, vibeArchetype, type Answer, type Vibe } from '../../lib/vibe'
 import { SmartImage } from '../ui/SmartImage'
+import { vibeHotelsAction } from './actions'
 import { VibeResult } from './VibeResult'
 
 interface Props {
@@ -51,6 +51,8 @@ function Option({ image, label, step, className, ...rest }: OptionProps) {
   )
 }
 
+const VIBE_ERROR = 'Не удалось подобрать отели. Попробуйте ещё раз.'
+
 export function VibeSearchDialog({ open, onOpenChange }: Props) {
   const today = useToday()
   // Answers stay when going back: the pair shows what was chosen.
@@ -59,7 +61,24 @@ export function VibeSearchDialog({ open, onOpenChange }: Props) {
   const leftRef = useRef<HTMLButtonElement>(null)
   const rightRef = useRef<HTMLButtonElement>(null)
   const done = step === VIBE_STEPS
-  const vibe = useMemo(() => (done ? readVibe(answers, loadAllHotels(), loadDestinations()) : null), [done, answers])
+  // The server picks the hotels over the whole catalogue; the reading belongs to the answers it was asked for.
+  const [reading, setReading] = useState<{ answers: Answer[]; vibe: Vibe | null } | null>(null)
+  const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    if (!done) return
+    let current = true
+    vibeHotelsAction(answers).then(
+      (hotels) =>
+        current &&
+        setReading({ answers, vibe: { archetype: vibeArchetype(answers), shares: axisShares(answers), hotels } }),
+      () => current && setReading({ answers, vibe: null }),
+    )
+    return () => {
+      current = false
+    }
+  }, [done, answers, attempt])
+  const read = done && reading?.answers === answers ? reading : null
+  const vibe = read?.vibe ?? null
   // The links start tomorrow and the day after, as in the collections.
   const stay = useMemo<Stay | null>(() => {
     if (!today) return null
@@ -101,7 +120,11 @@ export function VibeSearchDialog({ open, onOpenChange }: Props) {
 
   const status = vibe
     ? `Ваш вайб — ${vibe.archetype.name}`
-    : `${step + 1} из ${VIBE_STEPS}: ${axis.left} или ${axis.right}`
+    : done
+      ? read
+        ? VIBE_ERROR
+        : 'Подбираем отели…'
+      : `${step + 1} из ${VIBE_STEPS}: ${axis.left} или ${axis.right}`
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -118,6 +141,25 @@ export function VibeSearchDialog({ open, onOpenChange }: Props) {
 
         {vibe ? (
           <VibeResult vibe={vibe} stay={stay} onRestart={restart} />
+        ) : done ? (
+          <div className="flex flex-col items-start gap-4" aria-busy={!read}>
+            <p className="text-muted-foreground">{read ? VIBE_ERROR : 'Подбираем отели…'}</p>
+            {read && (
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  onClick={() => {
+                    setReading(null)
+                    setAttempt(attempt + 1)
+                  }}
+                >
+                  Повторить
+                </Button>
+                <Button variant="ghost" onClick={restart}>
+                  Заново
+                </Button>
+              </div>
+            )}
+          </div>
         ) : (
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-3">

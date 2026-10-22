@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
-import { loadHotel } from '@/lib/catalogSource'
+import type { Hotel } from '@/lib/catalog'
 import { formatDateRange, nightsBetween } from '@/lib/dates'
 import { countRu, formatPrice, guestsLabel } from '@/lib/format'
 import type { Booking } from '@/lib/storage'
@@ -11,8 +11,8 @@ const nightForms: [string, string, string] = ['ночь', 'ночи', 'ноче�
 
 const BADGE = { upcoming: 'success', past: 'secondary', cancelled: 'destructive' } as const
 
-export function TripCard({ booking, tab }: { booking: Booking; tab: TripTab }) {
-  const hotel = loadHotel(booking.hotelId)
+/** A booking in the list; `hotel` is `undefined` when it is gone from the catalogue or failed to load. */
+export function TripCard({ booking, hotel, tab }: { booking: Booking; hotel: Hotel | undefined; tab: TripTab }) {
   return (
     <li>
       <Link

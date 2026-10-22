@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildCatalog, hotelsIn } from './catalog'
+import { buildCatalog, hotelsIn } from './catalogGenerator'
 import { destinations } from '../data/destinations'
 import {
   aspectBetween,
