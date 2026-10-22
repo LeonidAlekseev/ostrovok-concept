@@ -36,6 +36,39 @@ describe('demo routes', () => {
     expect(new Set(names).size).toBeGreaterThanOrEqual(4)
   })
 
+  it('says the nights of the title and description as the stops add up', () => {
+    const WORDS: Record<string, number> = {
+      одну: 1,
+      две: 2,
+      три: 3,
+      четыре: 4,
+      пять: 5,
+      шесть: 6,
+      семь: 7,
+      девять: 9,
+      десять: 10,
+    }
+    for (const route of seedRoutes) {
+      const total = route.stops.reduce((sum, stop) => sum + stop.nights, 0)
+      const allowed = new Set([total, ...route.stops.map((stop) => stop.nights)])
+      for (const [, word] of `${route.title} ${route.description}`.toLowerCase().matchAll(/([а-яё]+) ноч/g))
+        expect(allowed.has(WORDS[word]), `${route.id}: «${word} ноч…»`).toBe(true)
+      expect(
+        route.leisure.every((item) => item.day <= total + 1),
+        route.id,
+      ).toBe(true)
+    }
+  })
+
+  it('has no two empty days in a row', () => {
+    for (const route of seedRoutes) {
+      const days = new Set(route.leisure.map((item) => item.day))
+      const total = route.stops.reduce((sum, stop) => sum + stop.nights, 0)
+      for (let day = 1; day < total + 1; day++)
+        expect(days.has(day) || days.has(day + 1), `${route.id}: дни ${day}–${day + 1}`).toBe(true)
+    }
+  })
+
   it('keeps every extra hotel in the catalogue (Scenario: Доп. отель в каталоге)', () => {
     for (const extra of extraHotels)
       expect(
