@@ -1,4 +1,4 @@
-// Loads the catalog generator's destinations and hotels into Supabase and prepares the demo account.
+// Loads the catalog generator's destinations and hotels and the seed routes into Supabase and prepares the demo account.
 //   npm run db:seed   (Node runs the TypeScript itself; the keys come from .env.local, see README «Ключи API»)
 // Upserts by id, so a second run leaves the same rows. Needs NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
 // DEMO_USER_EMAIL and DEMO_USER_PASSWORD; prints counts, never the keys.
@@ -19,6 +19,8 @@ registerHooks({
 
 const { destinations } = await import('../src/data/destinations.ts')
 const { buildCatalog } = await import('../src/lib/catalog.ts')
+const { seedRoutes } = await import('../src/data/routes.ts')
+const { parseRoute } = await import('../src/lib/routes.ts')
 
 const BATCH = 100
 const DEMO_NAME = 'Демо-путешественник'
@@ -48,9 +50,10 @@ await upsert(
   'destinations',
   destinations.map((destination) => ({ id: destination.id, data: destination, updated_at: updatedAt })),
 )
+const catalog = buildCatalog()
 await upsert(
   'hotels',
-  buildCatalog().map((hotel) => ({
+  catalog.map((hotel) => ({
     id: hotel.id,
     destination_id: hotel.destinationId,
     stars: hotel.stars,
@@ -61,6 +64,21 @@ await upsert(
     data: hotel,
     updated_at: updatedAt,
   })),
+)
+// Every stop's hotel must be in the catalog: parseRoute throws otherwise, before the routes are written.
+const hotelIds = new Set(catalog.map((hotel) => hotel.id))
+await upsert(
+  'routes',
+  seedRoutes
+    .map((route) => parseRoute(route, (id) => hotelIds.has(id)))
+    .map((route) => ({
+      id: route.id,
+      persona: route.persona,
+      destination_id: route.destinationId,
+      featured: false,
+      data: route,
+      updated_at: updatedAt,
+    })),
 )
 
 const { error } = await supabase.auth.admin.createUser({
