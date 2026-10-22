@@ -1,33 +1,14 @@
 'use client'
 
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ComponentProps,
-  type CSSProperties,
-  type KeyboardEvent,
-} from 'react'
+import { useEffect, useRef, useState, type ComponentProps, type CSSProperties, type KeyboardEvent } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import { useToday } from '../../hooks/useToday'
-import { bestRoute, type RouteCardData } from '../../lib/routes'
-import { DEFAULT_GUESTS, withStartDates, type Stay } from '../../lib/search'
-import {
-  axisShares,
-  poleImage,
-  VIBE_AXES,
-  VIBE_STEPS,
-  vibeArchetype,
-  vibePersona,
-  type Answer,
-  type Vibe,
-} from '../../lib/vibe'
+import type { RouteCardData } from '../../lib/routes'
+import { poleImage, VIBE_AXES, VIBE_STEPS, type Answer } from '../../lib/vibe'
 import { SmartImage } from '../ui/SmartImage'
-import { vibeHotelsAction } from './actions'
+import { useVibeReading } from './useVibeReading'
 import { VibeResult } from './VibeResult'
 
 interface Props {
@@ -66,52 +47,14 @@ function Option({ image, label, step, className, ...rest }: OptionProps) {
 const VIBE_ERROR = 'Не удалось подобрать отели. Попробуйте ещё раз.'
 
 export function VibeSearchDialog({ open, onOpenChange, routes }: Props) {
-  const today = useToday()
   // Answers stay when going back: the pair shows what was chosen.
   const [answers, setAnswers] = useState<Answer[]>([])
   const [step, setStep] = useState(0)
   const leftRef = useRef<HTMLButtonElement>(null)
   const rightRef = useRef<HTMLButtonElement>(null)
   const done = step === VIBE_STEPS
-  // The server picks the hotels over the whole catalogue; the reading belongs to the answers it was asked for.
-  const [reading, setReading] = useState<{ answers: Answer[]; vibe: Vibe | null; routeId?: string } | null>(null)
-  const [attempt, setAttempt] = useState(0)
-  useEffect(() => {
-    if (!done) return
-    let current = true
-    vibeHotelsAction(answers).then(
-      ({ hotels, routeId }) =>
-        current &&
-        setReading({
-          answers,
-          vibe: { archetype: vibeArchetype(answers), shares: axisShares(answers), hotels },
-          routeId,
-        }),
-      () => current && setReading({ answers, vibe: null }),
-    )
-    return () => {
-      current = false
-    }
-  }, [done, answers, attempt])
-  const read = done && reading?.answers === answers ? reading : null
-  const vibe = read?.vibe ?? null
-  // The search by meaning's route, or the rules: the persona of the answers in the first hotel's city.
-  const route = vibe
-    ? bestRoute(routes, {
-        semanticId: read?.routeId,
-        persona: vibePersona(answers),
-        destinationId: vibe.hotels[0]?.destinationId,
-      })
-    : null
-  // The links start tomorrow and the day after.
-  const stay = useMemo<Stay | null>(() => {
-    if (!today) return null
-    const { checkIn, checkOut, guests } = withStartDates(
-      { destination: '', checkIn: '', checkOut: '', guests: DEFAULT_GUESTS },
-      today,
-    )
-    return { checkIn, checkOut, guests }
-  }, [today])
+  // The server picks the hotels over the whole catalogue.
+  const { vibe, route, stay, failed, retry } = useVibeReading(done ? answers : null, routes)
 
   const axis = VIBE_AXES[step]
   // The next pair's photos are fetched while this one is on screen.
@@ -145,7 +88,7 @@ export function VibeSearchDialog({ open, onOpenChange, routes }: Props) {
   const status = vibe
     ? `Ваш вайб — ${vibe.archetype.name}`
     : done
-      ? read
+      ? failed
         ? VIBE_ERROR
         : 'Подбираем отели…'
       : `${step + 1} из ${VIBE_STEPS}: ${axis.left} или ${axis.right}`
@@ -166,18 +109,11 @@ export function VibeSearchDialog({ open, onOpenChange, routes }: Props) {
         {vibe ? (
           <VibeResult vibe={vibe} route={route} stay={stay} onRestart={restart} />
         ) : done ? (
-          <div className="flex flex-col items-start gap-4" aria-busy={!read}>
-            <p className="text-muted-foreground">{read ? VIBE_ERROR : 'Подбираем отели…'}</p>
-            {read && (
+          <div className="flex flex-col items-start gap-4" aria-busy={!failed}>
+            <p className="text-muted-foreground">{failed ? VIBE_ERROR : 'Подбираем отели…'}</p>
+            {failed && (
               <div className="flex flex-wrap gap-3">
-                <Button
-                  onClick={() => {
-                    setReading(null)
-                    setAttempt(attempt + 1)
-                  }}
-                >
-                  Повторить
-                </Button>
+                <Button onClick={retry}>Повторить</Button>
                 <Button variant="ghost" onClick={restart}>
                   Заново
                 </Button>

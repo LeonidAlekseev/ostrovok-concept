@@ -6,6 +6,7 @@ import { useHotelSearch } from '../hooks/useHotelSearch'
 import type { HotelSummary } from '../lib/catalog'
 import type { RouteCardData } from '../lib/routes'
 import { useDestinations } from './Catalog/useDestinations'
+import { DrawSearch } from './DrawSearch/DrawSearch'
 import { Hero } from './Hero/Hero'
 import { PersonaCarousel } from './PersonaCarousel/PersonaCarousel'
 import { RouteShowcase } from './RouteCard/RouteShowcase'
@@ -56,6 +57,8 @@ export function HomePage({ newHotels, routes }: Props) {
         <VibeSearch routes={routes} />
 
         <StarSearch routes={routes} />
+
+        <DrawSearch routes={routes} />
 
         <TravelBanner />
       </div>
