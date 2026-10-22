@@ -1,20 +1,30 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { signInDemo } from '@/app/auth/actions'
 import { Button } from '@/components/ui/button'
 import { reloadSession } from '@/lib/session'
 import { FormAlert } from './AuthForm'
 
 /** «Войти в демо-аккаунт»: the shared account prepared by `npm run db:seed`, signed in on the server. */
-export function DemoSignIn({ onDone }: { onDone: () => void }) {
+export function DemoSignIn({ next, onDone }: { next?: string | null; onDone: () => void }) {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string>()
+  // With `next` the action redirects and nothing runs after it here: the sign-in form goes away with the page,
+  // and the session is picked up then.
+  const attempted = useRef(false)
+  useEffect(
+    () => () => {
+      if (attempted.current) void reloadSession()
+    },
+    [],
+  )
 
   async function signIn() {
     setPending(true)
     setError(undefined)
-    const result = await signInDemo()
+    attempted.current = true
+    const result = await signInDemo(next)
     if (result.error) {
       setPending(false)
       setError(result.error)

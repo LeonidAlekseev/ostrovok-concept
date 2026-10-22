@@ -1,16 +1,4 @@
 import Link from 'next/link'
-import {
-  BedDouble,
-  Bus,
-  Car,
-  CarTaxiFront,
-  DoorOpen,
-  Flag,
-  Footprints,
-  MapPin,
-  Ticket,
-  type LucideIcon,
-} from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { countRu, formatDecimal, formatPrice } from '@/lib/format'
 import {
@@ -21,24 +9,9 @@ import {
   type PlanItem,
   type PlanStay,
   type RoutePlan,
-  type TransferMode,
 } from '@/lib/routes'
 import { hotelHref } from './hotelHref'
-
-const TRANSFER_ICON: Record<TransferMode, LucideIcon> = {
-  transfer: Bus,
-  taxi: CarTaxiFront,
-  car: Car,
-  walk: Footprints,
-}
-
-const ITEM_ICON: Record<Exclude<PlanItem['kind'], 'transfer'>, LucideIcon> = {
-  arrival: MapPin,
-  departure: Flag,
-  'check-in': BedDouble,
-  'check-out': DoorOpen,
-  leisure: Ticket,
-}
+import { ITEM_ICON, TRANSFER_ICON } from './planIcons'
 
 /**
  * The door-to-door plan by relative day («День 1», «День 2»…): arrival, transfers, check-ins and
@@ -67,7 +40,7 @@ export function RouteTimeline({ plan }: { plan: RoutePlan }) {
   )
 }
 
-function Time({ item }: { item: PlanItem }) {
+export function Time({ item }: { item: PlanItem }) {
   return <span className="w-12 shrink-0 pt-0.5 font-semibold tabular-nums">{formatTime(item.start)}</span>
 }
 

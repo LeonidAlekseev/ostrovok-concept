@@ -74,6 +74,8 @@ const routeSchema = z
     transfers: z.array(z.enum(TRANSFER_MODES)),
     leisure: z.array(
       z.object({
+        /** Stable within a trip plan (src/lib/trip.ts): the key of the item and of its calendar event. */
+        id: z.string().optional(),
         title: z.string().min(1),
         category: z.string().min(1),
         /** Day of the trip, 1 is the arrival day. */
@@ -380,7 +382,7 @@ export function itemKey(item: PlanItem): string {
     case 'transfer':
       return `transfer-${item.leg}`
     case 'leisure':
-      return `leisure-${item.index}`
+      return `leisure-${item.leisure.id ?? item.index}`
   }
 }
 

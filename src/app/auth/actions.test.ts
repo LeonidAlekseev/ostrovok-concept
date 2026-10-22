@@ -10,6 +10,12 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => (mocks.configured ? { auth: { signInWithPassword: mocks.signInWithPassword } } : null),
 }))
 vi.mock('@/lib/secrets', () => ({ getSecret: async (name: string) => mocks.secrets[name] }))
+const nav = vi.hoisted(() => ({
+  redirect: vi.fn((url: string) => {
+    throw new Error(`redirect ${url}`)
+  }),
+}))
+vi.mock('next/navigation', () => ({ redirect: nav.redirect }))
 
 beforeEach(() => {
   mocks.configured = true
@@ -30,6 +36,15 @@ describe('signInDemo', () => {
     mocks.configured = false
     expect(await signInDemo()).toEqual({ error: 'Вход временно недоступен' })
     expect(mocks.signInWithPassword).not.toHaveBeenCalled()
+  })
+
+  it('opens an internal `next` itself, so no navigation of the browser races the new cookies', async () => {
+    await expect(signInDemo('/trip/new?route=prague-culture')).rejects.toThrow(
+      'redirect /trip/new?route=prague-culture',
+    )
+    // An external address goes home, as the client does.
+    await expect(signInDemo('//evil.com')).rejects.toThrow('redirect /')
+    expect(nav.redirect).toHaveBeenLastCalledWith('/')
   })
 
   it('reports a failed sign-in without details', async () => {

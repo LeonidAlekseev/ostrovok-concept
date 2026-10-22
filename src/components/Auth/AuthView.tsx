@@ -41,7 +41,7 @@ function Content({ mode, modal }: { mode: AuthMode; modal: boolean }) {
         next={next ?? '/'}
         initialError={params.get('error') === 'link' ? LINK_ERROR : undefined}
       />
-      <DemoSignIn onDone={done} />
+      <DemoSignIn next={next} onDone={done} />
     </>
   )
 }
