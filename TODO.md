@@ -7,7 +7,7 @@
 
 Этапы A2 и B Travel OS (план согласован 2026-10-22, решения 97–107):
 
-- Волна 1: `fix-date-dependent-tests` (CI красный с 22.10), `catalog-pure-functions`.
+- Волна 1 выполнена: `fix-date-dependent-tests` (#120), `catalog-pure-functions` (#119).
 - Волна 2: `catalog-from-supabase` — серверный слой чтения с кешем, `GET /api/hotels?ids=`.
 - Волна 3: `catalog-stay-types` (хостел, апартаменты, вилла, Wi‑Fi Мбит/с, рабочая зона), `route-page` —
   `/routes/<id>`: точки маршрута с ночами (по умолчанию 3–5, пользователь увеличивает пребывание в любой
