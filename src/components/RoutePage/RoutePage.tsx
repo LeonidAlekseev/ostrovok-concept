@@ -3,12 +3,10 @@
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import type { Hotel } from '@/lib/catalog'
-import { addDays } from '@/lib/dates'
 import { authorName, PERSONA_LABEL, type Route } from '@/lib/routes'
+import { DateField } from '../SearchForm/DateField'
 import { RouteMap } from './RouteMap'
 import { RouteSummary } from './RouteSummary'
 import { RouteTimeline } from './RouteTimeline'
@@ -23,7 +21,7 @@ interface Props {
 const NO_EDITS = new URLSearchParams()
 
 function RouteView({ route, hotels, params }: Props & { params: Pick<URLSearchParams, 'get'> }) {
-  const { today, state, plan, edit } = useRoutePlan(route, hotels, params)
+  const { state, plan, edit } = useRoutePlan(route, hotels, params)
   return (
     <main className="mx-auto flex w-full max-w-(--page-max) flex-1 flex-col gap-6 px-(--page-x) py-[clamp(20px,5vw,40px)]">
       <header className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] md:items-center">
@@ -50,16 +48,13 @@ function RouteView({ route, hotels, params }: Props & { params: Pick<URLSearchPa
               <h2 id="route-plan" className="text-heading font-bold">
                 План от двери до двери
               </h2>
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="route-start">Начало</Label>
-                <Input
-                  id="route-start"
-                  type="date"
-                  className="w-44"
-                  min={today}
-                  max={addDays(today, 365)}
-                  value={state.start}
-                  onChange={(e) => e.target.value && edit((s) => ({ ...s, start: e.target.value }))}
+              <div className="flex w-full flex-col gap-1 sm:w-80">
+                <p className="text-sm font-semibold">Начало</p>
+                <DateField
+                  single
+                  checkIn={state.start}
+                  checkOut={state.start}
+                  onChange={(start) => edit((s) => ({ ...s, start }))}
                 />
               </div>
             </div>

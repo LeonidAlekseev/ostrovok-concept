@@ -22,5 +22,5 @@ export function useRoutePlan(
   const plan = useMemo(() => buildPlan(route, hotels, state), [route, hotels, state])
   const edit = (change: (state: RouteState) => RouteState) =>
     router.replace(`${pathname}?${toRouteParams(route, change(state))}`, { scroll: false })
-  return { today, state, plan, edit }
+  return { state, plan, edit }
 }

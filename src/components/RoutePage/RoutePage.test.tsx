@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { seedRoutes } from '@/data/routes'
 import { getHotel, type Hotel } from '@/lib/catalog'
+import { formatLongDate } from '@/lib/dates'
 import { formatPrice } from '@/lib/format'
 import { buildPlan, parseRouteState } from '@/lib/routes'
 import { RoutePage } from './RoutePage'
@@ -141,6 +142,24 @@ describe('RoutePage', () => {
     expect(screen.getByRole('link', { name: 'Повторить маршрут' }).getAttribute('href')).toBe(
       `/hotels/${residence.id}?checkin=2026-11-03&checkout=2026-11-06&adults=2&rooms=1`,
     )
+  })
+})
+
+describe('start date', () => {
+  it('picks the start in the calendar; past days are unavailable', async () => {
+    const { rerender } = renderPage()
+    await userEvent.click(screen.getByRole('button', { name: `Дата заезда: ${formatLongDate('2026-11-03')}` }))
+    const calendar = await screen.findByRole('dialog', { name: 'Выбор даты заезда' })
+    expect(
+      within(calendar).getByRole<HTMLButtonElement>('button', { name: formatLongDate('2026-11-01') }).disabled,
+    ).toBe(true)
+    await userEvent.click(within(calendar).getByRole('button', { name: formatLongDate('2026-11-10') }))
+    expect(lastAddress().get('start')).toBe('2026-11-10')
+
+    nav.query = lastAddress().toString()
+    rerender(<RoutePage route={route} hotels={hotels} />)
+    expect(screen.getByRole('button', { name: `Дата заезда: ${formatLongDate('2026-11-10')}` })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Повторить маршрут' }).getAttribute('href')).toContain('checkin=2026-11-10')
   })
 })
 
