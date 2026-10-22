@@ -6,6 +6,7 @@ import { hotels, getHotel } from './catalogGenerator'
 import {
   axisShares,
   BALANCE,
+  onePerCity,
   poleImage,
   readVibe,
   VIBE_AXES,
@@ -13,6 +14,7 @@ import {
   vibeArchetype,
   vibeHotels,
   vibeScale,
+  vibeWish,
   type Answer,
 } from './vibe'
 
@@ -158,5 +160,27 @@ describe('readVibe', () => {
     expect(vibe.shares).toHaveLength(7)
     expect(vibe.hotels).toHaveLength(6)
     expect(vibe.archetype.name).toBeTruthy()
+  })
+})
+
+describe('vibeWish', () => {
+  it('names the archetype and the chosen sides', () => {
+    expect(vibeWish([-1, -1, 0, 0, 0, 0, 0])).toBe(
+      'Тихая гавань: тишина, простор и вечер без спешки. Настроение: Тихий вечер, Море.',
+    )
+    expect(vibeWish(all(1))).toContain('Настроение: Шумная вечеринка, Город, Большой отель')
+  })
+
+  it('is empty when nothing is chosen', () => {
+    expect(vibeWish(all(0))).toBe('')
+  })
+})
+
+describe('onePerCity', () => {
+  it('keeps the first hotel of each city, up to VIBE_HOTELS', () => {
+    const picked = onePerCity(catalogue)
+    expect(picked).toHaveLength(VIBE_HOTELS)
+    expect(new Set(picked.map((h) => h.destinationId)).size).toBe(VIBE_HOTELS)
+    expect(picked[0]).toBe(catalogue[0])
   })
 })

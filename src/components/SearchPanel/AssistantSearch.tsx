@@ -95,7 +95,7 @@ export function AssistantSearch({ newHotels, onPreview, onChoose }: Props) {
     )
     clearTimeout(timerRef.current)
     timerRef.current = setTimeout(async () => {
-      const { brief: next, reply: remark } = await reply
+      const { brief: next, reply: remark, matches } = await reply
       if (pending.signal.aborted) return
       setBrief(next)
       const today = todayIso()
@@ -109,7 +109,7 @@ export function AssistantSearch({ newHotels, onPreview, onChoose }: Props) {
         setMessages((list) => [...list, { from: 'agent', text: lead ? `${lead} ${ask.text}` : ask.text }])
         return
       }
-      const plan = makePlan(next, today, destinations, newHotels)
+      const plan = makePlan(next, today, destinations, newHotels, matches)
       setMessages((list) => [...list, { from: 'agent', text: understood ? `Записал: ${understood}.` : '', plan }])
       if (plan.options[0]) onPreview(plan.options[0].destination)
     }, THINK_MS)
@@ -299,7 +299,7 @@ function PlanView({ plan, onChoose }: { plan: Plan; onChoose: Props['onChoose'] 
       </p>
       <ul className="grid grid-cols-1 gap-1.5">
         {plan.options.map(({ destination, hotel, total, fitsBudget }) => (
-          <li key={destination.id}>
+          <li key={hotel?.id ?? destination.id}>
             <button
               type="button"
               className="flex w-full items-center gap-2.5 rounded-lg border border-border bg-card py-2.5 pr-2 pl-3 text-left transition-[border-color,box-shadow] duration-200 hover:border-primary hover:shadow-[0_4px_14px_color-mix(in_srgb,var(--primary)_12%,transparent)] focus-visible:border-primary focus-visible:shadow-[0_4px_14px_color-mix(in_srgb,var(--primary)_12%,transparent)]"

@@ -216,15 +216,31 @@ export function vibeHotels(
       a.hotel.priceFrom - b.hotel.priceFrom ||
       a.hotel.id.localeCompare(b.hotel.id),
   )
+  return onePerCity(scored.map(({ hotel }) => hotel))
+}
+
+/** The first `VIBE_HOTELS` of the `hotels`, one per city. */
+export function onePerCity(hotels: readonly Hotel[]): Hotel[] {
   const cities = new Set<string>()
   const picked: Hotel[] = []
-  for (const { hotel } of scored) {
+  for (const hotel of hotels) {
     if (cities.has(hotel.destinationId)) continue
     cities.add(hotel.destinationId)
     picked.push(hotel)
     if (picked.length === VIBE_HOTELS) break
   }
   return picked
+}
+
+/**
+ * The answers as words for the semantic search: the archetype and the chosen sides, as the hotels' texts
+ * name them («Настроение: Тихий вечер, Море…»). Empty when every answer is «Не могу выбрать».
+ */
+export function vibeWish(answers: readonly Answer[]): string {
+  const sides = VIBE_AXES.flatMap((axis, i) => (answers[i] ? [answers[i] < 0 ? axis.left : axis.right] : []))
+  if (sides.length === 0) return ''
+  const { name, description } = vibeArchetype(answers)
+  return `${name}: ${description.toLocaleLowerCase('ru')}. Настроение: ${sides.join(', ')}.`
 }
 
 export interface Vibe {
