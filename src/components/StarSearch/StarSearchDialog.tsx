@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToday } from '../../hooks/useToday'
 import { addDays } from '../../lib/dates'
-import { sunSign, type Reading } from '../../lib/horoscope'
+import { starPersona, sunSign, type Company, type Reading } from '../../lib/horoscope'
+import { bestRoute, type RouteCardData } from '../../lib/routes'
 import { DEFAULT_GUESTS, startStay, type Stay } from '../../lib/search'
 import { readStarsAction } from './actions'
 import { MagicOrb } from './MagicOrb'
@@ -28,7 +29,9 @@ type Step =
       symbol: string
       stay: Stay
       name: string
-      reading: Reading | null
+      company: Company
+      /** With the route of the search by meaning, when it answered. */
+      reading: (Reading & { routeId?: string }) | null
       failed: boolean
       swirled: boolean
     }
@@ -49,9 +52,11 @@ const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion:
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** The routes the result picks its ready-made one from. */
+  routes: readonly RouteCardData[]
 }
 
-export function StarSearchDialog({ open, onOpenChange }: Props) {
+export function StarSearchDialog({ open, onOpenChange, routes }: Props) {
   const today = useToday()
   const [answers, setAnswers] = useState(emptyAnswers)
   const [step, setStep] = useState<Step>({ kind: 'form' })
@@ -73,7 +78,16 @@ export function StarSearchDialog({ open, onOpenChange }: Props) {
     }
     const stay = { checkIn, checkOut: addDays(checkIn, NIGHTS), guests: DEFAULT_GUESTS }
     const symbol = sunSign(input.birthMonth, input.birthDay).symbol
-    setStep({ kind: 'reading', symbol, stay, name, reading: null, failed: false, swirled: prefersReducedMotion() })
+    setStep({
+      kind: 'reading',
+      symbol,
+      stay,
+      name,
+      company: input.company,
+      reading: null,
+      failed: false,
+      swirled: prefersReducedMotion(),
+    })
     // Only the reading still on screen takes the answer: «Заново» or a new reading drop the old one.
     const settle = (patch: Partial<Step>) =>
       setStep((current) => (current.kind === 'reading' && current.stay === stay ? { ...current, ...patch } : current))
@@ -84,6 +98,15 @@ export function StarSearchDialog({ open, onOpenChange }: Props) {
   }
 
   const result = step.kind === 'reading' && step.reading && step.swirled ? step.reading : null
+  // The search by meaning's route, or the rules: the persona of the sign and the company in the stars' city.
+  const route =
+    result && step.kind === 'reading'
+      ? bestRoute(routes, {
+          semanticId: result.routeId,
+          persona: starPersona(result.sign, step.company),
+          destinationId: result.city.id,
+        })
+      : null
   const status = result
     ? `Звёзды выбрали: ${result.hotels[0].name}, ${result.city.name}`
     : step.kind === 'reading'
@@ -128,7 +151,13 @@ export function StarSearchDialog({ open, onOpenChange }: Props) {
           />
         )}
         {step.kind === 'reading' && result && (
-          <StarResult reading={result} stay={step.stay} name={step.name} onRestart={() => setStep({ kind: 'form' })} />
+          <StarResult
+            reading={result}
+            route={route}
+            stay={step.stay}
+            name={step.name}
+            onRestart={() => setStep({ kind: 'form' })}
+          />
         )}
 
         <p className="sr-only" role="status">

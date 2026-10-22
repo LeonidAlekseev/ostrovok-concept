@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { stayTotal } from './offer'
 import { hotels, newHotels } from './catalogGenerator'
 import { destinations } from '../data/destinations'
-import { makePlan, mergeBrief, parseWish } from './assistant'
+import { briefPersona, makePlan, mergeBrief, parseWish } from './assistant'
 
 describe('parseWish', () => {
   it('reads theme, month and budget from a full request', () => {
@@ -223,5 +223,18 @@ describe('makePlan with the semantic matches', () => {
     const plan = makePlan(brief, today, destinations, newHotels, [dear, cheap])
     expect(plan.options.map((o) => o.hotel?.id)).toEqual([cheap.id, dear.id])
     expect(plan.options[1].fitsBudget).toBe(false)
+  })
+})
+
+// routes, Requirement: Лучший готовый маршрут
+describe('briefPersona', () => {
+  it('reads work on the way, luxury, a student’s trip, else the culture', () => {
+    expect(briefPersona({}, 'Поработать с ноутбуком у моря', 5)).toBe('workation')
+    expect(briefPersona({}, 'Хочу роскошный отель', 5)).toBe('luxury')
+    expect(briefPersona({ budget: 200_000 }, 'на море', 5)).toBe('luxury')
+    expect(briefPersona({}, 'Недорого, мы студенты', 5)).toBe('student')
+    expect(briefPersona({ party: 'friends' }, 'с друзьями', 3)).toBe('student')
+    expect(briefPersona({ budget: 20_000 }, 'в горы', 5)).toBe('student')
+    expect(briefPersona({ party: 'couple' }, 'старинные города', 5)).toBe('culture')
   })
 })

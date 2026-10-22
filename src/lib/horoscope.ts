@@ -1,6 +1,7 @@
 import type { Destination } from '../data/destinations'
 import type { Hotel } from './catalog'
 import type { IsoDate } from './dates'
+import type { Persona } from './routes'
 
 /**
  * "Поиск по звёздам": a deterministic reading on the notions of western (tropical) astrology — the sun sign,
@@ -370,6 +371,26 @@ const ASPECT_LINE: Record<AspectKind | 'none', string> = {
 }
 
 export const lowerFirst = (text: string) => text.charAt(0).toLocaleLowerCase('ru') + text.slice(1)
+
+/**
+ * The persona of the ready-made routes for the stars: a pair goes for luxury, a group goes as students,
+ * alone the earth and air signs work on the way and the fire and water ones go for the culture.
+ */
+export function starPersona(sign: ZodiacSign, company: Company): Persona {
+  if (company === 'pair') return 'luxury'
+  if (company === 'group') return 'student'
+  return sign.element === 'earth' || sign.element === 'air' ? 'workation' : 'culture'
+}
+
+const COMPANY_TRIP: Record<Company, string> = {
+  solo: 'Поездка одному',
+  pair: 'Поездка вдвоём',
+  group: 'Поездка компанией',
+}
+
+/** The reading as words for the search by meaning over the routes; never the traveller's name. */
+export const starWish = (reading: Pick<Reading, 'sign' | 'city'>, company: Company) =>
+  `${COMPANY_TRIP[company]}: ${reading.city.name}, ${reading.city.country}. ${ELEMENT_LINE[reading.sign.element]}`
 
 /** Ranks the `destinations` for the traveller and picks the best rated of their `hotels` in the top three. */
 export function readStars(

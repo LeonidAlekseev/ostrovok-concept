@@ -3,12 +3,12 @@ import { ChevronRight, RotateCcw, SendHorizontal, Sparkles, Star } from 'lucide-
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import type { Destination } from '@/data/destinations'
 import type { HotelSearch } from '@/hooks/useHotelSearch'
 import type { HotelSummary } from '@/lib/catalog'
 import {
   MAX_MESSAGE_LENGTH,
   askAssistant,
+  briefPersona,
   describeBrief,
   makePlan,
   nextQuestion,
@@ -19,19 +19,24 @@ import {
 } from '../../lib/assistant'
 import { formatDateRange, todayIso } from '../../lib/dates'
 import { countRu, formatPrice, guestsLabel } from '../../lib/format'
+import { bestRoute, type RouteCardData } from '../../lib/routes'
 import { useDestinations } from '../Catalog/useDestinations'
+import { ReadyRoute } from '../RouteCard/ReadyRoute'
 import { RobotAvatar } from './RobotAvatar'
 
 interface Message {
   from: 'agent' | 'user'
   text: string
   plan?: Plan
+  /** The ready-made route over the plan's options. */
+  route?: RouteCardData | null
 }
 
 interface Props {
   /** The "recently added" hotels the plan's options suggest. */
   newHotels: readonly HotelSummary[]
-  onPreview: (destination: Destination) => void
+  /** The routes the plan picks its ready-made one from. */
+  routes: readonly RouteCardData[]
   onChoose: HotelSearch['searchFor']
 }
 
@@ -47,7 +52,7 @@ const messageAvatarClass = 'size-8 flex-none max-sm:hidden'
 const messageTextClass = 'leading-[1.45] whitespace-pre-wrap'
 const hintClass = 'block text-xs/[normal] font-normal text-muted-foreground'
 
-export function AssistantSearch({ newHotels, onPreview, onChoose }: Props) {
+export function AssistantSearch({ newHotels, routes, onChoose }: Props) {
   const destinations = useDestinations()
   const [messages, setMessages] = useState<Message[]>([])
   const [brief, setBrief] = useState<Brief>({})
@@ -95,7 +100,7 @@ export function AssistantSearch({ newHotels, onPreview, onChoose }: Props) {
     )
     clearTimeout(timerRef.current)
     timerRef.current = setTimeout(async () => {
-      const { brief: next, reply: remark, matches } = await reply
+      const { brief: next, reply: remark, matches, routeId } = await reply
       if (pending.signal.aborted) return
       setBrief(next)
       const today = todayIso()
@@ -110,8 +115,17 @@ export function AssistantSearch({ newHotels, onPreview, onChoose }: Props) {
         return
       }
       const plan = makePlan(next, today, destinations, newHotels, matches)
-      setMessages((list) => [...list, { from: 'agent', text: understood ? `Записал: ${understood}.` : '', plan }])
-      if (plan.options[0]) onPreview(plan.options[0].destination)
+      // The search by meaning's route, or the rules over all the traveller's words and the plan's first city.
+      const words = history.flatMap((m) => (m.from === 'user' ? m.text : [])).join('. ')
+      const route = bestRoute(routes, {
+        semanticId: routeId,
+        persona: briefPersona(next, words, plan.nights),
+        destinationId: plan.options[0]?.destination.id,
+      })
+      setMessages((list) => [
+        ...list,
+        { from: 'agent', text: understood ? `Записал: ${understood}.` : '', plan, route },
+      ])
     }, THINK_MS)
   }
 
@@ -189,7 +203,7 @@ export function AssistantSearch({ newHotels, onPreview, onChoose }: Props) {
                 }
               >
                 {message.text && <p className={messageTextClass}>{message.text}</p>}
-                {message.plan && <PlanView plan={message.plan} onChoose={onChoose} />}
+                {message.plan && <PlanView plan={message.plan} route={message.route ?? null} onChoose={onChoose} />}
               </div>
             </li>
           ))}
@@ -276,10 +290,21 @@ export function AssistantSearch({ newHotels, onPreview, onChoose }: Props) {
   )
 }
 
-function PlanView({ plan, onChoose }: { plan: Plan; onChoose: Props['onChoose'] }) {
+interface PlanProps {
+  plan: Plan
+  route: RouteCardData | null
+  onChoose: Props['onChoose']
+}
+
+function PlanView({ plan, route, onChoose }: PlanProps) {
   const nights = countRu(plan.nights, ['ночь', 'ночи', 'ночей'])
   if (plan.options.length === 0)
-    return <p className={messageTextClass}>Не нашёл подходящих вариантов — попробуйте описать поездку иначе.</p>
+    return (
+      <div data-slot="plan" className="flex flex-col gap-2 not-first:mt-2.5">
+        <p className={messageTextClass}>Не нашёл подходящих вариантов — попробуйте описать поездку иначе.</p>
+        <ReadyRoute route={route} />
+      </div>
+    )
   return (
     <div data-slot="plan" className="flex flex-col gap-2 not-first:mt-2.5">
       <p className="flex items-center gap-3 rounded-xl bg-[linear-gradient(120deg,var(--secondary),var(--decor-mint))] px-3 py-2.5">
@@ -297,6 +322,7 @@ function PlanView({ plan, onChoose }: { plan: Plan; onChoose: Props['onChoose'] 
       <p className="text-sm/[normal] text-muted-foreground">
         {formatDateRange(plan.query.checkIn, plan.query.checkOut)} · {nights} · {guestsLabel(plan.query.guests)}
       </p>
+      <ReadyRoute route={route} />
       <ul className="grid grid-cols-1 gap-1.5">
         {plan.options.map(({ destination, hotel, total, fitsBudget }) => (
           <li key={hotel?.id ?? destination.id}>

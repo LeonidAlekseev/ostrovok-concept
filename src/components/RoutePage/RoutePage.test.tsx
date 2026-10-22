@@ -93,7 +93,7 @@ describe('RoutePage', () => {
     renderPage()
     expect(screen.getByRole('heading', { level: 1, name: route.title })).toBeTruthy()
     expect(screen.getByText('Редакция О!Погнали')).toBeTruthy()
-    expect(screen.getByText('Культурный отпуск')).toBeTruthy()
+    expect(screen.getByText('Культура')).toBeTruthy()
     const map = await screen.findByRole('region', { name: 'Карта отелей' }, { timeout: 3000 })
     const marker = await within(map).findByRole('button', {
       name: `${residence.name}, ${formatPrice(plan.stays[0].price)}`,

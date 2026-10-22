@@ -1,14 +1,9 @@
 import { HomePage } from '../components/HomePage'
-import { tileHotel } from '../lib/catalog'
-import { homeCollections } from '../lib/collections'
-import { loadAllHotels, loadNewHotels } from '../lib/db/catalog'
+import { loadNewHotels } from '../lib/db/catalog'
+import { loadRouteCards } from '../lib/db/routes'
 
 export default async function Page() {
-  const [newHotels, hotels] = await Promise.all([loadNewHotels(), loadAllHotels()])
-  // The collections are picked over the whole catalogue here; the browser gets only the cards of their hotels.
-  const collections = homeCollections(hotels).map(({ collection: { id, title, description }, hotels }) => ({
-    collection: { id, title, description },
-    hotels: hotels.map(tileHotel),
-  }))
-  return <HomePage newHotels={newHotels} collections={collections} />
+  // The browser gets the routes' cards only, with the estimates of their pages.
+  const [newHotels, routes] = await Promise.all([loadNewHotels(), loadRouteCards()])
+  return <HomePage newHotels={newHotels} routes={routes} />
 }

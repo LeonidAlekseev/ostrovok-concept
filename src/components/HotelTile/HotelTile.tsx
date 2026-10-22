@@ -25,7 +25,7 @@ interface Props extends Omit<ComponentProps<'article'>, 'children'> {
 }
 
 /**
- * The hotel card of collections, favourites and search results: the photo carousel with the free
+ * The hotel card of the vibe, the stars, favourites and search results: the photo carousel with the free
  * cancellation, the guest rating, the favourite toggle and the stars on it, then the name, the
  * kind of stay if it is not a hotel with the distance to the city centre and the regular and GURU prices.
  */

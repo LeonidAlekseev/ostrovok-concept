@@ -33,23 +33,28 @@ const MAX_CANDIDATES = 50
 /** Most hotels a traveller's profile averages. */
 const MAX_PROFILE = 50
 
-/** Vectors of recent queries: the vibe's answers repeat, and the free model is slow and counts requests a day. */
-const queryVectors = new Map<string, number[]>()
+/**
+ * Vectors of recent queries: the vibe's answers repeat, and the free model is slow and counts requests a day.
+ * The pending vector is kept too, so the hotels and the route of one answer share one request.
+ */
+const queryVectors = new Map<string, Promise<number[]>>()
 const QUERY_CACHE = 500
 
-async function queryVector(apiKey: string, query: string, abortSignal: AbortSignal): Promise<number[]> {
+function queryVector(apiKey: string, query: string, abortSignal: AbortSignal): Promise<number[]> {
   const cached = queryVectors.get(query)
   if (cached) return cached
-  const { embedding } = await embed({
+  const vector = embed({
     model: embeddingModel(apiKey, 'query'),
     value: query,
     abortSignal,
     maxRetries: 0,
-  })
+  }).then(({ embedding }) => embedding)
+  // A failed request is not kept: the next search asks again.
+  vector.catch(() => queryVectors.delete(query))
   // The oldest entry goes first: a Map keeps the order of insertion.
   if (queryVectors.size >= QUERY_CACHE) queryVectors.delete(queryVectors.keys().next().value!)
-  queryVectors.set(query, embedding)
-  return embedding
+  queryVectors.set(query, vector)
+  return vector
 }
 
 /** The catalog's database with the anon key: the functions are `security definer`, the table is closed. */

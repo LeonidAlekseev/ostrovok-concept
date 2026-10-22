@@ -4,13 +4,14 @@ import dynamic from 'next/dynamic'
 import { useState } from 'react'
 import { Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import type { RouteCardData } from '@/lib/routes'
 import { MagicOrb } from './MagicOrb'
 import { ZodiacRing } from './ZodiacRing'
 
 // The window, the reading and the video load on the first click: the home page does not pay for them up front.
 const StarSearchDialog = dynamic(() => import('./StarSearchDialog').then((m) => m.StarSearchDialog), { ssr: false })
 
-export function StarSearch() {
+export function StarSearch({ routes }: { routes: readonly RouteCardData[] }) {
   const [open, setOpen] = useState(false)
   // Mounted from the first opening on, so the window keeps the answers and closes with its animation.
   const [opened, setOpened] = useState(false)
@@ -60,7 +61,7 @@ export function StarSearch() {
         <Sparkles className="size-5.5" aria-hidden />
         Найти по звёздам
       </Button>
-      {opened && <StarSearchDialog open={open} onOpenChange={setOpen} />}
+      {opened && <StarSearchDialog open={open} onOpenChange={setOpen} routes={routes} />}
     </section>
   )
 }

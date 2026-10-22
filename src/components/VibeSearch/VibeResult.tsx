@@ -3,19 +3,23 @@ import { RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Hotel } from '../../lib/catalog'
 import { setStayParams, type Stay } from '../../lib/search'
+import type { RouteCardData } from '../../lib/routes'
 import type { Vibe } from '../../lib/vibe'
 import { SmartImage } from '../ui/SmartImage'
 import { HotelTile } from '../HotelTile/HotelTile'
+import { ReadyRoute } from '../RouteCard/ReadyRoute'
 import { VibeImage } from './VibeImage'
 
 interface Props {
   vibe: Vibe
+  /** The ready-made route over the hotels; none without routes. */
+  route: RouteCardData | null
   /** `null` until today's date is known: the links go without dates and the hotel page asks for them. */
   stay: Stay | null
   onRestart: () => void
 }
 
-export function VibeResult({ vibe, stay, onRestart }: Props) {
+export function VibeResult({ vibe, route, stay, onRestart }: Props) {
   const headingRef = useRef<HTMLHeadingElement>(null)
   const hrefOf = (hotel: Hotel) =>
     stay ? `/hotels/${hotel.id}?${setStayParams(new URLSearchParams(), stay)}` : `/hotels/${hotel.id}`
@@ -61,6 +65,8 @@ export function VibeResult({ vibe, stay, onRestart }: Props) {
       </ul>
 
       <VibeImage vibe={vibe} />
+
+      <ReadyRoute route={route} />
 
       <section aria-labelledby="vibe-hotels" className="flex flex-col gap-2">
         {/* Not a heading: HotelTile goes down to h4, so the hotels stay on the level of the vibe. */}

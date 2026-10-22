@@ -1,23 +1,24 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
-import { BedDouble, ChevronRight, Star } from 'lucide-react'
+import Link from 'next/link'
+import { ChevronRight, Route as RouteIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import type { Destination } from '@/data/destinations'
-import type { HotelSummary } from '../../lib/catalog'
 import { GLOBE_CENTER, viewPlacing, type GlobeView } from '../../lib/globe'
 import { appEnv, isProduction } from '../../lib/env'
 import { formatPrice } from '../../lib/format'
+import type { RouteCardData } from '../../lib/routes'
+import { useDestinations } from '../Catalog/useDestinations'
 import { createFrameMeter, type FrameWindow } from './globePerformance'
 import { createGlobeRenderer, type GlobeRenderer } from './globeRenderer'
-import { createHotelFeed, depthOpacity, pickSpotlightCity, sceneAt, type Scene, type Spotlight } from './globeScene'
+import { createRouteFeed, depthOpacity, pickSpotlightCity, sceneAt, type Scene, type Spotlight } from './globeScene'
 import { StatsPanel, type StatsPanelHandle } from './StatsPanel'
 
 interface Props {
-  markers: Destination[]
-  hotels: readonly HotelSummary[]
+  /** The cities with routes: a pin each. */
+  cities: Destination[]
+  routes: readonly RouteCardData[]
   /** City spotlighted first (and in the server-rendered page). */
   featured: Destination
-  selectedId: string | null
-  onSelect: (destination: Destination) => void
 }
 
 /** Degrees of longitude per second; one turn takes about five minutes. */
@@ -34,7 +35,7 @@ const CENTER_RATE = 3
 /** Share of the hero's height covered by the search form, and the gap kept above it, px. */
 const FORM_OVERLAP = 0.24
 const SELECTED_GAP = 16
-/** Seconds each new hotel stays in the spotlight. */
+/** Seconds each route stays in the spotlight. */
 const SPOTLIGHT_SECONDS = 5
 const REDUCED_MOTION_SPOTLIGHT_SECONDS = 8
 /** The globe holds still while the page scrolls and this long after: the browser needs the frame budget to paint the page. */
@@ -102,7 +103,7 @@ const placeCard = [
   'max-md:[--card-dx:-50%] max-md:[--card-dy:12px]',
   // Inset of the picture, the same on every side; its size equals the text block's height.
   '[--card-pad:clamp(5px,1.4vw,7px)] [--badge-size:clamp(9px,2.5vw,12px)] [--name-size:clamp(13px,3.5vw,17px)] [--meta-size:clamp(10px,2.75vw,13px)] [--text-gap:2px]',
-  'absolute top-0 left-0 z-5 w-max rounded-[clamp(10px,3vw,14px)] border-0 bg-card py-(--card-pad) pr-[calc(var(--card-pad)_+_4px)] pl-(--card-pad) text-left text-foreground',
+  'absolute top-0 left-0 z-5 w-max max-w-[min(26rem,calc(100vw-24px))] md:max-w-[min(26rem,calc(50vw-40px))] rounded-[clamp(10px,3vw,14px)] border-0 bg-card py-(--card-pad) pr-[calc(var(--card-pad)_+_4px)] pl-(--card-pad) text-left text-foreground',
   'translate-x-[calc(var(--x)_*_var(--unit)_+_var(--card-dx))] translate-y-[calc(var(--y)_*_var(--unit)_+_var(--card-dy)_-_var(--card-lift))] touch-none opacity-[var(--o,1)] will-change-transform',
   'shadow-[0_14px_34px_color-mix(in_srgb,var(--decor-hotel-shadow)_25%,transparent)] transition-shadow duration-200 ease-[ease]',
   'hover:shadow-[0_18px_40px_color-mix(in_srgb,var(--decor-hotel-shadow)_32%,transparent)] hover:[--card-lift:4px]',
@@ -111,13 +112,16 @@ const placeIcon =
   // Concentric with the card's corner.
   'grid aspect-square w-[calc(1.25_*_(var(--badge-size)_+_var(--name-size)_+_var(--meta-size))_+_2_*_var(--text-gap))] flex-none place-items-center rounded-[calc(clamp(10px,3vw,14px)_-_var(--card-pad)_+_2px)] bg-[linear-gradient(135deg,var(--decor-hotel-from),var(--decor-hotel-to))] text-primary-foreground [&_svg]:h-auto [&_svg]:w-[48%]'
 
-export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props) {
-  const [feed] = useState(() => createHotelFeed(hotels))
+export function Hero({ cities: markers, routes, featured }: Props) {
+  const destinations = useDestinations()
+  const [feed] = useState(() => createRouteFeed(routes))
   const [spotlight, setSpotlight] = useState<Spotlight>(() => ({
     destination: featured,
-    hotel: feed.next(featured.id)!,
-    sources: initialSourceIds.flatMap((id) => markers.find((d) => d.id === id) ?? []),
+    routes: feed.has(featured.id) ? [feed.next(featured.id)!] : [],
+    sources: initialSourceIds.flatMap((id) => destinations.find((d) => d.id === id) ?? []),
   }))
+  /** The chosen pin: the globe turns it to the middle and its card lists the city's routes. */
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   // The initial layout is rendered once; afterwards the animation loop owns all positions.
   const [initialScene] = useState(() => sceneAt(markers, spotlight, GLOBE_CENTER))
   const [spinning, setSpinning] = useState(false)
@@ -130,7 +134,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
   const pinRefs = useRef(new Map<string, HTMLButtonElement>())
   const routeRefs = useRef<(SVGGElement | null)[]>([])
   const glowRef = useRef<HTMLDivElement>(null)
-  const cardRef = useRef<HTMLButtonElement>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
   const statsRef = useRef<StatsPanelHandle>(null)
   const spotlightRef = useRef(spotlight)
   const pausedRef = useRef({ hover: false, focus: false, selected: false })
@@ -214,7 +218,8 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
       const hub = points.get(spotlightRef.current.destination.id)!
       const hubX = globeRect.left + (hub.x / 100) * globeRect.width
       const hubY = globeRect.top + (hub.y / 100) * globeRect.height
-      const card = cardRef.current!.getBoundingClientRect()
+      const card = cardRef.current?.getBoundingClientRect()
+      if (!card) return
       const picked = pickSpotlightCity(
         markers.filter((d) => feed.has(d.id)),
         points,
@@ -229,7 +234,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
       if (!picked) return
       recent.unshift(picked.city.id)
       recent.length = Math.min(recent.length, 4)
-      setSpotlight({ destination: picked.city, hotel: feed.next(picked.city.id)!, sources: picked.sources })
+      setSpotlight({ destination: picked.city, routes: [feed.next(picked.city.id)!], sources: picked.sources })
     }
 
     const tick = (now: number) => {
@@ -352,15 +357,13 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
     const selected = markers.find((d) => d.id === selectedId)
     pausedRef.current.selected = selected !== undefined
     if (!selected) return
-    // The card moves to the selected city, so it never covers the pin.
-    if (spotlightRef.current.destination.id !== selected.id && feed.has(selected.id))
-      setSpotlight({ destination: selected, hotel: feed.next(selected.id)!, sources: [] })
+    // Measured once the chosen city's card is painted (`spotlight` in the deps): its height is the list's.
     const g = globeRef.current!.getBoundingClientRect()
     const h = heroRef.current!.getBoundingClientRect()
     const radius = g.width / 2
     // The card keeps its place relative to the pin (below it on phones, beside it on wide screens);
     // the pair must end just above the form, which overlaps the bottom quarter of the hero.
-    const card = cardRef.current!.getBoundingClientRect()
+    const card = cardRef.current?.getBoundingClientRect() ?? { bottom: 0 }
     const hub = sceneAt(markers, spotlightRef.current, viewRef.current).hub
     const hubY = g.top + (hub.y / 100) * g.height
     const formTop = h.bottom - h.height * FORM_OVERLAP
@@ -373,7 +376,18 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
       targetRef.current = viewPlacing(selected.lat, selected.lon, u * k, v * k, MAX_TILT)
       if (targetRef.current) break
     }
-  }, [markers, feed, selectedId])
+  }, [markers, feed, selectedId, spotlight])
+
+  /** A pin toggles its choice; the card moves to the city, so it never covers the pin, and lists all its routes. */
+  const choosePin = (city: Destination) => {
+    if (selectedId === city.id) return setSelectedId(null)
+    setSelectedId(city.id)
+    setSpotlight((current) => ({
+      destination: city,
+      routes: feed.all(city.id),
+      sources: current.destination.id === city.id ? current.sources : [],
+    }))
+  }
 
   const pause = (key: 'hover' | 'focus', value: boolean) => () => {
     pausedRef.current[key] = value
@@ -385,7 +399,7 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
     onBlur: pause('focus', false),
   }
 
-  const { hotel, destination } = spotlight
+  const { destination } = spotlight
 
   return (
     <section ref={heroRef} className={hero} aria-labelledby="hero-title">
@@ -406,9 +420,9 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
         Вращай глобус — воплощай мечту
       </p>
 
-      {/* No z-index or transform: the globe makes no stacking context of its own, so the hotel card can rise
+      {/* No z-index or transform: the globe makes no stacking context of its own, so the route card can rise
           above the hint while the pins stay under the faded bottom. No container query units for --unit: Safari
-          turns a query container into its own stacking layer, trapping the hotel card under the hint. */}
+          turns a query container into its own stacking layer, trapping the route card under the hint. */}
       <div
         ref={globeRef}
         className="absolute top-(--globe-top) left-[calc(var(--globe-x)_-_var(--globe-size)/2)] aspect-square w-(--globe-size) [--unit:calc(var(--globe-size)/100)]"
@@ -481,9 +495,9 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
               }`}
               style={{ ...positionStyle(point), '--o': depthOpacity(point.depth).toFixed(3) } as CSSProperties}
               data-hidden={point.depth <= 0.05 || undefined}
-              aria-label={`${d.name}, ${d.country} — выбрать направление`}
+              aria-label={`${d.name}, ${d.country} — маршруты`}
               aria-pressed={selectedId === d.id}
-              onClick={() => onSelect(d)}
+              onClick={() => choosePin(d)}
               {...pauseHandlers}
             >
               <PinIcon />
@@ -494,49 +508,48 @@ export function Hero({ markers, hotels, featured, selectedId, onSelect }: Props)
           )
         })}
 
-        <button
-          ref={cardRef}
-          type="button"
-          className={placeCard}
-          style={positionStyle(initialScene.hub)}
-          aria-label={`Новый отель ${hotel.name}, ${destination.name}, ${formatPrice(hotel.priceFrom)} за ночь — выбрать направление`}
-          onClick={() => onSelect(destination)}
-          {...pauseHandlers}
-        >
-          {/* Re-keyed per hotel so every new one plays the entrance animation. */}
-          <span
-            key={`${hotel.destinationId}/${hotel.name}`}
-            className="flex animate-in items-center gap-[clamp(7px,2vw,12px)] animation-duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] fade-in zoom-in-97 slide-in-from-bottom-2 motion-reduce:animate-none"
-          >
-            <span className={placeIcon} aria-hidden>
-              <BedDouble />
-            </span>
-            <span className="flex min-w-0 flex-col gap-(--text-gap) leading-[1.25]">
-              {/* Line height 1.25 and no vertical padding: the picture is sized from the three text lines. */}
-              <Badge
-                variant="success"
-                className="rounded-sm px-1 py-0 text-(length:--badge-size) leading-[1.25] tracking-[0.02em] uppercase"
-              >
-                Новый отель · {destination.name}
-              </Badge>
-              <span className="text-(length:--name-size) font-[650]">{hotel.name}</span>
-              <span className="flex h-[calc(1.25*var(--meta-size))] items-center gap-1.5">
-                <span className="flex text-(--decor-star) [&_svg]:h-auto [&_svg]:w-[clamp(9px,2.5vw,12px)]" aria-hidden>
-                  {Array.from({ length: hotel.stars }, (_, i) => (
-                    <Star key={i} fill="currentColor" strokeWidth={0} />
-                  ))}
-                </span>
-                <span className="text-(length:--meta-size) whitespace-nowrap text-muted-foreground">
-                  {formatPrice(hotel.priceFrom)}/ночь
-                </span>
+        {spotlight.routes.length > 0 && (
+          <div ref={cardRef} className={placeCard} style={positionStyle(initialScene.hub)} {...pauseHandlers}>
+            {/* Re-keyed per route so every new one plays the entrance animation. */}
+            <div
+              key={`${destination.id}/${spotlight.routes.map((route) => route.id).join()}`}
+              className="flex animate-in items-center gap-[clamp(7px,2vw,12px)] animation-duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] fade-in zoom-in-97 slide-in-from-bottom-2 motion-reduce:animate-none"
+            >
+              <span className={placeIcon} aria-hidden>
+                <RouteIcon />
               </span>
-            </span>
-            <ChevronRight
-              className="ml-[clamp(0px,1vw,14px)] w-[clamp(14px,3.8vw,18px)] flex-none text-muted-foreground"
-              aria-hidden
-            />
-          </span>
-        </button>
+              <div className="flex min-w-0 flex-col gap-(--text-gap) leading-[1.25]">
+                {/* Line height 1.25 and no vertical padding: the picture is sized from the three text lines. */}
+                <Badge
+                  variant="success"
+                  className="self-start rounded-sm px-1 py-0 text-(length:--badge-size) leading-[1.25] tracking-[0.02em] uppercase"
+                >
+                  {spotlight.routes.length > 1 ? 'Маршруты' : 'Маршрут'} · {destination.name}
+                </Badge>
+                <ul className="flex flex-col gap-(--text-gap)">
+                  {spotlight.routes.map((route) => (
+                    <li key={route.id} className="min-w-0">
+                      {/* A single route's link covers the whole card. */}
+                      <Link
+                        href={`/routes/${route.id}`}
+                        className={`flex flex-col rounded-sm ${spotlight.routes.length === 1 ? "after:absolute after:inset-0 after:content-['']" : ''}`}
+                      >
+                        <span className="truncate text-(length:--name-size) font-[650]">{route.title}</span>
+                        <span className="truncate text-(length:--meta-size) text-muted-foreground">
+                          {route.author} · ≈ {formatPrice(route.price)}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <ChevronRight
+                className="ml-[clamp(0px,1vw,14px)] w-[clamp(14px,3.8vw,18px)] flex-none text-muted-foreground"
+                aria-hidden
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {!isProduction && <StatsPanel ref={statsRef} />}

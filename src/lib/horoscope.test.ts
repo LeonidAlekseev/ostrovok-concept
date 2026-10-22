@@ -10,6 +10,8 @@ import {
   moonPhase,
   moonSign,
   readStars,
+  starPersona,
+  starWish,
   sunSign,
   zodiac,
   type ReadingInput,
@@ -154,5 +156,23 @@ describe('readStars', () => {
       zodiac.map((z) => readStars({ ...input, company: 'pair', partnerSignId: z.id }, destinations, catalogue).city.id),
     )
     expect(results.size).toBeGreaterThan(1)
+  })
+})
+
+// routes, Requirement: Лучший готовый маршрут
+describe('starPersona', () => {
+  const sign = (element: string) => zodiac.find((z) => z.element === element)!
+
+  it('reads the company, then the element alone', () => {
+    expect(starPersona(sign('fire'), 'pair')).toBe('luxury')
+    expect(starPersona(sign('water'), 'group')).toBe('student')
+    expect(starPersona(sign('earth'), 'solo')).toBe('workation')
+    expect(starPersona(sign('air'), 'solo')).toBe('workation')
+    expect(starPersona(sign('fire'), 'solo')).toBe('culture')
+  })
+
+  it('words the reading for the search without the name', () => {
+    const city = destinations.find((d) => d.id === 'prague')!
+    expect(starWish({ sign: sign('fire'), city }, 'pair')).toMatch(/^Поездка вдвоём: Прага, Чехия\. Огненным/)
   })
 })

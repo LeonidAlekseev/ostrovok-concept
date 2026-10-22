@@ -64,6 +64,20 @@ describe('semanticSearch', () => {
     expect(vi.mocked(rerank).mock.calls[0][0]).toMatchObject({ query: text, topN: 2 })
   })
 
+  it('asks the model once for the hotels and the route of the same words, and again after a failure', async () => {
+    vi.mocked(rerank).mockResolvedValue(reranked([{ originalIndex: 0, score: 0.9 }]))
+    const text = words()
+    await Promise.all([semanticSearch(text, { kind: 'hotel' }), semanticSearch(text, { kind: 'route', k: 1 })])
+    expect(embed).toHaveBeenCalledTimes(1)
+    expect(rpc.mock.calls.map(([, args]) => args.match_kind)).toEqual(['hotel', 'route'])
+
+    const failing = words()
+    vi.mocked(embed).mockRejectedValueOnce(new Error('timeout'))
+    expect(await semanticSearch(failing, { kind: 'hotel' })).toBeNull()
+    expect(await semanticSearch(failing, { kind: 'hotel' })).not.toBeNull()
+    expect(embed).toHaveBeenCalledTimes(3)
+  })
+
   it('keeps the vectors’ order when the reranker fails', async () => {
     vi.mocked(rerank).mockRejectedValue(new Error('429'))
     const hits = await semanticSearch(words(), { kind: 'hotel', k: 2 })

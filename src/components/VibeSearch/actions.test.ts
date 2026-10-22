@@ -17,9 +17,9 @@ beforeEach(() => {
 
 describe('vibeHotelsAction', () => {
   it('returns plain data a client component can take: no functions', async () => {
-    const hotels = await vibeHotelsAction(Array.from({ length: VIBE_STEPS }, () => 1 as Answer))
-    expect(hotels).toHaveLength(VIBE_HOTELS)
-    expect(JSON.parse(JSON.stringify(hotels))).toEqual(hotels)
+    const pick = await vibeHotelsAction(Array.from({ length: VIBE_STEPS }, () => 1 as Answer))
+    expect(pick.hotels).toHaveLength(VIBE_HOTELS)
+    expect(JSON.parse(JSON.stringify(pick))).toEqual(pick)
   })
 
   it('rejects answers of another length or value', async () => {
@@ -32,11 +32,19 @@ describe('vibeHotelsAction with the semantic search', () => {
   it('asks with the chosen sides and leads with its hotels, one per city, the axes filling the rest', async () => {
     const [a, sameCity] = allHotels().filter((h) => h.destinationId === 'prague')
     const b = allHotels().find((h) => h.destinationId === 'tokyo')!
-    vi.mocked(semanticSearch).mockResolvedValue(
-      [a, sameCity, b].map((h) => ({ id: h.id, destinationId: h.destinationId, score: 1 })),
+    vi.mocked(semanticSearch).mockImplementation(async (_, { kind }) =>
+      kind === 'route'
+        ? [{ id: 'lisbon-workation', destinationId: 'lisbon', score: 1 }]
+        : [a, sameCity, b].map((h) => ({ id: h.id, destinationId: h.destinationId, score: 1 })),
     )
-    const picked = await vibeHotelsAction(all(-1))
+    const { hotels: picked, routeId } = await vibeHotelsAction(all(-1))
     expect(vi.mocked(semanticSearch).mock.calls[0][0]).toContain('Тихий вечер')
+    // vibe-search, Requirement: Готовый маршрут в итоге — the same words, at the same time.
+    expect(vi.mocked(semanticSearch).mock.calls[1]).toEqual([
+      vi.mocked(semanticSearch).mock.calls[0][0],
+      { kind: 'route', k: 1 },
+    ])
+    expect(routeId).toBe('lisbon-workation')
     expect(picked.slice(0, 2).map((h) => h.id)).toEqual([a.id, b.id])
     expect(picked).toHaveLength(VIBE_HOTELS)
     expect(new Set(picked.map((h) => h.destinationId)).size).toBe(VIBE_HOTELS)
@@ -44,8 +52,10 @@ describe('vibeHotelsAction with the semantic search', () => {
 
   it('keeps the axes’ pick when the search is unavailable or nothing is chosen', async () => {
     const rules = vibeHotels(all(1), allHotels(), destinations).map((h) => h.id)
-    expect((await vibeHotelsAction(all(1))).map((h) => h.id)).toEqual(rules)
+    const pick = await vibeHotelsAction(all(1))
+    expect(pick.hotels.map((h) => h.id)).toEqual(rules)
+    expect(pick.routeId).toBeUndefined()
     await vibeHotelsAction(all(0))
-    expect(semanticSearch).toHaveBeenCalledTimes(1)
+    expect(semanticSearch).toHaveBeenCalledTimes(2)
   })
 })

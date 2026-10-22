@@ -202,10 +202,6 @@ describe('SearchResultsPage query', () => {
     await results()
 
     expect(screen.getByRole('heading', { level: 1, name: 'Прага, Чехия' })).toBeDefined()
-    // The card of the search: the destination and the dates; the nights and guests are in the form.
-    const card = screen.getByRole('button', { name: /^Прага, Чехия/ })
-    expect(card.textContent).toBe('Прага, Чехия20 окт. — 23 окт.')
-    expect(card.getAttribute('aria-expanded')).toBe('false')
     expect(screen.queryByText(/3 ночи/)).toBeNull()
     expect(cards().length).toBeGreaterThanOrEqual(6)
   })
@@ -226,22 +222,34 @@ describe('SearchResultsPage query', () => {
     expect(screen.queryByText('Ищем варианты…')).toBeNull()
   })
 
-  it('opens a new search from "Изменить поиск"', async () => {
+  // search-modes, Requirement: Ручная форма на странице выдачи, Scenario: Смена города
+  it('shows the manual form over the results, filled from the address; a new city changes the address', async () => {
     const user = userEvent.setup()
     open(PRAGUE)
     await results()
 
-    await user.click(screen.getByRole('button', { name: /^Прага, Чехия/ }))
-    expect(screen.getByRole('button', { name: /^Прага, Чехия/ }).getAttribute('aria-expanded')).toBe('true')
-    expect(screen.getByRole('button', { name: /^Прага, Чехия/ }).getAttribute('aria-describedby')).toBeTruthy()
-    const destination = screen.getByRole('combobox', { name: 'Направление' })
+    const form = screen.getByRole('form', { name: 'Поиск отелей' })
+    expect(form.compareDocumentPosition(cards()[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const destination = within(form).getByRole('combobox', { name: 'Направление' })
     expect((destination as HTMLInputElement).value).toBe('Прага')
     await user.clear(destination)
-    await user.type(destination, 'Париж')
+    await user.type(destination, 'Рим')
     await user.keyboard('{Escape}')
-    await user.click(screen.getByRole('button', { name: /Найти отель/ }))
+    await user.click(within(form).getByRole('button', { name: /Найти отель/ }))
 
-    expect(push).toHaveBeenCalledWith(`/search?destination=paris&${STAY}`)
+    expect(push).toHaveBeenCalledWith(`/search?destination=rome&${STAY}`)
+  })
+
+  it('shows the field errors at the form without leaving the page', async () => {
+    const user = userEvent.setup()
+    open(PRAGUE)
+    await results()
+
+    const destination = screen.getByRole('combobox', { name: 'Направление' })
+    await user.clear(destination)
+    await user.click(screen.getByRole('button', { name: /Найти отель/ }))
+    expect(screen.getByText('Укажите, куда вы хотите поехать')).toBeDefined()
+    expect(push).not.toHaveBeenCalled()
   })
 })
 

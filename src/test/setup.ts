@@ -19,6 +19,7 @@ document.addEventListener('click', (event) => {
 
 // jsdom has no layout and no element scrolling: scrollTo is a no-op, as for a strip without width.
 Element.prototype.scrollTo ??= () => {}
+Element.prototype.scrollIntoView ??= () => {}
 
 // The catalogue comes from the generator (src/test/catalog.ts): the destinations of the root layout, the
 // server actions and `GET /api/hotels`.
@@ -35,7 +36,7 @@ vi.mock('@/components/VibeSearch/actions', async () => {
   const { vibeHotels } = await import('@/lib/vibe')
   const { destinations } = await import('@/data/destinations')
   const { allHotels } = await import('./catalog')
-  return { vibeHotelsAction: async (answers: Answer[]) => vibeHotels(answers, allHotels(), destinations) }
+  return { vibeHotelsAction: async (answers: Answer[]) => ({ hotels: vibeHotels(answers, allHotels(), destinations) }) }
 })
 vi.mock('@/components/StarSearch/actions', async () => {
   const { readStars } = await import('@/lib/horoscope')

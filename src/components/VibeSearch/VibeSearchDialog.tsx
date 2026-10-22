@@ -14,8 +14,18 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { useToday } from '../../hooks/useToday'
+import { bestRoute, type RouteCardData } from '../../lib/routes'
 import { DEFAULT_GUESTS, withStartDates, type Stay } from '../../lib/search'
-import { axisShares, poleImage, VIBE_AXES, VIBE_STEPS, vibeArchetype, type Answer, type Vibe } from '../../lib/vibe'
+import {
+  axisShares,
+  poleImage,
+  VIBE_AXES,
+  VIBE_STEPS,
+  vibeArchetype,
+  vibePersona,
+  type Answer,
+  type Vibe,
+} from '../../lib/vibe'
 import { SmartImage } from '../ui/SmartImage'
 import { vibeHotelsAction } from './actions'
 import { VibeResult } from './VibeResult'
@@ -23,6 +33,8 @@ import { VibeResult } from './VibeResult'
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** The routes the result picks its ready-made one from. */
+  routes: readonly RouteCardData[]
 }
 
 // The inner side of each caption is padded wider: the «vs» circle reaches into the photo.
@@ -53,7 +65,7 @@ function Option({ image, label, step, className, ...rest }: OptionProps) {
 
 const VIBE_ERROR = 'Не удалось подобрать отели. Попробуйте ещё раз.'
 
-export function VibeSearchDialog({ open, onOpenChange }: Props) {
+export function VibeSearchDialog({ open, onOpenChange, routes }: Props) {
   const today = useToday()
   // Answers stay when going back: the pair shows what was chosen.
   const [answers, setAnswers] = useState<Answer[]>([])
@@ -62,15 +74,19 @@ export function VibeSearchDialog({ open, onOpenChange }: Props) {
   const rightRef = useRef<HTMLButtonElement>(null)
   const done = step === VIBE_STEPS
   // The server picks the hotels over the whole catalogue; the reading belongs to the answers it was asked for.
-  const [reading, setReading] = useState<{ answers: Answer[]; vibe: Vibe | null } | null>(null)
+  const [reading, setReading] = useState<{ answers: Answer[]; vibe: Vibe | null; routeId?: string } | null>(null)
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     if (!done) return
     let current = true
     vibeHotelsAction(answers).then(
-      (hotels) =>
+      ({ hotels, routeId }) =>
         current &&
-        setReading({ answers, vibe: { archetype: vibeArchetype(answers), shares: axisShares(answers), hotels } }),
+        setReading({
+          answers,
+          vibe: { archetype: vibeArchetype(answers), shares: axisShares(answers), hotels },
+          routeId,
+        }),
       () => current && setReading({ answers, vibe: null }),
     )
     return () => {
@@ -79,7 +95,15 @@ export function VibeSearchDialog({ open, onOpenChange }: Props) {
   }, [done, answers, attempt])
   const read = done && reading?.answers === answers ? reading : null
   const vibe = read?.vibe ?? null
-  // The links start tomorrow and the day after, as in the collections.
+  // The search by meaning's route, or the rules: the persona of the answers in the first hotel's city.
+  const route = vibe
+    ? bestRoute(routes, {
+        semanticId: read?.routeId,
+        persona: vibePersona(answers),
+        destinationId: vibe.hotels[0]?.destinationId,
+      })
+    : null
+  // The links start tomorrow and the day after.
   const stay = useMemo<Stay | null>(() => {
     if (!today) return null
     const { checkIn, checkOut, guests } = withStartDates(
@@ -140,7 +164,7 @@ export function VibeSearchDialog({ open, onOpenChange }: Props) {
         </DialogHeader>
 
         {vibe ? (
-          <VibeResult vibe={vibe} stay={stay} onRestart={restart} />
+          <VibeResult vibe={vibe} route={route} stay={stay} onRestart={restart} />
         ) : done ? (
           <div className="flex flex-col items-start gap-4" aria-busy={!read}>
             <p className="text-muted-foreground">{read ? VIBE_ERROR : 'Подбираем отели…'}</p>

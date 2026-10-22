@@ -5,6 +5,7 @@ import { getHotel } from './catalogGenerator'
 import { addDays } from './dates'
 import { stayTotal } from './offer'
 import {
+  bestRoute,
   buildPlan,
   CAR_RENTAL_PER_DAY,
   defaultState,
@@ -16,6 +17,7 @@ import {
   previewPlan,
   toRouteParams,
   type Route,
+  type RouteCardData,
   type RouteState,
 } from './routes'
 
@@ -211,5 +213,43 @@ describe('previewPlan', () => {
     const transfers = transfersOf(preview).reduce((total, item) => total + item.price, 0)
     expect(preview.main).toBe(preview.stays[0].price + preview.stays[1].price + transfers)
     expect(preview.extras).toBe(route.leisure.reduce((total, item) => total + item.price, 0))
+  })
+})
+
+// routes, Requirement: Лучший готовый маршрут
+describe('bestRoute', () => {
+  const card = (id: string, persona: RouteCardData['persona'], destinationId: string, featured = false) =>
+    ({ id, persona, destinationId, featured }) as RouteCardData
+  const cards = [
+    card('tbilisi-student', 'student', 'tbilisi'),
+    card('almaty-workation', 'workation', 'almaty'),
+    card('lisbon-workation', 'workation', 'lisbon'),
+    card('rome-luxury', 'luxury', 'rome', true),
+  ]
+
+  it('takes the search by meaning’s route first', () => {
+    expect(bestRoute(cards, { semanticId: 'rome-luxury', persona: 'workation', destinationId: 'lisbon' })?.id).toBe(
+      'rome-luxury',
+    )
+  })
+
+  it('without it, the persona’s route in the city (Scenario: Поиск по смыслу недоступен)', () => {
+    expect(bestRoute(cards, { semanticId: null, persona: 'workation', destinationId: 'lisbon' })?.id).toBe(
+      'lisbon-workation',
+    )
+    // An id the cards do not have is no hit.
+    expect(bestRoute(cards, { semanticId: 'gone', persona: 'workation', destinationId: 'lisbon' })?.id).toBe(
+      'lisbon-workation',
+    )
+  })
+
+  it('then the persona’s first route, then the first featured, then the first', () => {
+    expect(bestRoute(cards, { persona: 'workation', destinationId: 'tokyo' })?.id).toBe('almaty-workation')
+    expect(bestRoute(cards, { persona: 'culture', destinationId: 'lisbon' })?.id).toBe('rome-luxury')
+    expect(bestRoute(cards.slice(0, 1), { persona: 'culture' })?.id).toBe('tbilisi-student')
+  })
+
+  it('gives nothing without routes (Scenario: Нет маршрутов)', () => {
+    expect(bestRoute([], { persona: 'student' })).toBeNull()
   })
 })
