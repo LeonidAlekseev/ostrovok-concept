@@ -1,5 +1,6 @@
 import { cancellationLabel } from '@/lib/booking'
-import { findRate, findRoom, getHotel, MEAL_LABEL } from '@/lib/catalog'
+import { findRate, findRoom, MEAL_LABEL } from '@/lib/catalog'
+import { loadHotel } from '@/lib/catalogSource'
 import { formatDateRange, nightsBetween } from '@/lib/dates'
 import { countRu, formatPrice, guestsLabel } from '@/lib/format'
 import type { Booking } from '@/lib/storage'
@@ -16,7 +17,7 @@ interface Props {
 
 /** The details of a booking and its total: the confirmation page and the trip details. */
 export function BookingDetails({ booking, leadingRows = [], cancellationTerm }: Props) {
-  const hotel = getHotel(booking.hotelId)
+  const hotel = loadHotel(booking.hotelId)
   const room = hotel && findRoom(hotel, booking.roomId)
   const rate = room && findRate(room, booking.rateId)
   const rows: [string, string][] = [

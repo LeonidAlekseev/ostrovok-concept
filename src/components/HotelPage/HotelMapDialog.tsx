@@ -5,7 +5,8 @@ import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { Map as MapIcon } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
-import { fullHotelsIn, type Hotel } from '@/lib/catalog'
+import type { Hotel } from '@/lib/catalog'
+import { loadCityHotels } from '@/lib/catalogSource'
 import { lowestPrice } from '@/lib/offer'
 import { setGuestParams, setStayParams } from '@/lib/search'
 import { todayIso } from '@/lib/dates'
@@ -32,7 +33,7 @@ function HotelMap({ hotel }: { hotel: Hotel }) {
   const { stay, guests } = useHotelStay()
   const hotels = useMemo(
     () =>
-      fullHotelsIn(hotel.destinationId).map((h) => ({
+      loadCityHotels([hotel.destinationId]).map((h) => ({
         hotel: h,
         price: lowestPrice(h, stay, guests.rooms, todayIso()),
       })),

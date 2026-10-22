@@ -1,15 +1,5 @@
 import type { Destination } from '../data/destinations'
-import {
-  cheapestRate,
-  findRate,
-  findRoom,
-  getDestination,
-  getHotel,
-  roundUp100,
-  type Hotel,
-  type Rate,
-  type Room,
-} from './catalog'
+import { cheapestRate, findRate, findRoom, roundUp100, type Hotel, type Rate, type Room } from './catalog'
 import { addDays, nightsBetween, weekday, type IsoDate } from './dates'
 import { parseStayParams, setStayParams, validateSearch, type Stay } from './search'
 
@@ -85,17 +75,23 @@ export function toOfferParams({ hotelId, roomId, rateId, ...stay }: OfferSelecti
 
 /**
  * Reads an offer from URL parameters. An unknown hotel, room or rate, or a malformed URL, is
- * "Предложение не найдено"; dates and guests get the same checks and messages as the search.
+ * "Предложение не найдено"; dates and guests get the same checks and messages as the search. The hotel
+ * is looked up among `hotels`, its city among `destinations`.
  */
-export function parseOffer(params: Pick<URLSearchParams, 'get'>, today: IsoDate): OfferResult {
-  const hotel = getHotel(params.get('hotel') ?? '')
+export function parseOffer(
+  params: Pick<URLSearchParams, 'get'>,
+  today: IsoDate,
+  hotels: readonly Hotel[],
+  destinations: readonly Destination[],
+): OfferResult {
+  const hotel = hotels.find((h) => h.id === params.get('hotel'))
   const room = hotel && findRoom(hotel, params.get('room') ?? '')
   const rate = room && findRate(room, params.get('rate') ?? '')
   const stay = parseStayParams(params)
   if (!hotel || !room || !rate || !stay) return { ok: false, error: OFFER_NOT_FOUND }
 
-  const destination = getDestination(hotel.destinationId)!
-  const errors = validateSearch({ destination: destination.name, ...stay }, today)
+  const destination = destinations.find((d) => d.id === hotel.destinationId)!
+  const errors = validateSearch({ destination: destination.name, ...stay }, today, destinations)
   const error = errors.dates ?? errors.guests
   if (error) return { ok: false, error }
 

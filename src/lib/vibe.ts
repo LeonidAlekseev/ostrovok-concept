@@ -1,5 +1,5 @@
-import { destinations } from '../data/destinations'
-import { getDestination, getHotel, hotels, type Hotel } from './catalog'
+import type { Destination, ScenarioId } from '../data/destinations'
+import type { Hotel } from './catalog'
 
 /**
  * The vibe search: seven pairs of opposites, each a way to read the catalogue. An answer is −1 (the left
@@ -13,44 +13,60 @@ export interface VibeAxis {
   id: string
   left: string
   right: string
-  /** Fit of the hotel: −1 is all left, +1 all right. */
-  fit: (hotel: Hotel) => number
+  /** Fit of the hotel against the catalogue's scale: −1 is all left, +1 all right. */
+  fit: (hotel: Hotel, scale: VibeScale) => number
+}
+
+/** What the fits measure a hotel against: the catalogue it is picked from. */
+export interface VibeScale {
+  /** The nearest and the farthest distance to the centre, km. */
+  minKm: number
+  maxKm: number
+  /** Median `priceFrom` of every city: a hotel is cheap or dear against its own city. */
+  medianPrice: ReadonlyMap<string, number>
+  scenarios: ReadonlyMap<string, readonly ScenarioId[]>
+}
+
+/** The scale of the catalogue's `hotels` in their `destinations`. */
+export function vibeScale(hotels: readonly Hotel[], destinations: readonly Destination[]): VibeScale {
+  const distances = hotels.map((h) => h.distanceKm)
+  return {
+    minKm: Math.min(...distances),
+    maxKm: Math.max(...distances),
+    medianPrice: new Map(
+      destinations.map((city) => {
+        const prices = hotels
+          .filter((h) => h.destinationId === city.id)
+          .map((h) => h.priceFrom)
+          .sort((a, b) => a - b)
+        const mid = prices.length >> 1
+        return [city.id, prices.length % 2 ? prices[mid] : (prices[mid - 1] + prices[mid]) / 2]
+      }),
+    ),
+    scenarios: new Map(destinations.map((city) => [city.id, city.scenarios])),
+  }
 }
 
 const clamp = (value: number) => Math.max(-1, Math.min(1, value))
 
-/** The scale of the catalogue's own distances: its nearest hotel is +1, the farthest −1. */
-const distances = hotels.map((summary) => getHotel(summary.id)!.distanceKm)
-const MIN_KM = Math.min(...distances)
-const MAX_KM = Math.max(...distances)
-const centrality = (hotel: Hotel) => clamp(1 - (2 * (hotel.distanceKm - MIN_KM)) / (MAX_KM - MIN_KM))
+/** The catalogue's nearest hotel is +1, the farthest −1. */
+const centrality = (hotel: Hotel, { minKm, maxKm }: VibeScale) =>
+  clamp(1 - (2 * (hotel.distanceKm - minKm)) / (maxKm - minKm))
 const has = (hotel: Hotel, amenity: Hotel['amenities'][number]) => hotel.amenities.includes(amenity)
-
-/** Median `priceFrom` of every city: a hotel is cheap or dear against its own city. */
-const medianPrice = new Map(
-  destinations.map((city) => {
-    const prices = hotels
-      .filter((h) => h.destinationId === city.id)
-      .map((h) => h.priceFrom)
-      .sort((a, b) => a - b)
-    const mid = prices.length >> 1
-    return [city.id, prices.length % 2 ? prices[mid] : (prices[mid - 1] + prices[mid]) / 2]
-  }),
-)
 
 export const VIBE_AXES: readonly VibeAxis[] = [
   {
     id: 'evening',
     left: 'Тихий вечер',
     right: 'Шумная вечеринка',
-    fit: (h) => (has(h, 'bar') ? 0.5 : -0.5) + (has(h, 'restaurant') ? 0.25 : -0.25) + centrality(h) / 4,
+    fit: (h, scale) => (has(h, 'bar') ? 0.5 : -0.5) + (has(h, 'restaurant') ? 0.25 : -0.25) + centrality(h, scale) / 4,
   },
   {
     id: 'place',
     left: 'Море',
     right: 'Город',
-    fit: (h) => {
-      const { scenarios } = getDestination(h.destinationId)!
+    fit: (h, scale) => {
+      const scenarios = scale.scenarios.get(h.destinationId)!
       const sea = scenarios.includes('sea')
       const city = scenarios.includes('europe') || scenarios.includes('weekend')
       return sea === city ? 0 : sea ? -1 : 1
@@ -66,7 +82,7 @@ export const VIBE_AXES: readonly VibeAxis[] = [
     id: 'leisure',
     left: 'Спа и бассейн',
     right: 'Гулять до ночи',
-    fit: (h) => (centrality(h) - ((has(h, 'spa') ? 1 : 0) + (has(h, 'pool') ? 1 : 0) - 1)) / 2,
+    fit: (h, scale) => (centrality(h, scale) - ((has(h, 'spa') ? 1 : 0) + (has(h, 'pool') ? 1 : 0) - 1)) / 2,
   },
   {
     id: 'food',
@@ -83,7 +99,7 @@ export const VIBE_AXES: readonly VibeAxis[] = [
     left: 'Без лишних трат',
     right: 'Всё самое лучшее',
     // Twice the city median is +1, half of it −1.
-    fit: (h) => clamp(Math.log2(h.priceFrom / medianPrice.get(h.destinationId)!)),
+    fit: (h, scale) => clamp(Math.log2(h.priceFrom / scale.medianPrice.get(h.destinationId)!)),
   },
   {
     id: 'location',
@@ -180,14 +196,19 @@ export const axisShares = (answers: readonly Answer[]): AxisShare[] =>
 export const VIBE_HOTELS = 6
 
 /**
- * The hotels that fit the answers best, one per city: the sum of the answers times the hotel's fits; equal
+ * The `hotels` that fit the answers best, one per city: the sum of the answers times the hotel's fits; equal
  * scores go to the better rated, then the cheaper, then by id, so the same answers give the same list.
  */
-export function vibeHotels(answers: readonly Answer[]): Hotel[] {
-  const scored = hotels.map((summary) => {
-    const hotel = getHotel(summary.id)!
-    return { hotel, score: VIBE_AXES.reduce((sum, axis, i) => sum + (answers[i] ?? 0) * axis.fit(hotel), 0) }
-  })
+export function vibeHotels(
+  answers: readonly Answer[],
+  hotels: readonly Hotel[],
+  destinations: readonly Destination[],
+): Hotel[] {
+  const scale = vibeScale(hotels, destinations)
+  const scored = hotels.map((hotel) => ({
+    hotel,
+    score: VIBE_AXES.reduce((sum, axis, i) => sum + (answers[i] ?? 0) * axis.fit(hotel, scale), 0),
+  }))
   scored.sort(
     (a, b) =>
       b.score - a.score ||
@@ -212,8 +233,12 @@ export interface Vibe {
   hotels: Hotel[]
 }
 
-export const readVibe = (answers: readonly Answer[]): Vibe => ({
+export const readVibe = (
+  answers: readonly Answer[],
+  hotels: readonly Hotel[],
+  destinations: readonly Destination[],
+): Vibe => ({
   archetype: vibeArchetype(answers),
   shares: axisShares(answers),
-  hotels: vibeHotels(answers),
+  hotels: vibeHotels(answers, hotels, destinations),
 })

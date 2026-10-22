@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { destinations } from '../data/destinations'
 import { cheapestRate, getHotel } from './catalog'
 import {
   averageNight,
@@ -33,7 +34,7 @@ const parse = (overrides: Record<string, string | null>) => {
     if (value === null) params.delete(key)
     else params.set(key, value)
   }
-  return parseOffer(params, TODAY)
+  return parseOffer(params, TODAY, [hotel], destinations)
 }
 
 // hotel-catalog, Requirement: Цена предложения

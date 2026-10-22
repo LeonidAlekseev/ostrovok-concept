@@ -1,5 +1,5 @@
-import { destinations, type Destination } from '../data/destinations'
-import { getHotel, hotelsIn, type Hotel } from './catalog'
+import type { Destination } from '../data/destinations'
+import type { Hotel } from './catalog'
 import type { IsoDate } from './dates'
 
 /**
@@ -371,7 +371,12 @@ const ASPECT_LINE: Record<AspectKind | 'none', string> = {
 
 export const lowerFirst = (text: string) => text.charAt(0).toLocaleLowerCase('ru') + text.slice(1)
 
-export function readStars(input: ReadingInput): Reading {
+/** Ranks the `destinations` for the traveller and picks the best rated of their `hotels` in the top three. */
+export function readStars(
+  input: ReadingInput,
+  destinations: readonly Destination[],
+  hotels: readonly Hotel[],
+): Reading {
   const sign = sunSign(input.birthMonth, input.birthDay)
   const sunTransit = sunSign(Number(input.checkIn.slice(5, 7)), Number(input.checkIn.slice(8, 10)))
   const moon = { sign: moonSign(input.checkIn), phase: moonPhase(input.checkIn) }
@@ -394,8 +399,8 @@ export function readStars(input: ReadingInput): Reading {
     .sort((a, b) => b.score - a.score)
     .map((r) => r.city)
   const bestHotelIn = (city: Destination) => {
-    const list = hotelsIn(city.id)
-    return getHotel(list.reduce((best, h) => (h.rating > best.rating ? h : best)).id)!
+    const list = hotels.filter((h) => h.destinationId === city.id)
+    return list.reduce((best, h) => (h.rating > best.rating ? h : best))
   }
 
   const city = ranked[0]

@@ -2,7 +2,8 @@
 
 import { useMemo } from 'react'
 import { cn } from 'cn'
-import { getHomeCollections } from '../../lib/collections'
+import { loadAllHotels } from '../../lib/catalogSource'
+import { homeCollections } from '../../lib/collections'
 import { setStayParams, startStay } from '../../lib/search'
 import { useToday } from '../../hooks/useToday'
 import { HotelTile } from '../HotelTile/HotelTile'
@@ -12,6 +13,7 @@ export function HomeCollections() {
   const today = useToday()
   // Starts are tomorrow and the day after, as in the search form; empty until the date is known.
   const stay = useMemo(() => startStay(today), [today])
+  const collections = useMemo(() => homeCollections(loadAllHotels()), [])
 
   return (
     <section id="collections" aria-labelledby="collections-title">
@@ -22,7 +24,7 @@ export function HomeCollections() {
         Подборки
       </h2>
       <div className="flex flex-col gap-[clamp(18px,4vw,32px)]">
-        {getHomeCollections().map(({ collection, hotels }) => (
+        {collections.map(({ collection, hotels }) => (
           <div key={collection.id}>
             <h3 className="text-[clamp(16px,4.2vw,22px)] font-semibold tracking-[-0.01em]">{collection.title}</h3>
             <p className="mb-3 text-[clamp(13px,3.4vw,16px)] text-muted-foreground">{collection.description}</p>

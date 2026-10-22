@@ -3,6 +3,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToday } from '../../hooks/useToday'
+import { loadAllHotels, loadDestinations } from '../../lib/catalogSource'
 import { addDays } from '../../lib/dates'
 import { readStars, type Reading } from '../../lib/horoscope'
 import { DEFAULT_GUESTS, startStay, type Stay } from '../../lib/search'
@@ -45,14 +46,18 @@ export function StarSearchDialog({ open, onOpenChange }: Props) {
   const read = () => {
     const checkIn = answers.checkIn || defaultCheckIn
     const name = answers.name.trim()
-    const reading = readStars({
-      name,
-      birthMonth: Number(answers.birthMonth),
-      birthDay: Number(answers.birthDay),
-      checkIn,
-      company: answers.company,
-      partnerSignId: answers.partnerSignId || undefined,
-    })
+    const reading = readStars(
+      {
+        name,
+        birthMonth: Number(answers.birthMonth),
+        birthDay: Number(answers.birthDay),
+        checkIn,
+        company: answers.company,
+        partnerSignId: answers.partnerSignId || undefined,
+      },
+      loadDestinations(),
+      loadAllHotels(),
+    )
     const stay = { checkIn, checkOut: addDays(checkIn, NIGHTS), guests: DEFAULT_GUESTS }
     setStep({ kind: prefersReducedMotion() ? 'result' : 'reading', reading, stay, name })
   }

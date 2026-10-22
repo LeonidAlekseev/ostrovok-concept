@@ -8,7 +8,7 @@ import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
 import { useHotelSearch } from '../../hooks/useHotelSearch'
 import { useToday } from '../../hooks/useToday'
-import { getHotel } from '../../lib/catalog'
+import { loadCityHotels, loadDestinations, loadHotel } from '../../lib/catalogSource'
 import { formatShortRange } from '../../lib/dates'
 import { countRu } from '../../lib/format'
 import {
@@ -24,6 +24,7 @@ import {
   priceBounds,
   runDemoSearch,
   setFilterParams,
+  targetDestinations,
   type Filters,
   type SearchResult,
 } from '../../lib/results'
@@ -104,11 +105,14 @@ export function SearchResultsPage() {
     for (const name of [...FILTER_PARAMS, PAGE_PARAM, HOTEL_PARAM]) next.delete(name)
     return next.toString()
   }, [params])
-  const query = useMemo(() => withStartDates(fromSearchParams(new URLSearchParams(request)), today), [request, today])
+  const query = useMemo(
+    () => withStartDates(fromSearchParams(new URLSearchParams(request), loadDestinations()), today),
+    [request, today],
+  )
 
   if (!today) return <SearchResultsFallback />
-  const errors = validateSearch(query, today)
-  const target = resolveTarget(query.destination)
+  const errors = validateSearch(query, today, loadDestinations())
+  const target = resolveTarget(query.destination, loadDestinations())
   if (Object.keys(errors).length > 0 || !target) return <InvalidQuery key={request} query={query} errors={errors} />
   return (
     <Results
@@ -169,12 +173,13 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
 
   // Narrow screens have no hotel dialog: a link with the hotel opens its page instead.
   useEffect(() => {
-    if (hotelId && getHotel(hotelId) && !isDesktop()) router.replace(hotelHref(hotelId, query))
+    if (hotelId && loadHotel(hotelId) && !isDesktop()) router.replace(hotelHref(hotelId, query))
   }, [hotelId, query, router])
 
   useEffect(() => {
     const controller = new AbortController()
-    runDemoSearch(query, target, controller.signal).then(
+    const hotels = loadCityHotels(targetDestinations(target, loadDestinations()).map((d) => d.id))
+    runDemoSearch(query, target, hotels, controller.signal).then(
       (result) => setStatus({ state: 'done', result }),
       (error: unknown) => {
         if (controller.signal.aborted) return
@@ -373,7 +378,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
         total={items.length}
         priceBounds={bounds ?? [0, 0]}
       />
-      <HotelDialog hotel={hotelId && desktop ? getHotel(hotelId) : undefined} stay={query} onClose={closeHotel} />
+      <HotelDialog hotel={hotelId && desktop ? loadHotel(hotelId) : undefined} stay={query} onClose={closeHotel} />
     </main>
   )
 }

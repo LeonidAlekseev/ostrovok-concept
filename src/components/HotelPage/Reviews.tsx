@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import { Separator } from '@/components/ui/separator'
-import { getDestination, type Hotel, type Review } from '@/lib/catalog'
+import type { Hotel, Review } from '@/lib/catalog'
+import { loadDestination } from '@/lib/catalogSource'
 import { fromIso, monthTitle } from '../../lib/dates'
 import { ratingLabel, REVIEW_ORDERS, sortReviews, type ReviewOrder } from '../../lib/reviews'
 import { DialogButton } from './DialogButton'
@@ -32,7 +33,7 @@ export function ReviewsDialog({ hotel }: Props) {
   const [order, setOrder] = useState<ReviewOrder>('helpful')
   const mosaic = useHistoryDialog<MosaicStart>()
   const sortId = useId()
-  const city = getDestination(destinationId)?.name
+  const city = loadDestination(destinationId)?.name
 
   return (
     <Dialog onOpenChange={(open) => open && setVisible(PAGE)}>

@@ -1,14 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readStars } from '../../lib/horoscope'
+import { loadAllHotels, loadDestinations } from '../../lib/catalogSource'
 import { drawReadingFrame, loadOrbImage } from './starVideo'
 
-const reading = readStars({
-  name: 'Анна',
-  birthMonth: 3,
-  birthDay: 21,
-  checkIn: '2026-10-26',
-  company: 'solo',
-})
+const reading = readStars(
+  {
+    name: 'Анна',
+    birthMonth: 3,
+    birthDay: 21,
+    checkIn: '2026-10-26',
+    company: 'solo',
+  },
+  loadDestinations(),
+  loadAllHotels(),
+)
 
 afterEach(() => vi.unstubAllGlobals())
 

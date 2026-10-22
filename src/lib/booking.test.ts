@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { destinations } from '../data/destinations'
 import { getHotel } from './catalog'
 import {
   cancellationLabel,
@@ -24,7 +25,12 @@ const hotel = getHotel('prague-old-town-lantern')!
 const room = hotel.rooms[0]
 const stay = { checkIn: '2026-11-10', checkOut: '2026-11-13', guests: { adults: 2, children: 0, rooms: 1 } }
 const offerFor = (rateId: string) => {
-  const result = parseOffer(toOfferParams({ hotelId: hotel.id, roomId: room.id, rateId, ...stay }), TODAY)
+  const result = parseOffer(
+    toOfferParams({ hotelId: hotel.id, roomId: room.id, rateId, ...stay }),
+    TODAY,
+    [hotel],
+    destinations,
+  )
   if (!result.ok) throw new Error(result.error)
   return result.offer
 }

@@ -1,15 +1,5 @@
-import { destinations, type Destination } from '../data/destinations'
-import {
-  AMENITIES,
-  fullHotelsIn,
-  getDestination,
-  MEAL_LABEL,
-  type Amenity,
-  type Hotel,
-  type Meal,
-  type Rate,
-  type Room,
-} from './catalog'
+import type { Destination } from '../data/destinations'
+import { AMENITIES, MEAL_LABEL, type Amenity, type Hotel, type Meal, type Rate, type Room } from './catalog'
 import { nightsBetween } from './dates'
 import { averageNight, stayTotal } from './offer'
 import type { SearchQuery, SearchTarget, Stay } from './search'
@@ -30,10 +20,17 @@ export interface SearchResult {
 
 export const DEMO_SEARCH_MS = 700
 
-/** Demo search: there is no backend, so the hotels come from the local catalogue after a short delay. */
+/** The destinations a search covers: its destination, or every destination of its scenario. */
+export const targetDestinations = (target: SearchTarget, destinations: readonly Destination[]): Destination[] =>
+  target.kind === 'destination'
+    ? [target.destination]
+    : destinations.filter((d) => d.scenarios.includes(target.scenario))
+
+/** Demo search: there is no backend, so it answers with the given hotels of the target after a short delay. */
 export async function runDemoSearch(
   query: SearchQuery,
   target: SearchTarget,
+  hotels: Hotel[],
   signal?: AbortSignal,
 ): Promise<SearchResult> {
   await new Promise<void>((resolve, reject) => {
@@ -43,16 +40,7 @@ export async function runDemoSearch(
       reject(new DOMException('Aborted', 'AbortError'))
     })
   })
-  const matches =
-    target.kind === 'destination'
-      ? [target.destination]
-      : destinations.filter((d) => d.scenarios.includes(target.scenario))
-  return {
-    query,
-    target,
-    nights: nightsBetween(query.checkIn, query.checkOut),
-    hotels: matches.flatMap((d) => fullHotelsIn(d.id)),
-  }
+  return { query, target, nights: nightsBetween(query.checkIn, query.checkOut), hotels }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -193,7 +181,6 @@ export const countFilters = (f: Filters) =>
 
 export interface ResultItem {
   hotel: Hotel
-  destination: Destination
   /** The cheapest rate that meets the meal and cancellation filters, and its room. */
   room: Room
   rate: Rate
@@ -257,7 +244,7 @@ export function applyFilters(hotels: Hotel[], f: Filters, stay: Stay | null = nu
     if (!best) continue
     const price = filterPrice(best.price, stay)
     if ((f.priceMin !== null && price < f.priceMin) || (f.priceMax !== null && price > f.priceMax)) continue
-    items.push({ hotel, destination: getDestination(hotel.destinationId)!, ...best })
+    items.push({ hotel, ...best })
   }
   return items.sort(compare[f.sort])
 }

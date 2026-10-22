@@ -3,7 +3,8 @@ import type { ComponentProps } from 'react'
 import { MapPin } from 'lucide-react'
 import { cn } from 'cn'
 import { Separator } from '@/components/ui/separator'
-import { getDestination, hasFreeCancellation, type Hotel } from '../../lib/catalog'
+import { hasFreeCancellation, type Hotel } from '../../lib/catalog'
+import { loadDestination } from '../../lib/catalogSource'
 import { formatDecimal, formatPrice } from '../../lib/format'
 import { guruPrice } from '../../lib/offer'
 import { GuruLogo } from '../GuruLogo/GuruLogo'
@@ -72,7 +73,7 @@ export function HotelTile({
         </Heading>
         <p className="flex items-center gap-1 text-sm/[normal] text-muted-foreground">
           <MapPin className="size-4 shrink-0" aria-hidden />
-          {formatDecimal(hotel.distanceKm)} км от центра {getDestination(hotel.destinationId)?.genitive}
+          {formatDecimal(hotel.distanceKm)} км от центра {loadDestination(hotel.destinationId)?.genitive}
         </p>
         <div className="mt-auto flex flex-col gap-2 pt-2">
           <Separator />

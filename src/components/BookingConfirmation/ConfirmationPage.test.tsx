@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createBooking, EMPTY_CARD } from '@/lib/booking'
+import { destinations } from '@/data/destinations'
 import { getHotel } from '@/lib/catalog'
 import { addDays, todayIso } from '@/lib/dates'
 import { parseOffer, toOfferParams } from '@/lib/offer'
@@ -26,6 +27,8 @@ function save(payment: 'now' | 'at-hotel', id: string) {
       guests: { adults: 2, children: 0, rooms: 1 },
     }),
     todayIso(),
+    [hotel],
+    destinations,
   )
   if (!result.ok) throw new Error(result.error)
   const card = { ...EMPTY_CARD, number: '4242 4242 4242 4242' }

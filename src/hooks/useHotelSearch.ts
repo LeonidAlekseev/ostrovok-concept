@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { loadDestinations } from '../lib/catalogSource'
 import { todayIso } from '../lib/dates'
 import {
   DEFAULT_GUESTS,
@@ -57,9 +58,9 @@ export function useHotelSearch({ query: startQuery = initialQuery, errors: start
   const run = useCallback(
     (q: SearchQuery): SearchErrors => {
       // Same `today` snapshot the form used for its start dates; todayIso() only while that snapshot is empty.
-      const found = validateSearch(q, today || todayIso())
+      const found = validateSearch(q, today || todayIso(), loadDestinations())
       setErrors(found)
-      const target = resolveTarget(q.destination)
+      const target = resolveTarget(q.destination, loadDestinations())
       if (Object.keys(found).length === 0 && target)
         startTransition(() => router.push(`/search?${toSearchParams(q, target)}`))
       return found

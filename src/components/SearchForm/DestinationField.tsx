@@ -10,6 +10,7 @@ import {
   ComboboxItem,
   ComboboxList,
 } from '@/components/ui/combobox'
+import { loadDestinations } from '../../lib/catalogSource'
 import { formatPrice } from '../../lib/format'
 import { findScenario, suggestDestinations } from '../../lib/search'
 import { fieldBox } from './fieldBox'
@@ -34,7 +35,7 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
   // The suggestions are computed from the typed text here, so Base UI must not filter them again.
   const options = useMemo<Option[]>(() => {
     const scenario = findScenario(value)
-    const places = suggestDestinations(value).map((d) => ({
+    const places = suggestDestinations(value, loadDestinations()).map((d) => ({
       id: d.id,
       label: d.name,
       hint: `${d.country} · ${formatPrice(d.priceFrom)}`,

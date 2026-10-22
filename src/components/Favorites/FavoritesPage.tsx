@@ -6,13 +6,13 @@ import { buttonVariants } from '@/components/ui/button'
 import { useHydrated } from '@/hooks/useHydrated'
 import { useFavorites } from '@/hooks/useStore'
 import { useToday } from '@/hooks/useToday'
-import { getHotel } from '@/lib/catalog'
+import { loadHotels } from '@/lib/catalogSource'
 import { setStayParams, startStay } from '@/lib/search'
 import { pageClass } from '@/components/Trips/TripsGate'
 
 function Favorites() {
   const hydrated = useHydrated()
-  const hotels = useFavorites().flatMap((id) => getHotel(id) ?? [])
+  const hotels = loadHotels(useFavorites())
   const stay = startStay(useToday())
 
   if (!hydrated) return <p className="text-muted-foreground">Загружаем избранное…</p>

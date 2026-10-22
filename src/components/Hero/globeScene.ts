@@ -39,7 +39,7 @@ export function sceneAt(markers: Destination[], spotlight: Spotlight, view: Glob
 }
 
 /** Cycles through each city's hotels so consecutive visits show different ones. */
-export function createHotelFeed(hotels: HotelSummary[]) {
+export function createHotelFeed(hotels: readonly HotelSummary[]) {
   const byCity = new Map<string, HotelSummary[]>()
   for (const hotel of hotels) byCity.set(hotel.destinationId, [...(byCity.get(hotel.destinationId) ?? []), hotel])
   const cursor = new Map<string, number>()
