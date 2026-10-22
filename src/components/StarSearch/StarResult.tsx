@@ -3,13 +3,17 @@ import { RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Hotel } from '../../lib/catalog'
 import { ASPECT_LABEL, ELEMENT_LABEL, lowerFirst, MODALITY_LABEL, type Reading } from '../../lib/horoscope'
+import type { RouteCardData } from '../../lib/routes'
 import { setStayParams, type Stay } from '../../lib/search'
 import { HotelTile } from '../HotelTile/HotelTile'
+import { ReadyRoute } from '../RouteCard/ReadyRoute'
 import { MagicOrb } from './MagicOrb'
 import { StarVideo } from './StarVideo'
 
 interface Props {
   reading: Reading
+  /** The ready-made route over the hotels; none without routes. */
+  route: RouteCardData | null
   stay: Stay
   name: string
   onRestart: () => void
@@ -17,7 +21,7 @@ interface Props {
 
 const symbolFont = "font-['Segoe_UI_Symbol','Apple_Symbols','Noto_Sans_Symbols',sans-serif]"
 
-export function StarResult({ reading, stay, name, onRestart }: Props) {
+export function StarResult({ reading, route, stay, name, onRestart }: Props) {
   const headingRef = useRef<HTMLHeadingElement>(null)
   const { sign, moon, aspect, citySign } = reading
   const [main, ...backups] = reading.hotels
@@ -59,6 +63,8 @@ export function StarResult({ reading, stay, name, onRestart }: Props) {
       <p className="font-hand text-[clamp(20px,5.4vw,24px)] leading-[1.25] font-semibold text-primary">
         {reading.forecast}
       </p>
+
+      <ReadyRoute route={route} />
 
       <HotelTile hotel={main} href={hrefOf(main)} heading="h4" />
 

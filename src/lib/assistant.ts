@@ -3,6 +3,7 @@ import type { HotelSummary } from './catalog'
 import { addDays, fromIso, toIso, type IsoDate } from './dates'
 import { countRu, formatPrice } from './format'
 import { stayTotal } from './offer'
+import type { Persona } from './routes'
 import { MAX_NIGHTS, type Guests, type SearchQuery } from './search'
 
 /**
@@ -397,6 +398,28 @@ export function makePlan(
   }
 }
 
+const WORK = word('работ|удал[её]нк|ноутбук|воркейшн|созвон|коворк')
+const LUXURY = word('люкс|роскош|премиум|пятизв|5 звёзд|5 звезд|дорог[оу]|шикар')
+const STUDENT = word('студен|бюджетн|дёшев|дешев|недорог|хостел|эконом')
+/** A night above this, ₽, is luxury, below the other a student's. */
+const LUXURY_NIGHT = 25_000
+const STUDENT_NIGHT = 6_000
+
+/**
+ * The persona of the ready-made routes for the traveller's words (all their messages) and the brief: work
+ * on the way, then luxury by the words or the budget a night, then a student's trip by the words, the
+ * friends or the budget, else the culture.
+ */
+export function briefPersona(brief: Brief, wish: string, nights: number): Persona {
+  const text = normalize(wish)
+  const perNight = brief.budget ? brief.budget / Math.max(nights, 1) : undefined
+  if (WORK.test(text)) return 'workation'
+  if (LUXURY.test(text) || (perNight !== undefined && perNight >= LUXURY_NIGHT)) return 'luxury'
+  if (STUDENT.test(text) || brief.party === 'friends' || (perNight !== undefined && perNight <= STUDENT_NIGHT))
+    return 'student'
+  return 'culture'
+}
+
 export const PARTY_LABEL: Record<Party, string> = {
   solo: 'один',
   couple: 'вдвоём',
@@ -466,6 +489,8 @@ export interface AssistantResponse {
   source: 'model' | 'rules'
   /** Hotels the semantic search found for the traveller's words once the brief is complete, best first. */
   matches?: HotelSummary[]
+  /** The ready-made route the search by meaning found for the traveller's words with the plan. */
+  routeId?: string
 }
 
 export const MAX_MESSAGE_LENGTH = 500
@@ -508,6 +533,7 @@ export async function askAssistant(
         reply: typeof data.reply === 'string' ? data.reply : undefined,
         source: data.source === 'model' ? 'model' : 'rules',
         matches: Array.isArray(data.matches) ? data.matches : undefined,
+        routeId: typeof data.routeId === 'string' ? data.routeId : undefined,
       }
     }
   } catch {

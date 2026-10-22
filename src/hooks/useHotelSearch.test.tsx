@@ -110,6 +110,22 @@ describe('useHotelSearch submit', () => {
     expect(result.current.query.destination).toBe('У моря')
   })
 
+  // search-modes, Requirement: Состояние поиска ассистента и выдачи
+  it('opens the results page for the assistant’s choice even when it is invalid', () => {
+    const { result } = renderHook(() => useHotelSearch())
+    let errors = {}
+    act(() => {
+      errors = result.current.searchFor({
+        destination: 'Прага',
+        checkIn: '2026-10-25',
+        checkOut: '2026-10-20',
+        guests: { adults: 2, children: 0, rooms: 1 },
+      })
+    })
+    expect(errors).toHaveProperty('dates')
+    expect(push).toHaveBeenCalledWith(expect.stringMatching(/^\/search\?destination=prague&checkin=2026-10-25/))
+  })
+
   it('stays on the page and returns the errors when validation fails', () => {
     const { result } = renderHook(() => useHotelSearch())
 

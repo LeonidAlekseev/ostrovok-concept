@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { newHotels } from '../../lib/catalogGenerator'
+import { routeCards } from '../../test/catalog'
 import { AssistantSearch } from './AssistantSearch'
 
 const fetchMock = vi.fn<typeof fetch>()
@@ -13,7 +14,7 @@ afterEach(() => {
 
 function renderAssistant() {
   vi.stubGlobal('fetch', fetchMock)
-  render(<AssistantSearch newHotels={newHotels} onPreview={() => {}} onChoose={() => ({})} />)
+  render(<AssistantSearch newHotels={newHotels} routes={routeCards()} onChoose={() => ({})} />)
   return userEvent.setup()
 }
 
@@ -112,5 +113,27 @@ describe('AssistantSearch with the model', () => {
   it('caps the message at 500 characters', () => {
     renderAssistant()
     expect(screen.getByLabelText('Опишите поездку').getAttribute('maxlength')).toBe('500')
+  })
+})
+
+// assistant-search, Requirement: Готовый маршрут в плане; routes, Requirement: Лучший готовый маршрут
+describe('AssistantSearch ready-made route', () => {
+  const complete = { destinationId: 'lisbon', when: 9, party: 'solo' }
+  const readyLink = async () =>
+    within(await screen.findByRole('region', { name: 'Готовый маршрут' }, { timeout: 2000 })).getByRole('link')
+
+  it('shows the route the search by meaning found (a mock model)', async () => {
+    fetchMock.mockResolvedValue(Response.json({ brief: complete, source: 'model', routeId: 'tokyo-culture' }))
+    const user = renderAssistant()
+    await user.type(screen.getByLabelText('Опишите поездку'), 'Лиссабон в октябре, один{Enter}')
+    expect((await readyLink()).getAttribute('href')).toBe('/routes/tokyo-culture')
+  })
+
+  it('without the search by meaning, picks the persona’s route in the plan’s city (Scenario: Поиск по смыслу недоступен)', async () => {
+    fetchMock.mockResolvedValue(Response.json({ brief: complete, source: 'rules' }))
+    const user = renderAssistant()
+    await user.type(screen.getByLabelText('Опишите поездку'), 'Поработать с ноутбуком в Лиссабоне{Enter}')
+    expect((await readyLink()).getAttribute('href')).toBe('/routes/lisbon-workation')
+    expect(log().textContent).not.toMatch(/ошибк/i)
   })
 })

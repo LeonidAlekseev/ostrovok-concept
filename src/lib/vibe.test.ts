@@ -10,6 +10,7 @@ import {
   poleImage,
   readVibe,
   VIBE_AXES,
+  vibePersona,
   VIBE_HOTELS,
   vibeArchetype,
   vibeHotels,
@@ -182,5 +183,23 @@ describe('onePerCity', () => {
     expect(picked).toHaveLength(VIBE_HOTELS)
     expect(new Set(picked.map((h) => h.destinationId)).size).toBe(VIBE_HOTELS)
     expect(picked[0]).toBe(catalogue[0])
+  })
+})
+
+// routes, Requirement: Лучший готовый маршрут
+describe('vibePersona', () => {
+  const answers = (sides: Record<string, -1 | 1>) => VIBE_AXES.map((axis) => sides[axis.id] ?? 0)
+
+  it('picks the persona whose sides the answers chose most', () => {
+    expect(vibePersona(answers({ budget: -1, evening: 1 }))).toBe('student')
+    expect(vibePersona(answers({ budget: 1, size: 1 }))).toBe('luxury')
+    expect(vibePersona(answers({ evening: -1, location: -1, food: -1 }))).toBe('workation')
+    expect(vibePersona(answers({ place: 1, leisure: 1 }))).toBe('culture')
+  })
+
+  it('gives the culture when nothing is chosen, and the same answers the same persona', () => {
+    expect(vibePersona(answers({}))).toBe('culture')
+    const some = answers({ budget: -1, location: -1 })
+    expect(vibePersona(some)).toBe(vibePersona([...some]))
   })
 })

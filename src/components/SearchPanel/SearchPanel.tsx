@@ -1,10 +1,6 @@
-import type { RefObject } from 'react'
-import { SlidersHorizontal, Sparkles, type LucideIcon } from 'lucide-react'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import type { Destination } from '../../data/destinations'
 import type { HotelSummary } from '../../lib/catalog'
 import type { HotelSearch } from '../../hooks/useHotelSearch'
-import { SearchForm } from '../SearchForm/SearchForm'
+import type { RouteCardData } from '../../lib/routes'
 import { AssistantSearch } from './AssistantSearch'
 
 /* Liquid glass: the globe shows through, blurred and saturated, under a bright rim and a specular sheen. */
@@ -19,80 +15,25 @@ const glassSheen =
 const glassOpaque =
   '[@media(prefers-reduced-transparency:reduce)]:[background:var(--decor-glass-fallback)] [@media(prefers-reduced-transparency:reduce)]:[backdrop-filter:none]'
 
-export type SearchMode = 'assistant' | 'manual'
-
-const modes: { id: SearchMode; label: string; icon: LucideIcon }[] = [
-  { id: 'assistant', label: 'Ассистент', icon: Sparkles },
-  { id: 'manual', label: 'Вручную', icon: SlidersHorizontal },
-]
-
 interface Props {
-  mode: SearchMode
-  onModeChange: (mode: SearchMode) => void
-  search: HotelSearch
-  destinationRef: RefObject<HTMLInputElement | null>
-  submitRef: RefObject<HTMLButtonElement | null>
-  /** Shows a destination on the globe without leaving the current mode. */
-  onPreview: (destination: Destination) => void
   /** Searches for the assistant's choice: opens the results page. */
   onChoose: HotelSearch['searchFor']
   /** The "recently added" hotels the assistant suggests. */
   newHotels: readonly HotelSummary[]
+  /** The routes the plan picks its ready-made one from. */
+  routes: readonly RouteCardData[]
 }
 
-export function SearchPanel({
-  mode,
-  onModeChange,
-  search,
-  destinationRef,
-  submitRef,
-  onPreview,
-  onChoose,
-  newHotels,
-}: Props) {
+/** The search of the home page: the assistant on liquid glass; the manual form lives on `/search`. */
+export function SearchPanel({ onChoose, newHotels, routes }: Props) {
   return (
-    <Tabs
-      value={mode}
-      onValueChange={(value) => onModeChange(value as SearchMode)}
-      className={`relative z-10 rounded-[clamp(22px,5.6vw,30px)] ${glassFill} ${glassBlur} ${glassRim} ${glassSheen} ${glassOpaque}`}
+    <div
+      className={`relative z-10 rounded-[clamp(22px,5.6vw,30px)] p-[clamp(6px,2vw,10px)] ${glassFill} ${glassBlur} ${glassRim} ${glassSheen} ${glassOpaque}`}
     >
-      {/* Arrow keys move focus and select the tab (WAI-ARIA automatic activation). */}
-      <TabsList
-        className="grid grid-cols-2 gap-[clamp(4px,1.4vw,8px)] p-[clamp(6px,2vw,10px)]"
-        aria-label="Способ поиска"
-        activateOnFocus
-      >
-        {modes.map(({ id: modeId, label, icon: Icon }, index) => (
-          <TabsTrigger
-            key={modeId}
-            value={modeId}
-            className={`group flex h-[clamp(44px,12vw,58px)] min-w-0 items-center justify-center gap-[clamp(6px,1.8vw,12px)] px-[clamp(6px,2vw,18px)] text-[clamp(13px,3.8vw,18px)] whitespace-nowrap rounded-full border-0 bg-(--decor-light)/45 font-medium text-brand-foreground transition-[background-color,color,box-shadow] hover:bg-card data-active:bg-card data-active:font-[650] data-active:text-primary data-active:shadow-[0_6px_18px_color-mix(in_srgb,var(--shadow-color)_8%,transparent)]`}
-          >
-            {/* Only the sparkle reads well filled; the sliders keep their outline. */}
-            <Icon
-              className={`size-[clamp(18px,5vw,24px)] flex-none ${index === 0 ? 'group-data-active:fill-current' : ''}`}
-              aria-hidden
-            />
-            {label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-
-      {/* Panels stay mounted so a half-typed wish or the filled form survives switching tabs. Children that bleed
-          to the card edge (scrolling chips) read --pad; only the outer corners are rounded, following the panel. */}
-      {modes.map(({ id: modeId }) => (
-        <TabsContent
-          key={modeId}
-          value={modeId}
-          keepMounted
-          className="rounded-b-[inherit] bg-card p-(--pad) animate-in fade-in slide-in-from-bottom-1 animation-duration-250 ease-out [--pad:clamp(14px,3.6vw,22px)]"
-        >
-          {modeId === 'assistant' && (
-            <AssistantSearch newHotels={newHotels} onPreview={onPreview} onChoose={onChoose} />
-          )}
-          {modeId === 'manual' && <SearchForm search={search} destinationRef={destinationRef} submitRef={submitRef} />}
-        </TabsContent>
-      ))}
-    </Tabs>
+      {/* Children that bleed to the card edge (scrolling chips) read --pad. */}
+      <div className="rounded-[clamp(18px,4.6vw,24px)] bg-card p-(--pad) [--pad:clamp(14px,3.6vw,22px)]">
+        <AssistantSearch newHotels={newHotels} routes={routes} onChoose={onChoose} />
+      </div>
+    </div>
   )
 }

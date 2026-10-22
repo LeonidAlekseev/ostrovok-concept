@@ -1,96 +1,44 @@
 'use client'
 
-import { useCallback, useMemo, useRef, useState } from 'react'
-import { flushSync } from 'react-dom'
-import { ArrowRight } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { FEATURED_DESTINATION_ID, scenarios, type Destination } from '@/data/destinations'
+import { useMemo } from 'react'
+import { FEATURED_DESTINATION_ID } from '@/data/destinations'
 import { useHotelSearch } from '../hooks/useHotelSearch'
 import type { HotelSummary } from '../lib/catalog'
-import { formatPrice } from '../lib/format'
-import { resolveTarget } from '../lib/search'
+import type { RouteCardData } from '../lib/routes'
 import { useDestinations } from './Catalog/useDestinations'
-import { DestinationCard } from './DestinationCard/DestinationCard'
-import { HomeCollections, type ShownCollection } from './HomeCollections/HomeCollections'
 import { Hero } from './Hero/Hero'
-import { SearchPanel, type SearchMode } from './SearchPanel/SearchPanel'
+import { PersonaCarousel } from './PersonaCarousel/PersonaCarousel'
+import { RouteShowcase } from './RouteCard/RouteShowcase'
+import { SearchPanel } from './SearchPanel/SearchPanel'
 import { StarSearch } from './StarSearch/StarSearch'
 import { TravelBanner } from './TravelBanner/TravelBanner'
 import { VibeSearch } from './VibeSearch/VibeSearch'
 
 interface Props {
-  /** The "recently added" hotels: the globe's feed and the assistant's suggestions. */
+  /** The "recently added" hotels: the assistant's suggestions. */
   newHotels: readonly HotelSummary[]
-  collections: readonly ShownCollection[]
+  /** The cards of all routes, the featured first. */
+  routes: readonly RouteCardData[]
 }
 
-export function HomePage({ newHotels, collections }: Props) {
+export function HomePage({ newHotels, routes }: Props) {
   const destinations = useDestinations()
-  const { featured, globeDestinations, scenarioPrices } = useMemo(
-    () => ({
-      featured: destinations.find((d) => d.id === FEATURED_DESTINATION_ID)!,
-      globeDestinations: destinations.filter((d) => d.onGlobe),
-      scenarioPrices: new Map(
-        scenarios.map((s) => [
-          s.id,
-          formatPrice(Math.min(...destinations.filter((d) => d.scenarios.includes(s.id)).map((d) => d.priceFrom))),
-        ]),
-      ),
-    }),
-    [destinations],
-  )
-  const search = useHotelSearch()
-  const destinationRef = useRef<HTMLInputElement>(null)
-  const submitRef = useRef<HTMLButtonElement>(null)
-  const [mode, setMode] = useState<SearchMode>('assistant')
-  const { setDestination, searchFor } = search
-
-  /** Shows the manual form right away, so its fields can take focus in the same handler. */
-  const openManual = useCallback(() => flushSync(() => setMode('manual')), [])
-
-  /** Put a destination or scenario into the search and move focus to the submit button. */
-  const applyToSearch = useCallback(
-    (text: string) => {
-      openManual()
-      setDestination(text)
-      submitRef.current?.focus({ preventScroll: true })
-      submitRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    },
-    [openManual, setDestination],
-  )
-
-  const startSearch = useCallback(() => {
-    openManual()
-    destinationRef.current?.focus()
-  }, [openManual])
-
-  const chooseFromAssistant = useCallback(
-    (query: Parameters<typeof searchFor>[0]) => {
-      const found = searchFor(query)
-      // A valid choice opens the results page; otherwise the manual form shows what to fix.
-      if (Object.keys(found).length > 0) {
-        openManual()
-        document.getElementById('search')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }
-      return found
-    },
-    [openManual, searchFor],
-  )
-
-  const target = resolveTarget(search.query.destination, destinations)
-  const selectedDestinationId = target?.kind === 'destination' ? target.destination.id : null
-  const selectedScenarioId = target?.kind === 'scenario' ? target.scenario : null
+  // The globe shows the cities with routes; the featured city leads when it has one.
+  const { cities, featured } = useMemo(() => {
+    const cities = destinations.filter((d) => routes.some((route) => route.destinationId === d.id))
+    const featured =
+      cities.find((d) => d.id === FEATURED_DESTINATION_ID) ??
+      cities[0] ??
+      destinations.find((d) => d.id === FEATURED_DESTINATION_ID)!
+    return { cities, featured }
+  }, [destinations, routes])
+  // The assistant's choice opens the results page, whose manual form shows it.
+  const { searchFor } = useHotelSearch()
 
   // The hero starts under the transparent header of the layout, hence the negative top margin.
   return (
     <main className="-mt-(--header-height) bg-background pb-[clamp(24px,6vw,56px)]">
-      <Hero
-        markers={globeDestinations}
-        hotels={newHotels}
-        featured={featured}
-        selectedId={selectedDestinationId}
-        onSelect={(d: Destination) => applyToSearch(d.name)}
-      />
+      <Hero cities={cities} routes={routes} featured={featured} />
 
       <div className="mx-auto flex max-w-(--page-max) flex-col gap-[clamp(10px,3vw,24px)] px-(--page-x)">
         <section
@@ -98,55 +46,16 @@ export function HomePage({ newHotels, collections }: Props) {
           className="relative z-10 -mt-[clamp(120px,31vw,150px)] scroll-mt-4 md:-mt-24 lg:-mt-21"
           aria-label="Поиск отелей"
         >
-          <SearchPanel
-            mode={mode}
-            onModeChange={setMode}
-            search={search}
-            destinationRef={destinationRef}
-            submitRef={submitRef}
-            onPreview={(d) => setDestination(d.name)}
-            onChoose={chooseFromAssistant}
-            newHotels={newHotels}
-          />
+          <SearchPanel onChoose={searchFor} newHotels={newHotels} routes={routes} />
         </section>
 
-        <section id="ideas" aria-labelledby="ideas-title">
-          <div className="mt-[clamp(8px,2vw,16px)] mb-[clamp(10px,2.6vw,18px)] flex items-baseline justify-between gap-3">
-            <h2 id="ideas-title" className="text-title font-bold tracking-[-0.02em]">
-              Популярные направления
-            </h2>
-            <Button
-              variant="link"
-              className={`flex-none gap-1 py-1 text-[clamp(13px,3.6vw,18px)] font-medium hover:[&_svg]:translate-x-0.5 [&_svg]:transition-transform`}
-              onClick={startSearch}
-            >
-              Смотреть все
-              <ArrowRight className="size-4.5" aria-hidden />
-            </Button>
-          </div>
-          {/* overflow-x: auto clips vertically too, so the padding leaves room for the hover shadow and the
-                selection ring (about 20px above, 44px below); negative margins keep the layout unchanged. */}
-          <ul className="-mx-(--page-x) -mt-3.5 -mb-9.5 grid snap-x snap-mandatory list-none scroll-px-(--page-x) grid-cols-[repeat(3,minmax(100px,1fr))] gap-[clamp(8px,2.2vw,20px)] overflow-x-auto px-(--page-x) pt-5 pb-11 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {scenarios.map((scenario) => (
-              <li key={scenario.id}>
-                <DestinationCard
-                  title={scenario.title}
-                  image={scenario.image}
-                  alt={scenario.alt}
-                  price={scenarioPrices.get(scenario.id)!}
-                  selected={selectedScenarioId === scenario.id}
-                  onSelect={() => applyToSearch(scenario.title)}
-                />
-              </li>
-            ))}
-          </ul>
-        </section>
+        <PersonaCarousel routes={routes} />
 
-        <VibeSearch />
+        <RouteShowcase routes={routes} />
 
-        <StarSearch />
+        <VibeSearch routes={routes} />
 
-        <HomeCollections collections={collections} />
+        <StarSearch routes={routes} />
 
         <TravelBanner />
       </div>

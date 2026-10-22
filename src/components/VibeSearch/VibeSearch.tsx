@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'
 import { useState } from 'react'
 import { Moon, PartyPopper } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import type { RouteCardData } from '@/lib/routes'
 
 // The window, the vibe and its picture load on the first click: the home page does not pay for them up front.
 const VibeSearchDialog = dynamic(() => import('./VibeSearchDialog').then((m) => m.VibeSearchDialog), { ssr: false })
@@ -11,7 +12,7 @@ const VibeSearchDialog = dynamic(() => import('./VibeSearchDialog').then((m) => 
 const halfClass =
   'flex min-h-[clamp(120px,30vw,200px)] flex-col items-center justify-center gap-2 rounded-[clamp(18px,4.6vw,26px)] p-[clamp(10px,3vw,24px)] text-center text-primary-foreground shadow-(--shadow-card)'
 
-export function VibeSearch() {
+export function VibeSearch({ routes }: { routes: readonly RouteCardData[] }) {
   const [open, setOpen] = useState(false)
   // Mounted from the first opening on, so the window keeps the answers and closes with its animation.
   const [opened, setOpened] = useState(false)
@@ -27,7 +28,8 @@ export function VibeSearch() {
           Поиск вайба
         </h2>
         <p className="max-w-[52ch] text-[clamp(14px,3.7vw,17px)] text-muted-foreground">
-          Семь пар противоположностей — и вы узнаете свой вайб, получите картинку для друзей и отели под настроение.
+          Семь пар противоположностей — и вы узнаете свой вайб, получите картинку для друзей, готовый маршрут и отели
+          под настроение.
         </p>
       </div>
 
@@ -59,7 +61,7 @@ export function VibeSearch() {
       >
         Найти свой вайб
       </Button>
-      {opened && <VibeSearchDialog open={open} onOpenChange={setOpen} />}
+      {opened && <VibeSearchDialog open={open} onOpenChange={setOpen} routes={routes} />}
     </section>
   )
 }

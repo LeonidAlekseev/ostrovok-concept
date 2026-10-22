@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { addDays, todayIso } from '../../lib/dates'
+import { routeCards } from '../../test/catalog'
 import { VibeSearch } from './VibeSearch'
 import { VibeSearchDialog } from './VibeSearchDialog'
 
@@ -26,7 +27,7 @@ afterEach(() => {
   delete nav.canShare
 })
 
-const renderDialog = () => render(<VibeSearchDialog open onOpenChange={() => {}} />)
+const renderDialog = () => render(<VibeSearchDialog open onOpenChange={() => {}} routes={routeCards()} />)
 
 async function answerAll(user: ReturnType<typeof userEvent.setup>, option: string | RegExp) {
   for (let i = 0; i < 7; i++)
@@ -37,7 +38,7 @@ async function answerAll(user: ReturnType<typeof userEvent.setup>, option: strin
 describe('VibeSearch section', () => {
   it('shows «Тихий вечер» vs «Шумная вечеринка» and opens the window with the first pair', async () => {
     const user = userEvent.setup()
-    render(<VibeSearch />)
+    render(<VibeSearch routes={routeCards()} />)
     const section = screen.getByRole('region', { name: 'Поиск вайба' })
     expect(section.getAttribute('id')).toBe('vibe')
     expect(within(section).getByText('Тихий вечер')).toBeTruthy()
@@ -60,7 +61,7 @@ describe('VibeSearch photos', () => {
 
   it('loads no vibe photos on the home page until the window is opened', async () => {
     const user = userEvent.setup()
-    render(<VibeSearch />)
+    render(<VibeSearch routes={routeCards()} />)
     expect(vibePhotos()).toEqual([])
     await user.click(screen.getByRole('button', { name: 'Найти свой вайб' }))
     await screen.findByRole('dialog', { name: 'Поиск вайба' })
@@ -170,6 +171,9 @@ describe('VibeSearch result', () => {
     expect(await screen.findByRole('heading', { name: 'Тихая гавань' })).toBeTruthy()
     expect(screen.getByText('Тихий вечер 100%')).toBeTruthy()
     expect(screen.getByText('0% Шумная вечеринка')).toBeTruthy()
+    // vibe-search, Requirement: Готовый маршрут в итоге: quiet, away, breakfast in — workation by the rules.
+    const ready = screen.getByRole('region', { name: 'Готовый маршрут' })
+    expect(within(ready).getByRole('link').getAttribute('href')).toMatch(/^\/routes\/[a-z-]+-workation$/)
 
     const hotels = within(screen.getByRole('region', { name: 'Отели под настроение' })).getAllByRole('article')
     expect(hotels).toHaveLength(6)

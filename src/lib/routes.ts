@@ -18,8 +18,8 @@ export type Persona = (typeof PERSONAS)[number]
 export const PERSONA_LABEL: Record<Persona, string> = {
   student: 'Студент',
   luxury: 'Люкс',
-  workation: 'Работа и отдых',
-  culture: 'Культурный отпуск',
+  workation: 'Воркейшн',
+  culture: 'Культура',
 }
 
 export const TRANSFER_MODES = ['transfer', 'taxi', 'car', 'walk'] as const
@@ -366,6 +366,71 @@ const PREVIEW_START = '2026-01-05'
  */
 export const previewPlan = (route: Route, hotels: Readonly<Record<string, Hotel>>): RoutePlan =>
   buildPlan(route, hotels, { ...defaultState(route, PREVIEW_START), start: PREVIEW_START }, { weekdayPrices: true })
+
+// ---------------------------------------------------------------------------------------------
+// Cards
+
+/**
+ * A route as its card on the home page, on the globe and in the results: what the browser needs of it,
+ * with the estimate of the route page made on the server.
+ */
+export interface RouteCardData {
+  id: string
+  persona: Persona
+  destinationId: string
+  title: string
+  author: string
+  nights: number
+  /** The main costs of `previewPlan`, ₽: the «≈ N ₽ за K ночей» of the route page. */
+  price: number
+  cover: Route['cover']
+  featured: boolean
+}
+
+export function routeCard(route: Route, hotels: Readonly<Record<string, Hotel>>, featured: boolean): RouteCardData {
+  const plan = previewPlan(route, hotels)
+  return {
+    id: route.id,
+    persona: route.persona,
+    destinationId: route.destinationId,
+    title: route.title,
+    author: authorName(route),
+    nights: plan.nights,
+    price: plan.main,
+    cover: route.cover,
+    featured,
+  }
+}
+
+/** The featured cards first, the rest in their order. */
+export const featuredFirst = (cards: readonly RouteCardData[]) =>
+  cards.toSorted((a, b) => Number(b.featured) - Number(a.featured))
+
+export interface RouteWish {
+  /** The best route of the search by meaning, when it answered. */
+  semanticId?: string | null
+  /** The persona of the answers. */
+  persona: Persona
+  /** The city of the result's first option. */
+  destinationId?: string
+}
+
+/**
+ * The ready-made route for the answers of the vibe, the stars or the assistant: the search by meaning's,
+ * else the persona's in the city, else the persona's first, else the first featured, else the first;
+ * `null` only without routes. The same wish gives the same route.
+ */
+export function bestRoute(cards: readonly RouteCardData[], wish: RouteWish): RouteCardData | null {
+  const { semanticId, persona, destinationId } = wish
+  return (
+    cards.find((card) => card.id === semanticId) ??
+    cards.find((card) => card.persona === persona && card.destinationId === destinationId) ??
+    cards.find((card) => card.persona === persona) ??
+    cards.find((card) => card.featured) ??
+    cards[0] ??
+    null
+  )
+}
 
 // ---------------------------------------------------------------------------------------------
 // Calendar export

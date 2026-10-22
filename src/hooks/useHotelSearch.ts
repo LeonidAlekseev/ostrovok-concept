@@ -56,13 +56,14 @@ export function useHotelSearch({ query: startQuery = initialQuery, errors: start
     setErrors((e) => withoutKey(e, 'guests'))
   }, [])
 
+  /** With `anyway`, an invalid query opens the results page too: its form shows the errors at the fields. */
   const run = useCallback(
-    (q: SearchQuery): SearchErrors => {
+    (q: SearchQuery, anyway = false): SearchErrors => {
       // Same `today` snapshot the form used for its start dates; todayIso() only while that snapshot is empty.
       const found = validateSearch(q, today || todayIso(), destinations)
       setErrors(found)
       const target = resolveTarget(q.destination, destinations)
-      if (Object.keys(found).length === 0 && target)
+      if ((anyway || Object.keys(found).length === 0) && target)
         startTransition(() => router.push(`/search?${toSearchParams(q, target)}`))
       return found
     },
@@ -72,11 +73,11 @@ export function useHotelSearch({ query: startQuery = initialQuery, errors: start
   /** Returns validation errors so the caller can move focus to the first invalid field. */
   const submit = useCallback(() => run(query), [run, query])
 
-  /** Fills the whole form at once (e.g. from the assistant) and searches. */
+  /** Fills the whole form at once (the assistant's choice) and opens the results page with it. */
   const searchFor = useCallback(
     (q: SearchQuery) => {
       setChosen(q)
-      return run(q)
+      return run(q, true)
     },
     [run],
   )

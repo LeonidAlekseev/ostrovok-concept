@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { List, LoaderCircle, MapPin, SlidersVertical } from 'lucide-react'
@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button'
 import { useHotelSearch } from '../../hooks/useHotelSearch'
 import { useToday } from '../../hooks/useToday'
 import { fetchHotels } from '../../hooks/useHotels'
-import { formatShortRange } from '../../lib/dates'
 import { countRu } from '../../lib/format'
 import {
   applyFilters,
@@ -161,7 +160,6 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
   const router = useRouter()
   const [status, setStatus] = useState<Status>({ state: 'loading' })
   const [filters, setFilters] = useState(initialFilters)
-  const [editing, setEditing] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
   // Whether the open hotel has its own history entry: closing then goes back to the results.
@@ -260,57 +258,42 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
     target.kind === 'destination' ? `${target.destination.name}, ${target.destination.country}` : target.title
   const filterCount = countFilters(filters)
 
-  const editHintId = useId()
   const iconButton = 'size-14 shrink-0 rounded-2xl p-0 lg:hidden'
 
   return (
     <main className={pageClass}>
       <h1 className="sr-only">{title}</h1>
-      <div className="flex items-stretch gap-2">
-        <button
-          type="button"
-          aria-expanded={editing}
-          aria-describedby={editHintId}
-          onClick={() => setEditing((on) => !on)}
-          className="flex min-h-14 min-w-0 flex-1 flex-col justify-center rounded-2xl bg-card px-4 text-left shadow-(--shadow-card) lg:max-w-md"
-        >
-          <span className="truncate font-medium text-primary">{title}</span>
-          <span className="truncate text-sm text-foreground">{formatShortRange(query.checkIn, query.checkOut)}</span>
-        </button>
-        <span id={editHintId} className="sr-only">
-          Изменить поиск
-        </span>
-        {result && (
-          <>
-            <Button
-              variant="outline"
-              className={cn(iconButton, 'relative')}
-              aria-haspopup="dialog"
-              aria-label={filterCount > 0 ? `Фильтры, включено ${filterCount}` : 'Фильтры'}
-              onClick={() => setFiltersOpen(true)}
-            >
-              <SlidersVertical aria-hidden />
-              {filterCount > 0 && (
-                <span
-                  aria-hidden
-                  className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
-                >
-                  {filterCount}
-                </span>
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              className={iconButton}
-              onClick={() => saveView(viewKey, view === 'list' ? 'map' : 'list')}
-              aria-label={view === 'list' ? 'Карта' : 'Список'}
-            >
-              {view === 'list' ? <MapPin aria-hidden /> : <List aria-hidden />}
-            </Button>
-          </>
-        )}
-      </div>
-      {editing && <EditSearch query={query} />}
+      {/* The manual search, filled from the address: a new search changes the address and the results. */}
+      <EditSearch query={query} />
+      {result && (
+        <div className="flex justify-end gap-2 lg:hidden">
+          <Button
+            variant="outline"
+            className={cn(iconButton, 'relative')}
+            aria-haspopup="dialog"
+            aria-label={filterCount > 0 ? `Фильтры, включено ${filterCount}` : 'Фильтры'}
+            onClick={() => setFiltersOpen(true)}
+          >
+            <SlidersVertical aria-hidden />
+            {filterCount > 0 && (
+              <span
+                aria-hidden
+                className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
+              >
+                {filterCount}
+              </span>
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            className={iconButton}
+            onClick={() => saveView(viewKey, view === 'list' ? 'map' : 'list')}
+            aria-label={view === 'list' ? 'Карта' : 'Список'}
+          >
+            {view === 'list' ? <MapPin aria-hidden /> : <List aria-hidden />}
+          </Button>
+        </div>
+      )}
 
       <div aria-live="polite">
         {status.state === 'loading' && <Searching />}
