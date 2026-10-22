@@ -29,12 +29,12 @@ function Trips() {
       <h1 className="text-title font-bold tracking-[-0.02em]">Мои поездки</h1>
       {loaded.status === 'error' && <p role="alert">{loaded.message}: показываем поездки без фото.</p>}
       <Tabs defaultValue="upcoming">
-        <TabsList className="mb-4 flex gap-1 border-b border-border">
+        <TabsList className="mb-4 flex w-full gap-1 border-b border-border">
           {TABS.map(({ value, label }) => (
             <TabsTrigger
               key={value}
               value={value}
-              className="-mb-px cursor-pointer border-b-2 border-transparent px-3 py-2 font-medium text-muted-foreground data-active:border-primary data-active:text-foreground"
+              className="-mb-px min-w-0 flex-1 cursor-pointer whitespace-normal border-b-2 border-transparent px-1 py-2 text-sm font-medium sm:flex-none sm:px-3 sm:text-base text-muted-foreground data-active:border-primary data-active:text-foreground"
             >
               {label} ({tripsIn(bookings, value, today).length})
             </TabsTrigger>

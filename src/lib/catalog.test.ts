@@ -371,3 +371,14 @@ describe('travelTimes', () => {
     expect(travelTimes({ distanceKm: 3, metro: null })).toEqual({ centre: 9, transport: 5, metro: null })
   })
 })
+
+// hotel-catalog, Requirement: Тексты по типу жилья
+describe('texts by kind of stay', () => {
+  it('call only a hotel «отель»', () => {
+    for (const hotel of buildCatalog()) {
+      if (hotel.stayType === 'hotel') continue
+      const texts = [hotel.description, ...hotel.reviews.flatMap((r) => [r.pros, r.cons ?? ''])]
+      expect(texts.filter((t) => /отел/i.test(t)), hotel.id).toEqual([])
+    }
+  })
+})

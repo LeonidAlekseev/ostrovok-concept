@@ -15,6 +15,13 @@ describe('rankHotelAlternatives', () => {
     expect(ranked.every((h) => h.destinationId === 'prague' && h.id !== current.id)).toBe(true)
   })
 
+  it('leaves out the hotels of the other stops of the plan', () => {
+    const next = city.find((h) => h.id !== current.id)!
+    const ranked = rankHotelAlternatives(current, city, undefined, new Set([current.id, next.id]))
+    expect(ranked.some((h) => h.id === next.id)).toBe(false)
+    expect(ranked).toHaveLength(city.length - 2)
+  })
+
   it('puts the most alike first: same type, price, stars, rating, amenities and distance', () => {
     const ranked = rankHotelAlternatives(current, [
       twin('far', { distanceKm: current.distanceKm + 10 }),

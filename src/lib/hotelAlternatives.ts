@@ -35,15 +35,16 @@ function difference(current: Hotel, candidate: Hotel): number {
  * The replacements of a stop's hotel, the most alike first: the kind of stay, the stars, the rating, the
  * price, the amenities in common and the distance to the centre. `profile` (0…1, how well a hotel suits the
  * user) moves the hotels the user would like up: the embeddings of the hotels and the user plug in here.
- * Only the hotels of the same city count, the current one left out; equally alike hotels keep the order of `candidates`.
+ * Only the hotels of the same city count, the current one and the `taken` ones (the other stops' hotels) left out; equally alike hotels keep the order of `candidates`.
  */
 export function rankHotelAlternatives(
   current: Hotel,
   candidates: readonly Hotel[],
   profile?: (hotel: Hotel) => number,
+  taken: ReadonlySet<string> = new Set(),
 ): Hotel[] {
   return candidates
-    .filter((hotel) => hotel.id !== current.id && hotel.destinationId === current.destinationId)
+    .filter((hotel) => hotel.id !== current.id && !taken.has(hotel.id) && hotel.destinationId === current.destinationId)
     .map((hotel, order) => ({
       hotel,
       order,
