@@ -16,7 +16,8 @@
     "secrets:reveal": "node scripts/secrets.mjs reveal",
     "secrets:hide": "node scripts/secrets.mjs hide",
     "db:push": "node --env-file-if-exists=.env.local scripts/db-push.mjs",
-    "db:seed": "node --env-file-if-exists=.env.local scripts/seed.ts"
+    "db:seed": "node --env-file-if-exists=.env.local scripts/seed.ts",
+    "db:embed": "node --env-file-if-exists=.env.local scripts/embed.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

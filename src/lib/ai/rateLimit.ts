@@ -18,7 +18,7 @@ export function allowRequest(ip: string, now = Date.now()): boolean {
   return hit.count <= RATE_LIMIT
 }
 
-/** The client's address behind the Vercel proxy. */
-export function clientIp(request: Request): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0].trim() || request.headers.get('x-real-ip') || 'local'
+/** The client's address behind the Vercel proxy, from a request or from a server action's `headers()`. */
+export function clientIp({ headers }: { headers: Pick<Headers, 'get'> }): string {
+  return headers.get('x-forwarded-for')?.split(',')[0].trim() || headers.get('x-real-ip') || 'local'
 }
