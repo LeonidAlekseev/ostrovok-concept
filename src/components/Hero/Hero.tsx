@@ -1,16 +1,26 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
-import { ChevronRight, Route as RouteIcon } from 'lucide-react'
+import { ChevronRight, Dices, Route as RouteIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import type { Destination } from '@/data/destinations'
-import { GLOBE_CENTER, viewPlacing, type GlobeView } from '../../lib/globe'
+import { GLOBE_CENTER, spinTarget, spinView, viewPlacing, type GlobeSpin, type GlobeView } from '../../lib/globe'
 import { appEnv, isProduction } from '../../lib/env'
 import { formatPrice } from '../../lib/format'
+import { SLOGAN } from '../../lib/shareMedia'
 import type { RouteCardData } from '../../lib/routes'
 import { useDestinations } from '../Catalog/useDestinations'
 import { createFrameMeter, type FrameWindow } from './globePerformance'
 import { createGlobeRenderer, type GlobeRenderer } from './globeRenderer'
-import { createRouteFeed, depthOpacity, pickSpotlightCity, sceneAt, type Scene, type Spotlight } from './globeScene'
+import {
+  createRouteFeed,
+  depthOpacity,
+  pickOther,
+  pickSpotlightCity,
+  sceneAt,
+  type Scene,
+  type Spotlight,
+} from './globeScene'
 import { StatsPanel, type StatsPanelHandle } from './StatsPanel'
 
 interface Props {
@@ -32,6 +42,8 @@ const MAX_DRAG_SPEED = 400
 const MAX_TILT = 85
 /** How quickly the globe turns a selected pin into place (per second). */
 const CENTER_RATE = 3
+/** Length of the spin to a random idea, ms. */
+const SPIN_MS = 2000
 /** Share of the hero's height covered by the search form, and the gap kept above it, px. */
 const FORM_OVERLAP = 0.24
 const SELECTED_GAP = 16
@@ -117,18 +129,21 @@ export function Hero({ cities: markers, routes, featured }: Props) {
   const [feed] = useState(() => createRouteFeed(routes))
   const [spotlight, setSpotlight] = useState<Spotlight>(() => ({
     destination: featured,
-    routes: feed.has(featured.id) ? [feed.next(featured.id)!] : [],
+    route: feed.has(featured.id) ? feed.next(featured.id)! : null,
     sources: initialSourceIds.flatMap((id) => destinations.find((d) => d.id === id) ?? []),
   }))
-  /** The chosen pin: the globe turns it to the middle and its card lists the city's routes. */
+  /** The chosen pin: the globe turns it to the middle and its card shows one of the city's ideas. */
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // The initial layout is rendered once; afterwards the animation loop owns all positions.
   const [initialScene] = useState(() => sceneAt(markers, spotlight, GLOBE_CENTER))
   const [spinning, setSpinning] = useState(false)
+  /** Read out once a random idea is shown. */
+  const [announcement, setAnnouncement] = useState('')
 
   const heroRef = useRef<HTMLElement>(null)
   const copyRef = useRef<HTMLDivElement>(null)
   const hintRef = useRef<HTMLParagraphElement>(null)
+  const randomRef = useRef<HTMLButtonElement>(null)
   const globeRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const pinRefs = useRef(new Map<string, HTMLButtonElement>())
@@ -141,6 +156,12 @@ export function Hero({ cities: markers, routes, featured }: Props) {
   const viewRef = useRef({ ...GLOBE_CENTER })
   /** View the globe is turning to, so that the selected pin comes to the middle of the visible globe. */
   const targetRef = useRef<GlobeView | null>(null)
+  /** The spin to a random idea; while it lasts, the drag, the own spin and the turn to a pin wait. */
+  const spinRef = useRef<(GlobeSpin & { onEnd: () => void }) | null>(null)
+  /** The idea each city showed last, so that the next opening of its pin shows another one. */
+  const shownRef = useRef(new Map<string, string>())
+  /** Set when a random idea opens: its card takes the focus once painted. */
+  const focusCardRef = useRef(false)
 
   /** Writes the current scene straight to the DOM, bypassing React on every frame. */
   const paint = useCallback((scene: Scene) => {
@@ -168,7 +189,12 @@ export function Hero({ cities: markers, routes, featured }: Props) {
   useLayoutEffect(() => {
     const changed = spotlightRef.current !== spotlight
     spotlightRef.current = spotlight
+    if (spotlight.route) shownRef.current.set(spotlight.destination.id, spotlight.route.id)
     paint(sceneAt(markers, spotlight, viewRef.current))
+    if (focusCardRef.current) {
+      focusCardRef.current = false
+      cardRef.current?.querySelector('a')?.focus({ preventScroll: true })
+    }
     // The card and its routes fade in at the new city instead of jumping there (not on the first render:
     // the server-rendered card is already in place). Animations override the per-frame depth opacity
     // only while they run.
@@ -226,7 +252,7 @@ export function Hero({ cities: markers, routes, featured }: Props) {
         {
           globe: globeRect,
           hero: hero.getBoundingClientRect(),
-          avoid: [copyRef.current!.getBoundingClientRect(), hintRef.current!.getBoundingClientRect()],
+          avoid: [copyRef, hintRef, randomRef].map((ref) => ref.current!.getBoundingClientRect()),
           card: { left: card.left - hubX, right: card.right - hubX, top: card.top - hubY, bottom: card.bottom - hubY },
         },
         recent,
@@ -234,7 +260,7 @@ export function Hero({ cities: markers, routes, featured }: Props) {
       if (!picked) return
       recent.unshift(picked.city.id)
       recent.length = Math.min(recent.length, 4)
-      setSpotlight({ destination: picked.city, routes: [feed.next(picked.city.id)!], sources: picked.sources })
+      setSpotlight({ destination: picked.city, route: feed.next(picked.city.id)!, sources: picked.sources })
     }
 
     const tick = (now: number) => {
@@ -251,9 +277,20 @@ export function Hero({ cities: markers, routes, featured }: Props) {
       const canSpin = ready && !reducedMotion.matches
       const view = viewRef.current
 
-      // Ease in and out of rotation instead of starting or stopping abruptly. A drag pulls the spin
-      // towards the pointer's speed; once released, the globe coasts back to its own pace.
-      if (drag && dt > 0) {
+      const spin = spinRef.current
+      if (spin) {
+        // The spin to a random idea alone turns the globe; the own spin picks up from rest afterwards.
+        if (Number.isNaN(spin.start)) spin.start = now
+        Object.assign(view, spinView(spin, now))
+        speed = 0
+        if (now >= spin.start + spin.duration) {
+          spinRef.current = null
+          elapsed = 0
+          spin.onEnd()
+        }
+      } else if (drag && dt > 0) {
+        // Ease in and out of rotation instead of starting or stopping abruptly. A drag pulls the spin
+        // towards the pointer's speed; once released, the globe coasts back to its own pace.
         // Near the centre one radius of pointer travel turns the globe by one radian.
         const radius = globe.clientWidth / 2
         const dragSpeed = (drag.dx / dt / radius) * (180 / Math.PI)
@@ -269,7 +306,7 @@ export function Hero({ cities: markers, routes, featured }: Props) {
       }
       view.lon -= speed * dt
       const target = targetRef.current
-      if (target && !drag) {
+      if (target && !drag && !spin) {
         const k = reducedMotion.matches ? 1 : Math.min(dt * CENTER_RATE, 1)
         const dLat = target.lat - view.lat
         const dLon = ((((target.lon - view.lon) % 360) + 540) % 360) - 180
@@ -278,7 +315,7 @@ export function Hero({ cities: markers, routes, featured }: Props) {
         if (Math.abs(dLat) < 0.01 && Math.abs(dLon) < 0.01) targetRef.current = null
       }
       const period = reducedMotion.matches ? REDUCED_MOTION_SPOTLIGHT_SECONDS : SPOTLIGHT_SECONDS
-      if (!paused) elapsed += dt
+      if (!paused && !spinRef.current) elapsed += dt
       const scene = sceneAt(markers, spotlightRef.current, view)
 
       let drew = false
@@ -306,7 +343,7 @@ export function Hero({ cities: markers, routes, featured }: Props) {
     }
 
     const onPointerDown = (e: PointerEvent) => {
-      if (!ready || drag || e.button !== 0) return
+      if (!ready || drag || spinRef.current || e.button !== 0) return
       drag = { pointerId: e.pointerId, lastX: e.clientX, lastY: e.clientY, dx: 0, dy: 0 }
       // A drag takes over from turning to the selected pin.
       targetRef.current = null
@@ -357,36 +394,60 @@ export function Hero({ cities: markers, routes, featured }: Props) {
     const selected = markers.find((d) => d.id === selectedId)
     pausedRef.current.selected = selected !== undefined
     if (!selected) return
-    // Measured once the chosen city's card is painted (`spotlight` in the deps): its height is the list's.
-    const g = globeRef.current!.getBoundingClientRect()
-    const h = heroRef.current!.getBoundingClientRect()
-    const radius = g.width / 2
-    // The card keeps its place relative to the pin (below it on phones, beside it on wide screens);
-    // the pair must end just above the form, which overlaps the bottom quarter of the hero.
-    const card = cardRef.current?.getBoundingClientRect() ?? { bottom: 0 }
-    const hub = sceneAt(markers, spotlightRef.current, viewRef.current).hub
-    const hubY = g.top + (hub.y / 100) * g.height
-    const formTop = h.bottom - h.height * FORM_OVERLAP
-    const x = h.left + h.width / 2
-    const y = formTop - Math.max(card.bottom - hubY, 0) - SELECTED_GAP
-    const u = (x - g.left - radius) / radius
-    const v = (g.top + radius - y) / radius
-    // Far north a city cannot reach every spot of the disc: move the spot towards the centre until it can.
-    for (const k of [1, 0.75, 0.5, 0.25, 0]) {
-      targetRef.current = viewPlacing(selected.lat, selected.lon, u * k, v * k, MAX_TILT)
-      if (targetRef.current) break
-    }
+    // Measured once the chosen city's card is painted (`spotlight` in the deps).
+    targetRef.current = viewAboveForm(selected, heroRef.current!, globeRef.current!, cardRef.current, () =>
+      sceneAt(markers, spotlightRef.current, viewRef.current),
+    )
   }, [markers, feed, selectedId, spotlight])
 
-  /** A pin toggles its choice; the card moves to the city, so it never covers the pin, and lists all its routes. */
-  const choosePin = (city: Destination) => {
-    if (selectedId === city.id) return setSelectedId(null)
+  /** Opens the city's pin with a random idea of the city, another than it showed last; returns the idea. */
+  const openIdea = (city: Destination) => {
+    const route = pickOther(feed.all(city.id), shownRef.current.get(city.id)) ?? null
     setSelectedId(city.id)
+    // The card moves to the city, so it never covers the pin.
     setSpotlight((current) => ({
       destination: city,
-      routes: feed.all(city.id),
+      route,
       sources: current.destination.id === city.id ? current.sources : [],
     }))
+    return route
+  }
+
+  /** A pin toggles its choice. */
+  const choosePin = (city: Destination) => {
+    if (selectedId === city.id) return setSelectedId(null)
+    openIdea(city)
+  }
+
+  /** Spins the globe more than a full turn to a random city with routes and opens its pin; ignored mid-spin. */
+  const showRandomIdea = () => {
+    if (spinRef.current) return
+    const city = pickOther(
+      markers.filter((d) => feed.has(d.id)),
+      spotlightRef.current.destination.id,
+    )
+    if (!city) return
+    const reveal = () => {
+      const route = openIdea(city)
+      focusCardRef.current = true
+      setAnnouncement(route ? `Случайная идея: ${route.title}, ${city.name}` : '')
+    }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return reveal()
+    setSelectedId(null)
+    targetRef.current = null
+    const view = viewRef.current
+    // The city stops where its open pin is turned to anyway, so the globe barely moves after the spin.
+    const end = viewAboveForm(city, heroRef.current!, globeRef.current!, cardRef.current, () =>
+      sceneAt(markers, spotlightRef.current, view),
+    ) ?? { lat: view.lat, lon: city.lon }
+    spinRef.current = {
+      from: { ...view },
+      to: spinTarget(view, end),
+      // Set by the first frame of the spin.
+      start: Number.NaN,
+      duration: SPIN_MS,
+      onEnd: reveal,
+    }
   }
 
   const pause = (key: 'hover' | 'focus', value: boolean) => () => {
@@ -399,7 +460,7 @@ export function Hero({ cities: markers, routes, featured }: Props) {
     onBlur: pause('focus', false),
   }
 
-  const { destination } = spotlight
+  const { destination, route } = spotlight
 
   return (
     <section ref={heroRef} className={hero} aria-labelledby="hero-title">
@@ -408,16 +469,32 @@ export function Hero({ cities: markers, routes, featured }: Props) {
         className="pointer-events-none relative z-4 w-fit pt-[calc(var(--header-height)+clamp(18px,5vw,48px))] pr-(--page-x) pl-[calc(var(--page-x)+8px)] md:ml-[max(0px,(100%-var(--page-max))/2)] md:pt-[calc(var(--header-height)+clamp(56px,8vw,96px))]"
       >
         <h1 id="hero-title" className="text-(length:--text-display) leading-[1.02] font-extrabold tracking-[-0.035em]">
-          Найди свой <span className="block text-primary">уголок</span>
+          {SLOGAN.slice(0, SLOGAN.lastIndexOf(' '))}{' '}
+          <span className="block text-primary">{SLOGAN.slice(SLOGAN.lastIndexOf(' ') + 1)}</span>
         </h1>
       </div>
 
-      <p
-        ref={hintRef}
-        className="pointer-events-none relative z-4 mt-[clamp(32px,9vw,64px)] ml-[calc(var(--page-x)+4px)] w-[7em] origin-top-left -rotate-10 font-hand text-[clamp(17px,4.6vw,27px)]/[1.05] font-semibold text-primary md:ml-[calc(max(0px,(100%-var(--page-max))/2)+var(--page-x)+8px)]"
-        aria-hidden
-      >
-        Вращай глобус — воплощай мечту
+      {/* The button sits beside the hint on phones, under it on wide screens: either way clear of the open pin. */}
+      <div className="pointer-events-none relative z-4 mt-[clamp(32px,9vw,64px)] flex flex-wrap items-start gap-x-3 gap-y-4 pr-(--page-x) pl-[calc(var(--page-x)+4px)] md:flex-col md:gap-[clamp(20px,6vw,36px)] md:pl-[calc(max(0px,(100%-var(--page-max))/2)+var(--page-x)+8px)]">
+        <p
+          ref={hintRef}
+          className="w-[7em] origin-top-left -rotate-10 font-hand text-[clamp(17px,4.6vw,27px)]/[1.05] font-semibold text-primary"
+          aria-hidden
+        >
+          Вращай глобус — воплощай мечту
+        </p>
+        <Button
+          ref={randomRef}
+          shape="pill"
+          className="pointer-events-auto shadow-(--shadow-primary) max-md:ml-auto max-md:h-9 max-md:px-3.5 max-md:text-sm"
+          onClick={showRandomIdea}
+        >
+          <Dices aria-hidden />
+          Случайная идея
+        </Button>
+      </div>
+      <p role="status" className="sr-only">
+        {announcement}
       </p>
 
       {/* No z-index or transform: the globe makes no stacking context of its own, so the route card can rise
@@ -495,7 +572,7 @@ export function Hero({ cities: markers, routes, featured }: Props) {
               }`}
               style={{ ...positionStyle(point), '--o': depthOpacity(point.depth).toFixed(3) } as CSSProperties}
               data-hidden={point.depth <= 0.05 || undefined}
-              aria-label={`${d.name}, ${d.country} — маршруты`}
+              aria-label={`${d.name}, ${d.country} — идеи путешествий`}
               aria-pressed={selectedId === d.id}
               onClick={() => choosePin(d)}
               {...pauseHandlers}
@@ -508,11 +585,11 @@ export function Hero({ cities: markers, routes, featured }: Props) {
           )
         })}
 
-        {spotlight.routes.length > 0 && (
+        {route && (
           <div ref={cardRef} className={placeCard} style={positionStyle(initialScene.hub)} {...pauseHandlers}>
-            {/* Re-keyed per route so every new one plays the entrance animation. */}
+            {/* Re-keyed per idea so every new one plays the entrance animation. */}
             <div
-              key={`${destination.id}/${spotlight.routes.map((route) => route.id).join()}`}
+              key={`${destination.id}/${route.id}`}
               className="flex animate-in items-center gap-[clamp(7px,2vw,12px)] animation-duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] fade-in zoom-in-97 slide-in-from-bottom-2 motion-reduce:animate-none"
             >
               <span className={placeIcon} aria-hidden>
@@ -524,24 +601,18 @@ export function Hero({ cities: markers, routes, featured }: Props) {
                   variant="success"
                   className="self-start rounded-sm px-1 py-0 text-(length:--badge-size) leading-[1.25] tracking-[0.02em] uppercase"
                 >
-                  {spotlight.routes.length > 1 ? 'Маршруты' : 'Маршрут'} · {destination.name}
+                  Маршрут · {destination.name}
                 </Badge>
-                <ul className="flex flex-col gap-(--text-gap)">
-                  {spotlight.routes.map((route) => (
-                    <li key={route.id} className="min-w-0">
-                      {/* A single route's link covers the whole card. */}
-                      <Link
-                        href={`/routes/${route.id}`}
-                        className={`flex flex-col rounded-sm ${spotlight.routes.length === 1 ? "after:absolute after:inset-0 after:content-['']" : ''}`}
-                      >
-                        <span className="truncate text-(length:--name-size) font-[650]">{route.title}</span>
-                        <span className="truncate text-(length:--meta-size) text-muted-foreground">
-                          {route.author} · ≈ {formatPrice(route.price)}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                {/* The link covers the whole card. */}
+                <Link
+                  href={`/routes/${route.id}`}
+                  className="flex min-w-0 flex-col rounded-sm after:absolute after:inset-0 after:content-['']"
+                >
+                  <span className="truncate text-(length:--name-size) font-[650]">{route.title}</span>
+                  <span className="truncate text-(length:--meta-size) text-muted-foreground">
+                    {route.author} · ≈ {formatPrice(route.price)}
+                  </span>
+                </Link>
               </div>
               <ChevronRight
                 className="ml-[clamp(0px,1vw,14px)] w-[clamp(14px,3.8vw,18px)] flex-none text-muted-foreground"
@@ -555,6 +626,37 @@ export function Hero({ cities: markers, routes, featured }: Props) {
       {!isProduction && <StatsPanel ref={statsRef} />}
     </section>
   )
+}
+
+/**
+ * The view that brings `city` to the middle of the hero just above the search form, its open card included;
+ * `scene` gives the current position of the hub, whose card is measured.
+ */
+function viewAboveForm(
+  city: Destination,
+  hero: HTMLElement,
+  globe: HTMLElement,
+  card: HTMLElement | null,
+  scene: () => Scene,
+): GlobeView | null {
+  const g = globe.getBoundingClientRect()
+  const h = hero.getBoundingClientRect()
+  const radius = g.width / 2
+  // The card keeps its place relative to the pin (below it on phones, beside it on wide screens);
+  // the pair must end just above the form, which overlaps the bottom quarter of the hero.
+  const cardBottom = card?.getBoundingClientRect().bottom ?? 0
+  const hubY = g.top + (scene().hub.y / 100) * g.height
+  const formTop = h.bottom - h.height * FORM_OVERLAP
+  const x = h.left + h.width / 2
+  const y = formTop - Math.max(cardBottom - hubY, 0) - SELECTED_GAP
+  const u = (x - g.left - radius) / radius
+  const v = (g.top + radius - y) / radius
+  // Far north a city cannot reach every spot of the disc: move the spot towards the centre until it can.
+  for (const k of [1, 0.75, 0.5, 0.25, 0]) {
+    const view = viewPlacing(city.lat, city.lon, u * k, v * k, MAX_TILT)
+    if (view) return view
+  }
+  return null
 }
 
 /**

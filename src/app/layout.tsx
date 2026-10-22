@@ -37,7 +37,9 @@ export const revalidate = 3600
 export default async function RootLayout({ children, modal }: { children: ReactNode; modal: ReactNode }) {
   const destinations = await loadDestinations()
   return (
-    <html lang="ru">
+    // The root background shows above the page when it is pulled past the top (macOS, iOS) and tints Safari's
+    // bars: under the home page's lime hero it is lime too, not the grey page background.
+    <html lang="ru" className="has-[#hero-title]:bg-brand">
       {/* Each page renders its own `main`; the footer sits at the bottom of short pages. */}
       <body className="flex min-h-dvh flex-col">
         <CatalogProvider destinations={destinations}>
