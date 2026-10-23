@@ -15,6 +15,11 @@ export interface Destination {
   onGlobe?: boolean
   /** Real metro stations of a city with a metro; the demo hotels get one of them as the nearest. */
   metro?: string[]
+  /**
+   * The city's hotels are real, from an Ostrovok search loaded by `npm run db:seed:valencia`: the catalogue
+   * generator makes none for it.
+   */
+  real?: true
 }
 
 export interface Scenario {
@@ -433,6 +438,18 @@ export const destinations: Destination[] = [
     scenarios: [],
     onGlobe: true,
     metro: ['Гиндза', 'Синдзюку', 'Сибуя', 'Токио', 'Асакуса', 'Уэно', 'Роппонги'],
+  },
+  {
+    id: 'valencia',
+    name: 'Валенсия',
+    genitive: 'Валенсии',
+    country: 'Испания',
+    lat: 39.4699,
+    lon: -0.3763,
+    // The cheapest night of the Ostrovok search: npm run db:seed:valencia checks it.
+    priceFrom: 3600,
+    scenarios: ['sea', 'europe'],
+    real: true,
   },
 ]
 

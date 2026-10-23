@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import type { HotelSearch } from '@/hooks/useHotelSearch'
-import type { HotelSummary } from '@/lib/catalog'
+import { isRated, type HotelSummary } from '@/lib/catalog'
 import {
   MAX_MESSAGE_LENGTH,
   askAssistant,
@@ -391,10 +391,12 @@ function PlanView({ plan, onChoose }: PlanProps) {
                 {hotel && (
                   <span className="block truncate text-sm/[normal] text-muted-foreground">
                     {hotel.name}
-                    <Badge className="ml-1.5 gap-0.5">
-                      <Star fill="currentColor" strokeWidth={0} aria-hidden />
-                      {hotel.rating.toFixed(1)}
-                    </Badge>
+                    {isRated(hotel) && (
+                      <Badge className="ml-1.5 gap-0.5">
+                        <Star fill="currentColor" strokeWidth={0} aria-hidden />
+                        {hotel.rating.toFixed(1)}
+                      </Badge>
+                    )}
                   </span>
                 )}
               </span>

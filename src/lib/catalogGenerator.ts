@@ -125,7 +125,7 @@ const WIFI_MBPS: Record<StayType, [number, number]> = {
 const WORKSPACE_SHARE: Record<StayType, number> = { hotel: 0.35, hostel: 0, apartments: 0.6, villa: 0 }
 
 /** Wi‑Fi speed to 10 Мбит/с and the workspace: a seed of their own, so the rest of the hotel stays as it was. */
-function workTraits(id: string, type: StayType) {
+export function workTraits(id: string, type: StayType) {
   const rng = seeded(`work:${id}`)
   const [min, max] = WIFI_MBPS[type]
   return { wifiMbps: Math.round(rng.int(min, max) / 10) * 10, workspace: rng.next() < WORKSPACE_SHARE[type] }
@@ -259,7 +259,7 @@ const reviewCountOf = (id: string) => seeded(`reviews:${id}`).int(40, 1400)
 function buildSummaries() {
   const all: HotelSummary[] = []
   const fromSeed = new Map<HotelSeed, HotelSummary>()
-  for (const destination of destinations) {
+  for (const destination of destinations.filter((d) => !d.real)) {
     const own = newHotelSeeds.filter((h) => h.destinationId === destination.id)
     for (const seed of own) {
       const summary = summaryOf(seed, reviewCountOf(idOf(seed.destinationId, seed.name)), true)
@@ -676,7 +676,11 @@ function reviewDetails(review: Review): Review {
   }
 }
 
-function buildHotel(summary: HotelSummary): Hotel {
+/** What a real hotel brings of its own: the rest of it is generated, the photos too when it has none. */
+export type RealHotelDetails = Pick<Hotel, 'address' | 'lat' | 'lon' | 'distanceKm' | 'metro' | 'amenities' | 'rooms'> &
+  Partial<Pick<Hotel, 'photos'>>
+
+function buildHotel(summary: HotelSummary, real?: RealHotelDetails): Hotel {
   const rng = seeded(`hotel:${summary.id}`)
   const destination = getDestination(summary.destinationId)!
   const photo = (id: string, caption: string): Photo => ({ id, caption, tone: rng.int(0, PHOTO_TONE_COUNT - 1) })
@@ -733,12 +737,17 @@ function buildHotel(summary: HotelSummary): Hotel {
     .map(reviewDetails)
     .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id))
 
-  const distance = `${distanceKm.toLocaleString('ru-RU')} км`
+  const distance = `${(real?.distanceKm ?? distanceKm).toLocaleString('ru-RU')} км`
   const texts =
     summary.stayType === 'hotel'
       ? { rooms: DESCRIPTION_ROOMS, service: DESCRIPTION_SERVICE }
       : STAY_TEXTS[summary.stayType]
-  const kind = summary.stayType === 'hotel' ? `${summary.stars}-звёздочный отель` : STAY_TEXTS[summary.stayType].noun
+  const kind =
+    summary.stayType !== 'hotel'
+      ? STAY_TEXTS[summary.stayType].noun
+      : summary.stars > 0
+        ? `${summary.stars}-звёздочный отель`
+        : 'отель'
   return {
     ...summary,
     address: `${destination.name}, ${district}, д. ${rng.int(1, 120)}`,
@@ -749,7 +758,9 @@ function buildHotel(summary: HotelSummary): Hotel {
     amenities,
     sectionScores: sectionScores(summary),
     description: [
-      `${summary.name} — ${kind} в районе «${district}», в ${distance} от центра.`,
+      real
+        ? `${summary.name} — ${kind} в ${distance} от центра ${destination.genitive}.`
+        : `${summary.name} — ${kind} в районе «${district}», в ${distance} от центра.`,
       rng.pick(texts.rooms),
       rng.pick(texts.service),
     ].join(' '),
@@ -762,6 +773,7 @@ function buildHotel(summary: HotelSummary): Hotel {
     guestPhotos: guestPhotos(summary.id),
     rooms,
     reviews,
+    ...real,
   }
 }
 
@@ -780,4 +792,10 @@ export function getHotel(id: string): Hotel | undefined {
 export const fullHotelsIn = (destinationId: string): Hotel[] => hotelsIn(destinationId).map((h) => getHotel(h.id)!)
 
 /** Builds the whole catalogue from scratch, bypassing the cache. */
-export const buildCatalog = (): Hotel[] => buildSummaries().all.map(buildHotel)
+export const buildCatalog = (): Hotel[] => buildSummaries().all.map((summary) => buildHotel(summary))
+
+/**
+ * A real hotel (src/lib/ota/hotel.ts): its own summary and details, and the rest generated as for the demo
+ * hotels, seeded by its id: the description, the section scores, the reviews and the guests' photos.
+ */
+export const generateHotel = (summary: HotelSummary, real: RealHotelDetails): Hotel => buildHotel(summary, real)

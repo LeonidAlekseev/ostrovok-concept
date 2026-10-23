@@ -1,5 +1,5 @@
 import { cn } from 'cn'
-import type { Hotel } from '@/lib/catalog'
+import { isRated, type Hotel } from '@/lib/catalog'
 import { AboutHotel } from './AboutHotel'
 import { Gallery } from './Gallery'
 import { HotelHeader } from './HotelHeader'
@@ -18,7 +18,7 @@ interface Props {
 
 /**
  * The large photo with its thumbnails (under the transparent header on the page, at the top of the
- * dialog), then text and headings straight on the page's background: the hotel, the guests' rating,
+ * dialog), then text and headings straight on the page's background: the hotel, the guests' rating (if any),
  * the dates, the hotel's description and amenities and the rooms, then the price bar (stuck to the
  * bottom of a narrow screen).
  */
@@ -33,7 +33,7 @@ export function HotelPage({ hotel, titleId, stay }: Props) {
         )}
       >
         <HotelHeader hotel={hotel} titleId={titleId} />
-        <HotelRating hotel={hotel} />
+        {isRated(hotel) && <HotelRating hotel={hotel} />}
         <StayDates hotel={hotel} />
         <AboutHotel hotel={hotel} />
         <HotelRooms hotel={hotel} className="flex scroll-mt-3 flex-col gap-4 outline-none" />

@@ -276,7 +276,7 @@ export function applyFilters(hotels: Hotel[], f: Filters, stay: Stay | null = nu
   const items: ResultItem[] = []
   for (const hotel of hotels) {
     if (f.types.length && !f.types.includes(hotel.stayType)) continue
-    if (f.stars.length && !(hasStars(hotel.stayType) && f.stars.includes(hotel.stars))) continue
+    if (f.stars.length && !(hasStars(hotel) && f.stars.includes(hotel.stars))) continue
     if (f.workspace && !hotel.workspace) continue
     if (f.wifiMin !== null && hotel.wifiMbps < f.wifiMin) continue
     if (f.ratingMin !== null && hotel.rating < f.ratingMin) continue

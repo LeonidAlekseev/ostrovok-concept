@@ -22,7 +22,7 @@ export function HotelHeader({ hotel, titleId }: { hotel: Hotel; titleId?: string
         <FavoriteButton hotelId={hotel.id} className="size-11" />
       </div>
       <div className="flex items-center gap-2 text-muted-foreground">
-        {hasStars(hotel.stayType) && (
+        {hasStars(hotel) && (
           <span
             className="flex items-center gap-0.5"
             role="img"
@@ -33,7 +33,11 @@ export function HotelHeader({ hotel, titleId }: { hotel: Hotel; titleId?: string
             ))}
           </span>
         )}
-        <span>{hotel.stayType === 'hotel' ? `${hotel.stars}-звёздочный отель` : STAY_TYPES[hotel.stayType]}</span>
+        <span>
+          {hotel.stayType === 'hotel' && hotel.stars > 0
+            ? `${hotel.stars}-звёздочный отель`
+            : STAY_TYPES[hotel.stayType]}
+        </span>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <p className="flex min-w-0 items-center gap-1.5 text-muted-foreground">

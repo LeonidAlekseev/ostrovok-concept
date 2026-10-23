@@ -73,11 +73,12 @@ describe('suggestDestinations', () => {
   })
 
   it('puts matches by name or country start before matches inside the text', () => {
-    // "ис" starts "Испания" (Madrid, Barcelona) and "Исландия" (Reykjavik), and occurs inside the others.
+    // "ис" starts "Испания" (Madrid, Barcelona, Valencia) and "Исландия" (Reykjavik), and occurs inside the others.
     expect(ids(suggestDestinations('ис', destinations))).toEqual([
       'madrid',
       'barcelona',
       'reykjavik',
+      'valencia',
       'lisbon',
       'tbilisi',
     ])
