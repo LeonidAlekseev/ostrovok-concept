@@ -1,6 +1,6 @@
 import { CalendarDays, Star } from 'lucide-react'
 import { cn } from 'cn'
-import { hasFreeCancellation, hasStars, type TileHotel } from '../../lib/catalog'
+import { hasFreeCancellation, hasStars, isRated, type TileHotel } from '../../lib/catalog'
 import { countRu, formatDecimal } from '../../lib/format'
 import { FavoriteButton } from '../FavoriteButton/FavoriteButton'
 
@@ -15,7 +15,7 @@ const badgeClass = 'bg-success-soft/90 text-success-foreground backdrop-blur-sm'
 
 /**
  * The badges laid over a hotel photo inside an `@container`: the free cancellation, the guest rating
- * and the favourite toggle on top, the stars in the bottom right corner; none for apartments and villas. Only the toggle takes clicks.
+ * (if any) and the favourite toggle on top, the stars in the bottom right corner; none for apartments and villas. Only the toggle takes clicks.
  */
 export function PhotoBadges({ hotel, freeCancellation = hasFreeCancellation(hotel) }: Props) {
   return (
@@ -33,24 +33,26 @@ export function PhotoBadges({ hotel, freeCancellation = hasFreeCancellation(hote
             Бесплатная отмена
           </span>
         )}
-        <span
-          className={cn(
-            'ml-auto flex size-8 shrink-0 items-center justify-center rounded-full text-[13px] font-bold @[18rem]:size-9 @[18rem]:text-sm',
-            badgeClass,
-          )}
-        >
-          <span className="sr-only">Оценка гостей </span>
-          {formatDecimal(hotel.rating)}
-        </span>
+        {isRated(hotel) && (
+          <span
+            className={cn(
+              'ml-auto flex size-8 shrink-0 items-center justify-center rounded-full text-[13px] font-bold @[18rem]:size-9 @[18rem]:text-sm',
+              badgeClass,
+            )}
+          >
+            <span className="sr-only">Оценка гостей </span>
+            {formatDecimal(hotel.rating)}
+          </span>
+        )}
         <FavoriteButton
           hotelId={hotel.id}
           className={cn(
-            'pointer-events-auto size-8 border-0 text-success-foreground shadow-none hover:bg-success-soft @[18rem]:size-9 [&_svg]:size-4.5',
+            'pointer-events-auto ml-auto size-8 border-0 text-success-foreground shadow-none hover:bg-success-soft @[18rem]:size-9 [&_svg]:size-4.5',
             badgeClass,
           )}
         />
       </div>
-      {hasStars(hotel.stayType) && (
+      {hasStars(hotel) && (
         <span
           role="img"
           aria-label={countRu(hotel.stars, ['звезда', 'звезды', 'звёзд'])}

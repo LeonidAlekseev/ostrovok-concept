@@ -1,4 +1,5 @@
 import type { IsoDate } from './dates'
+import { countRu } from './format'
 
 /**
  * The hotel catalogue's types, labels and helpers. The catalogue itself lives in Supabase and is read by
@@ -28,8 +29,15 @@ export const STAY_TYPES = {
 
 export type StayType = keyof typeof STAY_TYPES
 
-/** Hotels and hostels are rated in stars; apartments and villas have none in the interface. */
-export const hasStars = (type: StayType) => type === 'hotel' || type === 'hostel'
+/**
+ * Hotels and hostels are rated in stars; apartments and villas have none in the interface, nor has a real hotel
+ * without a classification (0 stars).
+ */
+export const hasStars = (hotel: Pick<HotelSummary, 'stayType' | 'stars'>) =>
+  (hotel.stayType === 'hotel' || hotel.stayType === 'hostel') && hotel.stars > 0
+
+/** A real hotel nobody has rated yet has the rating 0: the interface shows no score for it. */
+export const isRated = (hotel: Pick<HotelSummary, 'rating'>) => hotel.rating > 0
 
 export const PAYMENT_LABEL: Record<Payment, string> = { now: 'Оплата сейчас', 'at-hotel': 'Оплата в отеле' }
 
@@ -163,12 +171,14 @@ export interface SectionScore {
   score: number
 }
 
-/** A photo placeholder: no image files, only a caption and one of the gradient tones. */
+/** A photo: a real one has the image's `url`; the demo hotels have only a caption and one of the gradient tones. */
 export interface Photo {
   id: string
   caption: string
-  /** Index into PHOTO_TONES of the placeholder. */
+  /** Index into PHOTO_TONES of the placeholder, shown while there is no image or it fails to load. */
   tone: number
+  /** The CDN template of a real photo: `{size}` in it stands for the size, see `ostrovokImage`. */
+  url?: string
 }
 
 export const PHOTO_TONE_COUNT = 4
@@ -187,8 +197,9 @@ export interface Room {
   /** Unique within its hotel. */
   id: string
   name: string
-  /** m². */
-  area: number
+  /** m², `null` when unknown. */
+  area: number | null
+  /** Empty when unknown. */
   beds: string
   /** Guests one room sleeps. */
   capacity: number
@@ -217,8 +228,11 @@ export interface HotelSummary {
   destinationId: string
   name: string
   stayType: StayType
-  /** 1…5. Apartments and villas keep a value only to satisfy the table and the sorting: see `hasStars`. */
-  stars: 1 | 2 | 3 | 4 | 5
+  /**
+   * 1…5, or 0 for a real hotel without a classification. Apartments and villas keep a value only to satisfy the
+   * table and the sorting: see `hasStars`.
+   */
+  stars: 0 | 1 | 2 | 3 | 4 | 5
   /** Guest rating, 0…10. */
   rating: number
   reviewCount: number
@@ -264,6 +278,12 @@ export interface Hotel extends HotelSummary {
 }
 
 export const roundUp100 = (value: number) => Math.ceil(value / 100) * 100
+
+/** The room's line under its name: «18 м² · 1 двуспальная кровать · до 2 гостей», without the unknown parts. */
+export const roomFacts = (room: Pick<Room, 'area' | 'beds' | 'capacity'>): string =>
+  [room.area !== null && `${room.area} м²`, room.beds, `до ${countRu(room.capacity, ['гостя', 'гостей', 'гостей'])}`]
+    .filter(Boolean)
+    .join(' · ')
 
 export const findRoom = (hotel: Hotel, roomId: string) => hotel.rooms.find((r) => r.id === roomId)
 export const findRate = (room: Room, rateId: string) => room.rates.find((r) => r.id === rateId)

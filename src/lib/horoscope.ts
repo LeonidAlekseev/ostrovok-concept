@@ -317,6 +317,7 @@ export const citySigns: Record<string, string> = {
   seoul: 'taurus', // no scenario: earth
   vladivostok: 'pisces', // sea: water
   tokyo: 'virgo', // no scenario: earth
+  valencia: 'cancer', // sea: water
 }
 
 export const citySign = (city: Destination): ZodiacSign => signById.get(citySigns[city.id])!

@@ -18,7 +18,7 @@ import { Star } from 'lucide-react'
 import { cn } from 'cn'
 import { Badge } from '@/components/ui/badge'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
-import { hasStars, STAY_TYPES, type Hotel } from '../../lib/catalog'
+import { hasStars, isRated, STAY_TYPES, type Hotel } from '../../lib/catalog'
 import { countRu, formatDecimal, formatPrice } from '../../lib/format'
 import { clusterPoints, expansionZoom, type MapCluster } from '../../lib/mapClusters'
 import { ATTRIBUTION_SHOWN_MS, foldAttribution, MAP_STYLE } from './mapSetup'
@@ -290,7 +290,7 @@ function MapPreview({ id, hotel, price }: MapHotel & { id: string }) {
       <PhotoPlaceholder photo={hotel.photos[0]} className="aspect-[2/1] w-full" />
       <div className="flex flex-col gap-1 p-3">
         <p className="text-[15px]/[1.3] font-[650]">{hotel.name}</p>
-        {hasStars(hotel.stayType) ? (
+        {hasStars(hotel) ? (
           <span
             role="img"
             aria-label={countRu(hotel.stars, ['звезда', 'звезды', 'звёзд'])}
@@ -305,10 +305,12 @@ function MapPreview({ id, hotel, price }: MapHotel & { id: string }) {
         )}
         <div className="flex items-center gap-2 pt-1">
           <p className="mr-auto text-base font-bold whitespace-nowrap">{formatPrice(price)}</p>
-          <Badge className="bg-primary text-primary-foreground">
-            <span className="sr-only">Оценка гостей </span>
-            {formatDecimal(hotel.rating)}
-          </Badge>
+          {isRated(hotel) && (
+            <Badge className="bg-primary text-primary-foreground">
+              <span className="sr-only">Оценка гостей </span>
+              {formatDecimal(hotel.rating)}
+            </Badge>
+          )}
         </div>
       </div>
     </div>

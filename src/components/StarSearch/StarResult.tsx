@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ASPECT_LABEL, ELEMENT_LABEL, lowerFirst, MODALITY_LABEL, type Reading } from '../../lib/horoscope'
-import type { Hotel } from '../../lib/catalog'
+import { isRated, type Hotel } from '../../lib/catalog'
 import { hotelHref, type Stay } from '../../lib/search'
 import Link from 'next/link'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
@@ -115,9 +115,11 @@ function StarHotel({ hotel, place, href }: { hotel: Hotel; place: string; href: 
             {hotel.name}
           </h4>
           <span className="text-sm text-(--decor-star-muted)">{place}</span>
-          <span className="text-sm text-(--decor-star-muted)">
-            Оценка гостей: <span className="font-medium text-(--decor-star-text)">{formatDecimal(hotel.rating)}</span>
-          </span>
+          {isRated(hotel) && (
+            <span className="text-sm text-(--decor-star-muted)">
+              Оценка гостей: <span className="font-medium text-(--decor-star-text)">{formatDecimal(hotel.rating)}</span>
+            </span>
+          )}
           <span className="mt-1 bg-(image:--decor-gold-gradient) bg-clip-text text-lg font-bold text-transparent">
             от {formatPrice(hotel.priceFrom)} за ночь
           </span>

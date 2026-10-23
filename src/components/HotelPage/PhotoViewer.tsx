@@ -58,7 +58,7 @@ function Slides({ title, photos, index, onIndexChange }: Props & { index: number
             aria-hidden={i !== index || undefined}
             className="w-full shrink-0 snap-center snap-always"
           >
-            <PhotoPlaceholder photo={photo} className="size-full" />
+            <PhotoPlaceholder photo={photo} large className="size-full" />
           </div>
         ))}
       </div>

@@ -24,12 +24,15 @@ import {
 const catalog = buildCatalog()
 
 // hotel-catalog, Requirement: Типы жилья
+
+/** The cities the generator fills: a city of real hotels gets none from it. */
+const generatedCities = destinations.filter((d) => !d.real)
 describe('stay types', () => {
   const ofType = (destinationId: string, type: string) =>
     catalog.filter((h) => h.destinationId === destinationId && h.stayType === type)
 
   it('gives every city 2 hostels, 2 apartments and 1 villa', () => {
-    for (const d of destinations) {
+    for (const d of generatedCities) {
       expect(ofType(d.id, 'hostel').length, d.id).toBeGreaterThanOrEqual(2)
       expect(ofType(d.id, 'apartments').length, d.id).toBeGreaterThanOrEqual(2)
       expect(ofType(d.id, 'villa').length, d.id).toBeGreaterThanOrEqual(1)
@@ -92,8 +95,10 @@ describe('catalogue', () => {
     for (const h of hotels) expect(h.id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/)
   })
 
-  it(`gives every destination at least ${MIN_HOTELS_PER_DESTINATION} hotels`, () => {
-    for (const d of destinations) expect(hotelsIn(d.id).length, d.id).toBeGreaterThanOrEqual(6)
+  it(`gives every destination at least ${MIN_HOTELS_PER_DESTINATION} hotels, and none to a city of real hotels`, () => {
+    for (const d of destinations)
+      if (d.real) expect(hotelsIn(d.id), d.id).toEqual([])
+      else expect(hotelsIn(d.id).length, d.id).toBeGreaterThanOrEqual(6)
   })
 
   it('finds the Prague hotels, the seeds among them', () => {
@@ -153,7 +158,7 @@ describe('catalogue', () => {
 
   it('prices a hotel from its cheapest rate and a city from its cheapest hotel', () => {
     for (const hotel of catalog) expect(cheapestRate(hotel).rate.pricePerNight, hotel.id).toBe(hotel.priceFrom)
-    for (const d of destinations) {
+    for (const d of generatedCities) {
       expect(Math.min(...hotelsIn(d.id).map((h) => h.priceFrom)), d.id).toBe(d.priceFrom)
     }
   })
