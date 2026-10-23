@@ -66,7 +66,7 @@ const hero = [
   'md:[--globe-size:clamp(760px,76vw,980px)] md:[--globe-top:calc(var(--header-height)+32px)] md:[--globe-x:64%]',
   'relative isolate h-[calc(var(--globe-top)+var(--globe-size)*0.76)] overflow-hidden text-brand-foreground md:h-[calc(var(--globe-top)+var(--globe-size)*0.62)]',
   'bg-brand bg-[radial-gradient(ellipse_60%_45%_at_85%_30%,color-mix(in_srgb,var(--decor-glow)_75%,transparent),transparent_70%)]',
-  // A long press on the globe must not start selecting the title or the hint (iOS) or open the callout.
+  // A long press on the globe must not start selecting the title (iOS) or open the callout.
   'select-none [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none]',
   // Fade the bottom of the scene into the page behind the search form, lightly at first: the globe shows through
   // the top of the assistant's glass.
@@ -144,7 +144,6 @@ export function Hero({ cities: markers, hotels, featured }: Props) {
 
   const heroRef = useRef<HTMLElement>(null)
   const copyRef = useRef<HTMLDivElement>(null)
-  const hintRef = useRef<HTMLParagraphElement>(null)
   const globeRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const pinRefs = useRef(new Map<string, HTMLButtonElement>())
@@ -265,7 +264,7 @@ export function Hero({ cities: markers, hotels, featured }: Props) {
         {
           globe: globeRect,
           hero: hero.getBoundingClientRect(),
-          avoid: [copyRef, hintRef].map((ref) => ref.current!.getBoundingClientRect()),
+          avoid: [copyRef.current!.getBoundingClientRect()],
           card: { left: card.left - hubX, right: card.right - hubX, top: card.top - hubY, bottom: card.bottom - hubY },
         },
         recent,
@@ -434,24 +433,14 @@ export function Hero({ cities: markers, hotels, featured }: Props) {
         className="pointer-events-none relative z-4 w-fit pt-[calc(var(--header-height)+clamp(18px,5vw,48px))] pr-(--page-x) pl-[calc(var(--page-x)+8px)] md:ml-[max(0px,(100%-var(--page-max))/2)] md:pt-[calc(var(--header-height)+clamp(56px,8vw,96px))]"
       >
         <h1 id="hero-title" className="text-(length:--text-display) leading-[1.02] font-extrabold tracking-[-0.035em]">
-          {SLOGAN.slice(0, SLOGAN.indexOf(' '))}{' '}
-          <span className="block text-primary">{SLOGAN.slice(SLOGAN.indexOf(' ') + 1)}</span>
+          {SLOGAN.slice(0, SLOGAN.lastIndexOf(' '))}{' '}
+          <span className="block text-primary">{SLOGAN.slice(SLOGAN.lastIndexOf(' ') + 1)}</span>
         </h1>
       </div>
 
-      <div className="pointer-events-none relative z-4 mt-[clamp(32px,9vw,64px)] pr-(--page-x) pl-[calc(var(--page-x)+4px)] md:pl-[calc(max(0px,(100%-var(--page-max))/2)+var(--page-x)+8px)]">
-        <p
-          ref={hintRef}
-          className="w-[7em] origin-top-left -rotate-10 font-hand text-[clamp(17px,4.6vw,27px)]/[1.05] font-semibold text-primary"
-          aria-hidden
-        >
-          Вращай глобус — воплощай мечту
-        </p>
-      </div>
-
       {/* No z-index or transform: the globe makes no stacking context of its own, so the hotel card can rise
-          above the hint while the pins stay under the faded bottom. No container query units for --unit: Safari
-          turns a query container into its own stacking layer, trapping the hotel card under the hint. */}
+          above the title while the pins stay under the faded bottom. No container query units for --unit: Safari
+          turns a query container into its own stacking layer, trapping the hotel card under the title. */}
       <div
         ref={globeRef}
         className="absolute top-(--globe-top) left-[calc(var(--globe-x)_-_var(--globe-size)/2)] aspect-square w-(--globe-size) [--unit:calc(var(--globe-size)/100)]"
