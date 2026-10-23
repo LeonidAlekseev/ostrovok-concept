@@ -205,8 +205,6 @@
   --animate-twinkle: twinkle 1.8s ease-in-out infinite;
   /* The glow under the hub pin on the globe breathes. */
   --animate-hub-pulse: hub-pulse 2.4s ease-in-out infinite;
-  /* The clouds around the globe drift slowly to and fro. */
-  --animate-cloud-drift: cloud-drift 18s ease-in-out infinite alternate;
   /* The vibe search: the «vs» between the sides beats, and each new pair of opposites slides in. */
   --animate-vibe-beat: vibe-beat 2.4s ease-in-out infinite;
   --animate-vibe-in: vibe-in 0.3s ease-out both;
@@ -287,12 +285,6 @@
     50% {
       opacity: 0.55;
       scale: 1.25;
-    }
-  }
-
-  @keyframes cloud-drift {
-    to {
-      translate: 4% 0;
     }
   }
 

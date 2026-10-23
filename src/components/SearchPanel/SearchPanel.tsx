@@ -31,7 +31,10 @@ export function SearchPanel({ onChoose, newHotels, routes }: Props) {
       className={`relative z-10 rounded-[clamp(22px,5.6vw,30px)] p-[clamp(6px,2vw,10px)] ${glassFill} ${glassBlur} ${glassRim} ${glassSheen} ${glassOpaque}`}
     >
       {/* Children that bleed to the card edge (scrolling chips) read --pad. */}
-      <div className="rounded-[clamp(18px,4.6vw,24px)] bg-card p-(--pad) [--pad:clamp(14px,3.6vw,22px)]">
+      <div
+        data-assistant-window
+        className="rounded-[clamp(18px,4.6vw,24px)] bg-card p-(--pad) [--pad:clamp(14px,3.6vw,22px)]"
+      >
         <AssistantSearch newHotels={newHotels} routes={routes} onChoose={onChoose} />
       </div>
     </div>
