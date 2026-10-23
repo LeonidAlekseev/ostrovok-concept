@@ -56,13 +56,11 @@ export interface Plan {
   overBudget: boolean
 }
 
+/** The starter cards of the assistant: a photo from `public/assistant/chips` (scripts/build-assistant-chips.mjs). */
 export const starterChips = [
-  { emoji: '🌴', label: 'На море' },
-  { emoji: '⛰️', label: 'В горы' },
-  { emoji: '🏛️', label: 'Города Европы' },
-  { emoji: '💑', label: 'Романтика' },
-  { emoji: '🧳', label: 'На выходные' },
-  { emoji: '🌃', label: 'Мегаполис' },
+  { emoji: '🌴', label: 'На море', photo: '/assistant/chips/sea.webp' },
+  { emoji: '⛰️', label: 'В горы', photo: '/assistant/chips/mountains.webp' },
+  { emoji: '🏛️', label: 'Города', photo: '/assistant/chips/cities.webp' },
 ]
 
 const MONTHS = [

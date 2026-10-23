@@ -195,4 +195,29 @@ describe('AssistantSearch after a reload', () => {
     renderAssistant()
     expect(screen.getByAltText('Эвал')).toBeTruthy()
   })
+
+  // assistant-search, Requirement: Начальный экран
+  it('opens with the reply bubble, the example and three photo cards', () => {
+    renderAssistant()
+    expect(screen.getByRole('heading', { name: 'О каком путешествии вы мечтаете?' })).toBeTruthy()
+    expect(screen.getByText('Я подберу идеальное жильё, направление и лучшие варианты для вашего отдыха')).toBeTruthy()
+    expect(screen.getByPlaceholderText('Например: «Хочу на море в октябре, спокойный отдых, с ребёнком»')).toBeTruthy()
+    const ideas = screen.getByRole('list', { name: 'Идеи для поездки' })
+    expect(
+      within(ideas)
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['🌴На море', '⛰️В горы', '🏛️Города'])
+  })
+
+  it('sends the card’s label as the traveller’s message (Scenario: Чип отправляет текст)', async () => {
+    fetchMock.mockResolvedValue(Response.json({ brief: { vibe: 'mountains' }, source: 'model' }))
+    const user = renderAssistant()
+
+    await user.click(screen.getByRole('button', { name: 'В горы' }))
+
+    expect(within(log()).getByText('В горы')).toBeTruthy()
+    expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string).messages).toEqual([{ role: 'user', text: 'В горы' }])
+    expect(screen.queryByRole('list', { name: 'Идеи для поездки' })).toBeNull()
+  })
 })
