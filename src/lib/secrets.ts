@@ -6,8 +6,9 @@ import { SECRET_FILE, decryptEnv } from './secretsFile.mjs'
 let decrypted: Promise<Record<string, string>> | undefined
 
 async function readSecretFile(armoredKey: string) {
-  // next.config.ts traces the file into every server function, so it sits next to the app on Vercel.
-  const encrypted = await readFile(path.join(process.cwd(), SECRET_FILE))
+  // next.config.ts traces the file into every server function, so it sits next to the app on Vercel. The ignore
+  // comment keeps Turbopack from tracing the whole project for this dynamic path.
+  const encrypted = await readFile(path.join(/*turbopackIgnore: true*/ process.cwd(), SECRET_FILE))
   return (await decryptEnv(armoredKey, encrypted)).env
 }
 
