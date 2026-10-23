@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { destinations } from '@/data/destinations'
 import { routeCards } from '@/test/catalog'
 import { createRouteFeed, pickOther } from './globeScene'
+import { cardShift, type CardFit } from './cardFit'
 import { Hero } from './Hero'
 
 const routes = routeCards()
@@ -55,6 +56,19 @@ describe('Hero in the server render', () => {
     expect(card.classList).toContain('max-w-[min(26rem,calc(100vw-2*var(--page-x)-2*clamp(6px,2vw,10px)))]')
     expect(card.classList).toContain('md:max-w-[min(26rem,calc(50vw-40px))]')
     expect(link.querySelector('span')!.classList).toContain('truncate')
+  })
+
+  // hero-globe, Requirement: Карточка маршрута на глобусе — Телефон
+  it('keeps the card inside the assistant window on a phone, whatever the pin', () => {
+    // Window 22–338 px, card 267 px wide, globe 600 px wide from -120 px.
+    const fit: CardFit = { globeLeft: -120, globeWidth: 600, winLeft: 22, winRight: 338, cardWidth: 267, phone: true }
+    for (const x of [0, 20, 50, 67, 80, 100]) {
+      const left = fit.globeLeft + (x / 100) * fit.globeWidth - fit.cardWidth / 2 + cardShift(fit, x)
+      expect(left).toBeGreaterThanOrEqual(fit.winLeft)
+      expect(left + fit.cardWidth).toBeLessThanOrEqual(fit.winRight)
+    }
+    expect(cardShift({ ...fit, phone: false }, 100)).toBe(0)
+    expect(cardShift(null, 50)).toBe(0)
   })
 
   // hero-globe, Requirement: Случайная идея
