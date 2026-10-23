@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
-import { ChevronRight, Dice5, Route as RouteIcon } from 'lucide-react'
+import { ChevronRight, Route as RouteIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import type { Destination } from '@/data/destinations'
-import { GLOBE_CENTER, spinTarget, spinView, viewPlacing, type GlobeSpin, type GlobeView } from '../../lib/globe'
+import { GLOBE_CENTER, viewPlacing, type GlobeView } from '../../lib/globe'
 import { appEnv, isProduction } from '../../lib/env'
 import { formatPrice } from '../../lib/format'
 import { SLOGAN } from '../../lib/shareMedia'
@@ -22,7 +20,6 @@ import {
   type Scene,
   type Spotlight,
 } from './globeScene'
-import { CLOUD_IMAGES } from './cloudImages'
 import { cardShift, type CardFit } from './cardFit'
 import { StatsPanel, type StatsPanelHandle } from './StatsPanel'
 
@@ -45,8 +42,6 @@ const MAX_DRAG_SPEED = 400
 const MAX_TILT = 85
 /** How quickly the globe turns a selected pin into place (per second). */
 const CENTER_RATE = 3
-/** Length of the spin to a random idea, ms. */
-const SPIN_MS = 2000
 /** Share of the hero's height covered by the search form, and the gap kept above it, px. */
 const FORM_OVERLAP = 0.24
 const SELECTED_GAP = 16
@@ -92,16 +87,6 @@ const earthShade = [
 ].join(' ')
 const atmosphere =
   'absolute inset-0 rounded-full shadow-[0_0_0_1.5px_color-mix(in_srgb,var(--decor-light)_70%,transparent),0_0_26px_8px_color-mix(in_srgb,var(--decor-atmosphere)_85%,transparent),0_0_90px_28px_color-mix(in_srgb,var(--decor-atmosphere)_55%,transparent)]'
-const randomButton = [
-  // On a small photo cloud behind a transparent button, so the focus ring still follows the button.
-  'pointer-events-auto relative z-4 h-9 px-4 text-sm font-bold text-foreground hover:scale-105 hover:bg-transparent hover:text-foreground md:h-10 md:text-base',
-].join(' ')
-const randomPlace = [
-  // The search form rises over the hero by clamp(120px,31vw,150px), 6rem and 5.25rem (see HomePage).
-  // No z-index of its own: the clouds in it stay under the faded bottom of the hero, the button rises above it.
-  'pointer-events-none absolute bottom-[calc(clamp(120px,31vw,150px)+28px)] md:bottom-[calc(6rem+36px)] lg:bottom-[calc(5.25rem+36px)]',
-  'left-[calc(var(--page-x)+20px)] md:left-[calc(max(0px,(100%-var(--page-max))/2)+var(--page-x)+28px)]',
-].join(' ')
 const sun = [
   // The glare sits exactly on the limb, at this angle from the globe's centre (clockwise from 3 o'clock).
   // The globe overflows a phone's screen sideways: there the glare stays on the visible part of the limb.
@@ -162,13 +147,10 @@ export function Hero({ cities: markers, routes, featured }: Props) {
   // The initial layout is rendered once; afterwards the animation loop owns all positions.
   const [initialScene] = useState(() => sceneAt(markers, spotlight, GLOBE_CENTER))
   const [spinning, setSpinning] = useState(false)
-  /** Read out once a random idea is shown. */
-  const [announcement, setAnnouncement] = useState('')
 
   const heroRef = useRef<HTMLElement>(null)
   const copyRef = useRef<HTMLDivElement>(null)
   const hintRef = useRef<HTMLParagraphElement>(null)
-  const randomRef = useRef<HTMLButtonElement>(null)
   const globeRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const pinRefs = useRef(new Map<string, HTMLButtonElement>())
@@ -182,12 +164,8 @@ export function Hero({ cities: markers, routes, featured }: Props) {
   const viewRef = useRef({ ...GLOBE_CENTER })
   /** View the globe is turning to, so that the selected pin comes to the middle of the visible globe. */
   const targetRef = useRef<GlobeView | null>(null)
-  /** The spin to a random idea; while it lasts, the drag, the own spin and the turn to a pin wait. */
-  const spinRef = useRef<(GlobeSpin & { onEnd: () => void }) | null>(null)
   /** The idea each city showed last, so that the next opening of its pin shows another one. */
   const shownRef = useRef(new Map<string, string>())
-  /** Set when a random idea opens: its card takes the focus once painted. */
-  const focusCardRef = useRef(false)
 
   /** Writes the current scene straight to the DOM, bypassing React on every frame. */
   const paint = useCallback((scene: Scene) => {
@@ -250,10 +228,6 @@ export function Hero({ cities: markers, routes, featured }: Props) {
     spotlightRef.current = spotlight
     if (spotlight.route) shownRef.current.set(spotlight.destination.id, spotlight.route.id)
     paint(sceneAt(markers, spotlight, viewRef.current))
-    if (focusCardRef.current) {
-      focusCardRef.current = false
-      cardRef.current?.querySelector('a')?.focus({ preventScroll: true })
-    }
     // The card and its routes fade in at the new city instead of jumping there (not on the first render:
     // the server-rendered card is already in place). Animations override the per-frame depth opacity
     // only while they run.
@@ -311,7 +285,7 @@ export function Hero({ cities: markers, routes, featured }: Props) {
         {
           globe: globeRect,
           hero: hero.getBoundingClientRect(),
-          avoid: [copyRef, hintRef, randomRef].map((ref) => ref.current!.getBoundingClientRect()),
+          avoid: [copyRef, hintRef].map((ref) => ref.current!.getBoundingClientRect()),
           card: { left: card.left - hubX, right: card.right - hubX, top: card.top - hubY, bottom: card.bottom - hubY },
         },
         recent,
@@ -336,18 +310,7 @@ export function Hero({ cities: markers, routes, featured }: Props) {
       const canSpin = ready && !reducedMotion.matches
       const view = viewRef.current
 
-      const spin = spinRef.current
-      if (spin) {
-        // The spin to a random idea alone turns the globe; the own spin picks up from rest afterwards.
-        if (Number.isNaN(spin.start)) spin.start = now
-        Object.assign(view, spinView(spin, now))
-        speed = 0
-        if (now >= spin.start + spin.duration) {
-          spinRef.current = null
-          elapsed = 0
-          spin.onEnd()
-        }
-      } else if (drag && dt > 0) {
+      if (drag && dt > 0) {
         // Ease in and out of rotation instead of starting or stopping abruptly. A drag pulls the spin
         // towards the pointer's speed; once released, the globe coasts back to its own pace.
         // Near the centre one radius of pointer travel turns the globe by one radian.
@@ -365,7 +328,7 @@ export function Hero({ cities: markers, routes, featured }: Props) {
       }
       view.lon -= speed * dt
       const target = targetRef.current
-      if (target && !drag && !spin) {
+      if (target && !drag) {
         const k = reducedMotion.matches ? 1 : Math.min(dt * CENTER_RATE, 1)
         const dLat = target.lat - view.lat
         const dLon = ((((target.lon - view.lon) % 360) + 540) % 360) - 180
@@ -374,7 +337,7 @@ export function Hero({ cities: markers, routes, featured }: Props) {
         if (Math.abs(dLat) < 0.01 && Math.abs(dLon) < 0.01) targetRef.current = null
       }
       const period = reducedMotion.matches ? REDUCED_MOTION_SPOTLIGHT_SECONDS : SPOTLIGHT_SECONDS
-      if (!paused && !spinRef.current) elapsed += dt
+      if (!paused) elapsed += dt
       const scene = sceneAt(markers, spotlightRef.current, view)
 
       let drew = false
@@ -402,7 +365,7 @@ export function Hero({ cities: markers, routes, featured }: Props) {
     }
 
     const onPointerDown = (e: PointerEvent) => {
-      if (!ready || drag || spinRef.current || e.button !== 0) return
+      if (!ready || drag || e.button !== 0) return
       drag = { pointerId: e.pointerId, lastX: e.clientX, lastY: e.clientY, dx: 0, dy: 0 }
       // A drag takes over from turning to the selected pin.
       targetRef.current = null
@@ -478,37 +441,6 @@ export function Hero({ cities: markers, routes, featured }: Props) {
     openIdea(city)
   }
 
-  /** Spins the globe more than a full turn to a random city with routes and opens its pin; ignored mid-spin. */
-  const showRandomIdea = () => {
-    if (spinRef.current) return
-    const city = pickOther(
-      markers.filter((d) => feed.has(d.id)),
-      spotlightRef.current.destination.id,
-    )
-    if (!city) return
-    const reveal = () => {
-      const route = openIdea(city)
-      focusCardRef.current = true
-      setAnnouncement(route ? `Случайная идея: ${route.title}, ${city.name}` : '')
-    }
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return reveal()
-    setSelectedId(null)
-    targetRef.current = null
-    const view = viewRef.current
-    // The city stops where its open pin is turned to anyway, so the globe barely moves after the spin.
-    const end = viewAboveForm(city, heroRef.current!, globeRef.current!, cardRef.current, () =>
-      sceneAt(markers, spotlightRef.current, view),
-    ) ?? { lat: view.lat, lon: city.lon }
-    spinRef.current = {
-      from: { ...view },
-      to: spinTarget(view, end),
-      // Set by the first frame of the spin.
-      start: Number.NaN,
-      duration: SPIN_MS,
-      onEnd: reveal,
-    }
-  }
-
   const pause = (key: 'hover' | 'focus', value: boolean) => () => {
     pausedRef.current[key] = value
   }
@@ -528,8 +460,8 @@ export function Hero({ cities: markers, routes, featured }: Props) {
         className="pointer-events-none relative z-4 w-fit pt-[calc(var(--header-height)+clamp(18px,5vw,48px))] pr-(--page-x) pl-[calc(var(--page-x)+8px)] md:ml-[max(0px,(100%-var(--page-max))/2)] md:pt-[calc(var(--header-height)+clamp(56px,8vw,96px))]"
       >
         <h1 id="hero-title" className="text-(length:--text-display) leading-[1.02] font-extrabold tracking-[-0.035em]">
-          {SLOGAN.slice(0, SLOGAN.lastIndexOf(' '))}{' '}
-          <span className="block text-primary">{SLOGAN.slice(SLOGAN.lastIndexOf(' ') + 1)}</span>
+          {SLOGAN.slice(0, SLOGAN.indexOf(' '))}{' '}
+          <span className="block text-primary">{SLOGAN.slice(SLOGAN.indexOf(' ') + 1)}</span>
         </h1>
       </div>
 
@@ -542,9 +474,6 @@ export function Hero({ cities: markers, routes, featured }: Props) {
           Вращай глобус — воплощай мечту
         </p>
       </div>
-      <p role="status" className="sr-only">
-        {announcement}
-      </p>
 
       {/* No z-index or transform: the globe makes no stacking context of its own, so the route card can rise
           above the hint while the pins stay under the faded bottom. No container query units for --unit: Safari
@@ -664,30 +593,6 @@ export function Hero({ cities: markers, routes, featured }: Props) {
             </div>
           </div>
         )}
-      </div>
-
-      {/* Phones and wide screens alike: on a cloud at the left, just above the search form that overlaps the hero. */}
-      <div className={randomPlace}>
-        {/* Both clouds stay under the faded bottom of the hero, as light as the clouds by the globe; only the
-            button rises above it. */}
-        <Image
-          {...CLOUD_IMAGES.big}
-          alt=""
-          sizes="(max-width: 767px) 300px, 420px"
-          className="absolute top-1/2 left-1/2 w-[clamp(280px,78vw,420px)] max-w-none -translate-x-[42%] -translate-y-[30%] md:-translate-y-[46%] select-none"
-          draggable={false}
-        />
-        <Image
-          {...CLOUD_IMAGES.flat}
-          alt=""
-          sizes="200px"
-          className="absolute -top-5 -left-7 h-[calc(100%+2.5rem)] w-[calc(100%+3.5rem)] max-w-none object-fill select-none"
-          draggable={false}
-        />
-        <Button ref={randomRef} variant="ghost" shape="pill" className={randomButton} onClick={showRandomIdea}>
-          <Dice5 className="size-[1.3em]" strokeWidth={2.25} aria-hidden />
-          Рандом
-        </Button>
       </div>
 
       {!isProduction && <StatsPanel ref={statsRef} />}

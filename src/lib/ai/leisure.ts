@@ -34,7 +34,7 @@ export interface LeisureRequest {
 
 function instructions({ city, day, date, current, taken }: LeisureRequest) {
   return [
-    'Ты помощник сервиса путешествий «О!Погнали». Пользователь меняет пункт досуга в плане поездки.',
+    'Ты помощник сервиса путешествий «О!бъективно». Пользователь меняет пункт досуга в плане поездки.',
     `Город: ${city}. День поездки ${day}, ${formatLongDate(date)}, начало в ${current.time}.`,
     `Сейчас в плане: «${current.title}» (${current.category}, ${current.minutes ?? 120} мин, ${current.price} ₽).`,
     taken.length ? `Уже есть в плане, не предлагай: ${taken.map((title) => `«${title}»`).join(', ')}.` : '',

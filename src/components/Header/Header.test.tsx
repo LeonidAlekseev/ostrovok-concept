@@ -30,11 +30,11 @@ const setup = () => {
 describe('Header', () => {
   it('links the logo to the home page', () => {
     setup()
-    expect(screen.getByRole('link', { name: 'О!Погнали — на главную' }).getAttribute('href')).toBe('/')
+    expect(screen.getByRole('link', { name: 'О!бъективно — на главную' }).getAttribute('href')).toBe('/')
   })
 
   it('widens the header to the search page width from 3xl only on /search', () => {
-    const logo = () => screen.getByRole('link', { name: 'О!Погнали — на главную' }).parentElement!.className
+    const logo = () => screen.getByRole('link', { name: 'О!бъективно — на главную' }).parentElement!.className
     window.history.pushState({}, '', '/search')
     setup()
     expect(logo()).toMatch(/(^|\s)3xl:max-w-\(--page-max-wide\)(\s|$)/)
@@ -44,47 +44,48 @@ describe('Header', () => {
 
   it('keeps the header width on other pages', () => {
     setup()
-    expect(screen.getByRole('link', { name: 'О!Погнали — на главную' }).parentElement!.className).not.toMatch(
+    expect(screen.getByRole('link', { name: 'О!бъективно — на главную' }).parentElement!.className).not.toMatch(
       /3xl:max-w-/,
     )
   })
 
-  it('links "Избранное" to /favorites instead of opening a panel', () => {
+  it('shows only the logo and the menu button in the header, whatever the screen', () => {
     setup()
-    const favorites = screen.getByRole('link', { name: 'Избранное' })
-    expect(favorites.getAttribute('href')).toBe('/favorites')
-    expect(screen.queryByRole('button', { name: 'Избранное' })).toBeNull()
+    const actions = [...screen.getByRole('banner').querySelectorAll('[aria-label]')].map((el) =>
+      el.getAttribute('aria-label'),
+    )
+    expect(actions).toEqual(['О!бъективно — на главную', 'Открыть меню'])
+    expect(screen.queryByRole('link', { name: 'Избранное' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Уведомления' })).toBeNull()
   })
 
-  it('switches between the notifications and the menu, one at a time', async () => {
+  it('opens and closes the menu on the button, "Escape" and a second press', async () => {
     const user = setup()
-    const notifications = screen.getByRole('button', { name: 'Уведомления' })
-    await user.click(notifications)
-    const panel = screen.getByRole('dialog', { name: 'Уведомления' })
-    expect(notifications.getAttribute('aria-expanded')).toBe('true')
-    expect(notifications.getAttribute('aria-controls')).toBe(panel.id)
-    expect(panel.textContent).toContain('Новых уведомлений нет')
+    const button = screen.getByRole('button', { name: 'Открыть меню' })
+    expect(button.getAttribute('aria-expanded')).toBe('false')
+    await user.click(button)
+    const panel = screen.getByRole('dialog', { name: 'Меню' })
+    const open = screen.getByRole('button', { name: 'Закрыть меню' })
+    expect(open.getAttribute('aria-expanded')).toBe('true')
+    expect(open.getAttribute('aria-controls')).toBe(panel.id)
 
-    await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Уведомления' })).toBeNull())
-    expect(screen.getByRole('dialog', { name: 'Меню' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Закрыть меню' }).getAttribute('aria-expanded')).toBe('true')
-  })
-
-  it('closes a panel on a second press, "Понятно" and Escape', async () => {
-    const user = setup()
-    const notifications = screen.getByRole('button', { name: 'Уведомления' })
-    await user.click(notifications)
-    await user.click(notifications)
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-
-    await user.click(notifications)
-    await user.click(screen.getByRole('button', { name: 'Понятно' }))
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-
-    await user.click(notifications)
     await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
+    await user.click(screen.getByRole('button', { name: 'Закрыть меню' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('reaches the menu items from the keyboard', async () => {
+    const user = setup()
+    screen.getByRole('button', { name: 'Открыть меню' }).focus()
+    await user.keyboard('{Enter}')
+    const panel = screen.getByRole('dialog', { name: 'Меню' })
+    expect(panel.contains(document.activeElement)).toBe(true)
+    await user.tab()
+    expect(panel.contains(document.activeElement)).toBe(true)
+    expect(document.activeElement?.getAttribute('href')).toBe('/trips')
   })
 
   it('closes a panel on a press outside the actions', async () => {
@@ -97,7 +98,7 @@ describe('Header', () => {
   it('closes a panel on a press on the logo', async () => {
     const user = setup()
     await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
-    await user.click(screen.getByRole('link', { name: 'О!Погнали — на главную' }))
+    await user.click(screen.getByRole('link', { name: 'О!бъективно — на главную' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
@@ -111,69 +112,48 @@ describe('Header', () => {
       ['Мои поездки', '/trips'],
       ['Избранное', '/favorites'],
       ['Уведомления', null],
-      ['Войти', '/login'],
       ['Поддержка', '/help'],
+      ['Войти', '/login'],
     ])
-    await user.click(screen.getByRole('link', { name: 'Мои поездки' }))
+    await user.click(screen.getByRole('link', { name: 'Избранное' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Меню' })).toBeNull())
   })
 
-  it('opens the notifications from the menu and closes the menu', async () => {
+  it('shows the notifications inside the menu, and "Понятно" folds them', async () => {
     const user = setup()
     await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
-    await user.click(
-      within(screen.getByRole('navigation', { name: 'Основное меню' })).getByRole('button', { name: 'Уведомления' }),
-    )
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Меню' })).toBeNull())
-    expect(screen.getByRole('dialog', { name: 'Уведомления' })).toBeTruthy()
+    const item = screen.getByRole('button', { name: 'Уведомления' })
+    expect(item.getAttribute('aria-expanded')).toBe('false')
+    await user.click(item)
+    expect(item.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('dialog', { name: 'Меню' }).textContent).toContain('Новых уведомлений нет')
+    await user.click(screen.getByRole('button', { name: 'Понятно' }))
+    expect(screen.queryByText('Новых уведомлений нет')).toBeNull()
   })
 
-  it('opens the account menu from the menu once signed in', async () => {
-    sessionStore.set({ name: 'anna', email: 'anna@example.com' })
+  it('offers a guest «Войти» in the menu, without an account block', async () => {
     const user = setup()
     await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
-    const nav = screen.getByRole('navigation', { name: 'Основное меню' })
-    expect(within(nav).queryByRole('link', { name: 'Войти' })).toBeNull()
-    await user.click(within(nav).getByRole('button', { name: 'Аккаунт' }))
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Меню' })).toBeNull())
-    expect(screen.getByRole('dialog', { name: 'Аккаунт' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Войти' }).getAttribute('href')).toBe('/login')
+    expect(screen.queryByRole('region', { name: 'Аккаунт' })).toBeNull()
   })
 
-  it('shows an account icon to a guest, linked to /login, without text', () => {
-    setup()
-    const login = screen.getByRole('link', { name: 'Войти' })
-    expect(login.getAttribute('href')).toBe('/login')
-    expect(login.textContent).toBe('')
-  })
-
-  it('keeps the account icon between the notifications and the menu', () => {
-    setup()
-    const actions = [...screen.getByRole('banner').querySelectorAll('[aria-label]')].map((el) =>
-      el.getAttribute('aria-label'),
-    )
-    expect(actions).toEqual(['О!Погнали — на главную', 'Избранное', 'Уведомления', 'Войти', 'Открыть меню'])
-  })
-
-  it('shows the account icon, not the name, once signed in, and "Выйти" ends the session only', async () => {
+  it('shows the name and «Выйти» in the menu once signed in, and "Выйти" ends the session only', async () => {
     favoritesStore.set(['h1'])
     sessionStore.set({ name: 'anna', email: 'anna@example.com' })
     const user = setup()
+    await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
     expect(screen.queryByRole('link', { name: 'Войти' })).toBeNull()
-    const account = screen.getByRole('button', { name: 'Аккаунт: anna' })
-    expect(account.textContent).toBe('')
-
-    await user.click(account)
-    const dialog = screen.getByRole('dialog', { name: 'Аккаунт' })
-    expect(within(dialog).getByText('anna')).toBeTruthy()
-    expect(dialog.textContent).toContain('anna@example.com')
-    const nav = screen.getByRole('navigation', { name: 'Аккаунт' })
-    expect([...nav.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
-      ['Мои поездки', '/trips'],
-    ])
+    const account = screen.getByRole('region', { name: 'Аккаунт' })
+    expect(within(account).getByText('anna')).toBeTruthy()
+    expect(account.textContent).toContain('anna@example.com')
+    expect(screen.getByRole('link', { name: 'Мои поездки' }).getAttribute('href')).toBe('/trips')
 
     await user.click(screen.getByRole('button', { name: 'Выйти' }))
     expect(sessionStore.get()).toBeNull()
     expect(favoritesStore.get()).toEqual(['h1'])
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Меню' })).toBeNull())
+    await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
     expect(await screen.findByRole('link', { name: 'Войти' })).toBeTruthy()
   })
 })
@@ -198,10 +178,10 @@ describe('Header chrome', () => {
     window.history.pushState({}, '', '/hotels/prague-old-town-lantern')
     setup()
     window.history.pushState({}, '', '/')
-    expect(screen.getByRole('link', { name: 'О!Погнали — на главную' }).className).toMatch(
+    expect(screen.getByRole('link', { name: 'О!бъективно — на главную' }).className).toMatch(
       /(^|\s)group-has-\[\[data-header-photo\]\]\/page:text-white(\s|$)/,
     )
-    expect(screen.getByRole('link', { name: 'Избранное' }).className).toMatch(
+    expect(screen.getByRole('button', { name: 'Открыть меню' }).className).toMatch(
       /(^|\s)group-has-\[\[data-header-photo\]\]\/page:text-white(\s|$)/,
     )
   })
@@ -210,7 +190,7 @@ describe('Header chrome', () => {
     setup()
     const header = screen.getByRole('banner')
     expect(header.className).not.toMatch(/rounded|shadow|fixed|sticky/)
-    expect(screen.getByRole('link', { name: 'О!Погнали — на главную' }).className).toMatch(/(^|\s)text-primary(\s|$)/)
+    expect(screen.getByRole('link', { name: 'О!бъективно — на главную' }).className).toMatch(/(^|\s)text-primary(\s|$)/)
   })
 
   it('scrolls with the page', () => {
