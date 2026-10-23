@@ -403,10 +403,3 @@ uv run --with pillow python scripts/build-images.py <папка-с-исходн�
 ```bash
 uv run --with pillow --with numpy python scripts/build-globe.py <папка-с-geojson>
 ```
-
-Облака у глобуса вырезаются из фото облаков на чёрном фоне (`globe-cloud-<имя>.jpeg` →
-`public/images/hero/clouds/<имя>.webp`, шум и рваный край вычищаются):
-
-```bash
-uv run --with pillow --with numpy --with scipy python scripts/build-clouds.py globe-cloud-big.jpeg globe-cloud-flat.jpeg
-```

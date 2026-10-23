@@ -30,11 +30,11 @@ const setup = () => {
 describe('Header', () => {
   it('links the logo to the home page', () => {
     setup()
-    expect(screen.getByRole('link', { name: 'О!Погнали — на главную' }).getAttribute('href')).toBe('/')
+    expect(screen.getByRole('link', { name: 'О!бъективно — на главную' }).getAttribute('href')).toBe('/')
   })
 
   it('widens the header to the search page width from 3xl only on /search', () => {
-    const logo = () => screen.getByRole('link', { name: 'О!Погнали — на главную' }).parentElement!.className
+    const logo = () => screen.getByRole('link', { name: 'О!бъективно — на главную' }).parentElement!.className
     window.history.pushState({}, '', '/search')
     setup()
     expect(logo()).toMatch(/(^|\s)3xl:max-w-\(--page-max-wide\)(\s|$)/)
@@ -44,7 +44,7 @@ describe('Header', () => {
 
   it('keeps the header width on other pages', () => {
     setup()
-    expect(screen.getByRole('link', { name: 'О!Погнали — на главную' }).parentElement!.className).not.toMatch(
+    expect(screen.getByRole('link', { name: 'О!бъективно — на главную' }).parentElement!.className).not.toMatch(
       /3xl:max-w-/,
     )
   })
@@ -97,7 +97,7 @@ describe('Header', () => {
   it('closes a panel on a press on the logo', async () => {
     const user = setup()
     await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
-    await user.click(screen.getByRole('link', { name: 'О!Погнали — на главную' }))
+    await user.click(screen.getByRole('link', { name: 'О!бъективно — на главную' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
@@ -151,7 +151,7 @@ describe('Header', () => {
     const actions = [...screen.getByRole('banner').querySelectorAll('[aria-label]')].map((el) =>
       el.getAttribute('aria-label'),
     )
-    expect(actions).toEqual(['О!Погнали — на главную', 'Избранное', 'Уведомления', 'Войти', 'Открыть меню'])
+    expect(actions).toEqual(['О!бъективно — на главную', 'Избранное', 'Уведомления', 'Войти', 'Открыть меню'])
   })
 
   it('shows the account icon, not the name, once signed in, and "Выйти" ends the session only', async () => {
@@ -198,7 +198,7 @@ describe('Header chrome', () => {
     window.history.pushState({}, '', '/hotels/prague-old-town-lantern')
     setup()
     window.history.pushState({}, '', '/')
-    expect(screen.getByRole('link', { name: 'О!Погнали — на главную' }).className).toMatch(
+    expect(screen.getByRole('link', { name: 'О!бъективно — на главную' }).className).toMatch(
       /(^|\s)group-has-\[\[data-header-photo\]\]\/page:text-white(\s|$)/,
     )
     expect(screen.getByRole('link', { name: 'Избранное' }).className).toMatch(
@@ -210,7 +210,7 @@ describe('Header chrome', () => {
     setup()
     const header = screen.getByRole('banner')
     expect(header.className).not.toMatch(/rounded|shadow|fixed|sticky/)
-    expect(screen.getByRole('link', { name: 'О!Погнали — на главную' }).className).toMatch(/(^|\s)text-primary(\s|$)/)
+    expect(screen.getByRole('link', { name: 'О!бъективно — на главную' }).className).toMatch(/(^|\s)text-primary(\s|$)/)
   })
 
   it('scrolls with the page', () => {

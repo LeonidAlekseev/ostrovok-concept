@@ -76,9 +76,9 @@ export function Header() {
             )}
             href="/"
             onClick={close}
-            aria-label="О!Погнали — на главную"
+            aria-label="О!бъективно — на главную"
           >
-            О!Погнали
+            О!бъективно
           </a>
 
           <div className="relative flex items-center gap-[clamp(0px,1vw,14px)] max-[360px]:gap-0">
