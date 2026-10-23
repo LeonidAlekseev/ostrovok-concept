@@ -14,6 +14,9 @@ const inputSchema = z.object({
   checkIn: z.iso.date(),
   company: z.enum(['solo', 'pair', 'group']),
   partnerSignId: z.string().max(20).optional(),
+  direction: z.enum(['north', 'south', 'east', 'west']).optional(),
+  country: z.string().max(40).optional(),
+  destinationId: z.string().max(40).optional(),
 })
 
 /**

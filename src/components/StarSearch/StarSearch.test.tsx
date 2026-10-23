@@ -2,7 +2,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { addDays, todayIso } from '../../lib/dates'
+import { addDays, formatLongDate, todayIso } from '../../lib/dates'
 import { routeCards } from '../../test/catalog'
 import { StarSearch } from './StarSearch'
 import { StarSearchDialog } from './StarSearchDialog'
@@ -106,12 +106,7 @@ describe('StarSearch form', () => {
     expect(day(addDays(today, -1))?.disabled).toBe(true)
     await user.click(day(later)!)
     expect(screen.queryByRole('dialog', { name: 'Выбор даты заезда' })).toBeNull()
-
-    await user.click(screen.getByRole('button', { name: 'Гадать' }))
-    const hotel = screen.getAllByRole('link').find((link) => link.getAttribute('href')!.startsWith('/hotels/'))!
-    const url = new URL(hotel.getAttribute('href')!, 'https://x')
-    expect(url.searchParams.get('checkin')).toBe(later)
-    expect(url.searchParams.get('checkout')).toBe(addDays(later, 2))
+    expect(screen.getByRole('button', { name: `Дата заезда: ${formatLongDate(later)}` })).toBeTruthy()
   })
 
   it('shows the sign as soon as the birthday is known', async () => {
@@ -172,7 +167,7 @@ describe('StarSearch reading', () => {
     expect(await screen.findByRole('heading', { name: /Анна, ваш знак — Овен/ }, { timeout: 4000 })).toBeTruthy()
   })
 
-  it('skips the animation under reduced motion and links the hotels with the dates of the trip', async () => {
+  it('skips the animation under reduced motion and answers with one route', async () => {
     reduceMotion()
     const user = userEvent.setup()
     renderDialog()
@@ -184,23 +179,53 @@ describe('StarSearch reading', () => {
     expect(screen.getAllByRole('status').some((s) => /^Звёзды выбрали: /.test(s.textContent!))).toBe(true)
     expect(screen.getByText(/Гороскоп — для настроения, а не для планов/)).toBeTruthy()
 
-    // star-search, Requirement: Готовый маршрут в итоге: a fire sign alone goes for the culture by the rules.
-    const ready = screen.getByRole('region', { name: 'Готовый маршрут' })
-    expect(within(ready).getByRole('link').getAttribute('href')).toMatch(/^\/routes\/[a-z-]+-culture$/)
+    // star-search, Requirement: Маршрут в итоге: one route, a fire sign alone goes for the culture by the rules.
+    const route = screen.getByRole('region', { name: 'Звёзды выбрали маршрут' })
+    const links = screen.getAllByRole('link')
+    expect(links).toHaveLength(1)
+    expect(within(route).getByRole('link').getAttribute('href')).toMatch(/^\/routes\/[a-z-]+-culture$/)
+    expect(screen.queryByText('Запасные варианты')).toBeNull()
+  })
 
-    const checkIn = addDays(todayIso(), 1)
-    const links = screen.getAllByRole('link').filter((link) => !ready.contains(link))
-    expect(links).toHaveLength(3)
-    for (const link of links) {
-      const url = new URL(link.getAttribute('href')!, 'https://x')
-      expect(url.pathname).toMatch(/^\/hotels\/[a-z0-9-]+$/)
-      expect(Object.fromEntries(url.searchParams)).toEqual({
-        checkin: checkIn,
-        checkout: addDays(checkIn, 2),
-        adults: '2',
-        rooms: '1',
-      })
-    }
+  // star-search, Requirement: Куда едем
+  it('reads the stars only on the chosen side of the world; a second press clears it', async () => {
+    reduceMotion()
+    const user = userEvent.setup()
+    renderDialog()
+    await fillForm(user)
+    const sides = screen.getByRole('group', { name: 'Сторона света' })
+    const north = within(sides).getByRole('button', { name: 'Север' })
+    await user.click(north)
+    expect(north.getAttribute('aria-pressed')).toBe('true')
+    await user.click(north)
+    expect(north.getAttribute('aria-pressed')).toBe('false')
+    await user.click(north)
+    await user.click(screen.getByRole('button', { name: 'Гадать' }))
+    const status = screen.getAllByRole('status').find((s) => /^Звёзды выбрали: /.test(s.textContent!))!
+    expect(status.textContent).toMatch(/, (Осло|Стокгольм|Хельсинки|Рейкьявик|Калининград)$/)
+  })
+
+  it('reads the stars in the chosen country and city', async () => {
+    reduceMotion()
+    const user = userEvent.setup()
+    renderDialog()
+    await fillForm(user)
+    await user.click(screen.getByRole('radio', { name: 'Страна' }))
+    expect(screen.queryByRole('group', { name: 'Сторона света' })).toBeNull()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Страна' }), 'Италия')
+    const city = screen.getByRole('combobox', { name: 'Город' })
+    expect(
+      within(city)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['Любой город', 'Рим', 'Флоренция'])
+    await user.selectOptions(city, 'Рим')
+    await user.click(screen.getByRole('button', { name: 'Гадать' }))
+    const status = screen.getAllByRole('status').find((s) => /^Звёзды выбрали: /.test(s.textContent!))!
+    expect(status.textContent).toMatch(/, Рим$/)
+    // The route of the stars' city comes first.
+    const route = within(screen.getByRole('region', { name: 'Звёзды выбрали маршрут' })).getByRole('link')
+    expect(route.textContent).toContain('Рим, Италия')
   })
 
   it('is the same for the same answers', async () => {
@@ -228,7 +253,7 @@ describe('StarSearch video', () => {
   it('moves the progress bar in 1 % steps, not on every frame', async () => {
     vi.stubGlobal('MediaRecorder', { isTypeSupported: () => true })
     let finish!: () => void
-    vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _type, { onProgress }) => {
+    vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _pick, _type, { onProgress }) => {
       await new Promise<void>((resolve) => (finish = resolve))
       onProgress(0)
       for (let i = 1; i <= 300; i++) {
@@ -255,7 +280,7 @@ describe('StarSearch video', () => {
     vi.stubGlobal('MediaRecorder', { isTypeSupported: () => true })
     let restart!: () => void
     let finish!: () => void
-    vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _type, { onRestart }) => {
+    vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _pick, _type, { onRestart }) => {
       restart = onRestart
       await new Promise<void>((resolve) => (finish = resolve))
       return video

@@ -122,6 +122,26 @@
   --decor-gold-gradient: linear-gradient(to bottom, var(--decor-light), var(--decor-gold) 45%, var(--decor-gold-deep));
   --decor-star-button: linear-gradient(100deg, var(--brand-blue), var(--decor-violet));
   --decor-spin-shadow: 0 10px 24px color-mix(in srgb, var(--decor-violet) 30%, transparent);
+  /* The star search window: the deep sky under the picture, violet glass fields, light text and errors that
+     keep 4.5:1 on the glass; the button's cosmic pill is stretched only between its round ends. */
+  --decor-star-sky: #0a0626;
+  --decor-star-glass: color-mix(in srgb, #120a3a 78%, transparent);
+  --decor-star-line: #8a6bff;
+  --decor-star-text: #f1edff;
+  --decor-star-muted: #c3bbef;
+  --decor-star-error: #ff9d9d;
+  --decor-star-button-image: url('/images/stars/button.webp') 0 14% fill / 0 39px;
+  --decor-star-choice: linear-gradient(
+    100deg,
+    var(--decor-violet),
+    color-mix(in srgb, var(--decor-magenta) 60%, var(--decor-violet))
+  );
+  /* A veil over the sky picture, darker in the middle where the fields are. */
+  --decor-star-veil: radial-gradient(
+    ellipse 70% 60% at 50% 55%,
+    color-mix(in srgb, var(--decor-star-sky) 55%, transparent),
+    color-mix(in srgb, var(--decor-star-sky) 10%, transparent)
+  );
   /* Vibe search: the calm blue-lilac and the loud pink-orange sides; white text keeps 3:1 on both. */
   --decor-vibe-calm-from: #3b5bdb;
   --decor-vibe-calm-to: #7048e8;
@@ -278,6 +298,8 @@
 }
 
 @theme inline {
+  /* The star search's antiqua: next/font declares --font-star-serif on the window. */
+  --font-star: var(--font-star-serif), Georgia, serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

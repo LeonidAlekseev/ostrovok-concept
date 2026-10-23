@@ -28,7 +28,8 @@ export function MagicOrb({ symbol, active = false, className }: Props) {
     <div className={cn('relative aspect-square', className)} aria-hidden>
       <div className="absolute -inset-[18%] animate-orb-glow rounded-full bg-[radial-gradient(circle,color-mix(in_srgb,var(--decor-violet)_55%,transparent),transparent_68%)]" />
       <img
-        src="/images/stars/orb.webp"
+        // Under a sign, the orb without the star in its heart, so the sign reads clearly.
+        src={symbol ? '/images/stars/orb-plain.webp' : '/images/stars/orb.webp'}
         alt=""
         width={640}
         height={640}

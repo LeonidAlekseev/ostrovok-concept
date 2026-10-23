@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { cheapestRate, travelTimes, type Hotel } from './catalog'
 import { addDays, fromIso, nightsBetween, toIso, type IsoDate } from './dates'
+import { countRu, formatPrice } from './format'
 import type { CalendarEvent } from './ics'
 import { stayTotal } from './offer'
 import { MAX_NIGHTS } from './search'
@@ -401,6 +402,13 @@ export function routeCard(route: Route, hotels: Readonly<Record<string, Hotel>>,
     featured,
   }
 }
+
+/** «5 ночей». */
+export const routeNights = (nights: number) => countRu(nights, ['ночь', 'ночи', 'ночей'])
+
+/** The estimate of the route page: «≈ 84 000 ₽ за 5 ночей». */
+export const routeEstimate = (route: Pick<RouteCardData, 'price' | 'nights'>) =>
+  `≈ ${formatPrice(route.price)} за ${routeNights(route.nights)}`
 
 /** The featured cards first, the rest in their order. */
 export const featuredFirst = (cards: readonly RouteCardData[]) =>

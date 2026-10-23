@@ -1,6 +1,7 @@
 import { useId, useState, type ReactElement, type Ref } from 'react'
 import { CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { FieldError } from '@/components/ui/field'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { addDays, formatDateRange, formatLongDate, nightsBetween, todayIso, type IsoDate } from '../../lib/dates'
@@ -20,12 +21,24 @@ interface Props {
   triggerRef?: Ref<HTMLButtonElement>
   /** A button of the caller's, e.g. "Изменить", opens the calendar instead of the field; it names itself. */
   trigger?: ReactElement
+  /** Extra classes of the field's own trigger, e.g. the star search's glass. */
+  triggerClassName?: string
   onChange: (checkIn: IsoDate, checkOut: IsoDate) => void
 }
 
 const nightForms: [string, string, string] = ['ночь', 'ночи', 'ночей']
 
-export function DateField({ checkIn, checkOut, error, single, describedBy, triggerRef, trigger, onChange }: Props) {
+export function DateField({
+  checkIn,
+  checkOut,
+  error,
+  single,
+  describedBy,
+  triggerRef,
+  trigger,
+  triggerClassName,
+  onChange,
+}: Props) {
   const [open, setOpen] = useState(false)
   // Check-in picked, check-out pending. Discarded if the popover closes midway.
   const [draftStart, setDraftStart] = useState<IsoDate | null>(null)
@@ -63,7 +76,7 @@ export function DateField({ checkIn, checkOut, error, single, describedBy, trigg
           <PopoverTrigger render={trigger} ref={triggerRef} />
         ) : (
           <PopoverTrigger
-            className={`${fieldBox(Boolean(error))}`}
+            className={cn(fieldBox(Boolean(error)), triggerClassName)}
             ref={triggerRef}
             aria-label={single ? `Дата заезда: ${label}` : `Даты поездки: ${label}, ${countRu(nights, nightForms)}`}
             aria-describedby={[describedBy, error && errorId].filter(Boolean).join(' ') || undefined}
