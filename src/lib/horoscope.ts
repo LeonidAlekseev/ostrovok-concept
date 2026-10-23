@@ -335,6 +335,42 @@ export interface ReadingInput {
   company: Company
   /** Only for a pair; optional. */
   partnerSignId?: string
+  /** Where to: a side of the world, or a country and maybe its city; without them, the whole catalogue. */
+  direction?: Direction
+  country?: string
+  destinationId?: string
+}
+
+export type Direction = 'north' | 'south' | 'east' | 'west'
+
+/**
+ * The sides of the world as seen from Moscow, generous so that each has several cities: the north is the
+ * latitude of Moscow and above (Scandinavia, Iceland, Kaliningrad), the south is from the Black Sea down, the
+ * east and the west are by longitude. A city may be on two sides: Lisbon is both south and west.
+ */
+const FROM = { lat: 55.76, lon: 37.62 }
+const SIDES: Record<Direction, (city: Destination) => boolean> = {
+  north: (city) => city.lat >= FROM.lat - 2,
+  south: (city) => city.lat <= FROM.lat - 12,
+  east: (city) => city.lon >= FROM.lon + 2,
+  west: (city) => city.lon <= FROM.lon - 12,
+}
+
+/** The cities the stars choose from: the chosen city, country or side; all of them if nothing fits. */
+export function destinationsFor(
+  { direction, country, destinationId }: Pick<ReadingInput, 'direction' | 'country' | 'destinationId'>,
+  destinations: readonly Destination[],
+): readonly Destination[] {
+  const fits = destinations.filter((city) =>
+    destinationId
+      ? city.id === destinationId
+      : country
+        ? city.country === country
+        : direction
+          ? SIDES[direction](city)
+          : true,
+  )
+  return fits.length > 0 ? fits : destinations
 }
 
 export interface Reading {
@@ -415,13 +451,18 @@ export function readStars(
     )
   }
   // A stable sort keeps the catalogue order among equal scores.
-  const ranked = destinations
+  const ranked = destinationsFor(input, destinations)
     .map((city) => ({ city, score: score(city) }))
     .sort((a, b) => b.score - a.score)
     .map((r) => r.city)
-  const bestHotelIn = (city: Destination) => {
-    const list = hotels.filter((h) => h.destinationId === city.id)
-    return list.reduce((best, h) => (h.rating > best.rating ? h : best))
+  // The best hotel of each of the three best cities; with fewer cities (a city or a small country was chosen),
+  // the next best hotels of those cities fill the three places.
+  const hotelsIn = (city: Destination) =>
+    hotels.filter((h) => h.destinationId === city.id).sort((a, b) => b.rating - a.rating)
+  const picks = ranked.slice(0, 3).map((c) => hotelsIn(c)[0])
+  for (const hotel of ranked.flatMap(hotelsIn)) {
+    if (picks.length >= 3) break
+    if (!picks.includes(hotel)) picks.push(hotel)
   }
 
   const city = ranked[0]
@@ -443,7 +484,7 @@ export function readStars(
     city,
     citySign: target,
     aspect,
-    hotels: ranked.slice(0, 3).map(bestHotelIn),
+    hotels: picks,
     forecast,
   }
 }

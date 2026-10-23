@@ -46,7 +46,7 @@ export function StarSearch({ routes }: { routes: readonly RouteCardData[] }) {
       </h2>
       <p className="max-w-[40ch] text-[clamp(15px,3.9vw,20px)] text-(--decor-light)">
         Знак зодиака, <span className="text-(--decor-lavender)">Луна в день заезда</span> и аспекты{' '}
-        <span className="text-(--decor-lavender)">подскажут город и отель</span>. Предсказание можно отправить друзьям
+        <span className="text-(--decor-lavender)">подскажут город и маршрут</span>. Предсказание можно отправить друзьям
         коротким видео.
       </p>
       <Button

@@ -7,6 +7,8 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       // Next resolves `server-only` in its compiler; tests run outside it.
       'server-only': fileURLToPath(new URL('./node_modules/next/dist/compiled/server-only/empty.js', import.meta.url)),
+      // next/font is a compiler transform too: in tests a font is a name without files.
+      'next/font/google': fileURLToPath(new URL('./src/test/nextFont.ts', import.meta.url)),
     },
   },
   test: {

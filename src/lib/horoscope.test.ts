@@ -4,6 +4,7 @@ import { destinations } from '../data/destinations'
 import {
   aspectBetween,
   citySigns,
+  destinationsFor,
   cuspOf,
   daysInMonth,
   moonLongitude,
@@ -149,6 +150,29 @@ describe('readStars', () => {
     expect(new Set(hotels.map((h) => h.destinationId)).size).toBe(3)
     for (const hotel of hotels)
       expect(hotel.rating).toBe(Math.max(...hotelsIn(hotel.destinationId).map((h) => h.rating)))
+  })
+
+  // star-search, Requirement: Куда едем
+  it('chooses among the cities of the chosen side, country or city', () => {
+    const ids = (where: Parameters<typeof destinationsFor>[0]) => destinationsFor(where, destinations).map((d) => d.id)
+    expect(ids({ direction: 'north' })).toEqual(['oslo', 'stockholm', 'helsinki', 'kaliningrad', 'reykjavik'])
+    for (const side of ['south', 'east', 'west'] as const) expect(ids({ direction: side }).length).toBeGreaterThan(4)
+    expect(ids({ direction: 'east' })).toContain('tokyo')
+    expect(ids({ direction: 'west' })).toContain('new-york')
+    expect(ids({ country: 'Италия' })).toEqual(['florence', 'rome'])
+    expect(ids({ country: 'Италия', destinationId: 'rome' })).toEqual(['rome'])
+    expect(ids({})).toHaveLength(destinations.length)
+    // A city the catalogue no longer has: the stars look everywhere.
+    expect(ids({ destinationId: 'atlantis' })).toHaveLength(destinations.length)
+  })
+
+  it('fills the three hotels from the one chosen city', () => {
+    const { city, hotels } = readStars({ ...input, destinationId: 'rome' }, destinations, catalogue)
+    expect(city.id).toBe('rome')
+    expect(hotels).toHaveLength(3)
+    expect(new Set(hotels).size).toBe(3)
+    for (const hotel of hotels) expect(hotel.destinationId).toBe('rome')
+    expect(hotels.map((h) => h.rating)).toEqual([...hotels.map((h) => h.rating)].sort((a, b) => b - a))
   })
 
   it('lets a companion sign change the score', () => {

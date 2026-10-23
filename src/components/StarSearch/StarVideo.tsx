@@ -3,7 +3,7 @@ import { Clapperboard, Download, Link2, Share2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Reading } from '../../lib/horoscope'
 import { BRAND_NAME, canShareFile, downloadFile, shareFile, shareText, videoType } from '../../lib/shareMedia'
-import { renderReadingVideo } from './starVideo'
+import { renderReadingVideo, type StarPick } from './starVideo'
 
 type State =
   | { kind: 'idle' }
@@ -13,10 +13,14 @@ type State =
 
 const RECORDING_NOTE = 'Не сворачивайте вкладку, пока идёт запись'
 const RESTARTED_NOTE = 'Запись прервалась — начали заново. Не сворачивайте вкладку'
-const buttonClass = 'h-12 px-3 text-base'
+/** On the night sky of the window: the main action is violet, the others are glass with a golden hover. */
+const buttonClass =
+  'h-12 bg-(image:--decor-star-choice) px-3 text-base text-(--decor-star-text) shadow-(--decor-spin-shadow) hover:bg-(image:--decor-star-choice) hover:brightness-110'
+const secondaryClass =
+  'h-12 border-(--decor-star-line)/70 bg-(--decor-star-glass) px-3 text-base text-(--decor-star-text) hover:bg-(--decor-star-glass) hover:text-(--decor-gold)'
 
 /** The video of the reading: rendered on request, then sent through the share sheet or downloaded. */
-export function StarVideo({ reading, name }: { reading: Reading; name: string }) {
+export function StarVideo({ reading, name, pick }: { reading: Reading; name: string; pick: StarPick }) {
   const [type] = useState(videoType)
   const [state, setState] = useState<State>({ kind: 'idle' })
   const [note, setNote] = useState('')
@@ -24,9 +28,8 @@ export function StarVideo({ reading, name }: { reading: Reading; name: string })
   const [restarted, setRestarted] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
-  const hotel = reading.hotels[0]
   const title = `${BRAND_NAME} Поиск по звёздам`
-  const text = `${name} ${reading.sign.symbol} — звёзды выбрали мне ${hotel.name} (${reading.city.name}). А что выпадет тебе?`
+  const text = `${name} ${reading.sign.symbol} — звёзды выбрали мне «${pick.title}» (${pick.place}). А что выпадет тебе?`
   const site = () => window.location.origin
 
   // Closing the window stops the recording; the preview's object URL goes with the video.
@@ -50,7 +53,7 @@ export function StarVideo({ reading, name }: { reading: Reading; name: string })
     setRestarted(false)
     setState({ kind: 'rendering', progress: 0 })
     try {
-      const file = await renderReadingVideo(reading, name, type, {
+      const file = await renderReadingVideo(reading, name, pick, type, {
         signal: controller.signal,
         // The bar moves in 1 % steps: a state update per frame would re-render the dialog 60 times a second.
         onProgress: (share) =>
@@ -107,14 +110,14 @@ export function StarVideo({ reading, name }: { reading: Reading; name: string })
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(state.progress * 100)}
-          className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted"
+          className="h-2.5 flex-1 overflow-hidden rounded-full bg-(--decor-star-glass) ring-1 ring-(--decor-star-line)/50"
         >
           <div
             className="h-full origin-left scale-x-(--progress) rounded-full bg-(image:--decor-spin-gradient)"
             style={{ '--progress': state.progress } as CSSProperties}
           />
         </div>
-        <Button variant="secondary" className="h-10" onClick={() => abortRef.current?.abort()}>
+        <Button variant="outline" className={`${secondaryClass} h-10`} onClick={() => abortRef.current?.abort()}>
           <X aria-hidden />
           Отменить
         </Button>
@@ -125,7 +128,7 @@ export function StarVideo({ reading, name }: { reading: Reading; name: string })
       <div className="grid grid-cols-[auto_1fr] items-center gap-3">
         <video
           src={state.url}
-          className="aspect-[9/16] w-24 rounded-lg bg-muted"
+          className="aspect-[9/16] w-24 rounded-lg bg-(--decor-star-sky) ring-1 ring-(--decor-gold)/50"
           aria-label="Видео с предсказанием"
           muted
           loop
@@ -159,7 +162,7 @@ export function StarVideo({ reading, name }: { reading: Reading; name: string })
                 <Download aria-hidden />
                 Скачать видео
               </Button>
-              <Button variant="secondary" size="lg" className={buttonClass} onClick={copyLink}>
+              <Button variant="outline" size="lg" className={secondaryClass} onClick={copyLink}>
                 <Link2 aria-hidden />
                 Скопировать ссылку
               </Button>
@@ -176,7 +179,7 @@ export function StarVideo({ reading, name }: { reading: Reading; name: string })
           Создать видео для друзей
         </Button>
         {state.kind === 'failed' && (
-          <Button variant="secondary" size="lg" className={buttonClass} onClick={copyLink}>
+          <Button variant="outline" size="lg" className={secondaryClass} onClick={copyLink}>
             <Link2 aria-hidden />
             Скопировать ссылку
           </Button>
@@ -189,7 +192,7 @@ export function StarVideo({ reading, name }: { reading: Reading; name: string })
   return (
     <div className="flex flex-col gap-2">
       {actions}
-      <p className="min-h-5 text-center text-sm text-muted-foreground" role="status">
+      <p className="min-h-5 text-center text-sm text-(--decor-star-muted)" role="status">
         {recording ? (restarted ? RESTARTED_NOTE : RECORDING_NOTE) : note}
       </p>
     </div>
