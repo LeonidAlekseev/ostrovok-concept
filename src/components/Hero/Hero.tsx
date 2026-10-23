@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
-import { ChevronRight, Dices, Route as RouteIcon } from 'lucide-react'
+import { ChevronRight, Dice5, Route as RouteIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { Destination } from '@/data/destinations'
@@ -21,6 +21,7 @@ import {
   type Scene,
   type Spotlight,
 } from './globeScene'
+import { GlobeClouds } from './GlobeClouds'
 import { StatsPanel, type StatsPanelHandle } from './StatsPanel'
 
 interface Props {
@@ -77,8 +78,22 @@ const hero = [
   "after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:z-3 after:h-[30%] after:bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_0%,transparent)_0%,color-mix(in_srgb,var(--decor-haze)_80%,transparent)_60%,var(--background)_100%)] after:content-['']",
 ].join(' ')
 const earth =
-  // Translucent glassy sphere: the dots and lines on top carry the geography.
-  'relative size-full rounded-full bg-[radial-gradient(circle_at_65%_15%,color-mix(in_srgb,var(--decor-light)_45%,transparent),transparent_40%),radial-gradient(circle_at_50%_50%,color-mix(in_srgb,var(--decor-light)_12%,transparent)_50%,color-mix(in_srgb,var(--decor-light)_50%,transparent)_100%)]'
+  // The ocean, lit from the upper right like the land dots on the canvas; it is also the whole globe until they load.
+  'relative size-full rounded-full bg-[radial-gradient(circle_at_68%_28%,var(--decor-ocean-light),var(--decor-ocean)_42%,var(--decor-ocean-deep)_95%)]'
+const earthShade = [
+  // Over the land and the ocean alike: a highlight on the sunlit side, the night side darkens towards the limb,
+  // and the atmosphere lights the rim from inside.
+  'pointer-events-none absolute inset-0 rounded-full',
+  'bg-[radial-gradient(circle_at_68%_28%,color-mix(in_srgb,var(--decor-light)_30%,transparent),transparent_28%,transparent_45%,color-mix(in_srgb,var(--decor-ocean-deep)_55%,transparent)_80%)]',
+  'shadow-[inset_0_0_28px_6px_color-mix(in_srgb,var(--decor-atmosphere)_75%,transparent)]',
+].join(' ')
+const atmosphere =
+  'absolute inset-0 rounded-full shadow-[0_0_0_1.5px_color-mix(in_srgb,var(--decor-light)_70%,transparent),0_0_26px_8px_color-mix(in_srgb,var(--decor-atmosphere)_85%,transparent),0_0_90px_28px_color-mix(in_srgb,var(--decor-atmosphere)_55%,transparent)]'
+const randomButton = [
+  // A small cloud: the shape is drawn behind a transparent button, so the focus ring still follows the button.
+  'pointer-events-auto relative isolate h-9 px-4 text-sm font-bold text-brand-foreground hover:scale-105 hover:bg-transparent md:h-10 md:text-base',
+  'max-md:ml-auto max-md:mr-1',
+].join(' ')
 const sun = [
   // The glare sits exactly on the limb, at this angle from the globe's centre (clockwise from 3 o'clock).
   // The globe overflows a phone's screen sideways: there the glare stays on the visible part of the limb.
@@ -483,14 +498,10 @@ export function Hero({ cities: markers, routes, featured }: Props) {
         >
           Вращай глобус — воплощай мечту
         </p>
-        <Button
-          ref={randomRef}
-          shape="pill"
-          className="pointer-events-auto shadow-(--shadow-primary) max-md:ml-auto max-md:h-9 max-md:px-3.5 max-md:text-sm"
-          onClick={showRandomIdea}
-        >
-          <Dices aria-hidden />
-          Случайная идея
+        <Button ref={randomRef} variant="ghost" shape="pill" className={randomButton} onClick={showRandomIdea}>
+          <CloudShape />
+          <Dice5 className="size-[1.3em]" strokeWidth={2.25} aria-hidden />
+          Рандом
         </Button>
       </div>
       <p role="status" className="sr-only">
@@ -504,10 +515,7 @@ export function Hero({ cities: markers, routes, featured }: Props) {
         ref={globeRef}
         className="absolute top-(--globe-top) left-[calc(var(--globe-x)_-_var(--globe-size)/2)] aspect-square w-(--globe-size) [--unit:calc(var(--globe-size)/100)]"
       >
-        <div
-          className="absolute inset-0 rounded-full shadow-[0_0_0_1.5px_color-mix(in_srgb,var(--decor-light)_60%,transparent),0_0_24px_6px_color-mix(in_srgb,var(--decor-glow-soft)_70%,transparent),0_0_80px_24px_color-mix(in_srgb,var(--decor-glow)_55%,transparent)]"
-          aria-hidden
-        />
+        <div className={atmosphere} aria-hidden />
         <div className={earth} aria-hidden />
         {/* Only the disc itself can be grabbed; on it, swipes in any direction turn the globe. */}
         <canvas
@@ -515,11 +523,9 @@ export function Hero({ cities: markers, routes, featured }: Props) {
           className={`absolute inset-0 size-full touch-none transition-opacity duration-600 ease-[ease] [clip-path:circle(50%)] data-dragging:cursor-grabbing ${spinning ? 'cursor-grab opacity-100' : 'opacity-0'}`}
           aria-hidden
         />
-        <div
-          className="pointer-events-none absolute inset-0 rounded-full shadow-[inset_0_0_30px_6px_color-mix(in_srgb,var(--decor-rim)_55%,transparent)]"
-          aria-hidden
-        />
+        <div className={earthShade} aria-hidden />
         <div className={sun} aria-hidden />
+        <GlobeClouds />
         <div ref={glowRef} className={cityGlow} style={positionStyle(initialScene.hub)} aria-hidden />
 
         <svg
@@ -681,6 +687,33 @@ function describeStats(frames: FrameWindow, renderer: GlobeRenderer) {
     `dpr ${window.devicePixelRatio} · ${nav.hardwareConcurrency} cores · ${nav.deviceMemory ?? '?'} GB`,
     `env ${appEnv}`,
   ].join('\n')
+}
+
+/** The cloud the «Рандом» button sits on, stretched to the button with some room around the label. */
+function CloudShape() {
+  const fill = useId()
+  return (
+    <span
+      className="absolute -inset-x-3 -inset-y-2.5 -z-1 drop-shadow-[0_6px_10px_color-mix(in_srgb,var(--decor-hotel-shadow)_28%,transparent)]"
+      aria-hidden
+    >
+      <svg className="size-full overflow-visible" viewBox="0 0 160 60" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id={fill} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" style={{ stopColor: 'var(--decor-glow-soft)' }} />
+            <stop offset="1" style={{ stopColor: 'var(--brand)' }} />
+          </linearGradient>
+        </defs>
+        <path
+          d="M24 57C10 57 3 47 8 38 2 29 11 17 23 21 27 9 43 4 53 12 61 2 81 0 91 10 101 3 119 6 121 18 135 14 152 22 149 35 159 41 155 57 140 57Z"
+          fill={`url(#${fill})`}
+          style={{ stroke: 'var(--decor-light)' }}
+          strokeWidth="2"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+    </span>
+  )
 }
 
 function PinIcon() {

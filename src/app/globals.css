@@ -90,10 +90,16 @@
   /* Hero and globe. */
   --decor-glow: #d6ffb0;
   --decor-glow-soft: #f0ffe1;
-  --decor-rim: #f5ffeb;
   --decor-haze: #ecf6e8;
   --decor-glass-fallback: #eefbe4;
   --decor-pin-selected: #0331a8;
+  /* The Earth: sunlit, mid and night-side ocean, the atmosphere around it, and the clouds' shaded underside. */
+  --decor-ocean-light: #8fdcff;
+  --decor-ocean: #2fa8ee;
+  --decor-ocean-deep: #0b5fb8;
+  --decor-atmosphere: #c9f1ff;
+  --decor-cloud-shade: #d3e4f2;
+  --decor-cloud-shadow: #2a6f9e;
   --decor-hotel-from: #3d8bff;
   --decor-hotel-to: #0b3aa8;
   --decor-hotel-shadow: #1e5014;
@@ -169,6 +175,8 @@
   --animate-twinkle: twinkle 1.8s ease-in-out infinite;
   /* The glow under the hub pin on the globe breathes. */
   --animate-hub-pulse: hub-pulse 2.4s ease-in-out infinite;
+  /* The clouds around the globe drift slowly to and fro. */
+  --animate-cloud-drift: cloud-drift 18s ease-in-out infinite alternate;
   /* The vibe search: the «vs» between the sides beats, and each new pair of opposites slides in. */
   --animate-vibe-beat: vibe-beat 2.4s ease-in-out infinite;
   --animate-vibe-in: vibe-in 0.3s ease-out both;
@@ -246,6 +254,12 @@
     50% {
       opacity: 0.55;
       scale: 1.25;
+    }
+  }
+
+  @keyframes cloud-drift {
+    to {
+      translate: 4% 0;
     }
   }
 
