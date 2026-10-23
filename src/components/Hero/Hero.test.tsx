@@ -35,6 +35,23 @@ describe('Hero in the server render', () => {
     expect(page.querySelectorAll('svg g').length).toBeGreaterThan(0)
   })
 
+  // hero-globe, Requirement: Облака у Земли
+  it('adds decorative clouds that let presses through and stand still with reduced motion', () => {
+    const clouds = [...page.querySelectorAll('svg[viewBox="0 0 240 120"]')].map((cloud) => cloud.parentElement!)
+    expect(clouds.length).toBeGreaterThan(0)
+    for (const cloud of clouds) {
+      expect(cloud.getAttribute('aria-hidden')).toBe('true')
+      expect(cloud.classList).toContain('pointer-events-none')
+      expect(cloud.firstElementChild!.classList).toContain('motion-reduce:animate-none')
+    }
+  })
+
+  // hero-globe, Requirement: Случайная идея
+  it('names the random idea button «Рандом»', () => {
+    const button = [...page.querySelectorAll('button')].find((b) => b.textContent === 'Рандом')
+    expect(button).toBeDefined()
+  })
+
   it('shows no card without routes', () => {
     const empty = renderToStaticMarkup(<Hero cities={[]} routes={[]} featured={prague} />)
     expect(empty).not.toContain('href="/routes/')
@@ -137,9 +154,9 @@ describe('Hero in the browser', () => {
 
   it('spins the globe to a random city for about two seconds, ignoring clicks meanwhile, then opens its idea', async () => {
     const user = setup()
-    await user.click(screen.getByRole('button', { name: 'Случайная идея' }))
+    await user.click(screen.getByRole('button', { name: 'Рандом' }))
     const random = vi.spyOn(Math, 'random')
-    await user.click(screen.getByRole('button', { name: 'Случайная идея' }))
+    await user.click(screen.getByRole('button', { name: 'Рандом' }))
     expect(random).not.toHaveBeenCalled()
 
     runFrames(1900)
@@ -156,7 +173,7 @@ describe('Hero in the browser', () => {
   it('opens a random idea at once with reduced motion', async () => {
     reducedMotion = true
     const user = setup()
-    await user.click(screen.getByRole('button', { name: 'Случайная идея' }))
+    await user.click(screen.getByRole('button', { name: 'Рандом' }))
     expect(pressedPin()).not.toBeNull()
     expect(screen.getByRole('status').textContent).toMatch(/^Случайная идея: /)
   })

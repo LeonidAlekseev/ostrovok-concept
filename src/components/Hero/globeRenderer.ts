@@ -4,16 +4,33 @@ import { advance, ahead, createFlyers, reroute, type Flyer, type Vec3 } from './
 /** Spacing of the latitude/longitude grid and the step its lines are sampled with, degrees. */
 const GRID_STEP = 15
 const GRID_SAMPLE = 2
-/** Side of a land dot, CSS pixels. */
-const DOT_SIZE = 1.8
-/** Dots are batched into a few opacity levels by how squarely they face the viewer. */
-const DOT_LEVELS = [
-  { depth: 0.05, alpha: 0.3 },
-  { depth: 0.25, alpha: 0.6 },
-  { depth: 0.5, alpha: 0.95 },
+/**
+ * Side of a land dot as a fraction of the globe's radius: about 2/3 of the 1.25° spacing of the dots, so the land
+ * reads as green fill with a fine dotted texture at any globe size. No smaller than DOT_MIN_SIZE CSS pixels.
+ */
+const DOT_SIZE = 0.014
+const DOT_MIN_SIZE = 2
+/** Dots on the very limb are left out: seen edge-on they only blur the outline of the disc. */
+const DOT_MIN_DEPTH = 0.05
+/**
+ * Direction to the sun in view space (x right, y up, z towards the viewer): from the upper right, where
+ * the glare sits on the limb. The CSS shading over the canvas is lit from the same side.
+ */
+const SUN = (() => {
+  const [x, y, z] = [0.45, 0.55, 0.7]
+  const length = Math.hypot(x, y, z)
+  return [x / length, y / length, z / length] as const
+})()
+/** Land dots are batched into a few shades of green by how squarely they face the sun, darkest first. */
+const DOT_SHADES = [
+  { light: -Infinity, color: '#2c8f45' },
+  { light: 0.2, color: '#3fb752' },
+  { light: 0.5, color: '#62d462' },
+  { light: 0.8, color: '#a4ef8c' },
 ]
-const GRID_STYLE = 'rgba(255, 255, 255, 0.4)'
-const COAST_STYLE = 'rgba(255, 255, 255, 0.85)'
+const DOT_ALPHA = 0.95
+const GRID_STYLE = 'rgba(255, 255, 255, 0.22)'
+const COAST_STYLE = 'rgba(220, 255, 205, 0.85)'
 /** Planes cruise slowly, balloons drift slower still; speeds in degrees of arc per second. */
 const PLANE_COUNT = 9
 const PLANE_SPEEDS: Flyer['speeds'] = [0.8, 1.6]
@@ -77,7 +94,7 @@ interface Polylines {
   starts: number[]
 }
 
-/** Dotted wireframe globe drawn with Canvas 2D: land dots, coastlines and a latitude/longitude grid. */
+/** Dotted globe drawn with Canvas 2D over the CSS ocean: sunlit green land dots, coastlines and a latitude/longitude grid. */
 export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): GlobeRenderer | null {
   const ctx = canvas.getContext('2d')
   if (!ctx) return null
@@ -168,18 +185,21 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
         ctx.stroke()
       }
 
-      const side = DOT_SIZE * pixelRatio
-      ctx.fillStyle = '#fff'
-      DOT_LEVELS.forEach(({ depth, alpha }, level) => {
-        const until = DOT_LEVELS[level + 1]?.depth ?? Infinity
-        ctx.beginPath()
-        for (let i = 0; i < dots.length; i += 3) {
-          project(dots, i, q)
-          if (q.depth >= depth && q.depth < until && q.y < visible + side)
-            ctx.rect(q.x - side / 2, q.y - side / 2, side, side)
-        }
-        ctx.globalAlpha = alpha
-        ctx.fill()
+      const side = Math.max(DOT_SIZE * r, DOT_MIN_SIZE * pixelRatio)
+      // One projection per dot: each lands in the path of its shade, and every shade is filled once.
+      const shades = DOT_SHADES.map(() => new Path2D())
+      for (let i = 0; i < dots.length; i += 3) {
+        project(dots, i, q)
+        if (q.depth < DOT_MIN_DEPTH || q.y >= visible + side) continue
+        const light = (SUN[0] * (q.x - r) + SUN[1] * (r - q.y)) / r + SUN[2] * q.depth
+        let shade = DOT_SHADES.length - 1
+        while (light < DOT_SHADES[shade].light) shade--
+        shades[shade].rect(q.x - side / 2, q.y - side / 2, side, side)
+      }
+      ctx.globalAlpha = DOT_ALPHA
+      DOT_SHADES.forEach(({ color }, shade) => {
+        ctx.fillStyle = color
+        ctx.fill(shades[shade])
       })
 
       /** Projects a flyer into `q`; returns its opacity, 0 when it is out of sight. */
