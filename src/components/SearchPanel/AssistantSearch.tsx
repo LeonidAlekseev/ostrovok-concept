@@ -47,6 +47,15 @@ const messageAvatarClass = 'size-8 flex-none max-sm:hidden'
 const messageTextClass = 'leading-[1.45] whitespace-pre-wrap'
 const avatarSrc = '/assistant/eval.webp'
 const hintClass = 'block text-xs/[normal] font-normal text-muted-foreground'
+/** Light glass over the window's glass: the composer and the quick replies. */
+const glassField =
+  'bg-(--glass-field) shadow-[inset_0_0_0_1.5px_color-mix(in_srgb,var(--decor-light)_75%,transparent)] [backdrop-filter:blur(12px)]'
+/** The bubble of the opening line, its tail at the lower left pointing at Eval. */
+const bubbleClass = [
+  'relative min-w-0 flex-1 rounded-[clamp(18px,4.6vw,32px)] bg-(--glass-plaque) px-[clamp(14px,3.6vw,34px)] py-[clamp(12px,3vw,26px)]',
+  'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--decor-light)_85%,transparent),0_8px_24px_color-mix(in_srgb,var(--decor-assistant-glow)_18%,transparent)]',
+  "before:absolute before:right-[calc(100%_-_1px)] before:bottom-[24%] before:h-[clamp(12px,3vw,22px)] before:w-[clamp(8px,2.2vw,16px)] before:bg-(--glass-plaque) before:[clip-path:polygon(100%_0,100%_100%,0_100%)] before:content-['']",
+].join(' ')
 
 export function AssistantSearch({ newHotels, routes, onChoose }: Props) {
   const destinations = useDestinations()
@@ -166,35 +175,35 @@ export function AssistantSearch({ newHotels, routes, onChoose }: Props) {
   }
 
   const started = messages.length > 0
-  const chips = question ? question.replies.map((label) => ({ emoji: null, label })) : starterChips
 
   return (
-    <div className="flex flex-col gap-[clamp(12px,3vw,18px)]">
-      <div className="flex items-center gap-[clamp(12px,3.4vw,22px)]">
-        <Image
-          src={avatarSrc}
-          alt={started ? '' : 'Эвал'}
-          width={256}
-          height={256}
-          priority
-          className={`flex-none ${started ? 'size-12' : 'size-[clamp(64px,18vw,104px)]'}`}
-        />
-        <div className="min-w-0 flex-1">
-          <h2
-            className={`leading-[1.25] font-bold tracking-[-0.01em] ${started ? 'text-[clamp(15px,4vw,18px)]' : 'text-(length:--text-heading)'}`}
-          >
+    <div className="flex flex-col gap-[clamp(12px,3vw,20px)] [--glass-field:color-mix(in_srgb,var(--decor-light)_60%,transparent)] [--glass-plaque:color-mix(in_srgb,var(--decor-light)_72%,transparent)]">
+      <div className={`flex items-center ${started ? 'gap-3' : 'gap-[clamp(14px,4vw,30px)]'}`}>
+        <EvalPortrait started={started} />
+        {started ? (
+          <h2 className="min-w-0 flex-1 text-[clamp(15px,4vw,18px)] leading-[1.25] font-bold tracking-[-0.01em]">
             О каком путешествии вы мечтаете?
           </h2>
-          <p className={`mt-1.5 text-[clamp(14px,3.7vw,18px)] text-muted-foreground ${started ? 'hidden' : ''}`}>
-            Я подберу идеальное жилье и направление
-          </p>
-        </div>
+        ) : (
+          // The reply bubble: its tail points at Eval.
+          <div className={bubbleClass}>
+            <h2 className="text-(length:--text-heading) leading-[1.2] font-bold tracking-[-0.01em]">
+              О каком путешествии вы мечтаете?{' '}
+              <span className="whitespace-nowrap" aria-hidden>
+                🌴
+              </span>
+            </h2>
+            <p className="mt-[clamp(4px,1.2vw,10px)] text-[clamp(14px,3.7vw,20px)] leading-[1.4] text-(--decor-assistant-text-2)">
+              Я подберу идеальное жильё, направление и лучшие варианты для вашего отдыха <span aria-hidden>✨</span>
+            </p>
+          </div>
+        )}
         {started && (
           <Button
             variant="secondary"
             size="sm"
             shape="pill"
-            className="flex-none max-sm:w-9 max-sm:justify-center max-sm:p-0"
+            className="flex-none bg-(--glass-field) max-sm:w-9 max-sm:justify-center max-sm:p-0"
             onClick={reset}
           >
             <RotateCcw className="size-4" aria-hidden />
@@ -244,18 +253,85 @@ export function AssistantSearch({ newHotels, routes, onChoose }: Props) {
         </ol>
       )}
 
+      {question ? (
+        // Bleeds to the window edge: the strip scrolls under the padding (--pad from SearchPanel).
+        <ul
+          className="-mx-(--pad) flex gap-2 overflow-x-auto px-(--pad) py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          aria-label="Быстрые ответы"
+        >
+          {question.replies.map((label) => (
+            <li key={label}>
+              <Button
+                variant="secondary"
+                shape="pill"
+                className={`h-[clamp(40px,10.6vw,48px)] px-[clamp(14px,3.6vw,20px)] text-[clamp(14px,3.7vw,16px)] font-normal text-foreground ${glassField} hover:bg-(--decor-light)`}
+                onClick={() => send(label)}
+                disabled={thinking}
+              >
+                {label}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        !started && (
+          <ul className="grid grid-cols-3 gap-[clamp(8px,2.4vw,22px)]" aria-label="Идеи для поездки">
+            {starterChips.map(({ emoji, label, photo }) => (
+              <li key={label} className="min-w-0">
+                <button
+                  type="button"
+                  className="group flex w-full flex-col overflow-hidden rounded-[clamp(16px,4.4vw,30px)] bg-(--glass-field) text-left shadow-[inset_0_0_0_1.5px_color-mix(in_srgb,var(--decor-light)_80%,transparent),0_6px_20px_color-mix(in_srgb,var(--decor-assistant-glow)_35%,transparent)] transition-[translate,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[inset_0_0_0_1.5px_var(--decor-light),0_10px_26px_color-mix(in_srgb,var(--decor-assistant-glow)_50%,transparent)] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-60"
+                  onClick={() => send(label)}
+                  disabled={thinking}
+                >
+                  <Image
+                    src={photo}
+                    alt=""
+                    width={310}
+                    height={70}
+                    className="h-[clamp(54px,15vw,104px)] w-full object-cover"
+                  />
+                  {/* The glass plaque rises over the bottom of the photo. */}
+                  <span className="relative mx-[clamp(4px,1.2vw,10px)] -mt-[clamp(16px,4.4vw,30px)] mb-[clamp(4px,1.2vw,10px)] flex items-center gap-[clamp(4px,1.4vw,12px)] rounded-full bg-(--glass-plaque) py-[clamp(6px,1.8vw,12px)] pr-[clamp(6px,1.6vw,10px)] pl-[clamp(8px,2.2vw,16px)] shadow-[inset_0_0_0_1px_var(--decor-light)] [backdrop-filter:blur(12px)]">
+                    <span className="text-[clamp(14px,4vw,26px)] leading-none" aria-hidden>
+                      {emoji}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[clamp(13px,3.6vw,20px)] leading-[1.2] font-semibold">
+                      {label}
+                    </span>
+                    <span
+                      className="grid size-[clamp(24px,5vw,36px)] flex-none place-items-center rounded-full bg-(--decor-light) text-(--decor-assistant-text-2) shadow-[0_1px_4px_color-mix(in_srgb,var(--shadow-color)_12%,transparent)] max-sm:hidden"
+                      aria-hidden
+                    >
+                      <ChevronRight className="size-[60%]" />
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )
+      )}
+
       <form
-        className="relative flex items-center gap-[clamp(10px,2.6vw,16px)] rounded-[clamp(16px,4vw,20px)] border border-border bg-card p-[clamp(10px,2.6vw,14px)] pl-[clamp(14px,3.6vw,22px)] transition-[border-color,box-shadow] duration-200 focus-within:border-primary focus-within:shadow-[0_0_0_3px_color-mix(in_srgb,var(--ring)_10%,transparent)]"
+        className={`relative flex items-center gap-[clamp(10px,2.6vw,18px)] rounded-[clamp(18px,4.8vw,30px)] p-[clamp(8px,2.2vw,14px)] pl-[clamp(14px,3.6vw,26px)] ${glassField} transition-shadow duration-200 focus-within:shadow-[inset_0_0_0_2px_var(--ring),0_0_0_4px_color-mix(in_srgb,var(--ring)_25%,transparent)]`}
         onSubmit={onSubmit}
       >
-        <Sparkles className="size-[clamp(22px,6vw,28px)] flex-none fill-current text-primary" aria-hidden />
+        <Sparkles
+          className="size-[clamp(22px,6vw,30px)] flex-none fill-current text-(--decor-assistant-spark) drop-shadow-[0_0_6px_color-mix(in_srgb,var(--decor-assistant-spark)_55%,transparent)]"
+          aria-hidden
+        />
+        <span
+          className="w-px self-stretch bg-[color-mix(in_srgb,var(--decor-assistant-text-2)_25%,transparent)]"
+          aria-hidden
+        />
         <label htmlFor={inputId} className="sr-only">
           Опишите поездку
         </label>
         {/* The composer draws the box and the focus state; the textarea is bare inside it. */}
         <Textarea
           id={inputId}
-          className="min-h-0 flex-1 resize-none rounded-none border-0 bg-transparent p-0 text-base leading-[1.4] field-sizing-fixed focus-visible:border-0 sm:text-lg md:text-lg"
+          className="min-h-0 flex-1 resize-none rounded-none border-0 bg-transparent p-0 text-base leading-[1.4] field-sizing-fixed placeholder:text-(--decor-assistant-text-2) focus-visible:border-0 focus-visible:ring-0 sm:text-lg md:text-lg"
           rows={2}
           value={text}
           enterKeyHint="send"
@@ -263,7 +339,7 @@ export function AssistantSearch({ newHotels, routes, onChoose }: Props) {
           placeholder={
             started
               ? 'Ответьте или уточните пожелания…'
-              : 'Например: «Хочу на море в октябре, спокойный отдых, бюджет до 70 000 ₽»'
+              : 'Например: «Хочу на море в октябре, спокойный отдых, с ребёнком»'
           }
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
@@ -271,38 +347,13 @@ export function AssistantSearch({ newHotels, routes, onChoose }: Props) {
         <Button
           type="submit"
           size="icon"
-          className="size-[clamp(48px,13vw,64px)] flex-none shadow-(--shadow-primary)"
+          className="size-[clamp(48px,13vw,68px)] flex-none bg-(image:--decor-assistant-send) shadow-(--decor-assistant-send-glow) disabled:opacity-60"
           aria-label="Отправить"
           disabled={!text.trim() || thinking}
         >
-          <SendHorizontal className="size-[45%]" aria-hidden />
+          <SendHorizontal className="size-[42%]" aria-hidden />
         </Button>
       </form>
-
-      {/* Bleeds to the card edge: the strip scrolls under the panel padding (--pad from SearchPanel). */}
-      <ul
-        className="-mx-(--pad) flex gap-2 overflow-x-auto px-(--pad) py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        aria-label={question ? 'Быстрые ответы' : 'Идеи для поездки'}
-      >
-        {chips.map(({ emoji, label }) => (
-          <li key={label}>
-            <Button
-              variant="secondary"
-              shape="pill"
-              className="h-[clamp(40px,10.6vw,48px)] bg-(--decor-surface-soft) px-[clamp(14px,3.6vw,20px)] text-[clamp(14px,3.7vw,16px)] font-normal text-foreground hover:bg-secondary"
-              onClick={() => send(label)}
-              disabled={thinking}
-            >
-              {emoji && (
-                <span className="text-[1.25em] leading-none" aria-hidden>
-                  {emoji}
-                </span>
-              )}
-              {label}
-            </Button>
-          </li>
-        ))}
-      </ul>
     </div>
   )
 }
@@ -384,6 +435,29 @@ function PlanView({ plan, route, onChoose }: PlanProps) {
         <p className="text-sm/[normal] text-muted-foreground">
           В бюджет не уложился — показал самые близкие варианты. Можно сократить поездку.
         </p>
+      )}
+    </div>
+  )
+}
+
+/** Eval's portrait over the conversation: a glowing rim behind the cut-out picture and sparkles before the start. */
+function EvalPortrait({ started }: { started: boolean }) {
+  return (
+    <div className={`relative isolate flex-none ${started ? 'size-12' : 'size-[clamp(64px,17vw,168px)]'}`}>
+      {/* The rim sits behind the picture: the palm and the hat stick out of its circle. */}
+      <span
+        className="absolute inset-[5%] -z-10 rounded-full shadow-[0_0_0_clamp(2px,0.5vw,4px)_color-mix(in_srgb,var(--decor-light)_85%,transparent),0_0_clamp(12px,3.4vw,34px)_color-mix(in_srgb,var(--decor-assistant-glow)_80%,transparent)]"
+        aria-hidden
+      />
+      <Image src={avatarSrc} alt={started ? '' : 'Эвал'} width={256} height={256} priority className="size-full" />
+      {!started && (
+        <span
+          className="pointer-events-none absolute -top-[10%] -left-[8%] text-(--decor-gold) drop-shadow-[0_0_6px_color-mix(in_srgb,var(--decor-star)_70%,transparent)] motion-safe:animate-pulse"
+          aria-hidden
+        >
+          <span className="block text-[clamp(16px,4.4vw,34px)] leading-none">✦</span>
+          <span className="-mt-[0.2em] -ml-[0.5em] block text-[clamp(9px,2.4vw,18px)] leading-none">✦</span>
+        </span>
       )}
     </div>
   )

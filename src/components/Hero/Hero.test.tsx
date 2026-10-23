@@ -53,7 +53,7 @@ describe('Hero in the server render', () => {
   it('keeps the route card to its old maximum width and cuts a long title with an ellipsis', () => {
     const link = page.querySelector('a[href="/routes/prague-culture"]')!
     const card = link.closest('[class*="max-w-"]')!
-    expect(card.classList).toContain('max-w-[min(26rem,calc(100vw-2*var(--page-x)-2*clamp(6px,2vw,10px)))]')
+    expect(card.classList).toContain('max-w-[min(26rem,calc(100vw-2*var(--page-x)))]')
     expect(card.classList).toContain('md:max-w-[min(26rem,calc(50vw-40px))]')
     expect(link.querySelector('span')!.classList).toContain('truncate')
   })
