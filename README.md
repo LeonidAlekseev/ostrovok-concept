@@ -398,8 +398,15 @@ uv run --with pillow python scripts/build-images.py <папка-с-исходн�
 ```
 
 Геометрия глобуса собирается из Natural Earth 1:50m (`ne_50m_land.geojson`,
-`ne_50m_coastline.geojson`):
+`ne_50m_coastline.geojson`): точки, береговые линии и кольца суши для зелёной заливки:
 
 ```bash
 uv run --with pillow --with numpy python scripts/build-globe.py <папка-с-geojson>
+```
+
+Облака у глобуса вырезаются из фото облаков на чёрном фоне (`globe-cloud-<имя>.jpeg` →
+`public/images/hero/clouds/<имя>.webp`, шум и рваный край вычищаются):
+
+```bash
+uv run --with pillow --with numpy --with scipy python scripts/build-clouds.py globe-cloud-big.jpeg globe-cloud-medium.jpeg globe-cloud-flat.jpeg
 ```
