@@ -35,27 +35,24 @@ describe('Hero in the server render', () => {
     expect(page.querySelectorAll('svg g').length).toBeGreaterThan(0)
   })
 
-  // hero-globe, Requirement: Облака у Земли
-  it('adds decorative clouds that let presses through and stand still with reduced motion', () => {
+  // hero-globe, Requirement: Случайная идея
+  it('keeps only the decorative cloud under «Рандом»: no clouds on the globe', () => {
     const photos = [...page.querySelectorAll('img')].filter((img) =>
       decodeURIComponent(img.getAttribute('src')!).includes('/images/hero/clouds/'),
     )
-    // The globe's clouds plus the two under the «Рандом» button: all of them hidden from screen readers.
+    expect(photos).toHaveLength(2)
     for (const photo of photos) expect(photo.getAttribute('alt')).toBe('')
-    const clouds = photos.map((photo) => photo.parentElement!).filter((parent) => parent.hasAttribute('aria-hidden'))
-    expect(clouds.length).toBeGreaterThanOrEqual(2)
-    expect(photos.length).toBeLessThanOrEqual(5)
-    for (const cloud of clouds) {
-      expect(cloud.classList).toContain('pointer-events-none')
-      expect(cloud.firstElementChild!.classList).toContain('motion-reduce:animate-none')
-    }
+    const place = photos[0].parentElement!
+    expect(place.classList).toContain('pointer-events-none')
+    expect(photos[1].parentElement).toBe(place)
+    expect(page.querySelector('.animate-cloud-drift')).toBeNull()
   })
 
   // hero-globe, Requirement: Карточка маршрута на глобусе — Длинное название
   it('keeps the route card to its old maximum width and cuts a long title with an ellipsis', () => {
     const link = page.querySelector('a[href="/routes/prague-culture"]')!
     const card = link.closest('[class*="max-w-"]')!
-    expect(card.classList).toContain('max-w-[min(26rem,calc(100vw-24px))]')
+    expect(card.classList).toContain('max-w-[min(26rem,calc(100vw-2*var(--page-x)-2*clamp(6px,2vw,10px)))]')
     expect(card.classList).toContain('md:max-w-[min(26rem,calc(50vw-40px))]')
     expect(link.querySelector('span')!.classList).toContain('truncate')
   })

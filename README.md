@@ -408,5 +408,5 @@ uv run --with pillow --with numpy python scripts/build-globe.py <папка-с-g
 `public/images/hero/clouds/<имя>.webp`, шум и рваный край вычищаются):
 
 ```bash
-uv run --with pillow --with numpy --with scipy python scripts/build-clouds.py globe-cloud-big.jpeg globe-cloud-medium.jpeg globe-cloud-flat.jpeg
+uv run --with pillow --with numpy --with scipy python scripts/build-clouds.py globe-cloud-big.jpeg globe-cloud-flat.jpeg
 ```

@@ -23,7 +23,6 @@ import {
   type Spotlight,
 } from './globeScene'
 import { CLOUD_IMAGES } from './cloudImages'
-import { GlobeClouds } from './GlobeClouds'
 import { StatsPanel, type StatsPanelHandle } from './StatsPanel'
 
 interface Props {
@@ -137,7 +136,7 @@ const placeCard = [
   'max-md:[--card-dx:-50%] max-md:[--card-dy:12px]',
   // Inset of the picture, the same on every side; its size equals the text block's height.
   '[--card-pad:clamp(5px,1.4vw,7px)] [--badge-size:clamp(9px,2.5vw,12px)] [--name-size:clamp(13px,3.5vw,17px)] [--meta-size:clamp(10px,2.75vw,13px)] [--text-gap:2px]',
-  'absolute top-0 left-0 z-5 w-max max-w-[min(26rem,calc(100vw-24px))] md:max-w-[min(26rem,calc(50vw-40px))] rounded-[clamp(10px,3vw,14px)] border-0 bg-card py-(--card-pad) pr-[calc(var(--card-pad)_+_4px)] pl-(--card-pad) text-left text-foreground',
+  'absolute top-0 left-0 z-5 w-max max-w-[min(26rem,calc(100vw-2*var(--page-x)-2*clamp(6px,2vw,10px)))] md:max-w-[min(26rem,calc(50vw-40px))] rounded-[clamp(10px,3vw,14px)] border-0 bg-card py-(--card-pad) pr-[calc(var(--card-pad)_+_4px)] pl-(--card-pad) text-left text-foreground',
   'translate-x-[calc(var(--x)_*_var(--unit)_+_var(--card-dx))] translate-y-[calc(var(--y)_*_var(--unit)_+_var(--card-dy)_-_var(--card-lift))] touch-none opacity-[var(--o,1)] will-change-transform',
   'shadow-[0_14px_34px_color-mix(in_srgb,var(--decor-hotel-shadow)_25%,transparent)] transition-shadow duration-200 ease-[ease]',
   'hover:shadow-[0_18px_40px_color-mix(in_srgb,var(--decor-hotel-shadow)_32%,transparent)] hover:[--card-lift:4px]',
@@ -526,7 +525,6 @@ export function Hero({ cities: markers, routes, featured }: Props) {
         />
         <div className={earthShade} aria-hidden />
         <div className={sun} aria-hidden />
-        <GlobeClouds />
         <div ref={glowRef} className={cityGlow} style={positionStyle(initialScene.hub)} aria-hidden />
 
         <svg
