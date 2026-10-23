@@ -1,6 +1,6 @@
 ## 1. Спеки
-- [ ] 1.1 `grep -rn "маршрут\|Маршрут\|route" openspec/specs` — для каждой затронутой спеки добавить в этот change дельту (MODIFIED с полным текстом требования или REMOVED); `routes` и `trip-plan` — все требования REMOVED (уже в change)
-- [ ] 1.2 `npx openspec validate hotels-only --strict` проходит до начала кода
+- [x] 1.1 `grep -rn "маршрут\|Маршрут\|route" openspec/specs` — для каждой затронутой спеки добавить в этот change дельту (MODIFIED с полным текстом требования или REMOVED); `routes` и `trip-plan` — все требования REMOVED (уже в change)
+- [x] 1.2 `npx openspec validate hotels-only --strict` проходит до начала кода
 
 ## 2. Удаление
 - [ ] 2.1 Удалить `/routes`, `/trip`, `RoutePage`, `RouteCard`, `TripPlan`, `src/data/routes.ts`, `src/lib/routes.ts`, `src/lib/trip.ts`, `src/lib/db/routes.ts`, `src/app/trip/actions.ts`, скрипты генерации маршрутов и их тесты
