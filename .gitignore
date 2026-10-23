@@ -44,3 +44,6 @@ openspec/**/screenshots/
 
 # Supabase CLI cache
 supabase/.temp/
+
+# Исходные геоданные (gpkg, parquet): большие, грузятся в Supabase скриптом scripts/load-valencia-geo.py
+/data/
