@@ -177,7 +177,7 @@ export function AssistantSearch({ newHotels, routes, onChoose }: Props) {
           width={256}
           height={256}
           priority
-          className={`flex-none rounded-full ${started ? 'size-12' : 'size-[clamp(64px,18vw,104px)]'}`}
+          className={`flex-none ${started ? 'size-12' : 'size-[clamp(64px,18vw,104px)]'}`}
         />
         <div className="min-w-0 flex-1">
           <h2
@@ -390,5 +390,5 @@ function PlanView({ plan, route, onChoose }: PlanProps) {
 }
 
 function EvalAvatar() {
-  return <Image src={avatarSrc} alt="" width={64} height={64} className={`${messageAvatarClass} rounded-full`} />
+  return <Image src={avatarSrc} alt="" width={64} height={64} className={messageAvatarClass} />
 }
