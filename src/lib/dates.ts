@@ -23,6 +23,12 @@ export function nightsBetween(from: IsoDate, to: IsoDate): number {
   return Math.round((fromIso(to).getTime() - fromIso(from).getTime()) / 86_400_000)
 }
 
+/** Day of the week of `iso`, 0 for Sunday; computed in UTC so the browser time zone cannot shift it. */
+export function weekday(iso: IsoDate): number {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+}
+
 export function todayIso(): IsoDate {
   return toIso(new Date())
 }
@@ -34,6 +40,14 @@ export const monthTitle = new Intl.DateTimeFormat('ru-RU', { month: 'long', year
 function monthLabel(date: Date): string {
   // "окт." — the short form already carries a trailing dot when abbreviated.
   return shortMonth.format(date)
+}
+
+const shortWeekday = new Intl.DateTimeFormat('ru-RU', { weekday: 'short' })
+
+/** "24 окт, сб": the day, the short month without its dot and the short weekday. */
+export function formatShortDay(iso: IsoDate): string {
+  const date = fromIso(iso)
+  return `${date.getDate()} ${monthLabel(date).replace('.', '')}, ${shortWeekday.format(date)}`
 }
 
 export function formatLongDate(iso: IsoDate): string {
@@ -53,6 +67,12 @@ export function formatDateRange(from: IsoDate, to: IsoDate | null): string {
     return `${a.getDate()} ${monthLabel(a)} – ${b.getDate()} ${monthLabel(b)} ${year}`
   }
   return `${a.getDate()} – ${b.getDate()} ${monthLabel(b)} ${year}`
+}
+
+/** "24 окт. — 25 окт.": the day and the short month of both ends, without the year. */
+export function formatShortRange(from: IsoDate, to: IsoDate): string {
+  const [a, b] = [fromIso(from), fromIso(to)]
+  return `${a.getDate()} ${monthLabel(a)} — ${b.getDate()} ${monthLabel(b)}`
 }
 
 /** Monday-first grid of a month; `null` cells pad the first week. */

@@ -1,51 +1,61 @@
-import { useRef, useState } from 'react'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useHotelSearch } from '../../hooks/useHotelSearch'
-import { SearchPanel, type SearchMode } from './SearchPanel'
+import { newHotels } from '../../lib/catalogGenerator'
+import { routeCards } from '../../test/catalog'
+import { SearchPanel } from './SearchPanel'
 
-function Harness() {
-  const [mode, setMode] = useState<SearchMode>('assistant')
+const push = vi.fn()
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
+
+afterEach(() => {
+  push.mockClear()
+  window.sessionStorage.clear()
+})
+
+function Harness({ routes = routeCards() }) {
   const search = useHotelSearch()
-  const destinationRef = useRef<HTMLInputElement>(null)
-  const submitRef = useRef<HTMLButtonElement>(null)
-  return (
-    <SearchPanel
-      mode={mode}
-      onModeChange={setMode}
-      search={search}
-      destinationRef={destinationRef}
-      submitRef={submitRef}
-      onPreview={() => {}}
-      onChoose={search.searchFor}
-    />
-  )
+  return <SearchPanel onChoose={search.searchFor} newHotels={newHotels} routes={routes} />
 }
 
-// search-modes, Requirement: Сохранение состояния режимов
-describe('SearchPanel tabs', () => {
-  it('keeps typed text in every panel when switching tabs', async () => {
+// home-page, Requirement: Состав и порядок секций, Scenario: Нет ручной формы на главной
+describe('SearchPanel', () => {
+  it('is the assistant alone: no tabs and no manual fields', () => {
+    render(<Harness />)
+    expect(screen.getByLabelText('Опишите поездку')).toBeTruthy()
+    expect(screen.queryByRole('tab')).toBeNull()
+    expect(screen.queryByText('Вручную')).toBeNull()
+    expect(screen.queryByRole('combobox', { name: 'Направление' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Найти отель/ })).toBeNull()
+  })
+})
+
+// assistant-search, Requirement: План поездки, Scenario: Выбор варианта; Готовый маршрут в плане
+describe('SearchPanel assistant plan', () => {
+  it('shows the ready-made route over the options and opens /search with the option’s dates and guests', async () => {
     const user = userEvent.setup()
     render(<Harness />)
 
-    const wish = screen.getByLabelText('Опишите поездку')
-    await user.type(wish, 'Хочу на море')
+    await user.type(screen.getByLabelText('Опишите поездку'), 'Хочу на море в октябре вдвоём, спокойно{Enter}')
+    const [option] = await screen.findAllByRole('button', { name: /₽/ }, { timeout: 3000 })
+    const ready = screen.getByRole('region', { name: 'Готовый маршрут' })
+    expect(within(ready).getByRole('link').getAttribute('href')).toMatch(/^\/routes\/[a-z0-9-]+$/)
+    // Over the options.
+    expect(ready.compareDocumentPosition(option) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    await user.click(option)
 
-    await user.click(screen.getByRole('tab', { name: 'Вручную' }))
-    const destination = screen.getByRole('combobox', { name: 'Направление' })
-    await user.type(destination, 'Сочи')
-    await user.keyboard('{Escape}')
+    expect(push).toHaveBeenCalledTimes(1)
+    expect(push.mock.calls[0][0]).toMatch(
+      /^\/search\?destination=[a-z-]+&checkin=[\d-]+&checkout=[\d-]+&adults=2&rooms=1$/,
+    )
+  }, 10_000)
 
-    await user.click(screen.getByRole('tab', { name: 'Случайность' }))
-    await user.click(screen.getByRole('tab', { name: 'Ассистент' }))
-
-    // Same nodes: the panels were hidden, not unmounted and mounted again.
-    expect(screen.getByLabelText('Опишите поездку')).toBe(wish)
-    expect((wish as HTMLTextAreaElement).value).toBe('Хочу на море')
-
-    await user.click(screen.getByRole('tab', { name: 'Вручную' }))
-    expect(screen.getByRole('combobox', { name: 'Направление' })).toBe(destination)
-    expect((destination as HTMLInputElement).value).toBe('Сочи')
-  })
+  it('shows no ready-made route without routes', async () => {
+    const user = userEvent.setup()
+    render(<Harness routes={[]} />)
+    await user.type(screen.getByLabelText('Опишите поездку'), 'Хочу на море в октябре вдвоём, спокойно{Enter}')
+    await screen.findAllByRole('button', { name: /₽/ }, { timeout: 3000 })
+    expect(screen.queryByRole('region', { name: 'Готовый маршрут' })).toBeNull()
+  }, 10_000)
 })

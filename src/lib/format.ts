@@ -8,6 +8,11 @@ export function formatPrice(value: number): string {
   return `${priceFormat.format(value).replace(/ /g, ' ')} ₽`
 }
 
+/** One decimal with a decimal comma: 9.4 → "9,4"; guest rating, distance. */
+export function formatDecimal(value: number): string {
+  return value.toFixed(1).replace('.', ',')
+}
+
 /** Russian plural form: pluralRu(2, ['гость', 'гостя', 'гостей']) → 'гостя'. */
 export function pluralRu(n: number, forms: [one: string, few: string, many: string]): string {
   const mod10 = n % 10

@@ -49,3 +49,27 @@ export function viewPlacing(lat: number, lon: number, u: number, v: number, maxT
   }
   return null
 }
+
+/** A turn of the globe from one view to another, eased in and out; `start` and `duration` in ms. */
+export interface GlobeSpin {
+  from: GlobeView
+  to: GlobeView
+  start: number
+  duration: number
+}
+
+/**
+ * Where a spin to `to` ends: the same point of the globe, reached by turning the way the globe spins
+ * (longitude decreasing) by more than a full turn.
+ */
+export function spinTarget(from: GlobeView, to: GlobeView): GlobeView {
+  const rest = (((from.lon - to.lon) % 360) + 360) % 360
+  return { lat: to.lat, lon: from.lon - 360 - (rest || 360) }
+}
+
+/** The view `now` ms into the spin: speeding up, then slowing down to a stop at `to`. */
+export function spinView({ from, to, start, duration }: GlobeSpin, now: number): GlobeView {
+  const t = Math.min(Math.max((now - start) / duration, 0), 1)
+  const k = t < 0.5 ? 4 * t ** 3 : 1 - (2 - 2 * t) ** 3 / 2
+  return { lat: from.lat + (to.lat - from.lat) * k, lon: from.lon + (to.lon - from.lon) * k }
+}

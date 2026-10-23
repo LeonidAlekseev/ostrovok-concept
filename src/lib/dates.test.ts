@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { addDays, formatDateRange, fromIso, nightsBetween, todayIso, toIso } from './dates'
+import {
+  addDays,
+  formatDateRange,
+  formatShortDay,
+  formatShortRange,
+  fromIso,
+  nightsBetween,
+  todayIso,
+  toIso,
+  weekday,
+} from './dates'
 
 describe('toIso', () => {
   it('formats a local date as YYYY-MM-DD with zero padding', () => {
@@ -48,6 +58,12 @@ describe('nightsBetween', () => {
   })
 })
 
+describe('weekday', () => {
+  it('is the day of the week of an ISO day, 0 for Sunday', () => {
+    expect(['2026-10-18', '2026-10-23', '2026-10-24', '2027-01-01'].map(weekday)).toEqual([0, 5, 6, 5])
+  })
+})
+
 describe('todayIso', () => {
   afterEach(() => {
     vi.useRealTimers()
@@ -75,5 +91,19 @@ describe('formatDateRange', () => {
 
   it('shows an open end while check-out is not chosen', () => {
     expect(formatDateRange('2026-10-17', null)).toBe('17 окт. 2026 г. – …')
+  })
+})
+
+describe('formatShortRange', () => {
+  it('is the day and the short month of both ends', () => {
+    expect(formatShortRange('2026-10-24', '2026-10-25')).toBe('24 окт. — 25 окт.')
+    expect(formatShortRange('2026-10-30', '2026-11-02')).toBe('30 окт. — 2 нояб.')
+  })
+})
+
+describe('formatShortDay', () => {
+  it('is the day, the short month without the dot and the short weekday', () => {
+    expect(formatShortDay('2026-10-24')).toBe('24 окт, сб')
+    expect(formatShortDay('2026-10-25')).toBe('25 окт, вс')
   })
 })

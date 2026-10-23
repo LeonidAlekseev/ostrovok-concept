@@ -1,12 +1,13 @@
 import type { Destination } from '../../data/destinations'
-import type { NewHotel } from '../../data/hotels'
+import type { RouteCardData } from '../../lib/routes'
 import { projectToGlobe, type GlobePoint, type GlobeView } from '../../lib/globe'
 import { arc, routePath } from './globeGeometry'
 
-/** A recently added hotel highlighted on the globe, with flight routes arriving at its city. */
+/** A city's ready-made route highlighted on the globe, with flight routes arriving at the city. */
 export interface Spotlight {
   destination: Destination
-  hotel: NewHotel
+  /** The travel idea shown: one of the city's routes; none without routes. */
+  route: RouteCardData | null
   /** Cities the routes start from. */
   sources: Destination[]
 }
@@ -38,14 +39,16 @@ export function sceneAt(markers: Destination[], spotlight: Spotlight, view: Glob
   return { points, hub, routes }
 }
 
-/** Cycles through each city's hotels so consecutive visits show different ones. */
-export function createHotelFeed(hotels: NewHotel[]) {
-  const byCity = new Map<string, NewHotel[]>()
-  for (const hotel of hotels) byCity.set(hotel.destinationId, [...(byCity.get(hotel.destinationId) ?? []), hotel])
+/** Cycles through each city's routes so consecutive visits show different ones. */
+export function createRouteFeed(routes: readonly RouteCardData[]) {
+  const byCity = new Map<string, RouteCardData[]>()
+  for (const route of routes) byCity.set(route.destinationId, [...(byCity.get(route.destinationId) ?? []), route])
   const cursor = new Map<string, number>()
   return {
     has: (destinationId: string) => byCity.has(destinationId),
-    next(destinationId: string): NewHotel | undefined {
+    /** All the city's routes, in their order. */
+    all: (destinationId: string): RouteCardData[] => byCity.get(destinationId) ?? [],
+    next(destinationId: string): RouteCardData | undefined {
       const list = byCity.get(destinationId)
       if (!list) return undefined
       const i = cursor.get(destinationId) ?? 0
@@ -53,6 +56,16 @@ export function createHotelFeed(hotels: NewHotel[]) {
       return list[i % list.length]
     },
   }
+}
+
+/** A random item of `list`, other than `previousId` while there is a choice; `random` as Math.random(). */
+export function pickOther<T extends { id: string }>(
+  list: readonly T[],
+  previousId?: string,
+  random: () => number = Math.random,
+): T | undefined {
+  const choice = list.length > 1 ? list.filter((item) => item.id !== previousId) : list
+  return choice[Math.floor(random() * choice.length)]
 }
 
 /** Screen-space limits for a spotlight: the card must clear the text, the faded bottom and the sides. */
@@ -85,7 +98,7 @@ export function pickSpotlightCity(
   const fits = front.filter((d) => {
     const { x, y } = screen(points.get(d.id)!)
     return (
-      // Margins leave room for hotel names longer than the current one.
+      // Margins leave room for route titles longer than the current one.
       x + view.card.left > view.hero.left + 12 &&
       x + view.card.right + 32 < view.hero.right &&
       x < view.hero.left + view.hero.width * 0.65 &&

@@ -1,17 +1,27 @@
+'use client'
+
 import { useCallback, useState } from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Bell, Heart, Menu, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useSession } from '@/hooks/useStore'
+import { cn } from '@/lib/utils'
+import { UserMenu } from './UserMenu'
 
-type Panel = 'favorites' | 'notifications' | 'menu'
-
-interface Props {
-  onStartSearch: () => void
-}
+type Panel = 'notifications' | 'account' | 'menu'
 
 // Blue on the lime hero; the white glaze replaces ghost's grey hover there.
+// Below 360 px the four icons take 40 px each: the touch area shrinks a little, the glyph stays 24 px or more.
 const iconButton =
-  'text-primary hover:bg-card/35 hover:text-primary-hover aria-expanded:bg-card/35 aria-expanded:text-primary-hover'
+  'text-primary hover:bg-card/35 hover:text-primary-hover aria-expanded:bg-card/35 aria-expanded:text-primary-hover max-[360px]:size-10'
+// White over the photo of the hotel page, under a glaze of the same white.
+const iconButtonOnPhoto =
+  'text-white hover:bg-white/20 hover:text-white aria-expanded:bg-white/20 aria-expanded:text-white max-[360px]:size-10'
+
+/** The hotel page, not its rates: its photo starts under the header. */
+const HOTEL_PAGE = /^\/hotels\/[^/]+$/
 
 // Placement comes from the popover (portaled, aligned to its trigger); only the size and the entrance are here.
 const panelClass =
@@ -20,15 +30,19 @@ const panelClass =
 const panelTitleClass = 'm-0 mb-1.5 text-base font-[650]'
 const panelTextClass = 'm-0 mb-3.5 text-sm leading-[1.45] text-muted-foreground'
 
-const menuLinks = [
-  { href: '#search', label: 'Поиск отелей' },
-  { href: '#ideas', label: 'Популярные направления' },
-  { href: '#explore', label: 'Исследуйте мир' },
+const menuItemClass =
+  'block w-full rounded-md p-3 text-left font-[550] text-foreground no-underline hover:bg-muted hover:text-primary'
+
+const linksBefore = [
+  { href: '/#search', label: 'Поиск отелей' },
+  { href: '/trips', label: 'Мои поездки' },
+  { href: '/favorites', label: 'Избранное' },
 ]
 
-export function Header({ onStartSearch }: Props) {
+export function Header() {
   const [open, setOpen] = useState<Panel | null>(null)
   const close = useCallback(() => setOpen(null), [])
+  const session = useSession()
 
   // Only one panel is open at a time: a panel closing never closes a sibling that already opened.
   const panelProps = (panel: Panel) => ({
@@ -36,98 +50,124 @@ export function Header({ onStartSearch }: Props) {
     onOpenChange: (next: boolean) => setOpen((current) => (next ? panel : current === panel ? null : current)),
   })
 
-  // Transparent: the hero (and the globe's glow) continues underneath.
-  return (
-    <header className="relative z-20">
-      <div className="mx-auto flex h-(--header-height) max-w-(--page-max) items-center justify-between gap-4 px-[calc(var(--page-x)+8px)]">
-        <a
-          className="rounded-sm text-[clamp(26px,6.6vw,32px)] leading-none font-extrabold tracking-[-0.035em] text-primary no-underline"
-          href="/"
-          aria-label="Островок! — на главную"
-        >
-          Островок!
-        </a>
+  // On the home page the header is transparent: the hero (and the globe's glow) continues underneath.
+  // On the hotel page too, its logo and icons white over the photo.
+  const pathname = usePathname()
+  const onPhoto = HOTEL_PAGE.test(pathname)
+  const transparent = pathname === '/' || onPhoto
+  const buttonClass = onPhoto ? iconButtonOnPhoto : iconButton
+  // On /search the header follows the results page width on 3xl screens, and its logo and icons align with the search card.
+  const wideSearch = pathname === '/search'
 
-        <div className="relative flex items-center gap-[clamp(0px,1vw,14px)]">
-          <Popover {...panelProps('favorites')}>
-            <PopoverTrigger
-              render={<Button variant="ghost" size="icon" className={iconButton} aria-label="Избранное" />}
+  // The wrapper keeps the header's place in the flow; the header scrolls away with the page.
+  return (
+    <div className="relative z-20 h-(--header-height)">
+      <header className={cn('absolute inset-x-0 top-0', !transparent && 'bg-background')}>
+        <div
+          className={cn(
+            'mx-auto flex h-(--header-height) max-w-(--page-max) items-center justify-between gap-4 px-[calc(var(--page-x)+8px)] max-[360px]:gap-2 max-[360px]:px-3',
+            wideSearch && '3xl:max-w-(--page-max-wide) 3xl:px-(--page-x)',
+          )}
+        >
+          <a
+            className={cn(
+              'rounded-sm text-[clamp(26px,6.6vw,32px)] leading-none font-extrabold tracking-[-0.035em] whitespace-nowrap no-underline',
+              onPhoto ? 'text-white' : 'text-primary',
+            )}
+            href="/"
+            onClick={close}
+            aria-label="О!Погнали — на главную"
+          >
+            О!Погнали
+          </a>
+
+          <div className="relative flex items-center gap-[clamp(0px,1vw,14px)] max-[360px]:gap-0">
+            <Link
+              href="/favorites"
+              className={buttonVariants({ variant: 'ghost', size: 'icon', className: buttonClass })}
+              aria-label="Избранное"
             >
               <Heart className="size-6.5" fill="currentColor" strokeWidth={2} aria-hidden />
-            </PopoverTrigger>
-            <PopoverContent align="end" sideOffset={10} aria-label={panelTitle.favorites} className={panelClass}>
-              <p className={panelTitleClass}>Избранное пока пусто</p>
-              <p className={panelTextClass}>Сохраняйте понравившиеся отели, чтобы вернуться к ним позже.</p>
-              <Button
-                className="w-full"
-                onClick={() => {
-                  close()
-                  onStartSearch()
-                }}
+            </Link>
+
+            <Popover {...panelProps('notifications')}>
+              <PopoverTrigger
+                render={<Button variant="ghost" size="icon" className={buttonClass} aria-label="Уведомления" />}
               >
-                Найти отель
-              </Button>
-            </PopoverContent>
-          </Popover>
+                <Bell className="size-6.25" fill="currentColor" strokeWidth={2} aria-hidden />
+              </PopoverTrigger>
+              <PopoverContent align="end" sideOffset={10} aria-label={panelTitle.notifications} className={panelClass}>
+                <p className={panelTitleClass}>Новых уведомлений нет</p>
+                <p className={panelTextClass}>Здесь появятся изменения цен и статусы бронирований.</p>
+                <Button className="w-full" onClick={close}>
+                  Понятно
+                </Button>
+              </PopoverContent>
+            </Popover>
 
-          <Popover {...panelProps('notifications')}>
-            <PopoverTrigger
-              render={<Button variant="ghost" size="icon" className={iconButton} aria-label="Уведомления" />}
-            >
-              <Bell className="size-6.25" fill="currentColor" strokeWidth={2} aria-hidden />
-            </PopoverTrigger>
-            <PopoverContent align="end" sideOffset={10} aria-label={panelTitle.notifications} className={panelClass}>
-              <p className={panelTitleClass}>Новых уведомлений нет</p>
-              <p className={panelTextClass}>Здесь появятся изменения цен и статусы бронирований.</p>
-              <Button className="w-full" onClick={close}>
-                Понятно
-              </Button>
-            </PopoverContent>
-          </Popover>
+            <UserMenu buttonClass={buttonClass} {...panelProps('account')} />
 
-          <Popover {...panelProps('menu')}>
-            <PopoverTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={iconButton}
-                  aria-label={open === 'menu' ? 'Закрыть меню' : 'Открыть меню'}
-                />
-              }
-            >
-              {open === 'menu' ? (
-                <X className="size-7" strokeWidth={2.8} aria-hidden />
-              ) : (
-                <Menu className="size-7" strokeWidth={2.8} aria-hidden />
-              )}
-            </PopoverTrigger>
-            <PopoverContent align="end" sideOffset={10} aria-label={panelTitle.menu} className={panelClass}>
-              <nav aria-label="Основное меню">
-                <ul className="-m-1.5">
-                  {menuLinks.map((link) => (
-                    <li key={link.href}>
-                      <a
-                        className="block rounded-md p-3 font-[550] text-foreground no-underline hover:bg-muted hover:text-primary"
-                        href={link.href}
-                        onClick={close}
-                      >
-                        {link.label}
-                      </a>
+            <Popover {...panelProps('menu')}>
+              <PopoverTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={buttonClass}
+                    aria-label={open === 'menu' ? 'Закрыть меню' : 'Открыть меню'}
+                  />
+                }
+              >
+                {open === 'menu' ? (
+                  <X className="size-7" strokeWidth={2.8} aria-hidden />
+                ) : (
+                  <Menu className="size-7" strokeWidth={2.8} aria-hidden />
+                )}
+              </PopoverTrigger>
+              <PopoverContent align="end" sideOffset={10} aria-label={panelTitle.menu} className={panelClass}>
+                <nav aria-label="Основное меню">
+                  <ul className="-m-1.5">
+                    {linksBefore.map((link) => (
+                      <li key={link.href}>
+                        <Link className={menuItemClass} href={link.href} onClick={close}>
+                          {link.label}
+                        </Link>
+                      </li>
+                    ))}
+                    <li>
+                      <button type="button" className={menuItemClass} onClick={() => setOpen('notifications')}>
+                        Уведомления
+                      </button>
                     </li>
-                  ))}
-                </ul>
-              </nav>
-            </PopoverContent>
-          </Popover>
+                    <li>
+                      {session ? (
+                        <button type="button" className={menuItemClass} onClick={() => setOpen('account')}>
+                          Аккаунт
+                        </button>
+                      ) : (
+                        <Link className={menuItemClass} href="/login" onClick={close}>
+                          Войти
+                        </Link>
+                      )}
+                    </li>
+                    <li>
+                      <Link className={menuItemClass} href="/help" onClick={close}>
+                        Поддержка
+                      </Link>
+                    </li>
+                  </ul>
+                </nav>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+    </div>
   )
 }
 
 const panelTitle: Record<Panel, string> = {
-  favorites: 'Избранное',
   notifications: 'Уведомления',
+  account: 'Аккаунт',
   menu: 'Меню',
 }

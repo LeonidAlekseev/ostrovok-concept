@@ -1,18 +1,20 @@
-import { destinations, type Destination } from '../data/destinations'
-import { newHotels, type NewHotel } from '../data/hotels'
+import type { Destination } from '../data/destinations'
+import type { HotelSummary } from './catalog'
 import { addDays, fromIso, toIso, type IsoDate } from './dates'
 import { countRu, formatPrice } from './format'
+import { stayTotal } from './offer'
+import type { Persona } from './routes'
 import { MAX_NIGHTS, type Guests, type SearchQuery } from './search'
 
 /**
- * Demo travel assistant: there is no backend, so a free-text wish is read with keyword rules,
- * missing essentials are asked one question at a time, and the "atmosphere" of the trip is
- * decided from what is known. Everything runs locally and instantly.
+ * Travel assistant: a free-text wish is read by the language model behind `POST /api/assistant`
+ * (`askAssistant`), or with keyword rules when the model is unavailable; missing essentials are asked
+ * one question at a time, and the "atmosphere" of the trip is decided from what is known locally.
  */
 
 export type VibeId = 'sea' | 'mountains' | 'europe' | 'romantic' | 'weekend' | 'exotic' | 'metropolis'
 type Mood = 'calm' | 'active'
-type Party = 'solo' | 'couple' | 'family' | 'friends'
+export type Party = 'solo' | 'couple' | 'family' | 'friends'
 /** Zero-based month, or "as soon as possible". `any` means the traveller left it to the assistant. */
 type When = number | 'soon' | 'any'
 
@@ -27,7 +29,7 @@ export interface Brief {
   budget?: number
 }
 
-type QuestionId = 'vibe' | 'when' | 'party'
+export type QuestionId = 'vibe' | 'when' | 'party'
 
 export interface Question {
   id: QuestionId
@@ -38,7 +40,7 @@ export interface Question {
 
 export interface AssistantOption {
   destination: Destination
-  hotel?: NewHotel
+  hotel?: HotelSummary
   perNight: number
   total: number
   fitsBudget: boolean
@@ -123,7 +125,7 @@ const ANY = word('не важно|неважно|вс[её] равно|любо[
 const normalize = (s: string) => s.toLocaleLowerCase('ru').replace(/ /g, ' ')
 
 /** Reads whatever the text says about the trip; fields it does not mention stay undefined. */
-export function parseWish(input: string): Brief {
+export function parseWish(input: string, destinations: readonly Destination[]): Brief {
   const text = normalize(input)
   const brief: Brief = {}
 
@@ -165,8 +167,17 @@ export function parseWish(input: string): Brief {
 }
 
 /** Folds a new reply into the brief. A "don't care" answers the question that was asked. */
-export function mergeBrief(brief: Brief, input: string, asked: QuestionId | null): Brief {
-  const parsed = parseWish(input)
+export function mergeBrief(
+  brief: Brief,
+  input: string,
+  asked: QuestionId | null,
+  destinations: readonly Destination[],
+): Brief {
+  return foldBrief(brief, parseWish(input, destinations), input, asked)
+}
+
+/** `mergeBrief` for a reply already read (by the rules or by the language model). */
+export function foldBrief(brief: Brief, parsed: Brief, input: string, asked: QuestionId | null): Brief {
   const next: Brief = { ...brief }
   for (const key of Object.keys(parsed) as (keyof Brief)[]) {
     if (parsed[key] !== undefined) Object.assign(next, { [key]: parsed[key] })
@@ -213,7 +224,7 @@ const VIBE_DESTINATIONS: Partial<Record<VibeId, string[]>> = {
 const WARM_IN_WINTER = new Set(['dubai', 'cancun', 'honolulu', 'miami'])
 const isWinter = (month: number) => month >= 10 || month <= 2
 
-function candidatesFor(vibe: VibeId, month: number): Destination[] {
+function candidatesFor(vibe: VibeId, month: number, destinations: readonly Destination[]): Destination[] {
   const ids = VIBE_DESTINATIONS[vibe]
   const list = ids
     ? ids.flatMap((id) => destinations.find((d) => d.id === id) ?? [])
@@ -298,31 +309,74 @@ function travelDates(brief: Brief, nights: number, today: IsoDate): IsoDate {
 const tripMonth = (brief: Brief, today: IsoDate) =>
   typeof brief.when === 'number' ? brief.when : fromIso(addDays(today, brief.when === 'soon' ? 3 : 14)).getMonth()
 
-export function makePlan(brief: Brief, today: IsoDate): Plan {
+/** The theme of the plan (the traveller's, the named city's or the assistant's own pick) and its cities. */
+function planScope(brief: Brief, today: IsoDate, destinations: readonly Destination[]) {
   const month = tripMonth(brief, today)
   const named = destinations.find((d) => d.id === brief.destinationId)
   const own = brief.vibe && brief.vibe !== 'any' ? { vibe: brief.vibe, reason: '' } : null
   const fallbackVibe = named?.scenarios[0] ?? 'europe'
   const { vibe, reason } = own ?? (named ? { vibe: fallbackVibe, reason: '' } : chooseVibe(brief, month))
+  return { vibe, reason, named, pool: named ? [named] : candidatesFor(vibe, month, destinations) }
+}
+
+/** The cities the plan of a complete `brief` picks from: the semantic search looks for hotels there. */
+export const planCities = (brief: Brief, today: IsoDate, destinations: readonly Destination[]): Destination[] =>
+  planScope(brief, today, destinations).pool
+
+/** Options in a plan. */
+const PLAN_OPTIONS = 3
+
+/**
+ * The plan over the `destinations`, with a hotel from `hotels` (the "recently added" ones) where a city has
+ * one. `matches` are the hotels the semantic search found for the traveller's words, best first: they lead
+ * the plan — up to three in a named city, otherwise one a city, the rest by the rules.
+ */
+export function makePlan(
+  brief: Brief,
+  today: IsoDate,
+  destinations: readonly Destination[],
+  hotels: readonly HotelSummary[],
+  matches: readonly HotelSummary[] = [],
+): Plan {
+  const { vibe, reason, named, pool } = planScope(brief, today, destinations)
   const [emoji, atmosphere, text] = ATMOSPHERES[vibe][brief.mood ?? 'default']
 
   const nights = Math.min(brief.nights ?? (vibe === 'weekend' ? 2 : brief.party === 'family' ? 7 : 5), MAX_NIGHTS)
   const guests = PARTY_GUESTS[brief.party && brief.party !== 'any' ? brief.party : 'couple']
   const checkIn = travelDates(brief, nights, today)
 
-  const pool = named ? [named] : candidatesFor(vibe, month)
   // Quiet and romantic trips get the best-rated hotel; active ones and tight budgets the cheaper good one.
   const preferCheap = brief.mood === 'active' || brief.party === 'friends'
-  const options = pool
-    .map((destination): AssistantOption => {
-      const hotels = newHotels
+  const checkOut = addDays(checkIn, nights)
+  const total = (perNight: number) => stayTotal(perNight, checkIn, checkOut, guests.rooms)
+  const option = (destination: Destination, hotel: HotelSummary | undefined): AssistantOption => {
+    const perNight = hotel?.priceFrom ?? destination.priceFrom
+    const sum = total(perNight)
+    return { destination, hotel, perNight, total: sum, fitsBudget: !brief.budget || sum <= brief.budget }
+  }
+
+  // The semantic matches in the plan's cities keep their order, within the budget first.
+  const cityOf = new Map(pool.map((d) => [d.id, d]))
+  const found: AssistantOption[] = []
+  for (const hotel of matches) {
+    const destination = cityOf.get(hotel.destinationId)
+    if (!destination || (!named && found.some((o) => o.destination.id === destination.id))) continue
+    found.push(option(destination, hotel))
+  }
+  found.sort((a, b) => Number(b.fitsBudget) - Number(a.fitsBudget))
+
+  const ruled = pool
+    .filter((destination) => !found.some((o) => o.destination.id === destination.id))
+    .map((destination) => {
+      const cityHotels = hotels
         .filter((h) => h.destinationId === destination.id)
         .sort((a, b) => (preferCheap ? a.priceFrom - b.priceFrom : b.rating - a.rating))
-      const affordable = hotels.find((h) => !brief.budget || h.priceFrom * nights * guests.rooms <= brief.budget)
-      const hotel = affordable ?? hotels[0]
-      const perNight = hotel?.priceFrom ?? destination.priceFrom
-      const total = perNight * nights * guests.rooms
-      return { destination, hotel, perNight, total, fitsBudget: !brief.budget || total <= brief.budget }
+      const affordable = cityHotels.find((h) => !brief.budget || total(h.priceFrom) <= brief.budget)
+      const cheapest = cityHotels.reduce<HotelSummary | undefined>(
+        (min, h) => (!min || total(h.priceFrom) < total(min.priceFrom) ? h : min),
+        undefined,
+      )
+      return option(destination, affordable ?? cheapest)
     })
     .sort(
       (a, b) =>
@@ -330,22 +384,49 @@ export function makePlan(brief: Brief, today: IsoDate): Plan {
         (b.hotel?.rating ?? 8) - (a.hotel?.rating ?? 8) ||
         a.total - b.total,
     )
-    .slice(0, 3)
+  const options = [...found, ...ruled].slice(0, PLAN_OPTIONS)
 
   const why = reason ? `Выбрал сам: ${reason}. Значит, ${text}.` : `${text[0].toLocaleUpperCase('ru')}${text.slice(1)}.`
   return {
     emoji,
     atmosphere,
     why,
-    query: { checkIn, checkOut: addDays(checkIn, nights), guests },
+    query: { checkIn, checkOut, guests },
     nights,
     options,
     overBudget: options.length > 0 && !options.some((o) => o.fitsBudget),
   }
 }
 
-const PARTY_LABEL: Record<Party, string> = { solo: 'один', couple: 'вдвоём', family: 'с детьми', friends: 'с друзьями' }
-const VIBE_LABEL: Record<VibeId, string> = {
+const WORK = word('работ|удал[её]нк|ноутбук|воркейшн|созвон|коворк')
+const LUXURY = word('люкс|роскош|премиум|пятизв|5 звёзд|5 звезд|дорог[оу]|шикар')
+const STUDENT = word('студен|бюджетн|дёшев|дешев|недорог|хостел|эконом')
+/** A night above this, ₽, is luxury, below the other a student's. */
+const LUXURY_NIGHT = 25_000
+const STUDENT_NIGHT = 6_000
+
+/**
+ * The persona of the ready-made routes for the traveller's words (all their messages) and the brief: work
+ * on the way, then luxury by the words or the budget a night, then a student's trip by the words, the
+ * friends or the budget, else the culture.
+ */
+export function briefPersona(brief: Brief, wish: string, nights: number): Persona {
+  const text = normalize(wish)
+  const perNight = brief.budget ? brief.budget / Math.max(nights, 1) : undefined
+  if (WORK.test(text)) return 'workation'
+  if (LUXURY.test(text) || (perNight !== undefined && perNight >= LUXURY_NIGHT)) return 'luxury'
+  if (STUDENT.test(text) || brief.party === 'friends' || (perNight !== undefined && perNight <= STUDENT_NIGHT))
+    return 'student'
+  return 'culture'
+}
+
+export const PARTY_LABEL: Record<Party, string> = {
+  solo: 'один',
+  couple: 'вдвоём',
+  family: 'с детьми',
+  friends: 'с друзьями',
+}
+export const VIBE_LABEL: Record<VibeId, string> = {
   sea: 'море',
   mountains: 'горы',
   europe: 'города Европы',
@@ -356,7 +437,7 @@ const VIBE_LABEL: Record<VibeId, string> = {
 }
 
 /** What the assistant has understood so far, e.g. "море · в октябре · до 70 000 ₽". */
-export function describeBrief(brief: Brief): string {
+export function describeBrief(brief: Brief, destinations: readonly Destination[]): string {
   const named = destinations.find((d) => d.id === brief.destinationId)
   return [
     named?.name ?? (brief.vibe && brief.vibe !== 'any' ? VIBE_LABEL[brief.vibe] : null),
@@ -368,4 +449,96 @@ export function describeBrief(brief: Brief): string {
   ]
     .filter(Boolean)
     .join(' · ')
+}
+
+const MOODS: readonly Mood[] = ['calm', 'active']
+const intIn = (value: unknown, min: number, max: number) =>
+  typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max ? value : undefined
+
+/**
+ * Keeps only what the assistant understands: a catalog city, known themes and answers, a month 0–11,
+ * 1–30 nights and a whole budget in ₽. Reads untrusted input — the client's brief or the model's answer.
+ */
+export function normalizeBrief(
+  raw: Partial<Record<keyof Brief, unknown>>,
+  destinations: readonly Destination[],
+): Brief {
+  const brief: Brief = {}
+  const { vibe, destinationId, when, nights, party, mood, budget } = raw
+  if (vibe === 'any' || (typeof vibe === 'string' && Object.hasOwn(VIBE_LABEL, vibe))) brief.vibe = vibe as VibeId
+  if (destinations.some((d) => d.id === destinationId)) brief.destinationId = destinationId as string
+  if (when === 'soon' || when === 'any') brief.when = when
+  else if (intIn(when, 0, 11) !== undefined) brief.when = when as number
+  if (typeof nights === 'number' && nights >= 1) brief.nights = Math.min(Math.round(nights), MAX_NIGHTS)
+  if (party === 'any' || (typeof party === 'string' && Object.hasOwn(PARTY_LABEL, party))) brief.party = party as Party
+  if (MOODS.includes(mood as Mood)) brief.mood = mood as Mood
+  if (typeof budget === 'number' && budget >= 1) brief.budget = Math.round(budget)
+  return brief
+}
+
+/** `POST /api/assistant`. Message texts are capped at `MAX_MESSAGE_LENGTH`, the history at `MAX_HISTORY`. */
+export interface AssistantRequest {
+  messages: { role: 'user' | 'assistant'; text: string }[]
+  brief: Brief
+}
+
+export interface AssistantResponse {
+  brief: Brief
+  /** The model's short remark; absent when the rules read the message. */
+  reply?: string
+  source: 'model' | 'rules'
+  /** Hotels the semantic search found for the traveller's words once the brief is complete, best first. */
+  matches?: HotelSummary[]
+  /** The ready-made route the search by meaning found for the traveller's words with the plan. */
+  routeId?: string
+}
+
+export const MAX_MESSAGE_LENGTH = 500
+export const MAX_HISTORY = 20
+/**
+ * The client's own limit: the route gives the model 8 s (the rules after that) and answers within 14 s with
+ * the semantic search's hotels, when the plan is due.
+ */
+const ASSISTANT_TIMEOUT_MS = 15_000
+
+/**
+ * Reads the newest message of `messages` into `brief` through the assistant route. Any failure — no
+ * network, a limit, a timeout — falls back to the rules here, so the dialog never shows an error.
+ */
+export async function askAssistant(
+  request: AssistantRequest,
+  asked: QuestionId | null,
+  destinations: readonly Destination[],
+  signal?: AbortSignal,
+): Promise<AssistantResponse> {
+  // A reply with a plan only has no text; long replies of the assistant are cut to the route's limit.
+  const messages = request.messages
+    .filter((m) => m.text.trim())
+    .slice(-MAX_HISTORY)
+    .map((m) => ({ ...m, text: m.text.slice(0, MAX_MESSAGE_LENGTH) }))
+  const body: AssistantRequest = { ...request, messages }
+  try {
+    const response = await fetch('/api/assistant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: signal
+        ? AbortSignal.any([signal, AbortSignal.timeout(ASSISTANT_TIMEOUT_MS)])
+        : AbortSignal.timeout(ASSISTANT_TIMEOUT_MS),
+    })
+    if (response.ok) {
+      const data = (await response.json()) as AssistantResponse
+      return {
+        brief: normalizeBrief(data.brief ?? {}, destinations),
+        reply: typeof data.reply === 'string' ? data.reply : undefined,
+        source: data.source === 'model' ? 'model' : 'rules',
+        matches: Array.isArray(data.matches) ? data.matches : undefined,
+        routeId: typeof data.routeId === 'string' ? data.routeId : undefined,
+      }
+    }
+  } catch {
+    // Falls through to the rules below.
+  }
+  const input = request.messages.at(-1)?.text ?? ''
+  return { brief: mergeBrief(request.brief, input, asked, destinations), source: 'rules' }
 }

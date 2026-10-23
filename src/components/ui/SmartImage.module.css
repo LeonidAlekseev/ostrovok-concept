@@ -1,6 +1,0 @@
-.fallback {
-  display: grid;
-  place-items: center;
-  color: color-mix(in srgb, var(--decor-light) 70%, transparent);
-  background: linear-gradient(135deg, var(--decor-photo-from) 0%, var(--decor-photo-to) 100%);
-}

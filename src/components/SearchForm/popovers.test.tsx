@@ -56,3 +56,31 @@ describe.each(fields)('$name popover', ({ field, trigger, dialog }) => {
     expect(screen.queryByRole('dialog', { name: dialog })).toBeNull()
   })
 })
+
+// star-search, Requirement: Анкета
+describe('single DateField', () => {
+  const single = (
+    <>
+      <DateField single checkIn="2026-10-21" checkOut="2026-10-21" describedBy="note" onChange={() => {}} />
+      <p id="note">Выезд — через 2 ночи</p>
+    </>
+  )
+
+  it('shows one month and is described by the note', async () => {
+    const user = userEvent.setup()
+    render(single)
+    const trigger = screen.getByRole('button', { name: /^Дата заезда/ })
+    expect(trigger.getAttribute('aria-describedby')).toBe('note')
+    await user.click(trigger)
+    await screen.findByRole('dialog', { name: 'Выбор даты заезда' })
+    expect(screen.getAllByRole('group')).toHaveLength(1)
+  })
+
+  it('keeps two months for a stay', async () => {
+    const user = userEvent.setup()
+    render(<Dates />)
+    await user.click(screen.getByRole('button', { name: /^Даты поездки/ }))
+    await screen.findByRole('dialog', { name: 'Выбор дат заезда и выезда' })
+    expect(screen.getAllByRole('group')).toHaveLength(2)
+  })
+})

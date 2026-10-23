@@ -5,8 +5,6 @@ import type { HotelSearch } from '@/hooks/useHotelSearch'
 import { DateField } from './DateField'
 import { DestinationField } from './DestinationField'
 import { GuestsField } from './GuestsField'
-import { SearchResults } from './SearchResults'
-import styles from './SearchForm.module.css'
 
 interface Props {
   search: HotelSearch
@@ -15,20 +13,20 @@ interface Props {
 }
 
 export function SearchForm({ search, destinationRef, submitRef }: Props) {
-  const { query, errors, status, setDestination, setDates, setGuests, submit } = search
+  const { query, errors, pending, setDestination, setDates, setGuests, submit } = search
   const formRef = useRef<HTMLFormElement>(null)
-  const loading = status.state === 'loading'
 
-  const onSubmit = async (event: FormEvent) => {
+  const onSubmit = (event: FormEvent) => {
     event.preventDefault()
-    const found = await submit()
+    const found = submit()
     if (found.destination) destinationRef.current?.focus()
     else if (found.dates || found.guests) formRef.current?.querySelector<HTMLElement>('[aria-describedby]')?.focus()
   }
 
   return (
     <form ref={formRef} onSubmit={onSubmit} noValidate aria-label="Поиск отелей">
-      <div className={styles.grid}>
+      {/* Phones: destination and submit take the full row, dates and guests share one (stacked below xs). */}
+      <div className="grid grid-cols-[minmax(0,1.42fr)_minmax(0,1fr)] gap-[clamp(8px,2.4vw,12px)] max-xs:grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1.2fr)_minmax(0,0.95fr)_auto]">
         <DestinationField
           value={query.destination}
           error={errors.destination}
@@ -40,19 +38,18 @@ export function SearchForm({ search, destinationRef, submitRef }: Props) {
         <Button
           ref={submitRef}
           size="lg"
-          className={`${styles.areaSubmit} h-[clamp(50px,12.8vw,56px)] gap-3 lg:h-15`}
+          className="col-span-full h-[clamp(50px,12.8vw,56px)] gap-3 lg:col-auto lg:h-15"
           type="submit"
-          aria-busy={loading}
+          aria-busy={pending}
         >
           Найти отель
-          {loading ? (
+          {pending ? (
             <LoaderCircle className="size-6 animate-[spin_0.9s_linear_infinite]" aria-hidden />
           ) : (
             <ArrowRight className="size-6.5" strokeWidth={2} aria-hidden />
           )}
         </Button>
       </div>
-      <SearchResults status={status} />
     </form>
   )
 }

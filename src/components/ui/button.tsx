@@ -11,6 +11,7 @@ const buttonVariants = cva(
         default: 'bg-primary text-primary-foreground hover:bg-primary-hover',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary-hover',
         ghost: 'text-brand-foreground hover:bg-muted aria-expanded:bg-muted',
+        destructive: 'bg-destructive text-white hover:bg-destructive/90',
         outline: 'border-border bg-card text-primary hover:border-primary',
         link: 'text-primary hover:text-primary-hover',
       },

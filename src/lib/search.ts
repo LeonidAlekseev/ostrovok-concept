@@ -1,5 +1,5 @@
-import { destinations, scenarios, type Destination, type Scenario, type ScenarioId } from '../data/destinations'
-import { nightsBetween, type IsoDate } from './dates'
+import { scenarios, type Destination, type Scenario, type ScenarioId } from '../data/destinations'
+import { addDays, fromIso, nightsBetween, toIso, type IsoDate } from './dates'
 
 export const GUEST_LIMITS = {
   adults: { min: 1, max: 10 },
@@ -8,6 +8,8 @@ export const GUEST_LIMITS = {
 } as const
 
 export const MAX_NIGHTS = 30
+
+export const DEFAULT_GUESTS: Guests = { adults: 2, children: 0, rooms: 1 }
 
 export interface Guests {
   adults: number
@@ -29,14 +31,31 @@ export type SearchTarget =
 
 export type SearchErrors = Partial<Record<'destination' | 'dates' | 'guests', string>>
 
-const normalize = (s: string) => s.trim().toLocaleLowerCase('ru').replace(/ё/g, 'е')
+/** Empty dates default to tomorrow and the night after. Nothing is filled until `today` is known. */
+export function withStartDates(query: SearchQuery, today: IsoDate): SearchQuery {
+  if (!today) return query
+  const checkIn = query.checkIn || addDays(today, 1)
+  return { ...query, checkIn, checkOut: query.checkOut || addDays(checkIn, 1) }
+}
+
+/** The stay of a link without a search: tomorrow and the day after, default guests. `null` until `today` is known. */
+export function startStay(today: IsoDate): Stay | null {
+  if (!today) return null
+  const { checkIn, checkOut, guests } = withStartDates(
+    { destination: '', checkIn: '', checkOut: '', guests: DEFAULT_GUESTS },
+    today,
+  )
+  return { checkIn, checkOut, guests }
+}
+
+export const normalize = (s: string) => s.trim().toLocaleLowerCase('ru').replace(/ё/g, 'е')
 
 export function findScenario(text: string): Scenario | undefined {
   const q = normalize(text)
   return q ? scenarios.find((s) => normalize(s.title) === q) : undefined
 }
 
-export function resolveTarget(text: string): SearchTarget | null {
+export function resolveTarget(text: string, destinations: readonly Destination[]): SearchTarget | null {
   const q = normalize(text)
   if (!q) return null
   const destination = destinations.find((d) => normalize(d.name) === q)
@@ -46,7 +65,7 @@ export function resolveTarget(text: string): SearchTarget | null {
   return null
 }
 
-export function suggestDestinations(text: string, limit = 6): Destination[] {
+export function suggestDestinations(text: string, destinations: readonly Destination[], limit = 6): Destination[] {
   const q = normalize(text)
   if (!q) return destinations.filter((d) => d.onGlobe).slice(0, limit)
   const scenario = findScenario(q)
@@ -60,11 +79,11 @@ export function suggestDestinations(text: string, limit = 6): Destination[] {
 
 const inLimits = (n: number, { min, max }: { min: number; max: number }) => Number.isInteger(n) && n >= min && n <= max
 
-export function validateSearch(query: SearchQuery, today: IsoDate): SearchErrors {
+export function validateSearch(query: SearchQuery, today: IsoDate, destinations: readonly Destination[]): SearchErrors {
   const errors: SearchErrors = {}
   if (!query.destination.trim()) {
     errors.destination = 'Укажите, куда вы хотите поехать'
-  } else if (!resolveTarget(query.destination)) {
+  } else if (!resolveTarget(query.destination, destinations)) {
     errors.destination = 'Выберите направление из списка подсказок'
   }
 
@@ -84,60 +103,82 @@ export function validateSearch(query: SearchQuery, today: IsoDate): SearchErrors
   return errors
 }
 
+/** Dates and guests of a stay: shared by search and offer URLs. */
+export type Stay = Pick<SearchQuery, 'checkIn' | 'checkOut' | 'guests'>
+
+export function setGuestParams(params: URLSearchParams, guests: Guests): URLSearchParams {
+  params.set('adults', String(guests.adults))
+  if (guests.children) params.set('children', String(guests.children))
+  else params.delete('children')
+  params.set('rooms', String(guests.rooms))
+  return params
+}
+
+export function setStayParams(params: URLSearchParams, { checkIn, checkOut, guests }: Stay): URLSearchParams {
+  params.set('checkin', checkIn)
+  params.set('checkout', checkOut)
+  return setGuestParams(params, guests)
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+const isIsoDate = (value: string | null): value is IsoDate =>
+  value !== null && ISO_DATE.test(value) && toIso(fromIso(value)) === value
+const toCount = (value: string | null) => (value !== null && /^\d+$/.test(value) ? Number(value) : NaN)
+
+/**
+ * Reads the guests written by `setStayParams`, whatever the dates; `null` if the address has none.
+ * Counts are read as is (a missing one is NaN): `validateSearch` judges them.
+ */
+export function parseGuestParams(params: Pick<URLSearchParams, 'get'>): Guests | null {
+  const adults = params.get('adults')
+  const children = params.get('children')
+  const rooms = params.get('rooms')
+  if (adults === null && children === null && rooms === null) return null
+  return {
+    adults: toCount(adults),
+    children: children === null ? 0 : toCount(children),
+    rooms: toCount(rooms),
+  }
+}
+
+/**
+ * Reads the stay written by `setStayParams`; `null` if the dates are missing or malformed.
+ * Guest counts are read by `parseGuestParams` (none at all means NaN, for `validateSearch` to report).
+ */
+export function parseStayParams(params: Pick<URLSearchParams, 'get'>): Stay | null {
+  const checkIn = params.get('checkin')
+  const checkOut = params.get('checkout')
+  if (!isIsoDate(checkIn) || !isIsoDate(checkOut)) return null
+  return { checkIn, checkOut, guests: parseGuestParams(params) ?? { adults: NaN, children: 0, rooms: NaN } }
+}
+
 export function toSearchParams(query: SearchQuery, target: SearchTarget): URLSearchParams {
   const params = new URLSearchParams()
   if (target.kind === 'destination') params.set('destination', target.destination.id)
   else params.set('scenario', target.scenario)
-  params.set('checkin', query.checkIn)
-  params.set('checkout', query.checkOut)
-  params.set('adults', String(query.guests.adults))
-  if (query.guests.children) params.set('children', String(query.guests.children))
-  params.set('rooms', String(query.guests.rooms))
-  return params
-}
-
-export interface SearchResultItem {
-  destination: Destination
-  /** Demo estimate for the whole stay and all rooms, ₽. */
-  totalFrom: number
-}
-
-export interface SearchResult {
-  query: SearchQuery
-  target: SearchTarget
-  params: URLSearchParams
-  nights: number
-  items: SearchResultItem[]
+  return setStayParams(params, query)
 }
 
 /**
- * Demo search: there is no backend, so matches come from the local catalogue
- * and prices are rough "from" estimates. Nothing is booked.
+ * The query written by `toSearchParams`, as the form holds it: the destination or scenario id
+ * becomes its name, missing dates stay empty (see `withStartDates`) and guests default to
+ * `DEFAULT_GUESTS` without dates. An unknown id becomes an empty destination; malformed guest
+ * counts are kept (NaN) for `validateSearch` to report.
  */
-export async function runDemoSearch(
-  query: SearchQuery,
-  target: SearchTarget,
-  signal?: AbortSignal,
-): Promise<SearchResult> {
-  await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(resolve, 700)
-    signal?.addEventListener('abort', () => {
-      clearTimeout(timer)
-      reject(new DOMException('Aborted', 'AbortError'))
-    })
-  })
-  const nights = nightsBetween(query.checkIn, query.checkOut)
-  const matches =
-    target.kind === 'destination'
-      ? [target.destination]
-      : destinations.filter((d) => d.scenarios.includes(target.scenario))
+export function fromSearchParams(
+  params: Pick<URLSearchParams, 'get'>,
+  destinations: readonly Destination[],
+): SearchQuery {
+  const destinationId = params.get('destination')
+  const scenarioId = params.get('scenario')
+  const destination = destinationId
+    ? destinations.find((d) => d.id === destinationId)?.name
+    : scenarios.find((s) => s.id === scenarioId)?.title
+  const stay = parseStayParams(params)
   return {
-    query,
-    target,
-    params: toSearchParams(query, target),
-    nights,
-    items: matches
-      .map((destination) => ({ destination, totalFrom: destination.priceFrom * nights * query.guests.rooms }))
-      .sort((a, b) => a.totalFrom - b.totalFrom),
+    destination: destination ?? '',
+    checkIn: stay?.checkIn ?? '',
+    checkOut: stay?.checkOut ?? '',
+    guests: stay?.guests ?? DEFAULT_GUESTS,
   }
 }
