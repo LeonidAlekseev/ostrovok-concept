@@ -108,7 +108,7 @@ export function DrawCanvas({ strokes, colorId, onStroke }: Props) {
       ref={ref}
       role="img"
       aria-label={strokes.length ? `Рисунок: мазков — ${strokes.length}` : 'Пустой холст'}
-      className="aspect-[3/2] w-full cursor-crosshair touch-none rounded-2xl bg-white shadow-(--shadow-card) ring-1 ring-foreground/10"
+      className="aspect-[3/2] w-full cursor-crosshair touch-none rounded-[clamp(18px,4vw,28px)] bg-white shadow-(--shadow-card) ring-1 ring-foreground/5"
       onPointerDown={start}
       onPointerMove={move}
       onPointerUp={end}

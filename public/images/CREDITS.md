@@ -32,3 +32,10 @@ coastlines (public domain). The cloud photos in `hero/clouds/` were provided by 
 `stars/sky.webp`, `stars/sky-mobile.webp` (night sky with the Moon) and `stars/orb.webp` (magic orb) are
 provided by the project owner; `scripts/build-images.py` resizes them to WebP. The source PNGs are not kept
 in the repository.
+
+## Draw search
+
+`draw/bg.webp`, `draw/bg-mobile.webp` (watercolour bay), `draw/preview.webp` (child's drawing of the sea) and
+`draw/result.webp`, `draw/result-mobile.webp` (islands with a route) are provided by the project owner;
+`scripts/build-draw-images.mjs` converts them to WebP and cleans the speckles off the drawing's alpha. The source
+PNGs are not kept in the repository.
