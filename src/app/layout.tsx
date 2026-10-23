@@ -41,7 +41,7 @@ export default async function RootLayout({ children, modal }: { children: ReactN
     // bars: under the home page's lime hero it is lime too, not the grey page background.
     <html lang="ru" className="has-[#hero-title]:bg-brand">
       {/* Each page renders its own `main`; the footer sits at the bottom of short pages. */}
-      <body className="flex min-h-dvh flex-col">
+      <body className="group/page flex min-h-dvh flex-col">
         <CatalogProvider destinations={destinations}>
           <Header />
           {children}

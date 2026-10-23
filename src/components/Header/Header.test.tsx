@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { renderToString } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { sessionStore } from '@/lib/session'
 import { favoritesStore } from '@/lib/storage'
@@ -178,25 +179,38 @@ describe('Header', () => {
 })
 
 describe('Header chrome', () => {
-  // site-header, Requirement: Оформление шапки
-  it('on the hotel page is transparent with a white logo and icons', () => {
+  // site-header, Requirement: Оформление шапки — Серверный HTML главной
+  it.each(['/', '/search', '/hotels/prague-old-town-lantern', '/hotels/prague-old-town-lantern/rooms', '/index'])(
+    'the server markup of %s does not depend on the pathname',
+    (path) => {
+      window.history.pushState({}, '', path)
+      const html = renderToString(<Header />)
+      window.history.pushState({}, '', '/')
+      // Grey by default; the page content (the hero, the hotel photo) turns it transparent through CSS alone.
+      expect(html).toMatch(/<header class="[^"]*\bbg-background\b/)
+      expect(html).toContain('group-has-[#hero-title]/page:bg-transparent')
+      expect(html).toContain('group-has-[[data-header-photo]]/page:bg-transparent')
+      expect(html).toContain('group-has-[[data-header-photo]]/page:text-white')
+    },
+  )
+
+  it('turns the logo and icons white through CSS over the hotel photo, not by pathname', () => {
     window.history.pushState({}, '', '/hotels/prague-old-town-lantern')
     setup()
-    const header = screen.getByRole('banner')
-    expect(header.className).not.toMatch(/\bbg-background\b/)
-    expect(screen.getByRole('link', { name: 'О!Погнали — на главную' }).className).toMatch(/\btext-white\b/)
-    expect(screen.getByRole('link', { name: 'Избранное' }).className).toMatch(/(^|\s)text-white(\s|$)/)
     window.history.pushState({}, '', '/')
+    expect(screen.getByRole('link', { name: 'О!Погнали — на главную' }).className).toMatch(
+      /(^|\s)group-has-\[\[data-header-photo\]\]\/page:text-white(\s|$)/,
+    )
+    expect(screen.getByRole('link', { name: 'Избранное' }).className).toMatch(
+      /(^|\s)group-has-\[\[data-header-photo\]\]\/page:text-white(\s|$)/,
+    )
   })
 
-  it('is flat and blue on the rates page of a hotel, never sticky', () => {
-    window.history.pushState({}, '', '/hotels/prague-old-town-lantern/rooms')
+  it('is flat and blue, never sticky', () => {
     setup()
     const header = screen.getByRole('banner')
-    expect(header.className).toMatch(/\bbg-background\b/)
     expect(header.className).not.toMatch(/rounded|shadow|fixed|sticky/)
-    expect(screen.getByRole('link', { name: 'О!Погнали — на главную' }).className).toMatch(/\btext-primary\b/)
-    window.history.pushState({}, '', '/')
+    expect(screen.getByRole('link', { name: 'О!Погнали — на главную' }).className).toMatch(/(^|\s)text-primary(\s|$)/)
   })
 
   it('scrolls with the page', () => {

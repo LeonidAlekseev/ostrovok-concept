@@ -11,4 +11,12 @@ describe('RootLayout', () => {
     expect(isValidElement(html)).toBe(true)
     expect(html.props.className.split(' ')).toEqual(['has-[#hero-title]:bg-brand'])
   })
+
+  // site-header, Requirement: Оформление шапки — Серверный HTML главной
+  it('makes the body the group the header reads the page content through', async () => {
+    const html = (await RootLayout({ children: null, modal: null })) as ReactElement<{
+      children: ReactElement<{ className: string }>
+    }>
+    expect(html.props.children.props.className.split(' ')).toContain('group/page')
+  })
 })
