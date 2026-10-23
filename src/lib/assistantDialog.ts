@@ -23,7 +23,8 @@ export interface Dialog {
 export const DIALOG_KEY = 'ostrovok:v1:assistant'
 
 type Shape = Record<string, unknown>
-const isObject = (value: unknown): value is Shape => typeof value === 'object' && value !== null && !Array.isArray(value)
+const isObject = (value: unknown): value is Shape =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
 const isString = (value: unknown): value is string => typeof value === 'string'
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
 

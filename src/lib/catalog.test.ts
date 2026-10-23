@@ -378,7 +378,10 @@ describe('texts by kind of stay', () => {
     for (const hotel of buildCatalog()) {
       if (hotel.stayType === 'hotel') continue
       const texts = [hotel.description, ...hotel.reviews.flatMap((r) => [r.pros, r.cons ?? ''])]
-      expect(texts.filter((t) => /отел/i.test(t)), hotel.id).toEqual([])
+      expect(
+        texts.filter((t) => /отел/i.test(t)),
+        hotel.id,
+      ).toEqual([])
     }
   })
 })

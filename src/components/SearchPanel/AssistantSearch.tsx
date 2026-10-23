@@ -230,10 +230,7 @@ export function AssistantSearch({ newHotels, routes, onChoose }: Props) {
           {thinking && (
             <li className={messageClass}>
               <EvalAvatar />
-              <div
-                className="flex gap-1 rounded-[18px_18px_18px_6px] bg-muted px-4 py-3.5"
-                aria-label="Эвал думает"
-              >
+              <div className="flex gap-1 rounded-[18px_18px_18px_6px] bg-muted px-4 py-3.5" aria-label="Эвал думает">
                 {[0, 0.15, 0.3].map((delay) => (
                   <span
                     key={delay}
