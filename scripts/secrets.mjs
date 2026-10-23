@@ -24,6 +24,11 @@ const command = process.argv[2]
 if (command === 'build') {
   // A separate file so a local build never overwrites hand edits in .env.local.
   if (armoredKey) await writeDecrypted('.env.production.local')
+  else if (process.env.VERCEL) {
+    // Without the key the catalogue pages cannot be prerendered; fail here with the cause, not in next build.
+    console.error(`secrets: GIT_SECRET_PRIVATE_KEY is not set for the Vercel ${process.env.VERCEL_ENV} environment`)
+    process.exit(1)
+  }
 } else if (command === 'reveal') {
   if (armoredKey) await writeDecrypted('.env.local')
   else if (spawnSync('git', ['secret', '--version'], { stdio: 'ignore' }).status === 0)
