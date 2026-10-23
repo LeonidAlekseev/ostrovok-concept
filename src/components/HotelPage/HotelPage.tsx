@@ -49,5 +49,9 @@ export function HotelPage({ hotel, titleId, stay }: Props) {
   )
   if (titleId) return content
   // The photo starts under the header, which is transparent over it.
-  return <main className="-mt-(--header-height) flex flex-1 flex-col bg-(--decor-surface-soft)">{content}</main>
+  return (
+    <main data-header-photo className="-mt-(--header-height) flex flex-1 flex-col bg-(--decor-surface-soft)">
+      {content}
+    </main>
+  )
 }

@@ -12,16 +12,16 @@ import { UserMenu } from './UserMenu'
 
 type Panel = 'notifications' | 'account' | 'menu'
 
-// Blue on the lime hero; the white glaze replaces ghost's grey hover there.
+// The header's look follows the page content, not the pathname: `usePathname()` is not reliable in the server
+// HTML of a prerendered page, and React does not fix attributes at hydration. The body is `group/page`; the home
+// hero has `#hero-title`, the hotel page's `main` has `data-header-photo` (its photo starts under the header).
+// Blue on the lime hero, where the white glaze replaces ghost's grey hover; white over the photo of the hotel
+// page, under a glaze of the same white.
 // Below 360 px the four icons take 40 px each: the touch area shrinks a little, the glyph stays 24 px or more.
-const iconButton =
-  'text-primary hover:bg-card/35 hover:text-primary-hover aria-expanded:bg-card/35 aria-expanded:text-primary-hover max-[360px]:size-10'
-// White over the photo of the hotel page, under a glaze of the same white.
-const iconButtonOnPhoto =
-  'text-white hover:bg-white/20 hover:text-white aria-expanded:bg-white/20 aria-expanded:text-white max-[360px]:size-10'
-
-/** The hotel page, not its rates: its photo starts under the header. */
-const HOTEL_PAGE = /^\/hotels\/[^/]+$/
+const iconButton = cn(
+  'text-primary hover:bg-card/35 hover:text-primary-hover aria-expanded:bg-card/35 aria-expanded:text-primary-hover max-[360px]:size-10',
+  'group-has-[[data-header-photo]]/page:text-white group-has-[[data-header-photo]]/page:hover:bg-white/20 group-has-[[data-header-photo]]/page:hover:text-white group-has-[[data-header-photo]]/page:aria-expanded:bg-white/20 group-has-[[data-header-photo]]/page:aria-expanded:text-white',
+)
 
 // Placement comes from the popover (portaled, aligned to its trigger); only the size and the entrance are here.
 const panelClass =
@@ -50,19 +50,19 @@ export function Header() {
     onOpenChange: (next: boolean) => setOpen((current) => (next ? panel : current === panel ? null : current)),
   })
 
-  // On the home page the header is transparent: the hero (and the globe's glow) continues underneath.
-  // On the hotel page too, its logo and icons white over the photo.
-  const pathname = usePathname()
-  const onPhoto = HOTEL_PAGE.test(pathname)
-  const transparent = pathname === '/' || onPhoto
-  const buttonClass = onPhoto ? iconButtonOnPhoto : iconButton
   // On /search the header follows the results page width on 3xl screens, and its logo and icons align with the search card.
-  const wideSearch = pathname === '/search'
+  const wideSearch = usePathname() === '/search'
 
   // The wrapper keeps the header's place in the flow; the header scrolls away with the page.
   return (
     <div className="relative z-20 h-(--header-height)">
-      <header className={cn('absolute inset-x-0 top-0', !transparent && 'bg-background')}>
+      <header
+        className={cn(
+          'absolute inset-x-0 top-0 bg-background',
+          'group-has-[#hero-title]/page:bg-transparent',
+          'group-has-[[data-header-photo]]/page:bg-transparent',
+        )}
+      >
         <div
           className={cn(
             'mx-auto flex h-(--header-height) max-w-(--page-max) items-center justify-between gap-4 px-[calc(var(--page-x)+8px)] max-[360px]:gap-2 max-[360px]:px-3',
@@ -72,7 +72,7 @@ export function Header() {
           <a
             className={cn(
               'rounded-sm text-[clamp(26px,6.6vw,32px)] leading-none font-extrabold tracking-[-0.035em] whitespace-nowrap no-underline',
-              onPhoto ? 'text-white' : 'text-primary',
+              'text-primary group-has-[[data-header-photo]]/page:text-white',
             )}
             href="/"
             onClick={close}
@@ -84,7 +84,7 @@ export function Header() {
           <div className="relative flex items-center gap-[clamp(0px,1vw,14px)] max-[360px]:gap-0">
             <Link
               href="/favorites"
-              className={buttonVariants({ variant: 'ghost', size: 'icon', className: buttonClass })}
+              className={buttonVariants({ variant: 'ghost', size: 'icon', className: iconButton })}
               aria-label="Избранное"
             >
               <Heart className="size-6.5" fill="currentColor" strokeWidth={2} aria-hidden />
@@ -92,7 +92,7 @@ export function Header() {
 
             <Popover {...panelProps('notifications')}>
               <PopoverTrigger
-                render={<Button variant="ghost" size="icon" className={buttonClass} aria-label="Уведомления" />}
+                render={<Button variant="ghost" size="icon" className={iconButton} aria-label="Уведомления" />}
               >
                 <Bell className="size-6.25" fill="currentColor" strokeWidth={2} aria-hidden />
               </PopoverTrigger>
@@ -105,7 +105,7 @@ export function Header() {
               </PopoverContent>
             </Popover>
 
-            <UserMenu buttonClass={buttonClass} {...panelProps('account')} />
+            <UserMenu buttonClass={iconButton} {...panelProps('account')} />
 
             <Popover {...panelProps('menu')}>
               <PopoverTrigger
@@ -113,7 +113,7 @@ export function Header() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={buttonClass}
+                    className={iconButton}
                     aria-label={open === 'menu' ? 'Закрыть меню' : 'Открыть меню'}
                   />
                 }
