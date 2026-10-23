@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -20,7 +20,7 @@ describe('Hero in the server render', () => {
 
   // home-page, Requirement: Состав и порядок секций — Слоган
   it('titles the hero with the slogan', () => {
-    expect(page.querySelector('h1')!.textContent).toBe('Путешествуй легко')
+    expect(page.querySelector('h1')!.textContent).toBe('Отель без догадок')
   })
 
   it('has a pin a city with new hotels', () => {
@@ -36,19 +36,6 @@ describe('Hero in the server render', () => {
     expect(page.textContent).toContain('Новый отель · Прага')
     expect(page.querySelector('path[d^="M "]')).toBeNull()
     expect(page.querySelector('a[href^="/routes/"]')).toBeNull()
-  })
-
-  // hero-globe, Requirement: Случайная идея
-  it('keeps only the decorative cloud under «Рандом»: no clouds on the globe', () => {
-    const photos = [...page.querySelectorAll('img')].filter((img) =>
-      decodeURIComponent(img.getAttribute('src')!).includes('/images/hero/clouds/'),
-    )
-    expect(photos).toHaveLength(2)
-    for (const photo of photos) expect(photo.getAttribute('alt')).toBe('')
-    const place = photos[0].parentElement!
-    expect(place.classList).toContain('pointer-events-none')
-    expect(photos[1].parentElement).toBe(place)
-    expect(page.querySelector('.animate-cloud-drift')).toBeNull()
   })
 
   // hero-globe, Requirement: Ширина карточки отеля — Длинное название
@@ -71,12 +58,6 @@ describe('Hero in the server render', () => {
     }
     expect(cardShift({ ...fit, phone: false }, 100)).toBe(0)
     expect(cardShift(null, 50)).toBe(0)
-  })
-
-  // hero-globe, Requirement: Случайная идея
-  it('names the random idea button «Рандом»', () => {
-    const button = [...page.querySelectorAll('button')].find((b) => b.textContent === 'Рандом')
-    expect(button).toBeDefined()
   })
 
   it('shows no card without new hotels', () => {
@@ -110,7 +91,7 @@ describe('pickOther', () => {
   })
 })
 
-// hero-globe, Requirement: Пины городов с отелями; Случайная идея; Раскрутка без помех
+// hero-globe, Requirement: Пины городов с отелями
 describe('Hero in the browser', () => {
   let frames: FrameRequestCallback[] = []
   let clock = 0
@@ -140,22 +121,12 @@ describe('Hero in the browser', () => {
   })
   afterEach(() => vi.restoreAllMocks())
 
-  /** Runs the animation frames up to `until` ms, one every 16 ms. */
-  const runFrames = (until: number) =>
-    act(() => {
-      while (clock < until) {
-        clock += 16
-        for (const cb of frames.splice(0)) cb(clock)
-      }
-    })
-
   const setup = () => {
     const user = userEvent.setup()
     render(<Hero cities={cities} hotels={hotels} featured={prague} />)
     return user
   }
   const cardLinks = () => document.querySelectorAll<HTMLAnchorElement>('a[href^="/hotels/"]')
-  const pressedPin = () => document.querySelector('button[aria-pressed="true"]')
 
   it('opens one new hotel of the city', async () => {
     const user = setup()
@@ -175,31 +146,5 @@ describe('Hero in the browser', () => {
     expect(cardLinks()).toHaveLength(1)
     expect(cardLinks()[0].getAttribute('href')).not.toBe(first)
     expect(cardLinks()[0].getAttribute('href')).toMatch(/^\/hotels\/lisbon-/)
-  })
-
-  it('spins the globe to a random city for about two seconds, ignoring clicks meanwhile, then opens its hotel', async () => {
-    const user = setup()
-    await user.click(screen.getByRole('button', { name: 'Рандом' }))
-    const random = vi.spyOn(Math, 'random')
-    await user.click(screen.getByRole('button', { name: 'Рандом' }))
-    expect(random).not.toHaveBeenCalled()
-
-    runFrames(1900)
-    expect(pressedPin()).toBeNull()
-    runFrames(2100)
-    const pin = pressedPin()!
-    expect(pin.ariaLabel).toMatch(/— отели$/)
-    expect(cardLinks()).toHaveLength(1)
-    expect(document.activeElement).toBe(cardLinks()[0])
-    expect(screen.getByRole('status').textContent).toMatch(/^Случайный отель: .+, /)
-    expect(screen.getByRole('status').textContent).toContain(pin.ariaLabel!.split(',')[0])
-  })
-
-  it('opens a random hotel at once with reduced motion', async () => {
-    reducedMotion = true
-    const user = setup()
-    await user.click(screen.getByRole('button', { name: 'Рандом' }))
-    expect(pressedPin()).not.toBeNull()
-    expect(screen.getByRole('status').textContent).toMatch(/^Случайный отель: /)
   })
 })

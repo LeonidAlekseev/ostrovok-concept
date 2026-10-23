@@ -8,7 +8,7 @@ import { allHotels } from '../test/catalog'
 import { HomePage } from './HomePage'
 
 // The globe needs a canvas, which jsdom does not have; the tests check the sections.
-vi.mock('./Hero/Hero', () => ({ Hero: () => <h1>Путешествуй легко</h1> }))
+vi.mock('./Hero/Hero', () => ({ Hero: () => <h1>Отель без догадок</h1> }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
 const selections = PERSONAS.map((persona) => ({

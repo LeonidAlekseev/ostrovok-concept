@@ -10,10 +10,10 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: {
-    default: 'О!Погнали — бронирование отелей',
-    template: '%s — О!Погнали',
+    default: 'О!бъективно — бронирование отелей',
+    template: '%s — О!бъективно',
   },
-  description: 'О!Погнали — найдите отель для следующего путешествия',
+  description: 'О!бъективно — найдите отель для следующего путешествия',
   icons: {
     icon: [
       { url: '/favicon.svg', type: 'image/svg+xml' },
