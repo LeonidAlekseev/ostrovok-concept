@@ -10,7 +10,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: {
-    default: 'О!бъективно — бронирование отелей',
+    default: 'О!бъективно — за гранью поиска',
     template: '%s — О!бъективно',
   },
   description: 'О!бъективно — найдите отель для следующего путешествия',

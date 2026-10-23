@@ -58,7 +58,7 @@ export function pickOther<T extends { id: string }>(
 export interface Viewport {
   globe: DOMRect
   hero: DOMRect
-  /** Text blocks the card must not cover (the title, the hint). */
+  /** Text blocks the card must not cover (the title). */
   avoid: DOMRect[]
   /** Edges of the place card relative to its pin, px (the CSS decides where the card sits). */
   card: { left: number; right: number; top: number; bottom: number }

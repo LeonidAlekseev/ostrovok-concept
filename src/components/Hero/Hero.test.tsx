@@ -20,7 +20,7 @@ describe('Hero in the server render', () => {
 
   // home-page, Requirement: Состав и порядок секций — Слоган
   it('titles the hero with the slogan', () => {
-    expect(page.querySelector('h1')!.textContent).toBe('Отель без догадок')
+    expect(page.querySelector('h1')!.textContent).toBe('За гранью поиска')
   })
 
   it('has a pin a city with new hotels', () => {
