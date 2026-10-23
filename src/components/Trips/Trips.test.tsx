@@ -10,8 +10,6 @@ import { waitForCatalog } from '@/test/waitForCatalog'
 
 const nav = vi.hoisted(() => ({ query: '' }))
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(nav.query) }))
-// «Мои планы» delete with a server action; MyPlans.test covers them.
-vi.mock('@/app/trip/actions', () => ({ deleteTripPlan: vi.fn() }))
 
 const signIn = () => sessionStore.set({ name: 'Анна Петрова', email: 'anna@example.com' })
 
@@ -37,6 +35,16 @@ describe('TripsPage', () => {
     expect(within(panel).getByText('Бронирование OS-UP0001')).toBeTruthy()
     expect(within(panel).queryByText('Бронирование OS-PAST01')).toBeNull()
     expect(within(panel).getByRole('link').getAttribute('href')).toBe('/trips/booking?id=OS-UP0001')
+  })
+
+  // trips, Requirement: Список поездок, Scenario: Без планов
+  it('shows the bookings only, without «Мои планы»', async () => {
+    signIn()
+    render(<TripsPage />)
+    await waitForCatalog()
+    expect(screen.getAllByRole('tab')).toHaveLength(3)
+    expect(screen.queryByText('Мои планы')).toBeNull()
+    expect(document.querySelector('a[href^="/trip/"]')).toBeNull()
   })
 
   it('shows past and cancelled trips in their tabs', async () => {

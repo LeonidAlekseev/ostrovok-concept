@@ -1,7 +1,6 @@
 import type { Destination } from '../data/destinations'
 import type { Hotel } from './catalog'
 import type { IsoDate } from './dates'
-import type { Persona } from './routes'
 
 /**
  * "Поиск по звёздам": a deterministic reading on the notions of western (tropical) astrology — the sun sign,
@@ -382,7 +381,10 @@ export interface Reading {
   citySign: ZodiacSign
   /** The aspect between the natal Sun and the city's sign. */
   aspect: AspectKind | null
-  /** The best hotel of the best city, then the best of the 2nd and the 3rd cities. */
+  /**
+   * The best hotel of the best city, then the best of the 2nd and the 3rd cities; the result shows the first,
+   * which is of the next city when the best one has no hotels.
+   */
   hotels: Hotel[]
   forecast: string
 }
@@ -407,26 +409,6 @@ const ASPECT_LINE: Record<AspectKind | 'none', string> = {
 }
 
 export const lowerFirst = (text: string) => text.charAt(0).toLocaleLowerCase('ru') + text.slice(1)
-
-/**
- * The persona of the ready-made routes for the stars: a pair goes for luxury, a group goes as students,
- * alone the earth and air signs work on the way and the fire and water ones go for the culture.
- */
-export function starPersona(sign: ZodiacSign, company: Company): Persona {
-  if (company === 'pair') return 'luxury'
-  if (company === 'group') return 'student'
-  return sign.element === 'earth' || sign.element === 'air' ? 'workation' : 'culture'
-}
-
-const COMPANY_TRIP: Record<Company, string> = {
-  solo: 'Поездка одному',
-  pair: 'Поездка вдвоём',
-  group: 'Поездка компанией',
-}
-
-/** The reading as words for the search by meaning over the routes; never the traveller's name. */
-export const starWish = (reading: Pick<Reading, 'sign' | 'city'>, company: Company) =>
-  `${COMPANY_TRIP[company]}: ${reading.city.name}, ${reading.city.country}. ${ELEMENT_LINE[reading.sign.element]}`
 
 /** Ranks the `destinations` for the traveller and picks the best rated of their `hotels` in the top three. */
 export function readStars(
@@ -455,11 +437,11 @@ export function readStars(
     .map((city) => ({ city, score: score(city) }))
     .sort((a, b) => b.score - a.score)
     .map((r) => r.city)
-  // The best hotel of each of the three best cities; with fewer cities (a city or a small country was chosen),
-  // the next best hotels of those cities fill the three places.
+  // The best hotel of each of the three best cities (a city without hotels gives none); with fewer cities
+  // (a city or a small country was chosen), the next best hotels of those cities fill the three places.
   const hotelsIn = (city: Destination) =>
     hotels.filter((h) => h.destinationId === city.id).sort((a, b) => b.rating - a.rating)
-  const picks = ranked.slice(0, 3).map((c) => hotelsIn(c)[0])
+  const picks = ranked.slice(0, 3).flatMap((c) => hotelsIn(c).slice(0, 1))
   for (const hotel of ranked.flatMap(hotelsIn)) {
     if (picks.length >= 3) break
     if (!picks.includes(hotel)) picks.push(hotel)

@@ -1,6 +1,5 @@
 import type { Destination, ScenarioId } from '../data/destinations'
 import type { Hotel } from './catalog'
-import { PERSONAS, type Persona } from './routes'
 
 /**
  * The vibe search: seven pairs of opposites, each a way to read the catalogue. An answer is −1 (the left
@@ -179,26 +178,6 @@ export function vibeArchetype(answers: readonly Answer[]): Archetype {
       best = { ...archetype, image: poleImage(axisId, Number(side) < 0 ? -1 : 1) }
       bestScore = score
     }
-  }
-  return best
-}
-
-/** The sides that lead to each persona of the ready-made routes. */
-const PERSONA_POLES: Record<Persona, readonly Pole[]> = {
-  student: ['budget:-1', 'evening:1', 'size:-1'],
-  luxury: ['budget:1', 'size:1', 'leisure:-1'],
-  workation: ['evening:-1', 'location:-1', 'food:-1'],
-  culture: ['place:1', 'food:1', 'leisure:1', 'location:1'],
-}
-
-/** The persona whose sides the answers chose most, the first of `PERSONAS` on a tie; culture when none. */
-export function vibePersona(answers: readonly Answer[]): Persona {
-  const chosen = chosenPoles(answers)
-  let best: Persona = 'culture'
-  let bestScore = 0
-  for (const persona of PERSONAS) {
-    const score = PERSONA_POLES[persona].filter((pole) => chosen.has(pole)).length
-    if (score > bestScore) [best, bestScore] = [persona, score]
   }
   return best
 }

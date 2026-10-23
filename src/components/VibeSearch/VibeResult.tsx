@@ -2,23 +2,19 @@ import { useEffect, useRef, type CSSProperties } from 'react'
 import { RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Stay } from '../../lib/search'
-import type { RouteCardData } from '../../lib/routes'
 import type { Vibe } from '../../lib/vibe'
 import { SmartImage } from '../ui/SmartImage'
-import { ReadyRoute } from '../RouteCard/ReadyRoute'
 import { VibeHotels } from './VibeHotels'
 import { VibeImage } from './VibeImage'
 
 interface Props {
   vibe: Vibe
-  /** The ready-made route over the hotels; none without routes. */
-  route: RouteCardData | null
   /** `null` until today's date is known: the links go without dates and the hotel page asks for them. */
   stay: Stay | null
   onRestart: () => void
 }
 
-export function VibeResult({ vibe, route, stay, onRestart }: Props) {
+export function VibeResult({ vibe, stay, onRestart }: Props) {
   const headingRef = useRef<HTMLHeadingElement>(null)
 
   // The pairs are gone: the focus moves to the result.
@@ -62,8 +58,6 @@ export function VibeResult({ vibe, route, stay, onRestart }: Props) {
       </ul>
 
       <VibeImage vibe={vibe} />
-
-      <ReadyRoute route={route} />
 
       <VibeHotels hotels={vibe.hotels} stay={stay} />
 

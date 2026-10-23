@@ -143,8 +143,8 @@ const summaryOf = (
 }
 
 /**
- * A place the route generator (`npm run routes:generate`) proposed for a route when the city had none
- * that fit the persona: it is kept in src/data/extraHotels.json and joins the catalogue after the generated stays.
+ * A place the language model once proposed for a city that had none of its kind: it is kept in
+ * src/data/extraHotels.json and joins the catalogue after the generated stays.
  */
 export const extraHotelSchema = z.object({
   destinationId: z.string().min(1),

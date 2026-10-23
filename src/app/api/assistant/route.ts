@@ -34,16 +34,14 @@ const MIN_SEMANTIC_MS = 1500
 /** Hotels the semantic search hands to the plan. */
 const MATCHES = 6
 
-/** The hotels and the ready-made route the search by meaning finds for the plan; empty keeps the rules. */
+/** The hotels the search by meaning finds for the plan; empty keeps the rules. */
 interface Found {
   matches?: HotelSummary[]
-  routeId?: string
 }
 
 /**
  * Hotels for the traveller's words — all their messages, so «тихо» from the first one still counts — in the
- * plan's cities, and the route for the same words, both at once and in the same time, once the brief is
- * complete and the plan is due; nothing found keeps the plan and the route on the rules.
+ * plan's cities, once the brief is complete and the plan is due; nothing found keeps the plan on the rules.
  */
 async function findForPlan(
   brief: Brief,
@@ -56,22 +54,17 @@ async function findForPlan(
   const timeoutMs = Math.min(deadline - Date.now(), SEMANTIC_TIMEOUT_MS)
   if (nextQuestion(brief, today) || timeoutMs < MIN_SEMANTIC_MS) return {}
   const destinationIds = planCities(brief, today, destinations).map((d) => d.id)
-  const [hits, routes] = await Promise.all([
-    semanticSearch(wish, { kind: 'hotel', destinationIds, k: MATCHES, timeoutMs, signal }),
-    semanticSearch(wish, { kind: 'route', k: 1, timeoutMs, signal }),
-  ])
-  const found: Found = { routeId: routes?.[0]?.id }
-  if (!hits) return found
+  const hits = await semanticSearch(wish, { destinationIds, k: MATCHES, timeoutMs, signal })
+  if (!hits) return {}
   const summaries = new Map((await loadHotelSummaries().catch(() => [])).map((h) => [h.id, h]))
   const matches = hits.flatMap((hit) => summaries.get(hit.id) ?? [])
-  return matches.length ? { ...found, matches } : found
+  return matches.length ? { matches } : {}
 }
 
 /**
  * Reads the traveller's newest message into the brief with the language model; without a key, on a model
  * error or after 8 s — with the rules, so the dialog goes on either way. Once the brief is complete, adds the
- * hotels (`matches`) and the ready-made route (`routeId`) the semantic search finds for the traveller's words;
- * without them the plan and the route keep the rules.
+ * hotels (`matches`) the semantic search finds for the traveller's words; without them the plan keeps the rules.
  */
 export async function POST(request: Request) {
   const deadline = Date.now() + ANSWER_BUDGET_MS

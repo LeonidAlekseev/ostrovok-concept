@@ -12,8 +12,6 @@ import { openRouterReranker } from './rerank'
  * `null`, and the caller keeps its rules; the traveller never sees an error.
  */
 
-export type SemanticKind = 'hotel' | 'route'
-
 export interface SemanticHit {
   id: string
   destinationId: string
@@ -30,12 +28,10 @@ export const SEMANTIC_TIMEOUT_MS = 8000
 export const MAX_SEMANTIC_QUERY = 1000
 /** Most nearest vectors a search reranks. */
 const MAX_CANDIDATES = 50
-/** Most hotels a traveller's profile averages. */
-const MAX_PROFILE = 50
 
 /**
  * Vectors of recent queries: the vibe's answers repeat, and the free model is slow and counts requests a day.
- * The pending vector is kept too, so the hotels and the route of one answer share one request.
+ * The pending vector is kept too, so concurrent searches for the same words share one request.
  */
 const queryVectors = new Map<string, Promise<number[]>>()
 const QUERY_CACHE = 500
@@ -75,7 +71,6 @@ interface Match {
 }
 
 export interface SemanticOptions {
-  kind: SemanticKind
   /** Only objects in these cities; all cities when absent. */
   destinationIds?: readonly string[]
   /** Hits to return. */
@@ -87,10 +82,10 @@ export interface SemanticOptions {
   signal?: AbortSignal
 }
 
-/** The `k` objects of `kind` closest in meaning to `text`, best first, or `null` to fall back to the rules. */
+/** The `k` hotels closest in meaning to `text`, best first, or `null` to fall back to the rules. */
 export async function semanticSearch(
   text: string,
-  { kind, destinationIds, k = 5, candidates = 30, timeoutMs = SEMANTIC_TIMEOUT_MS, signal }: SemanticOptions,
+  { destinationIds, k = 5, candidates = 30, timeoutMs = SEMANTIC_TIMEOUT_MS, signal }: SemanticOptions,
 ): Promise<SemanticHit[] | null> {
   const query = text.trim().slice(0, MAX_SEMANTIC_QUERY)
   if (!query || !isSupabaseConfigured || destinationIds?.length === 0) return null
@@ -105,7 +100,7 @@ export async function semanticSearch(
     const { data, error } = await database()
       .rpc('match_embeddings', {
         query_embedding: toVector(embedding),
-        match_kind: kind,
+        match_kind: 'hotel',
         destination_ids: destinationIds ?? null,
         match_count: Math.min(Math.max(candidates, k), MAX_CANDIDATES),
       })
@@ -137,35 +132,5 @@ export async function semanticSearch(
     // The vectors' own order is still by meaning: better than the rules.
     warn('the reranker failed, using the vectors’ order', error)
     return matches.slice(0, k).map((m) => hit(m, m.similarity))
-  }
-}
-
-/**
- * The other hotels of `hotelId`'s city, the most alike first. `profile` is the traveller's hotels — the
- * favourites, the bookings and the plans (they live in the browser, so the caller sends their ids): with
- * them the order leans to the traveller's taste, without them it is the likeness to the hotel alone.
- * `null` when the hotel has no vector or the database failed.
- */
-export async function similarHotels(
-  hotelId: string,
-  profile: readonly string[] = [],
-  k = 10,
-): Promise<Omit<SemanticHit, 'destinationId'>[] | null> {
-  if (!isSupabaseConfigured) return null
-  try {
-    const { data, error } = await database()
-      .rpc('similar_hotels', {
-        hotel_id: hotelId,
-        profile_ids: [...new Set(profile)].slice(0, MAX_PROFILE),
-        match_count: k,
-      })
-      .abortSignal(AbortSignal.timeout(SEMANTIC_TIMEOUT_MS))
-    if (error) throw new Error(error.message)
-    const rows = (data ?? []) as { ref_id: string; score: number }[]
-    if (rows.length === 0) return null
-    return rows.map((row) => ({ id: row.ref_id, score: row.score }))
-  } catch (error) {
-    warn('similar hotels failed', error)
-    return null
   }
 }

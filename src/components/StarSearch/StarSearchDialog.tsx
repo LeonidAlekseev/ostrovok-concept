@@ -13,14 +13,14 @@ import {
 } from '@/components/ui/dialog'
 import { useToday } from '../../hooks/useToday'
 import { addDays } from '../../lib/dates'
-import { starPersona, sunSign, type Company, type Reading } from '../../lib/horoscope'
-import { bestRoute, type RouteCardData } from '../../lib/routes'
+import { sunSign, type Reading } from '../../lib/horoscope'
 import { DEFAULT_GUESTS, startStay, type Stay } from '../../lib/search'
 import { readStarsAction } from './actions'
 import { starSerif } from './starFont'
 import { MagicOrb } from './MagicOrb'
 import { StarForm, type StarAnswers } from './StarForm'
 import { StarResult } from './StarResult'
+import { useDestination } from '../Catalog/useDestinations'
 
 /** Length of the reading's animation; the orb's reveal in globals.css lasts as long. */
 export const READING_MS = 2500
@@ -38,9 +38,7 @@ type Step =
       symbol: string
       stay: Stay
       name: string
-      company: Company
-      /** With the route of the search by meaning, when it answered. */
-      reading: (Reading & { routeId?: string }) | null
+      reading: Reading | null
       failed: boolean
       swirled: boolean
     }
@@ -65,11 +63,9 @@ const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion:
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** The routes the result picks its ready-made one from. */
-  routes: readonly RouteCardData[]
 }
 
-export function StarSearchDialog({ open, onOpenChange, routes }: Props) {
+export function StarSearchDialog({ open, onOpenChange }: Props) {
   const today = useToday()
   const [answers, setAnswers] = useState(emptyAnswers)
   const [step, setStep] = useState<Step>({ kind: 'form' })
@@ -100,7 +96,6 @@ export function StarSearchDialog({ open, onOpenChange, routes }: Props) {
       symbol,
       stay,
       name,
-      company: input.company,
       reading: null,
       failed: false,
       swirled: prefersReducedMotion(),
@@ -115,20 +110,13 @@ export function StarSearchDialog({ open, onOpenChange, routes }: Props) {
   }
 
   const result = step.kind === 'reading' && step.reading && step.swirled ? step.reading : null
-  // The stars' answer is a route: by meaning or by the rules, in the stars' city first, then anywhere.
-  const wish =
-    result && step.kind === 'reading'
-      ? { semanticId: result.routeId, persona: starPersona(result.sign, step.company), destinationId: result.city.id }
-      : null
-  const route =
-    result && wish
-      ? (bestRoute(
-          routes.filter((card) => card.destinationId === result.city.id),
-          wish,
-        ) ?? bestRoute(routes, wish))
-      : null
+  // The stars' answer is one hotel: the best of their city, or of the next city when theirs has none.
+  const hotel = result?.hotels[0]
+  const hotelCity = useDestination(hotel?.destinationId ?? '')
   const status = result
-    ? `Звёзды выбрали: ${route?.title ?? result.hotels[0].name}, ${result.city.name}`
+    ? hotel
+      ? `Звёзды выбрали: ${hotel.name}, ${hotelCity?.name ?? result.city.name}`
+      : `Звёзды выбрали: ${result.city.name}`
     : step.kind === 'reading'
       ? step.failed
         ? READING_ERROR
@@ -163,7 +151,7 @@ export function StarSearchDialog({ open, onOpenChange, routes }: Props) {
               по звёздам
             </DialogTitle>
             <DialogDescription className="max-w-[34ch] text-[clamp(14px,3.8vw,16px)] text-(--decor-star-muted)">
-              Звёзды выберут город и маршрут по вашему знаку, Луне и дате поездки.
+              Звёзды выберут город и отель по вашему знаку, Луне и дате поездки.
             </DialogDescription>
           </DialogHeader>
           {/* Under the close button, leaning on the frame; its own column, so it never covers the title. */}
@@ -199,7 +187,7 @@ export function StarSearchDialog({ open, onOpenChange, routes }: Props) {
           />
         )}
         {step.kind === 'reading' && result && (
-          <StarResult reading={result} route={route} name={step.name} onRestart={() => setStep({ kind: 'form' })} />
+          <StarResult reading={result} stay={step.stay} name={step.name} onRestart={() => setStep({ kind: 'form' })} />
         )}
 
         <p className="sr-only" role="status">

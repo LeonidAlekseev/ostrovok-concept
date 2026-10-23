@@ -3,8 +3,6 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as actions from '@/components/VibeSearch/actions'
-import type { RouteCardData } from '../../lib/routes'
-import { routeCards } from '../../test/catalog'
 import { DrawSearch } from './DrawSearch'
 import { DrawSearchDialog } from './DrawSearchDialog'
 
@@ -23,17 +21,15 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks())
 
 /** The window as the section holds it: the colour of the brush lives outside. */
-function Harness({ routes }: { routes: readonly RouteCardData[] }) {
+function Harness() {
   const [colorId, setColorId] = useState('blue')
-  return (
-    <DrawSearchDialog open onOpenChange={() => {}} routes={routes} colorId={colorId} onColorIdChange={setColorId} />
-  )
+  return <DrawSearchDialog open onOpenChange={() => {}} colorId={colorId} onColorIdChange={setColorId} />
 }
 
-const renderDialog = (routes: readonly RouteCardData[] = routeCards()) => render(<Harness routes={routes} />)
+const renderDialog = () => render(<Harness />)
 const next = () => screen.getByRole('button', { name: 'Далее' }) as HTMLButtonElement
 const status = () => screen.getByRole('status')
-// Past the «Подбираем маршрут» of at least 1,5 s.
+// Past the «Подбираем отель» of at least 1,5 s.
 const RESULT = { timeout: 3000 }
 
 /** Green from the keyboard, then «Далее». */
@@ -47,7 +43,7 @@ async function drawAndGo(user: ReturnType<typeof userEvent.setup>) {
 describe('DrawSearch section', () => {
   it('opens the window with an empty canvas and the palette', async () => {
     const user = userEvent.setup()
-    render(<DrawSearch routes={routeCards()} />)
+    render(<DrawSearch />)
     const section = screen.getByRole('region', { name: 'Нарисуй своё путешествие' })
     expect(section.getAttribute('id')).toBe('draw')
 
@@ -63,7 +59,7 @@ describe('DrawSearch section', () => {
   // draw-search, Scenario: Цвет из превью
   it('opens the window on the colour chosen in the card', async () => {
     const user = userEvent.setup()
-    render(<DrawSearch routes={routeCards()} />)
+    render(<DrawSearch />)
     const card = screen.getByRole('group', { name: 'Цвет кисти' })
     expect(within(card).getAllByRole('button')).toHaveLength(10)
 
@@ -75,7 +71,7 @@ describe('DrawSearch section', () => {
   // draw-search, Scenario: Повтор анимации; Scenario: Меньше движения
   it('replays the hidden preview drawing, without motion when reduced', async () => {
     const user = userEvent.setup()
-    const { container } = render(<DrawSearch routes={routeCards()} />)
+    const { container } = render(<DrawSearch />)
     const preview = container.querySelector('img[src="/images/draw/preview.webp"]')!
     expect(preview.getAttribute('aria-hidden')).toBe('true')
     expect(preview.className).toContain('animate-draw-reveal')
@@ -148,10 +144,10 @@ describe('DrawSearch canvas', () => {
   })
 })
 
-// draw-search, Requirement: Пошаговое окно; Requirement: Подбор маршрута на шаге настроения;
-// Requirement: Готовый маршрут на последнем шаге
+// draw-search, Requirement: Пошаговое окно; Requirement: Подбор отеля на шаге настроения;
+// Requirement: Готовый отель на последнем шаге
 describe('DrawSearch steps', () => {
-  it('reads the mood while the route is picked, then shows the ready route on its own', async () => {
+  it('reads the mood while the hotels are picked, then shows the hotel on its own', async () => {
     const user = userEvent.setup()
     // The hotels come when the test lets them.
     const pick = actions.vibeHotelsAction
@@ -170,52 +166,37 @@ describe('DrawSearch steps', () => {
     expect(screen.getByText('Эстет-минималист')).toBeTruthy()
     const colors = screen.getByRole('region', { name: 'Цвета рисунка' })
     expect(within(colors).getByText(/Природа и тишина/).textContent).toBe('Природа и тишина 100%')
-    const progress = screen.getByRole('progressbar', { name: 'Подбираем маршрут…' })
+    const progress = screen.getByRole('progressbar', { name: 'Подбираем отель…' })
     expect(progress.getAttribute('aria-busy')).toBe('true')
     release()
     await waitFor(() => expect(progress.getAttribute('aria-busy')).toBe('false'))
     expect(progress.getAttribute('aria-valuenow')).toBe('100')
 
     // Step 3, by itself.
-    const ready = await screen.findByRole('heading', { name: 'Ваш маршрут готов!' }, RESULT)
-    expect(status().textContent).toBe('Шаг 3 из 3: Ваш маршрут готов!')
+    const ready = await screen.findByRole('heading', { name: 'Ваш отель готов!' }, RESULT)
+    expect(status().textContent).toBe('Шаг 3 из 3: Ваш отель готов!')
     await waitFor(() => expect(document.activeElement).toBe(ready))
-    expect(screen.getByRole('img', { name: 'Острова в океане и маршрут между ними' })).toBeTruthy()
+    expect(screen.getByRole('img', { name: 'Острова в океане' })).toBeTruthy()
     const hotels = within(screen.getByRole('region', { name: 'Отели под настроение' })).getAllByRole('article')
     expect(hotels).toHaveLength(6)
-    // Only what the product has: no flights, no transfers.
+    // Only what the product has: no flights, no transfers, no routes.
     expect(screen.queryByText(/Перел[её]т/)).toBeNull()
     expect(screen.queryByText(/Трансфер/)).toBeNull()
+    expect(screen.queryByText(/маршрут/i)).toBeNull()
     expect(screen.getByText('Отели под настроение', { selector: 'li' })).toBeTruthy()
-    expect(screen.getByText(/^Маршрут на \d+ ноч/)).toBeTruthy()
+    expect(screen.getByText('Фото и отзывы гостей', { selector: 'li' })).toBeTruthy()
 
-    // draw-search, Scenario: Посмотреть путешествие
-    const journey = screen.getByRole('link', { name: 'Посмотреть путешествие' })
-    expect(journey.getAttribute('href')).toMatch(/^\/routes\/[a-z0-9-]+$/)
+    // draw-search, Scenario: Посмотреть отель — the first hotel of the mood.
+    const first = within(hotels[0]).getByRole('link').getAttribute('href')!
+    const hotel = screen.getByRole('link', { name: 'Посмотреть отель' })
+    expect(hotel.getAttribute('href')).toBe(first)
+    expect(first).toMatch(/^\/hotels\/[a-z0-9-]+\?/)
 
     // draw-search, Scenario: Изменить рисунок
     await user.click(screen.getByRole('button', { name: 'Изменить рисунок' }))
     expect(status().textContent).toBe('Шаг 1 из 3: Нарисуй своё путешествие')
     expect(screen.getByRole('img', { name: 'Рисунок: мазков — 1' })).toBeTruthy()
     expect(next().disabled).toBe(false)
-  })
-
-  // draw-search, Scenario: Нет маршрута
-  it('leads to the hotels when there is no ready route', async () => {
-    const user = userEvent.setup()
-    const scroll = vi.fn()
-    Element.prototype.scrollIntoView = scroll
-    renderDialog([])
-    await drawAndGo(user)
-    await screen.findByRole('heading', { name: 'Ваш маршрут готов!' }, RESULT)
-    expect(screen.queryByText(/^Маршрут на/)).toBeNull()
-
-    await user.click(screen.getByRole('button', { name: 'Посмотреть путешествие' }))
-    const hotels = screen.getByRole('region', { name: 'Отели под настроение' })
-    expect(scroll).toHaveBeenCalled()
-    expect(document.activeElement).toBe(hotels)
-    // jsdom has no scrolling of its own.
-    delete (Element.prototype as Partial<Element>).scrollIntoView
   })
 
   // draw-search, Scenario: Ошибка подбора
@@ -231,6 +212,6 @@ describe('DrawSearch steps', () => {
 
     await user.click(screen.getByRole('button', { name: 'Повторить' }))
     expect(pick).toHaveBeenCalledTimes(2)
-    await screen.findByRole('heading', { name: 'Ваш маршрут готов!' }, RESULT)
+    await screen.findByRole('heading', { name: 'Ваш отель готов!' }, RESULT)
   })
 })

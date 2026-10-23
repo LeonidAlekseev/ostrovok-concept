@@ -5,7 +5,6 @@ import { useState, type CSSProperties } from 'react'
 import { ArrowRight, RotateCcw, WandSparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PALETTE } from '@/lib/drawMood'
-import type { RouteCardData } from '@/lib/routes'
 import { RainbowButton } from './RainbowButton'
 
 // The window and its canvas load on the first click: the home page does not pay for them up front.
@@ -29,7 +28,7 @@ function Rays({ className }: { className?: string }) {
   )
 }
 
-export function DrawSearch({ routes }: { routes: readonly RouteCardData[] }) {
+export function DrawSearch() {
   const [open, setOpen] = useState(false)
   // Mounted from the first opening on, so the window keeps the drawing and closes with its animation.
   const [opened, setOpened] = useState(false)
@@ -71,7 +70,7 @@ export function DrawSearch({ routes }: { routes: readonly RouteCardData[] }) {
         <Rays className="-scale-x-100" />
       </div>
       <p className="mt-[clamp(12px,2.4vw,20px)] max-w-[36ch] text-[clamp(15px,3.9vw,21px)]/[1.45] text-foreground/65">
-        По цветам поймём настроение: море и покой, город и ночь или роскошь — и подберём отели и готовый маршрут.
+        По цветам поймём настроение: море и покой, город и ночь или роскошь — и подберём отель.
       </p>
 
       <div className="relative mt-[clamp(40px,10vw,120px)] flex w-full max-w-[880px] flex-col gap-[clamp(14px,3vw,28px)] rounded-[clamp(22px,5vw,34px)] bg-card p-[clamp(14px,3.4vw,32px)] shadow-(--shadow-card)">
@@ -128,15 +127,7 @@ export function DrawSearch({ routes }: { routes: readonly RouteCardData[] }) {
         Нарисовать
         <ArrowRight aria-hidden className="size-[1.1em]" />
       </RainbowButton>
-      {opened && (
-        <DrawSearchDialog
-          open={open}
-          onOpenChange={setOpen}
-          routes={routes}
-          colorId={colorId}
-          onColorIdChange={setColorId}
-        />
-      )}
+      {opened && <DrawSearchDialog open={open} onOpenChange={setOpen} colorId={colorId} onColorIdChange={setColorId} />}
     </section>
   )
 }
