@@ -16,7 +16,7 @@ describe('Footer', () => {
     render(<Footer />)
     const text = screen.getByRole('contentinfo').textContent
     expect(text).toContain(`© ${new Date().getFullYear()} О!бъективно`)
-    expect(text).toContain('Демо-проект: концепт платформы агрегатора поиска отелей.')
+    expect(text).toContain('Концепт платформы агрегатора поиска отелей.')
   })
 
   // app-shell, Requirement: Оформление подвала
