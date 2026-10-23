@@ -40,33 +40,3 @@ export function hotelDocument(hotel: Hotel, destination: Destination, scale: Vib
   ]
   return lines.filter(Boolean).join('\n')
 }
-
-const PERSONAS: Record<string, string> = {
-  student: 'студенческий, недорого',
-  luxury: 'роскошный',
-  workation: 'воркейшн — работа в поездке',
-  culture: 'культурный',
-}
-
-/** A route's row as `npm run db:embed` reads it: only what the text needs, everything optional. */
-export interface RouteText {
-  title?: string
-  persona?: string
-  description?: string
-  leisure?: { title?: string; category?: string }[]
-}
-
-export function routeDocument(route: RouteText, destination: Destination): string {
-  const persona = route.persona && (PERSONAS[route.persona] ?? route.persona)
-  const leisure = (route.leisure ?? []).flatMap((l) =>
-    l.title ? [l.category ? `${l.title} (${l.category.toLocaleLowerCase('ru')})` : l.title] : [],
-  )
-  return [
-    `Маршрут «${route.title ?? ''}» — ${destination.name}, ${destination.country}.`,
-    persona ? `Стиль: ${persona}.` : '',
-    route.description ? sentence(route.description) : '',
-    leisure.length ? `Досуг: ${leisure.join(', ')}.` : '',
-  ]
-    .filter(Boolean)
-    .join('\n')
-}

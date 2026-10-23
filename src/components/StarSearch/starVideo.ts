@@ -201,12 +201,12 @@ function drawSymbol(ctx: CanvasRenderingContext2D, p: Palette, symbol: string, x
   ctx.restore()
 }
 
-/** The stars' choice the video ends on: the route, or the hotel without routes. */
+/** The stars' hotel the video ends on. */
 export interface StarPick {
   title: string
   /** City and country. */
   place: string
-  /** «≈ 84 000 ₽ за 5 ночей», or the hotel's price. */
+  /** «от 7 000 ₽ за ночь». */
   estimate: string
 }
 

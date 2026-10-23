@@ -1,7 +1,7 @@
 import { embed, rerank } from 'ai'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getSecret } from '../secrets'
-import { semanticSearch, similarHotels } from './semantic'
+import { semanticSearch } from './semantic'
 
 const rpc = vi.fn()
 
@@ -50,7 +50,7 @@ describe('semanticSearch', () => {
       ]),
     )
     const text = words()
-    const hits = await semanticSearch(text, { kind: 'hotel', destinationIds: ['prague'], k: 2 })
+    const hits = await semanticSearch(text, { destinationIds: ['prague'], k: 2 })
     expect(hits).toEqual([
       { id: 'prague-skyline-hostel', destinationId: 'prague', score: 0.9 },
       { id: 'prague-central-hostel', destinationId: 'prague', score: 0.3 },
@@ -64,23 +64,23 @@ describe('semanticSearch', () => {
     expect(vi.mocked(rerank).mock.calls[0][0]).toMatchObject({ query: text, topN: 2 })
   })
 
-  it('asks the model once for the hotels and the route of the same words, and again after a failure', async () => {
+  it('asks the model once for concurrent searches of the same words, and again after a failure', async () => {
     vi.mocked(rerank).mockResolvedValue(reranked([{ originalIndex: 0, score: 0.9 }]))
     const text = words()
-    await Promise.all([semanticSearch(text, { kind: 'hotel' }), semanticSearch(text, { kind: 'route', k: 1 })])
+    await Promise.all([semanticSearch(text, {}), semanticSearch(text, { k: 1 })])
     expect(embed).toHaveBeenCalledTimes(1)
-    expect(rpc.mock.calls.map(([, args]) => args.match_kind)).toEqual(['hotel', 'route'])
+    expect(rpc.mock.calls.map(([, args]) => args.match_kind)).toEqual(['hotel', 'hotel'])
 
     const failing = words()
     vi.mocked(embed).mockRejectedValueOnce(new Error('timeout'))
-    expect(await semanticSearch(failing, { kind: 'hotel' })).toBeNull()
-    expect(await semanticSearch(failing, { kind: 'hotel' })).not.toBeNull()
+    expect(await semanticSearch(failing, {})).toBeNull()
+    expect(await semanticSearch(failing, {})).not.toBeNull()
     expect(embed).toHaveBeenCalledTimes(3)
   })
 
   it('keeps the vectors’ order when the reranker fails', async () => {
     vi.mocked(rerank).mockRejectedValue(new Error('429'))
-    const hits = await semanticSearch(words(), { kind: 'hotel', k: 2 })
+    const hits = await semanticSearch(words(), { k: 2 })
     expect(hits?.map((h) => [h.id, h.score])).toEqual([
       ['prague-central-hostel', 0.7],
       ['prague-skyline-hostel', 0.6],
@@ -89,44 +89,23 @@ describe('semanticSearch', () => {
 
   it('gives null without the key, on a model error, without vectors or without text', async () => {
     vi.mocked(getSecret).mockResolvedValueOnce(undefined)
-    expect(await semanticSearch(words(), { kind: 'hotel' })).toBeNull()
+    expect(await semanticSearch(words(), {})).toBeNull()
     vi.mocked(embed).mockRejectedValueOnce(new Error('timeout'))
-    expect(await semanticSearch(words(), { kind: 'hotel' })).toBeNull()
+    expect(await semanticSearch(words(), {})).toBeNull()
     rpc.mockResolvedValueOnce({ data: [], error: null })
-    expect(await semanticSearch(words(), { kind: 'hotel' })).toBeNull()
+    expect(await semanticSearch(words(), {})).toBeNull()
     rpc.mockResolvedValueOnce({ data: null, error: { message: 'no function' } })
-    expect(await semanticSearch(words(), { kind: 'hotel' })).toBeNull()
-    expect(await semanticSearch('   ', { kind: 'hotel' })).toBeNull()
-    expect(await semanticSearch(words(), { kind: 'hotel', destinationIds: [] })).toBeNull()
+    expect(await semanticSearch(words(), {})).toBeNull()
+    expect(await semanticSearch('   ', {})).toBeNull()
+    expect(await semanticSearch(words(), { destinationIds: [] })).toBeNull()
     expect(rerank).not.toHaveBeenCalled()
   })
 
   it('embeds the same words once', async () => {
     vi.mocked(rerank).mockResolvedValue(reranked([{ originalIndex: 0, score: 1 }]))
     const text = words()
-    await semanticSearch(text, { kind: 'hotel' })
-    await semanticSearch(text, { kind: 'hotel' })
+    await semanticSearch(text, {})
+    await semanticSearch(text, {})
     expect(embed).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('similarHotels', () => {
-  it('asks the database for the city’s hotels by likeness and the profile', async () => {
-    rpc.mockResolvedValue({ data: [{ ref_id: 'prague-park-rooms', score: 0.8 }], error: null })
-    expect(await similarHotels('prague-grand-lodge', ['a', 'a', 'b'], 5)).toEqual([
-      { id: 'prague-park-rooms', score: 0.8 },
-    ])
-    expect(rpc).toHaveBeenCalledWith('similar_hotels', {
-      hotel_id: 'prague-grand-lodge',
-      profile_ids: ['a', 'b'],
-      match_count: 5,
-    })
-  })
-
-  it('gives null when the hotel has no vector or the database fails', async () => {
-    rpc.mockResolvedValueOnce({ data: [], error: null })
-    expect(await similarHotels('nope')).toBeNull()
-    rpc.mockResolvedValueOnce({ data: null, error: { message: 'down' } })
-    expect(await similarHotels('nope')).toBeNull()
   })
 })

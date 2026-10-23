@@ -7,8 +7,6 @@ import { useHotels } from '@/hooks/useHotels'
 import { useBookings } from '@/hooks/useStore'
 import { todayIso } from '@/lib/dates'
 import { tripsIn, type TripTab } from '@/lib/trips'
-import type { TripSummary } from '@/lib/trip'
-import { MyPlans } from './MyPlans'
 import { TripCard } from './TripCard'
 import { pageClass, TripsGate } from './TripsGate'
 
@@ -71,13 +69,12 @@ function Trips() {
   )
 }
 
-/** `/trips`: the user's plans (copies of routes) and the bookings of this browser in three tabs. */
-export function TripsPage({ plans = [] }: { plans?: TripSummary[] | null }) {
+/** `/trips`: the bookings of this browser in three tabs. */
+export function TripsPage() {
   return (
     <main className={pageClass}>
       <TripsGate next="/trips">
         <Trips />
-        <MyPlans plans={plans} />
       </TripsGate>
     </main>
   )

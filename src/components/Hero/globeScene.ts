@@ -1,24 +1,18 @@
 import type { Destination } from '../../data/destinations'
-import type { RouteCardData } from '../../lib/routes'
+import type { HotelSummary } from '../../lib/catalog'
 import { projectToGlobe, type GlobePoint, type GlobeView } from '../../lib/globe'
-import { arc, routePath } from './globeGeometry'
 
-/** A city's ready-made route highlighted on the globe, with flight routes arriving at the city. */
+/** A city's new hotel highlighted on the globe. */
 export interface Spotlight {
   destination: Destination
-  /** The travel idea shown: one of the city's routes; none without routes. */
-  route: RouteCardData | null
-  /** Cities the routes start from. */
-  sources: Destination[]
+  /** The hotel shown: one of the city's new hotels; none in a city without them. */
+  hotel: HotelSummary | null
 }
 
 export interface Scene {
   points: Map<string, GlobePoint>
   hub: GlobePoint
-  routes: { id: string; d: string; opacity: number }[]
 }
-
-const routeLift = [0.3, 0.2, 0.25]
 
 /** Fades a marker out as it approaches the limb (depth 0) and hides it behind. */
 export const depthOpacity = (depth: number) => Math.min(Math.max((depth - 0.05) / 0.2, 0), 1)
@@ -26,29 +20,21 @@ export const depthOpacity = (depth: number) => Math.min(Math.max((depth - 0.05) 
 /** Positions of everything on the globe when it is turned to `view`. */
 export function sceneAt(markers: Destination[], spotlight: Spotlight, view: GlobeView): Scene {
   const points = new Map(markers.map((d) => [d.id, projectToGlobe(d.lat, d.lon, view)]))
-  const project = (d: Destination) => points.get(d.id) ?? projectToGlobe(d.lat, d.lon, view)
-  const hub = project(spotlight.destination)
-  const routes = spotlight.sources.map((source, i) => {
-    const from = project(source)
-    return {
-      id: source.id,
-      d: routePath(arc(source.id, from, hub, routeLift[i % routeLift.length])),
-      opacity: depthOpacity(Math.min(from.depth, hub.depth)),
-    }
-  })
-  return { points, hub, routes }
+  const { destination } = spotlight
+  const hub = points.get(destination.id) ?? projectToGlobe(destination.lat, destination.lon, view)
+  return { points, hub }
 }
 
-/** Cycles through each city's routes so consecutive visits show different ones. */
-export function createRouteFeed(routes: readonly RouteCardData[]) {
-  const byCity = new Map<string, RouteCardData[]>()
-  for (const route of routes) byCity.set(route.destinationId, [...(byCity.get(route.destinationId) ?? []), route])
+/** Cycles through each city's hotels so consecutive visits show different ones. */
+export function createHotelFeed(hotels: readonly HotelSummary[]) {
+  const byCity = new Map<string, HotelSummary[]>()
+  for (const hotel of hotels) byCity.set(hotel.destinationId, [...(byCity.get(hotel.destinationId) ?? []), hotel])
   const cursor = new Map<string, number>()
   return {
     has: (destinationId: string) => byCity.has(destinationId),
-    /** All the city's routes, in their order. */
-    all: (destinationId: string): RouteCardData[] => byCity.get(destinationId) ?? [],
-    next(destinationId: string): RouteCardData | undefined {
+    /** All the city's hotels, in their order. */
+    all: (destinationId: string): HotelSummary[] => byCity.get(destinationId) ?? [],
+    next(destinationId: string): HotelSummary | undefined {
       const list = byCity.get(destinationId)
       if (!list) return undefined
       const i = cursor.get(destinationId) ?? 0
@@ -89,7 +75,7 @@ export function pickSpotlightCity(
   points: Map<string, GlobePoint>,
   view: Viewport,
   recent: string[],
-): { city: Destination; sources: Destination[] } | null {
+): Destination | null {
   const screen = (p: GlobePoint) => ({
     x: view.globe.left + (p.x / 100) * view.globe.width,
     y: view.globe.top + (p.y / 100) * view.globe.height,
@@ -98,7 +84,7 @@ export function pickSpotlightCity(
   const fits = front.filter((d) => {
     const { x, y } = screen(points.get(d.id)!)
     return (
-      // Margins leave room for route titles longer than the current one.
+      // Margins leave room for hotel names longer than the current one.
       x + view.card.left > view.hero.left + 12 &&
       x + view.card.right + 32 < view.hero.right &&
       x < view.hero.left + view.hero.width * 0.65 &&
@@ -114,14 +100,5 @@ export function pickSpotlightCity(
     )
   })
   const fresh = fits.filter((d) => !recent.includes(d.id))
-  const city = shuffle(fresh.length ? fresh : fits)[0]
-  if (!city) return null
-
-  const at = points.get(city.id)!
-  const distance = (d: Destination) => Math.hypot(points.get(d.id)!.x - at.x, points.get(d.id)!.y - at.y)
-  const nearby = front
-    .filter((d) => d !== city && distance(d) > 4)
-    .toSorted((a, b) => distance(a) - distance(b))
-    .slice(0, 6)
-  return { city, sources: shuffle(nearby).slice(0, 3) }
+  return shuffle(fresh.length ? fresh : fits)[0] ?? null
 }

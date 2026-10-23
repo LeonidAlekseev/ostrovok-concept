@@ -16,11 +16,11 @@ const post = (authorization?: string) =>
 beforeEach(() => vi.mocked(revalidateTag).mockClear())
 
 describe('POST /api/revalidate', () => {
-  it('drops the cached catalogue and routes for the bearer of the service key', async () => {
+  it('drops the cached catalogue for the bearer of the service key', async () => {
     const response = await post('Bearer service')
     expect(response.status).toBe(200)
     expect(revalidateTag).toHaveBeenCalledWith('catalog', { expire: 0 })
-    expect(revalidateTag).toHaveBeenCalledWith('routes', { expire: 0 })
+    expect(revalidateTag).toHaveBeenCalledTimes(1)
   })
 
   it.each([

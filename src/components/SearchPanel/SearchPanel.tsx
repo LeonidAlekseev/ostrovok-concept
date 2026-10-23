@@ -1,6 +1,5 @@
 import type { HotelSummary } from '../../lib/catalog'
 import type { HotelSearch } from '../../hooks/useHotelSearch'
-import type { RouteCardData } from '../../lib/routes'
 import { AssistantSearch } from './AssistantSearch'
 
 /* Liquid glass with no backing card: the globe shows through, blurred and saturated, tinted sky to mint. */
@@ -20,19 +19,17 @@ interface Props {
   onChoose: HotelSearch['searchFor']
   /** The "recently added" hotels the assistant suggests. */
   newHotels: readonly HotelSummary[]
-  /** The routes the plan picks its ready-made one from. */
-  routes: readonly RouteCardData[]
 }
 
 /** The search of the home page: the assistant on liquid glass; the manual form lives on `/search`. */
-export function SearchPanel({ onChoose, newHotels, routes }: Props) {
+export function SearchPanel({ onChoose, newHotels }: Props) {
   return (
     // Children that bleed to the window edge (scrolling chips) read --pad.
     <div
       data-assistant-window
       className={`relative isolate z-10 rounded-[clamp(24px,6vw,36px)] p-(--pad) [--pad:clamp(14px,3.8vw,28px)] ${glassFill} ${glassBlur} ${glassRim} ${glassSheen} ${glassOpaque}`}
     >
-      <AssistantSearch newHotels={newHotels} routes={routes} onChoose={onChoose} />
+      <AssistantSearch newHotels={newHotels} onChoose={onChoose} />
     </div>
   )
 }

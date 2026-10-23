@@ -120,6 +120,10 @@ export function setStayParams(params: URLSearchParams, { checkIn, checkOut, gues
   return setGuestParams(params, guests)
 }
 
+/** The hotel page with the dates of `stay`; without them, for two adults in one room, and the page asks for dates. */
+export const hotelHref = (hotelId: string, stay?: Stay | null) =>
+  `/hotels/${hotelId}?${stay ? setStayParams(new URLSearchParams(), stay) : setGuestParams(new URLSearchParams(), DEFAULT_GUESTS)}`
+
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 const isIsoDate = (value: string | null): value is IsoDate =>
   value !== null && ISO_DATE.test(value) && toIso(fromIso(value)) === value

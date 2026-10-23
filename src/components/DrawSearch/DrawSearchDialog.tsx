@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { ArrowRight, BedDouble, Eraser, MapPin, Plus, RefreshCw, RotateCcw, Route, XIcon } from 'lucide-react'
+import { ArrowRight, BedDouble, Eraser, MessageSquareText, Plus, RefreshCw, RotateCcw, XIcon } from 'lucide-react'
 import { cn } from 'cn'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -16,9 +16,8 @@ import {
   paintedShare,
   type Stroke,
 } from '../../lib/drawMood'
-import type { RouteCardData } from '../../lib/routes'
 import { vibeArchetype, type Answer } from '../../lib/vibe'
-import { countRu } from '../../lib/format'
+import { hotelHref } from '../../lib/search'
 import { useVibeReading } from '../VibeSearch/useVibeReading'
 import { VibeHotels } from '../VibeSearch/VibeHotels'
 import { DrawCanvas } from './DrawCanvas'
@@ -27,8 +26,6 @@ import { RainbowButton, rainbowClass } from './RainbowButton'
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** The routes the result picks its ready-made one from. */
-  routes: readonly RouteCardData[]
   /** The colour of the brush, shared with the palette of the section's card. */
   colorId: string
   onColorIdChange: (colorId: string) => void
@@ -39,11 +36,11 @@ type Step = 1 | 2 | 3
 const STEPS: Record<Step, string> = {
   1: 'Нарисуй своё путешествие',
   2: 'Настроение рисунка',
-  3: 'Ваш маршрут готов!',
+  3: 'Ваш отель готов!',
 }
 
 const DRAW_ERROR = 'Не удалось подобрать отели. Попробуйте ещё раз.'
-/** «Подбираем маршрут» shows at least this long, so the mood of the drawing can be read before the result. */
+/** «Подбираем отель» shows at least this long, so the mood of the drawing can be read before the result. */
 const MIN_SEARCH_MS = 1500
 
 const percent = (share: number) => `${Math.round(share * 100)}%`
@@ -60,23 +57,22 @@ function Sparkles() {
 
 /**
  * The drawing window: a wizard of three steps. 1 — the canvas and the palette; 2 — the mood of the drawing while the
- * hotels and the route are picked, then on by itself; 3 — the ready route. On phones it is a sheet from the bottom.
+ * hotels are picked, then on by itself; 3 — the hotel of the mood. On phones it is a sheet from the bottom.
  */
-export function DrawSearchDialog({ open, onOpenChange, routes, colorId, onColorIdChange }: Props) {
+export function DrawSearchDialog({ open, onOpenChange, colorId, onColorIdChange }: Props) {
   const [strokes, setStrokes] = useState<Stroke[]>([])
   const [step, setStep] = useState<Step>(1)
   // The drawing's answers once «Далее» is pressed; the drawing stays for «Изменить рисунок».
   const [answers, setAnswers] = useState<Answer[] | null>(null)
   // When the search (or its retry) started: step 3 waits for `MIN_SEARCH_MS` after it.
   const [searchedAt, setSearchedAt] = useState(0)
-  const { vibe, route, stay, failed, retry } = useVibeReading(answers, routes)
+  const { vibe, stay, failed, retry } = useVibeReading(answers)
   const shares = useMemo(() => colorShares(strokes), [strokes])
   const archetype = useMemo(() => answers && vibeArchetype(answers), [answers])
   const ready = paintedShare(strokes) >= MIN_PAINTED
   // The chosen colour: the window opens on it.
   const chosenRef = useRef<HTMLButtonElement>(null)
   const titleRef = useRef<HTMLHeadingElement>(null)
-  const hotelsRef = useRef<HTMLElement>(null)
   const color = PALETTE.find((c) => c.id === colorId)!
 
   // A new step takes the focus to its title; the first opening keeps it on the chosen colour.
@@ -87,7 +83,7 @@ export function DrawSearchDialog({ open, onOpenChange, routes, colorId, onColorI
     titleRef.current?.focus()
   }, [step])
 
-  // The hotels and the route are picked: on to the result, once the search has shown long enough.
+  // The hotels are picked: on to the result, once the search has shown long enough.
   useEffect(() => {
     if (step !== 2 || !vibe) return
     const timer = setTimeout(() => setStep(3), Math.max(0, searchedAt + MIN_SEARCH_MS - Date.now()))
@@ -162,12 +158,10 @@ export function DrawSearchDialog({ open, onOpenChange, routes, colorId, onColorI
           </DialogTitle>
           <DialogDescription className="text-[clamp(15px,3.8vw,18px)]/[1.45]">
             {step === 1
-              ? 'Рисуйте цветами настроения — по ним мы подберём отели и готовый маршрут.'
+              ? 'Рисуйте цветами настроения — по ним мы подберём отель.'
               : step === 2
-                ? 'По цветам рисунка мы поняли настроение и подбираем под него отели и маршрут.'
-                : route
-                  ? 'Отели, маршрут и места для прогулок подобраны по вашему настроению.'
-                  : 'Отели подобраны по вашему настроению.'}
+                ? 'По цветам рисунка мы поняли настроение и подбираем под него отели.'
+                : 'Отели подобраны по вашему настроению.'}
           </DialogDescription>
         </div>
 
@@ -262,7 +256,7 @@ export function DrawSearchDialog({ open, onOpenChange, routes, colorId, onColorI
             </div>
             <p id="draw-hint" className={cn('-mt-1 text-center text-sm text-muted-foreground', ready && 'sr-only')}>
               {ready
-                ? 'По цветам рисунка подберём отели и маршрут.'
+                ? 'По цветам рисунка подберём отели.'
                 : `Закрасьте ещё немного холста — цветом «${color.label}» или любым другим.`}
             </p>
           </div>
@@ -297,7 +291,7 @@ export function DrawSearchDialog({ open, onOpenChange, routes, colorId, onColorI
                 aria-busy={!vibe}
                 className="gap-2.5 **:data-[slot=progress-indicator]:bg-(image:--decor-rainbow) **:data-[slot=progress-indicator]:data-indeterminate:w-2/5 **:data-[slot=progress-indicator]:data-indeterminate:animate-draw-progress **:data-[slot=progress-indicator]:motion-reduce:data-indeterminate:w-full **:data-[slot=progress-indicator]:motion-reduce:data-indeterminate:animate-none **:data-[slot=progress-indicator]:motion-reduce:data-indeterminate:opacity-40 **:data-[slot=progress-track]:h-2.5"
               >
-                <ProgressLabel className="text-base font-semibold">Подбираем маршрут…</ProgressLabel>
+                <ProgressLabel className="text-base font-semibold">Подбираем отель…</ProgressLabel>
               </Progress>
             )}
           </div>
@@ -309,7 +303,7 @@ export function DrawSearchDialog({ open, onOpenChange, routes, colorId, onColorI
               <source media="(min-width: 640px)" srcSet="/images/draw/result.webp" />
               <img
                 src="/images/draw/result-mobile.webp"
-                alt="Острова в океане и маршрут между ними"
+                alt="Острова в океане"
                 width={720}
                 height={405}
                 className="aspect-video w-full rounded-[clamp(18px,4vw,28px)] object-cover shadow-(--shadow-card)"
@@ -320,19 +314,12 @@ export function DrawSearchDialog({ open, onOpenChange, routes, colorId, onColorI
               <Feature icon={<BedDouble aria-hidden />} tone="bg-primary/10 text-primary">
                 Отели под настроение
               </Feature>
-              {route && (
-                <Feature icon={<Route aria-hidden />} tone="bg-(--decor-violet)/12 text-(--decor-violet)">
-                  Маршрут на {countRu(route.nights, ['ночь', 'ночи', 'ночей'])}
-                </Feature>
-              )}
-              {route && (
-                <Feature icon={<MapPin aria-hidden />} tone="bg-(--decor-badge-green)/12 text-(--decor-badge-green)">
-                  Места и рекомендации
-                </Feature>
-              )}
+              <Feature icon={<MessageSquareText aria-hidden />} tone="bg-(--decor-violet)/12 text-(--decor-violet)">
+                Фото и отзывы гостей
+              </Feature>
             </ul>
 
-            <VibeHotels ref={hotelsRef} hotels={vibe.hotels} stay={stay} />
+            <VibeHotels hotels={vibe.hotels} stay={stay} />
 
             <div className="sticky -bottom-[clamp(16px,4vw,32px)] z-10 -mx-[clamp(16px,4vw,32px)] grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] *:whitespace-normal gap-[clamp(10px,2.4vw,16px)] bg-background/95 px-[clamp(16px,4vw,32px)] py-3 backdrop-blur-sm">
               <Button
@@ -344,29 +331,18 @@ export function DrawSearchDialog({ open, onOpenChange, routes, colorId, onColorI
                 <RefreshCw aria-hidden />
                 Изменить рисунок
               </Button>
-              {route ? (
+              {vibe.hotels[0] && (
                 <Link
-                  href={`/routes/${route.id}`}
+                  href={hotelHref(vibe.hotels[0].id, stay)}
                   className={cn(
                     buttonVariants({ size: 'lg' }),
                     rainbowClass,
                     'h-[clamp(52px,12vw,64px)] gap-2 rounded-2xl px-3 text-[clamp(14px,3.8vw,19px)]',
                   )}
                 >
-                  Посмотреть путешествие
+                  Посмотреть отель
                   <ArrowRight aria-hidden />
                 </Link>
-              ) : (
-                <RainbowButton
-                  onClick={() => {
-                    hotelsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                    hotelsRef.current?.focus({ preventScroll: true })
-                  }}
-                  className="h-[clamp(52px,12vw,64px)] gap-2 rounded-2xl px-3 text-[clamp(14px,3.8vw,19px)]"
-                >
-                  Посмотреть путешествие
-                  <ArrowRight aria-hidden />
-                </RainbowButton>
               )}
             </div>
           </div>

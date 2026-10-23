@@ -2,7 +2,6 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { newHotels } from '../../lib/catalogGenerator'
-import { routeCards } from '../../test/catalog'
 import { DIALOG_KEY } from '../../lib/assistantDialog'
 import { AssistantSearch } from './AssistantSearch'
 
@@ -16,7 +15,7 @@ afterEach(() => {
 
 function renderAssistant() {
   vi.stubGlobal('fetch', fetchMock)
-  render(<AssistantSearch newHotels={newHotels} routes={routeCards()} onChoose={() => ({})} />)
+  render(<AssistantSearch newHotels={newHotels} onChoose={() => ({})} />)
   return userEvent.setup()
 }
 
@@ -118,25 +117,18 @@ describe('AssistantSearch with the model', () => {
   })
 })
 
-// assistant-search, Requirement: Готовый маршрут в плане; routes, Requirement: Лучший готовый маршрут
-describe('AssistantSearch ready-made route', () => {
-  const complete = { destinationId: 'lisbon', when: 9, party: 'solo' }
-  const readyLink = async () =>
-    within(await screen.findByRole('region', { name: 'Готовый маршрут' }, { timeout: 2000 })).getByRole('link')
-
-  it('shows the route the search by meaning found (a mock model)', async () => {
-    fetchMock.mockResolvedValue(Response.json({ brief: complete, source: 'model', routeId: 'tokyo-culture' }))
+// assistant-search, Requirement: План поездки — hotels only, no ready-made route.
+describe('AssistantSearch plan', () => {
+  it('shows the hotels of the plan and no route', async () => {
+    fetchMock.mockResolvedValue(
+      Response.json({ brief: { destinationId: 'lisbon', when: 9, party: 'solo' }, source: 'model' }),
+    )
     const user = renderAssistant()
     await user.type(screen.getByLabelText('Опишите поездку'), 'Лиссабон в октябре, один{Enter}')
-    expect((await readyLink()).getAttribute('href')).toBe('/routes/tokyo-culture')
-  })
-
-  it('without the search by meaning, picks the persona’s route in the plan’s city (Scenario: Поиск по смыслу недоступен)', async () => {
-    fetchMock.mockResolvedValue(Response.json({ brief: complete, source: 'rules' }))
-    const user = renderAssistant()
-    await user.type(screen.getByLabelText('Опишите поездку'), 'Поработать с ноутбуком в Лиссабоне{Enter}')
-    expect((await readyLink()).getAttribute('href')).toBe('/routes/lisbon-workation')
-    expect(log().textContent).not.toMatch(/ошибк/i)
+    expect(await screen.findByText('Атмосфера поездки', {}, { timeout: 2000 })).toBeTruthy()
+    expect(within(log()).getAllByRole('button', { name: /Лиссабон/ }).length).toBeGreaterThan(0)
+    expect(log().textContent).not.toMatch(/маршрут/i)
+    expect(within(log()).queryByRole('link')).toBeNull()
   })
 })
 
@@ -144,7 +136,7 @@ describe('AssistantSearch ready-made route', () => {
 describe('AssistantSearch after a reload', () => {
   const remount = (view: ReturnType<typeof render>) => {
     view.unmount()
-    return render(<AssistantSearch newHotels={newHotels} routes={routeCards()} onChoose={() => ({})} />)
+    return render(<AssistantSearch newHotels={newHotels} onChoose={() => ({})} />)
   }
 
   it('restores the dialog, the brief and the question (Scenario: Перезагрузка после «Записал»)', async () => {
@@ -152,7 +144,7 @@ describe('AssistantSearch after a reload', () => {
       .mockResolvedValueOnce(Response.json({ brief: { vibe: 'sea' }, source: 'model' }))
       .mockResolvedValueOnce(Response.json({ brief: { vibe: 'sea', when: 9 }, source: 'model' }))
     vi.stubGlobal('fetch', fetchMock)
-    const view = render(<AssistantSearch newHotels={newHotels} routes={routeCards()} onChoose={() => ({})} />)
+    const view = render(<AssistantSearch newHotels={newHotels} onChoose={() => ({})} />)
     const user = userEvent.setup()
     await user.type(screen.getByLabelText('Опишите поездку'), 'к морю{Enter}')
     await screen.findByText('Записал: море. Когда планируете поехать?', {}, { timeout: 2000 })
@@ -166,10 +158,40 @@ describe('AssistantSearch after a reload', () => {
     expect(JSON.parse(fetchMock.mock.calls[1][1]?.body as string).brief).toEqual({ vibe: 'sea' })
   })
 
+  it('drops the route of a dialog saved before the routes were gone (Scenario: Старый диалог с маршрутом)', async () => {
+    fetchMock.mockResolvedValue(
+      Response.json({ brief: { destinationId: 'lisbon', when: 9, party: 'solo' }, source: 'model' }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const view = render(<AssistantSearch newHotels={newHotels} onChoose={() => ({})} />)
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Опишите поездку'), 'Лиссабон в октябре, один{Enter}')
+    await screen.findByText('Атмосфера поездки', {}, { timeout: 2000 })
+    // The dialog as the version with routes saved it: the plan's message carried its ready-made route.
+    const saved = JSON.parse(window.sessionStorage.getItem(DIALOG_KEY)!)
+    const route = {
+      id: 'lisbon-workation',
+      title: 'Воркейшн в Лиссабоне',
+      persona: 'workation',
+      destinationId: 'lisbon',
+    }
+    const planned = saved.messages.filter((message: { plan?: unknown }) => message.plan)
+    expect(planned).toHaveLength(1)
+    for (const message of planned) message.route = route
+    window.sessionStorage.setItem(DIALOG_KEY, JSON.stringify(saved))
+
+    remount(view)
+
+    expect(await screen.findByText('Атмосфера поездки')).toBeTruthy()
+    expect(within(log()).getAllByRole('button', { name: /Лиссабон/ }).length).toBeGreaterThan(0)
+    expect(screen.queryByText('Воркейшн в Лиссабоне')).toBeNull()
+    expect(within(log()).queryByRole('link')).toBeNull()
+  })
+
   it('forgets the dialog on «Заново» (Scenario: Сброс стирает сохранённое)', async () => {
     fetchMock.mockResolvedValue(Response.json({ brief: { vibe: 'sea' }, source: 'model' }))
     vi.stubGlobal('fetch', fetchMock)
-    const view = render(<AssistantSearch newHotels={newHotels} routes={routeCards()} onChoose={() => ({})} />)
+    const view = render(<AssistantSearch newHotels={newHotels} onChoose={() => ({})} />)
     const user = userEvent.setup()
     await user.type(screen.getByLabelText('Опишите поездку'), 'к морю{Enter}')
     await screen.findByText(/Когда планируете поехать/, {}, { timeout: 2000 })

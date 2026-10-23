@@ -1,7 +1,7 @@
-// Embeds the catalog for the semantic search: every hotel (and every route, once the `routes` table exists)
-// gets a vector from nvidia/nemotron-3.5-embed-8b in the `embeddings` table.
+// Embeds the catalog for the semantic search: every hotel gets a vector from nvidia/nemotron-3.5-embed-8b in the `embeddings` table.
 //   npm run db:embed   (Node runs the TypeScript itself; the keys come from .env.local, see README «Ключи API»)
-// Only new and changed objects go to the model (`content_hash`); vectors of removed objects are deleted.
+// Only new and changed hotels go to the model (`content_hash`); vectors of removed objects (and of the routes the
+// site no longer has) are deleted.
 // Batches of BATCH texts; a 429 or a 5xx is retried with a growing pause. Needs NEXT_PUBLIC_SUPABASE_URL,
 // SUPABASE_SERVICE_ROLE_KEY and OPENROUTER_API_KEY; prints counts, never the keys. Exits with 1 on errors.
 import { createHash } from 'node:crypto'
@@ -23,12 +23,11 @@ registerHooks({
 })
 
 const { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, embeddingModel, toVector } = await import('../src/lib/ai/embedding.ts')
-const { hotelDocument, routeDocument } = await import('../src/lib/ai/documents.ts')
+const { hotelDocument } = await import('../src/lib/ai/documents.ts')
 const { vibeScale } = await import('../src/lib/vibe.ts')
 
 type Destination = import('../src/data/destinations.ts').Destination
 type Hotel = import('../src/lib/catalog.ts').Hotel
-type RouteText = import('../src/lib/ai/documents.ts').RouteText
 
 const BATCH = 32
 const PAGE = 1000
@@ -60,7 +59,7 @@ async function readAll<T>(table: string, columns: string, orderBy = ['id']): Pro
 }
 
 interface Document {
-  kind: 'hotel' | 'route'
+  kind: 'hotel'
   ref_id: string
   destination_id: string
   content: string
@@ -73,10 +72,6 @@ const hash = (content: string) =>
 const destinations = ((await readAll<{ data: Destination }>('destinations', 'data')) ?? []).map((row) => row.data)
 const cityOf = new Map(destinations.map((d) => [d.id, d]))
 const hotels = ((await readAll<{ data: Hotel }>('hotels', 'data')) ?? []).map((row) => row.data)
-const routes = await readAll<{ id: string; destination_id: string; data: RouteText }>(
-  'routes',
-  'id, destination_id, data',
-)
 
 const scale = vibeScale(hotels, destinations)
 const documents: Document[] = []
@@ -85,12 +80,6 @@ for (const hotel of hotels) {
   if (!city) continue
   const content = hotelDocument(hotel, city, scale)
   documents.push({ kind: 'hotel', ref_id: hotel.id, destination_id: city.id, content, content_hash: hash(content) })
-}
-for (const route of routes ?? []) {
-  const city = cityOf.get(route.destination_id)
-  if (!city) continue
-  const content = routeDocument(route.data, city)
-  documents.push({ kind: 'route', ref_id: route.id, destination_id: city.id, content, content_hash: hash(content) })
 }
 
 const stored = (await readAll<{ kind: string; ref_id: string; content_hash: string }>(
@@ -142,7 +131,7 @@ for (let i = 0; i < todo.length; i += BATCH) {
   }
 }
 
-// Vectors of hotels and routes that are gone from the catalog.
+// Vectors of hotels gone from the catalog, and of the routes.
 const current = new Set(documents.map(key))
 const stale = stored.filter((row) => !current.has(key(row)))
 for (const row of stale) {
@@ -150,10 +139,8 @@ for (const row of stale) {
   if (error) throw new Error(`embeddings: ${error.message}`)
 }
 
-const hotelCount = documents.filter((d) => d.kind === 'hotel').length
-const routeCount = routes ? `${documents.length - hotelCount} routes` : 'no routes table'
 console.log(
-  `embeddings: ${documents.length} objects (${hotelCount} hotels, ${routeCount}), ${embedded} embedded, ` +
+  `embeddings: ${documents.length} hotels, ${embedded} embedded, ` +
     `${documents.length - todo.length} unchanged, ${errors} errors, ${stale.length} deleted`,
 )
 if (errors) process.exit(1)

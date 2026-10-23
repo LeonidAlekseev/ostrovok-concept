@@ -9,7 +9,6 @@ import type { HotelSummary } from '@/lib/catalog'
 import {
   MAX_MESSAGE_LENGTH,
   askAssistant,
-  briefPersona,
   describeBrief,
   makePlan,
   nextQuestion,
@@ -20,9 +19,7 @@ import {
 } from '../../lib/assistant'
 import { formatDateRange, todayIso } from '../../lib/dates'
 import { countRu, formatPrice, guestsLabel } from '../../lib/format'
-import { bestRoute, type RouteCardData } from '../../lib/routes'
 import { useDestinations } from '../Catalog/useDestinations'
-import { ReadyRoute } from '../RouteCard/ReadyRoute'
 import { loadDialog, saveDialog, type DialogMessage } from '../../lib/assistantDialog'
 
 type Message = DialogMessage
@@ -30,8 +27,6 @@ type Message = DialogMessage
 interface Props {
   /** The "recently added" hotels the plan's options suggest. */
   newHotels: readonly HotelSummary[]
-  /** The routes the plan picks its ready-made one from. */
-  routes: readonly RouteCardData[]
   onChoose: HotelSearch['searchFor']
 }
 
@@ -57,7 +52,7 @@ const bubbleClass = [
   "before:absolute before:right-[calc(100%_-_1px)] before:bottom-[24%] before:h-[clamp(12px,3vw,22px)] before:w-[clamp(8px,2.2vw,16px)] before:bg-(--glass-plaque) before:[clip-path:polygon(100%_0,100%_100%,0_100%)] before:content-['']",
 ].join(' ')
 
-export function AssistantSearch({ newHotels, routes, onChoose }: Props) {
+export function AssistantSearch({ newHotels, onChoose }: Props) {
   const destinations = useDestinations()
   const [messages, setMessages] = useState<Message[]>([])
   const [brief, setBrief] = useState<Brief>({})
@@ -122,7 +117,7 @@ export function AssistantSearch({ newHotels, routes, onChoose }: Props) {
     )
     clearTimeout(timerRef.current)
     timerRef.current = setTimeout(async () => {
-      const { brief: next, reply: remark, matches, routeId } = await reply
+      const { brief: next, reply: remark, matches } = await reply
       if (pending.signal.aborted) return
       setBrief(next)
       const today = todayIso()
@@ -137,17 +132,7 @@ export function AssistantSearch({ newHotels, routes, onChoose }: Props) {
         return
       }
       const plan = makePlan(next, today, destinations, newHotels, matches)
-      // The search by meaning's route, or the rules over all the traveller's words and the plan's first city.
-      const words = history.flatMap((m) => (m.from === 'user' ? m.text : [])).join('. ')
-      const route = bestRoute(routes, {
-        semanticId: routeId,
-        persona: briefPersona(next, words, plan.nights),
-        destinationId: plan.options[0]?.destination.id,
-      })
-      setMessages((list) => [
-        ...list,
-        { from: 'agent', text: understood ? `Записал: ${understood}.` : '', plan, route },
-      ])
+      setMessages((list) => [...list, { from: 'agent', text: understood ? `Записал: ${understood}.` : '', plan }])
     }, THINK_MS)
   }
 
@@ -232,7 +217,7 @@ export function AssistantSearch({ newHotels, routes, onChoose }: Props) {
                 }
               >
                 {message.text && <p className={messageTextClass}>{message.text}</p>}
-                {message.plan && <PlanView plan={message.plan} route={message.route ?? null} onChoose={onChoose} />}
+                {message.plan && <PlanView plan={message.plan} onChoose={onChoose} />}
               </div>
             </li>
           ))}
@@ -360,17 +345,15 @@ export function AssistantSearch({ newHotels, routes, onChoose }: Props) {
 
 interface PlanProps {
   plan: Plan
-  route: RouteCardData | null
   onChoose: Props['onChoose']
 }
 
-function PlanView({ plan, route, onChoose }: PlanProps) {
+function PlanView({ plan, onChoose }: PlanProps) {
   const nights = countRu(plan.nights, ['ночь', 'ночи', 'ночей'])
   if (plan.options.length === 0)
     return (
       <div data-slot="plan" className="flex flex-col gap-2 not-first:mt-2.5">
         <p className={messageTextClass}>Не нашёл подходящих вариантов — попробуйте описать поездку иначе.</p>
-        <ReadyRoute route={route} />
       </div>
     )
   return (
@@ -390,7 +373,6 @@ function PlanView({ plan, route, onChoose }: PlanProps) {
       <p className="text-sm/[normal] text-muted-foreground">
         {formatDateRange(plan.query.checkIn, plan.query.checkOut)} · {nights} · {guestsLabel(plan.query.guests)}
       </p>
-      <ReadyRoute route={route} />
       <ul className="grid grid-cols-1 gap-1.5">
         {plan.options.map(({ destination, hotel, total, fitsBudget }) => (
           <li key={hotel?.id ?? destination.id}>

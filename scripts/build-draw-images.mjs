@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// The pictures of the draw search: the section's background, the drawing of its preview and the picture of the
-// ready route, from the owner's PNGs to WebP in public/images/draw. The PNGs stay out of the repository.
+// The pictures of the draw search: the section's background, the drawing of its preview and the picture of its
+// result, from the owner's PNGs to WebP in public/images/draw. The PNGs stay out of the repository.
 // Usage: node scripts/build-draw-images.mjs <dir with section-bg.png, canvas-drawing.png, result-image.png>
 import sharp from 'sharp'
 import { mkdirSync, statSync } from 'node:fs'

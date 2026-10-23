@@ -2,10 +2,11 @@ import { useEffect, useRef } from 'react'
 import { RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ASPECT_LABEL, ELEMENT_LABEL, lowerFirst, MODALITY_LABEL, type Reading } from '../../lib/horoscope'
-import { routeEstimate, routeNights, type RouteCardData } from '../../lib/routes'
+import type { Hotel } from '../../lib/catalog'
+import { hotelHref, type Stay } from '../../lib/search'
 import Link from 'next/link'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
-import { formatPrice } from '../../lib/format'
+import { formatDecimal, formatPrice } from '../../lib/format'
 import { useDestination } from '../Catalog/useDestinations'
 import { MagicOrb } from './MagicOrb'
 import type { StarPick } from './starVideo'
@@ -13,31 +14,26 @@ import { StarVideo } from './StarVideo'
 
 interface Props {
   reading: Reading
-  /** The stars' ready-made route, the whole answer; none without routes, then the stars' hotel stands in. */
-  route: RouteCardData | null
+  /** The dates of the reading, for the hotel's link. */
+  stay: Stay
   name: string
   onRestart: () => void
 }
 
 const symbolFont = "font-['Segoe_UI_Symbol','Apple_Symbols','Noto_Sans_Symbols',sans-serif]"
 
-export function StarResult({ reading, route, name, onRestart }: Props) {
+export function StarResult({ reading, stay, name, onRestart }: Props) {
   const headingRef = useRef<HTMLHeadingElement>(null)
   const { sign, moon, aspect, citySign } = reading
-  const destination = useDestination(route?.destinationId ?? '')
+  // The stars' hotel: of their city, or of the next one when theirs has none.
   const [hotel] = reading.hotels
-  // What the video and the message tell: the route, or without routes the stars' hotel.
-  const pick: StarPick = route
-    ? {
-        title: route.title,
-        place: destination ? `${destination.name}, ${destination.country}` : reading.city.name,
-        estimate: routeEstimate(route),
-      }
-    : {
-        title: hotel.name,
-        place: `${reading.city.name}, ${reading.city.country}`,
-        estimate: formatPrice(hotel.priceFrom),
-      }
+  const city = useDestination(hotel?.destinationId ?? '') ?? reading.city
+  // What the video and the message tell.
+  const pick: StarPick = {
+    title: hotel?.name ?? reading.city.name,
+    place: `${city.name}, ${city.country}`,
+    estimate: hotel ? `от ${formatPrice(hotel.priceFrom)} за ночь` : '',
+  }
   const facts = [
     ['Стихия', `${ELEMENT_LABEL[sign.element]}, ${MODALITY_LABEL[sign.modality]} знак, управитель — ${sign.ruler}`],
     ['Луна', `${moon.sign.name}, ${lowerFirst(moon.phase.name)}`],
@@ -80,7 +76,7 @@ export function StarResult({ reading, route, name, onRestart }: Props) {
         {reading.forecast}
       </p>
 
-      {route && <StarRoute route={route} place={pick.place} />}
+      {hotel && <StarHotel hotel={hotel} place={pick.place} href={hotelHref(hotel.id, stay)} />}
 
       <p className="text-sm text-(--decor-star-muted)">
         Гороскоп — для настроения, а не для планов. Цены и даты проверьте при бронировании.
@@ -101,31 +97,29 @@ export function StarResult({ reading, route, name, onRestart }: Props) {
   )
 }
 
-/** The stars' route: a card of the window's glass in a golden line, a link to the route's page. */
-function StarRoute({ route, place }: { route: RouteCardData; place: string }) {
+/** The stars' hotel: a card of the window's glass in a golden line, a link to the hotel's page. */
+function StarHotel({ hotel, place, href }: { hotel: Hotel; place: string; href: string }) {
   return (
-    <section aria-labelledby="star-route" className="flex flex-col gap-2.5">
-      {/* Not a heading: the result's heading is h3, the route's title is h4. */}
-      <p id="star-route" className="font-star text-lg font-semibold text-(--decor-gold)">
-        Звёзды выбрали маршрут
+    <section aria-labelledby="star-hotel" className="flex flex-col gap-2.5">
+      {/* Not a heading: the result's heading is h3, the hotel's name is h4. */}
+      <p id="star-hotel" className="font-star text-lg font-semibold text-(--decor-gold)">
+        Звёзды выбрали отель
       </p>
       <Link
-        href={`/routes/${route.id}`}
+        href={href}
         className="group flex flex-col overflow-hidden rounded-3xl border border-(--decor-gold)/45 bg-(--decor-star-glass) shadow-[0_16px_48px_color-mix(in_srgb,var(--decor-violet)_35%,transparent)] transition-[border-color,translate] duration-200 outline-none hover:-translate-y-0.5 hover:border-(--decor-gold) focus-visible:ring-3 focus-visible:ring-(--decor-gold)/70"
       >
-        <PhotoPlaceholder photo={route.cover} className="aspect-[16/9] w-full" />
+        <PhotoPlaceholder photo={hotel.photos[0]} className="aspect-[16/9] w-full" />
         <span className="flex flex-col gap-1.5 p-[clamp(14px,4vw,20px)]">
           <h4 className="font-star text-[clamp(19px,5vw,22px)]/[1.25] font-semibold text-(--decor-star-text) group-hover:text-(--decor-gold)">
-            {route.title}
+            {hotel.name}
           </h4>
+          <span className="text-sm text-(--decor-star-muted)">{place}</span>
           <span className="text-sm text-(--decor-star-muted)">
-            {place} · {routeNights(route.nights)}
-          </span>
-          <span className="text-sm text-(--decor-star-muted)">
-            Автор: <span className="font-medium text-(--decor-star-text)">{route.author}</span>
+            Оценка гостей: <span className="font-medium text-(--decor-star-text)">{formatDecimal(hotel.rating)}</span>
           </span>
           <span className="mt-1 bg-(image:--decor-gold-gradient) bg-clip-text text-lg font-bold text-transparent">
-            {routeEstimate(route)}
+            от {formatPrice(hotel.priceFrom)} за ночь
           </span>
         </span>
       </Link>

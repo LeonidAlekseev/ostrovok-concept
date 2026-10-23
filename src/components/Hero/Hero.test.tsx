@@ -3,37 +3,39 @@ import userEvent from '@testing-library/user-event'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { destinations } from '@/data/destinations'
-import { routeCards } from '@/test/catalog'
-import { createRouteFeed, pickOther } from './globeScene'
+import { newHotels } from '@/lib/catalogGenerator'
+import { createHotelFeed, pickOther } from './globeScene'
 import { cardShift, type CardFit } from './cardFit'
 import { Hero } from './Hero'
 
-const routes = routeCards()
-const cities = destinations.filter((d) => routes.some((route) => route.destinationId === d.id))
+const hotels = newHotels
+const cities = destinations.filter((d) => hotels.some((hotel) => hotel.destinationId === d.id))
 const prague = destinations.find((d) => d.id === 'prague')!
+const [firstOfPrague] = hotels.filter((h) => h.destinationId === 'prague')
 
-// hero-globe, Requirement: Пины маршрутов; Карточка маршрута на глобусе
+// hero-globe, Requirement: Пины городов с отелями; Карточка отеля на глобусе
 describe('Hero in the server render', () => {
   const page = document.createElement('div')
-  page.innerHTML = renderToStaticMarkup(<Hero cities={cities} routes={routes} featured={prague} />)
+  page.innerHTML = renderToStaticMarkup(<Hero cities={cities} hotels={hotels} featured={prague} />)
 
   // home-page, Requirement: Состав и порядок секций — Слоган
   it('titles the hero with the slogan', () => {
     expect(page.querySelector('h1')!.textContent).toBe('Путешествуй легко')
   })
 
-  it('has a pin a city with routes', () => {
-    const pins = [...page.querySelectorAll('button[aria-label$="— идеи путешествий"]')].map((pin) => pin.ariaLabel)
+  it('has a pin a city with new hotels', () => {
+    const pins = [...page.querySelectorAll('button[aria-label$="— отели"]')].map((pin) => pin.ariaLabel)
     expect(pins).toHaveLength(cities.length)
-    expect(pins).toContain('Лиссабон, Португалия — идеи путешествий')
+    expect(pins).toContain('Лиссабон, Португалия — отели')
   })
 
-  it('shows the featured city’s route card linking to its page, with the arcs', () => {
-    const link = page.querySelector('a[href="/routes/prague-culture"]')!
-    expect(link.textContent).toContain('Культурный отпуск в Праге')
-    expect(link.textContent).toContain('≈')
-    expect(page.textContent).toContain('Маршрут · Прага')
-    expect(page.querySelectorAll('svg g').length).toBeGreaterThan(0)
+  it('shows the featured city’s new hotel card linking to its page, without arcs', () => {
+    const link = page.querySelector(`a[href="/hotels/${firstOfPrague.id}?adults=2&rooms=1"]`)!
+    expect(link.textContent).toContain(firstOfPrague.name)
+    expect(link.textContent).toMatch(/Прага · от [\d\s]+₽ за ночь/)
+    expect(page.textContent).toContain('Новый отель · Прага')
+    expect(page.querySelector('path[d^="M "]')).toBeNull()
+    expect(page.querySelector('a[href^="/routes/"]')).toBeNull()
   })
 
   // hero-globe, Requirement: Случайная идея
@@ -49,16 +51,16 @@ describe('Hero in the server render', () => {
     expect(page.querySelector('.animate-cloud-drift')).toBeNull()
   })
 
-  // hero-globe, Requirement: Карточка маршрута на глобусе — Длинное название
-  it('keeps the route card to its old maximum width and cuts a long title with an ellipsis', () => {
-    const link = page.querySelector('a[href="/routes/prague-culture"]')!
+  // hero-globe, Requirement: Ширина карточки отеля — Длинное название
+  it('keeps the hotel card to its old maximum width and cuts a long name with an ellipsis', () => {
+    const link = page.querySelector('a[href^="/hotels/"]')!
     const card = link.closest('[class*="max-w-"]')!
     expect(card.classList).toContain('max-w-[min(26rem,calc(100vw-2*var(--page-x)))]')
     expect(card.classList).toContain('md:max-w-[min(26rem,calc(50vw-40px))]')
     expect(link.querySelector('span')!.classList).toContain('truncate')
   })
 
-  // hero-globe, Requirement: Карточка маршрута на глобусе — Телефон
+  // hero-globe, Requirement: Ширина карточки отеля — Телефон
   it('keeps the card inside the assistant window on a phone, whatever the pin', () => {
     // Window 22–338 px, card 267 px wide, globe 600 px wide from -120 px.
     const fit: CardFit = { globeLeft: -120, globeWidth: 600, winLeft: 22, winRight: 338, cardWidth: 267, phone: true }
@@ -77,21 +79,18 @@ describe('Hero in the server render', () => {
     expect(button).toBeDefined()
   })
 
-  it('shows no card without routes', () => {
-    const empty = renderToStaticMarkup(<Hero cities={[]} routes={[]} featured={prague} />)
-    expect(empty).not.toContain('href="/routes/')
+  it('shows no card without new hotels', () => {
+    const empty = renderToStaticMarkup(<Hero cities={[]} hotels={[]} featured={prague} />)
+    expect(empty).not.toContain('href="/hotels/')
   })
 })
 
-describe('createRouteFeed', () => {
-  it('cycles the city’s routes and lists them all', () => {
-    const feed = createRouteFeed(routes)
-    expect(feed.all('lisbon').map((route) => route.id)).toEqual(['lisbon-student', 'lisbon-workation'])
-    expect([feed.next('lisbon')?.id, feed.next('lisbon')?.id, feed.next('lisbon')?.id]).toEqual([
-      'lisbon-student',
-      'lisbon-workation',
-      'lisbon-student',
-    ])
+describe('createHotelFeed', () => {
+  it('cycles the city’s hotels and lists them all', () => {
+    const feed = createHotelFeed(hotels)
+    const lisbon = hotels.filter((h) => h.destinationId === 'lisbon').map((h) => h.id)
+    expect(feed.all('lisbon').map((hotel) => hotel.id)).toEqual(lisbon)
+    expect(Array.from({ length: lisbon.length + 1 }, () => feed.next('lisbon')?.id)).toEqual([...lisbon, lisbon[0]])
     expect(feed.has('paris')).toBe(false)
   })
 })
@@ -111,7 +110,7 @@ describe('pickOther', () => {
   })
 })
 
-// hero-globe, Requirement: Пины маршрутов; Случайная идея; Раскрутка без помех
+// hero-globe, Requirement: Пины городов с отелями; Случайная идея; Раскрутка без помех
 describe('Hero in the browser', () => {
   let frames: FrameRequestCallback[] = []
   let clock = 0
@@ -152,21 +151,22 @@ describe('Hero in the browser', () => {
 
   const setup = () => {
     const user = userEvent.setup()
-    render(<Hero cities={cities} routes={routes} featured={prague} />)
+    render(<Hero cities={cities} hotels={hotels} featured={prague} />)
     return user
   }
-  const cardLinks = () => document.querySelectorAll<HTMLAnchorElement>('a[href^="/routes/"]')
+  const cardLinks = () => document.querySelectorAll<HTMLAnchorElement>('a[href^="/hotels/"]')
   const pressedPin = () => document.querySelector('button[aria-pressed="true"]')
 
-  it('opens one idea of a city with one route', async () => {
+  it('opens one new hotel of the city', async () => {
     const user = setup()
-    await user.click(screen.getByRole('button', { name: 'Прага, Чехия — идеи путешествий' }))
-    expect([...cardLinks()].map((a) => a.getAttribute('href'))).toEqual(['/routes/prague-culture'])
+    await user.click(screen.getByRole('button', { name: 'Прага, Чехия — отели' }))
+    expect(cardLinks()).toHaveLength(1)
+    expect(cardLinks()[0].getAttribute('href')).toMatch(/^\/hotels\/prague-[a-z0-9-]+\?adults=2&rooms=1$/)
   })
 
-  it('shows another idea when the pin of a city with two routes opens again', async () => {
+  it('shows another hotel when the pin of a city with three new hotels opens again', async () => {
     const user = setup()
-    const lisbon = screen.getByRole('button', { name: 'Лиссабон, Португалия — идеи путешествий' })
+    const lisbon = screen.getByRole('button', { name: 'Лиссабон, Португалия — отели' })
     await user.click(lisbon)
     expect(cardLinks()).toHaveLength(1)
     const first = cardLinks()[0].getAttribute('href')
@@ -174,10 +174,10 @@ describe('Hero in the browser', () => {
     await user.click(lisbon)
     expect(cardLinks()).toHaveLength(1)
     expect(cardLinks()[0].getAttribute('href')).not.toBe(first)
-    expect(cardLinks()[0].getAttribute('href')).toMatch(/^\/routes\/lisbon-/)
+    expect(cardLinks()[0].getAttribute('href')).toMatch(/^\/hotels\/lisbon-/)
   })
 
-  it('spins the globe to a random city for about two seconds, ignoring clicks meanwhile, then opens its idea', async () => {
+  it('spins the globe to a random city for about two seconds, ignoring clicks meanwhile, then opens its hotel', async () => {
     const user = setup()
     await user.click(screen.getByRole('button', { name: 'Рандом' }))
     const random = vi.spyOn(Math, 'random')
@@ -188,18 +188,18 @@ describe('Hero in the browser', () => {
     expect(pressedPin()).toBeNull()
     runFrames(2100)
     const pin = pressedPin()!
-    expect(pin.ariaLabel).toMatch(/— идеи путешествий$/)
+    expect(pin.ariaLabel).toMatch(/— отели$/)
     expect(cardLinks()).toHaveLength(1)
     expect(document.activeElement).toBe(cardLinks()[0])
-    expect(screen.getByRole('status').textContent).toMatch(/^Случайная идея: .+, /)
+    expect(screen.getByRole('status').textContent).toMatch(/^Случайный отель: .+, /)
     expect(screen.getByRole('status').textContent).toContain(pin.ariaLabel!.split(',')[0])
   })
 
-  it('opens a random idea at once with reduced motion', async () => {
+  it('opens a random hotel at once with reduced motion', async () => {
     reducedMotion = true
     const user = setup()
     await user.click(screen.getByRole('button', { name: 'Рандом' }))
     expect(pressedPin()).not.toBeNull()
-    expect(screen.getByRole('status').textContent).toMatch(/^Случайная идея: /)
+    expect(screen.getByRole('status').textContent).toMatch(/^Случайный отель: /)
   })
 })

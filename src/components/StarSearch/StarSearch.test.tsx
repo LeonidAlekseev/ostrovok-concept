@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { addDays, formatLongDate, todayIso } from '../../lib/dates'
-import { routeCards } from '../../test/catalog'
 import { StarSearch } from './StarSearch'
 import { StarSearchDialog } from './StarSearchDialog'
 import { ZodiacRing } from './ZodiacRing'
@@ -44,14 +43,14 @@ async function fillForm(user: ReturnType<typeof userEvent.setup>) {
 }
 
 function renderDialog() {
-  return render(<StarSearchDialog open onOpenChange={() => {}} routes={routeCards()} />)
+  return render(<StarSearchDialog open onOpenChange={() => {}} />)
 }
 
 // star-search, Requirement: Блок на главной
 describe('StarSearch section', () => {
   it('opens the window with the focus in the first field', async () => {
     const user = userEvent.setup()
-    render(<StarSearch routes={routeCards()} />)
+    render(<StarSearch />)
     expect(screen.getByRole('heading', { name: 'Поиск по звёздам' })).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: 'Найти по звёздам' }))
@@ -62,7 +61,7 @@ describe('StarSearch section', () => {
   // star-search, Scenario: Меньше движения. The turn is gated by `motion-safe:`, so the circle stands still
   // under `prefers-reduced-motion: reduce`; jsdom evaluates no media queries, hence the class is checked.
   it('turns the zodiac circle only where motion is allowed', () => {
-    const { container } = render(<StarSearch routes={routeCards()} />)
+    const { container } = render(<StarSearch />)
     const ring = container.querySelector('#stars svg')!
     expect(ring.getAttribute('aria-hidden')).toBe('true')
     const turning = [...ring.querySelectorAll('g')].filter((g) =>
@@ -75,7 +74,7 @@ describe('StarSearch section', () => {
   // star-search, Requirement: Знаки вращаются с кольцом. The signs sit inside the turning group and carry no
   // counter-rotation animation; their placement is a fixed, deterministic rotate().
   it('turns the signs with the circle, with deterministic coordinates', () => {
-    const { container } = render(<StarSearch routes={routeCards()} />)
+    const { container } = render(<StarSearch />)
     const turning = container.querySelector('#stars svg g[class*="animate-zodiac-spin"]')!
     const texts = [...turning.querySelectorAll('text')]
     expect(texts).toHaveLength(12)
@@ -167,7 +166,7 @@ describe('StarSearch reading', () => {
     expect(await screen.findByRole('heading', { name: /Анна, ваш знак — Овен/ }, { timeout: 4000 })).toBeTruthy()
   })
 
-  it('skips the animation under reduced motion and answers with one route', async () => {
+  it('skips the animation under reduced motion and answers with one hotel', async () => {
     reduceMotion()
     const user = userEvent.setup()
     renderDialog()
@@ -179,12 +178,16 @@ describe('StarSearch reading', () => {
     expect(screen.getAllByRole('status').some((s) => /^Звёзды выбрали: /.test(s.textContent!))).toBe(true)
     expect(screen.getByText(/Гороскоп — для настроения, а не для планов/)).toBeTruthy()
 
-    // star-search, Requirement: Маршрут в итоге: one route, a fire sign alone goes for the culture by the rules.
-    const route = screen.getByRole('region', { name: 'Звёзды выбрали маршрут' })
+    // star-search, Requirement: Итог гадания — один отель: the hotel's page with the dates of the reading.
+    const hotel = screen.getByRole('region', { name: 'Звёзды выбрали отель' })
     const links = screen.getAllByRole('link')
     expect(links).toHaveLength(1)
-    expect(within(route).getByRole('link').getAttribute('href')).toMatch(/^\/routes\/[a-z-]+-culture$/)
+    expect(within(hotel).getByRole('link').getAttribute('href')).toMatch(
+      /^\/hotels\/[a-z-]+\?checkin=\d{4}-\d{2}-\d{2}&/,
+    )
+    expect(within(hotel).getByText(/^от .+ ₽ за ночь$/)).toBeTruthy()
     expect(screen.queryByText('Запасные варианты')).toBeNull()
+    expect(screen.queryByText(/маршрут/i)).toBeNull()
   })
 
   // star-search, Requirement: Куда едем
@@ -223,9 +226,10 @@ describe('StarSearch reading', () => {
     await user.click(screen.getByRole('button', { name: 'Гадать' }))
     const status = screen.getAllByRole('status').find((s) => /^Звёзды выбрали: /.test(s.textContent!))!
     expect(status.textContent).toMatch(/, Рим$/)
-    // The route of the stars' city comes first.
-    const route = within(screen.getByRole('region', { name: 'Звёзды выбрали маршрут' })).getByRole('link')
-    expect(route.textContent).toContain('Рим, Италия')
+    // star-search, Requirement: Гадание среди выбранных городов: the hotel of Rome.
+    const hotel = within(screen.getByRole('region', { name: 'Звёзды выбрали отель' })).getByRole('link')
+    expect(hotel.textContent).toContain('Рим, Италия')
+    expect(hotel.getAttribute('href')).toMatch(/^\/hotels\/rome-/)
   })
 
   it('is the same for the same answers', async () => {
