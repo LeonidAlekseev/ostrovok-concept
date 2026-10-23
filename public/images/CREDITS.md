@@ -3,7 +3,8 @@
 Photos were downloaded from Wikimedia Commons and processed by `scripts/build-images.py`
 (crop, resize, WebP). The globe geometry `public/data/globe.json` is built by
 `scripts/build-globe.py` from [Natural Earth](https://www.naturalearthdata.com/) 1:50m land and
-coastlines (public domain).
+coastlines (public domain). The cloud photos in `hero/clouds/` were provided by the project owner and cut out by
+`scripts/build-clouds.py`.
 
 | File                       | Source                                                                                                                                                                                                                                                                     | Author           | License      |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ------------ |

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { ChevronRight, Dice5, Route as RouteIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
@@ -21,6 +22,7 @@ import {
   type Scene,
   type Spotlight,
 } from './globeScene'
+import { CLOUD_IMAGES } from './cloudImages'
 import { GlobeClouds } from './GlobeClouds'
 import { StatsPanel, type StatsPanelHandle } from './StatsPanel'
 
@@ -90,9 +92,14 @@ const earthShade = [
 const atmosphere =
   'absolute inset-0 rounded-full shadow-[0_0_0_1.5px_color-mix(in_srgb,var(--decor-light)_70%,transparent),0_0_26px_8px_color-mix(in_srgb,var(--decor-atmosphere)_85%,transparent),0_0_90px_28px_color-mix(in_srgb,var(--decor-atmosphere)_55%,transparent)]'
 const randomButton = [
-  // A small cloud: the shape is drawn behind a transparent button, so the focus ring still follows the button.
-  'pointer-events-auto relative isolate h-9 px-4 text-sm font-bold text-brand-foreground hover:scale-105 hover:bg-transparent md:h-10 md:text-base',
-  'max-md:ml-auto max-md:mr-1',
+  // On a small photo cloud behind a transparent button, so the focus ring still follows the button.
+  'pointer-events-auto relative z-4 h-9 px-4 text-sm font-bold text-foreground hover:scale-105 hover:bg-transparent hover:text-foreground md:h-10 md:text-base',
+].join(' ')
+const randomPlace = [
+  // The search form rises over the hero by clamp(120px,31vw,150px), 6rem and 5.25rem (see HomePage).
+  // No z-index of its own: the clouds in it stay under the faded bottom of the hero, the button rises above it.
+  'pointer-events-none absolute bottom-[calc(clamp(120px,31vw,150px)+28px)] md:bottom-[calc(6rem+36px)] lg:bottom-[calc(5.25rem+36px)]',
+  'left-[calc(var(--page-x)+20px)] md:left-[calc(max(0px,(100%-var(--page-max))/2)+var(--page-x)+28px)]',
 ].join(' ')
 const sun = [
   // The glare sits exactly on the limb, at this angle from the globe's centre (clockwise from 3 o'clock).
@@ -489,8 +496,7 @@ export function Hero({ cities: markers, routes, featured }: Props) {
         </h1>
       </div>
 
-      {/* The button sits beside the hint on phones, under it on wide screens: either way clear of the open pin. */}
-      <div className="pointer-events-none relative z-4 mt-[clamp(32px,9vw,64px)] flex flex-wrap items-start gap-x-3 gap-y-4 pr-(--page-x) pl-[calc(var(--page-x)+4px)] md:flex-col md:gap-[clamp(20px,6vw,36px)] md:pl-[calc(max(0px,(100%-var(--page-max))/2)+var(--page-x)+8px)]">
+      <div className="pointer-events-none relative z-4 mt-[clamp(32px,9vw,64px)] pr-(--page-x) pl-[calc(var(--page-x)+4px)] md:pl-[calc(max(0px,(100%-var(--page-max))/2)+var(--page-x)+8px)]">
         <p
           ref={hintRef}
           className="w-[7em] origin-top-left -rotate-10 font-hand text-[clamp(17px,4.6vw,27px)]/[1.05] font-semibold text-primary"
@@ -498,11 +504,6 @@ export function Hero({ cities: markers, routes, featured }: Props) {
         >
           Вращай глобус — воплощай мечту
         </p>
-        <Button ref={randomRef} variant="ghost" shape="pill" className={randomButton} onClick={showRandomIdea}>
-          <CloudShape />
-          <Dice5 className="size-[1.3em]" strokeWidth={2.25} aria-hidden />
-          Рандом
-        </Button>
       </div>
       <p role="status" className="sr-only">
         {announcement}
@@ -629,6 +630,30 @@ export function Hero({ cities: markers, routes, featured }: Props) {
         )}
       </div>
 
+      {/* Phones and wide screens alike: on a cloud at the left, just above the search form that overlaps the hero. */}
+      <div className={randomPlace}>
+        {/* Both clouds stay under the faded bottom of the hero, as light as the clouds by the globe; only the
+            button rises above it. */}
+        <Image
+          {...CLOUD_IMAGES.big}
+          alt=""
+          sizes="(max-width: 767px) 300px, 420px"
+          className="absolute top-1/2 left-1/2 w-[clamp(280px,78vw,420px)] max-w-none -translate-x-[42%] -translate-y-[30%] md:-translate-y-[46%] select-none"
+          draggable={false}
+        />
+        <Image
+          {...CLOUD_IMAGES.flat}
+          alt=""
+          sizes="200px"
+          className="absolute -top-5 -left-7 h-[calc(100%+2.5rem)] w-[calc(100%+3.5rem)] max-w-none object-fill select-none"
+          draggable={false}
+        />
+        <Button ref={randomRef} variant="ghost" shape="pill" className={randomButton} onClick={showRandomIdea}>
+          <Dice5 className="size-[1.3em]" strokeWidth={2.25} aria-hidden />
+          Рандом
+        </Button>
+      </div>
+
       {!isProduction && <StatsPanel ref={statsRef} />}
     </section>
   )
@@ -687,33 +712,6 @@ function describeStats(frames: FrameWindow, renderer: GlobeRenderer) {
     `dpr ${window.devicePixelRatio} · ${nav.hardwareConcurrency} cores · ${nav.deviceMemory ?? '?'} GB`,
     `env ${appEnv}`,
   ].join('\n')
-}
-
-/** The cloud the «Рандом» button sits on, stretched to the button with some room around the label. */
-function CloudShape() {
-  const fill = useId()
-  return (
-    <span
-      className="absolute -inset-x-3 -inset-y-2.5 -z-1 drop-shadow-[0_6px_10px_color-mix(in_srgb,var(--decor-hotel-shadow)_28%,transparent)]"
-      aria-hidden
-    >
-      <svg className="size-full overflow-visible" viewBox="0 0 160 60" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id={fill} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" style={{ stopColor: 'var(--decor-glow-soft)' }} />
-            <stop offset="1" style={{ stopColor: 'var(--brand)' }} />
-          </linearGradient>
-        </defs>
-        <path
-          d="M24 57C10 57 3 47 8 38 2 29 11 17 23 21 27 9 43 4 53 12 61 2 81 0 91 10 101 3 119 6 121 18 135 14 152 22 149 35 159 41 155 57 140 57Z"
-          fill={`url(#${fill})`}
-          style={{ stroke: 'var(--decor-light)' }}
-          strokeWidth="2"
-          vectorEffect="non-scaling-stroke"
-        />
-      </svg>
-    </span>
-  )
 }
 
 function PinIcon() {

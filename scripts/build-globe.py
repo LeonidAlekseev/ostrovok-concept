@@ -4,12 +4,14 @@ Usage:
     uv run --with pillow --with numpy python scripts/build-globe.py <sources-dir>
 
 Expected files in <sources-dir> (public domain, https://github.com/nvkelso/natural-earth-vector/tree/master/geojson):
-    ne_50m_land.geojson       land polygons, filled with dots
+    ne_50m_land.geojson       land polygons, filled green and with dots
     ne_50m_coastline.geojson  coastlines, drawn as outlines
 
 Output, all coordinates in tenths of a degree:
     dots   flat [lon, lat, lon, lat, …] of land dots on an even grid
     lines  polylines [[lon, lat, lon, lat, …], …] of the coastlines
+    land   rings [[lon, lat, lon, lat, …], …] of the land polygons, open (the last point is not repeated),
+           outer rings counter-clockwise and holes clockwise with north up, so the land is always on the left
 """
 
 import json
@@ -59,18 +61,24 @@ def land_dots(mask: np.ndarray) -> list[int]:
     return dots
 
 
+def thin(part: list[list[float]]) -> list[list[float]]:
+    """Drops vertices closer than LINE_STEP to the previous kept one, keeping both ends."""
+    kept = [part[0]]
+    for lon, lat in part[1:]:
+        if np.hypot((lon - kept[-1][0]) * np.cos(np.radians(lat)), lat - kept[-1][1]) >= LINE_STEP:
+            kept.append([lon, lat])
+    if part[-1] != kept[-1]:
+        kept.append(part[-1])
+    return kept
+
+
 def coastlines(path: Path) -> list[list[int]]:
     lines = []
     for feature in json.loads(path.read_text())["features"]:
         geometry = feature["geometry"]
         parts = geometry["coordinates"] if geometry["type"] == "MultiLineString" else [geometry["coordinates"]]
         for part in parts:
-            kept = [part[0]]
-            for lon, lat in part[1:]:
-                if np.hypot((lon - kept[-1][0]) * np.cos(np.radians(lat)), lat - kept[-1][1]) >= LINE_STEP:
-                    kept.append([lon, lat])
-            if part[-1] != kept[-1]:
-                kept.append(part[-1])
+            kept = thin(part)
             # Drop islands too small to read.
             if len(kept) < 4:
                 continue
@@ -78,13 +86,37 @@ def coastlines(path: Path) -> list[list[int]]:
     return lines
 
 
+def land_rings(path: Path) -> list[list[int]]:
+    rings = []
+    for feature in json.loads(path.read_text())["features"]:
+        geometry = feature["geometry"]
+        polygons = geometry["coordinates"] if geometry["type"] == "MultiPolygon" else [geometry["coordinates"]]
+        for polygon in polygons:
+            for hole, ring in enumerate(polygon):
+                kept = thin(ring)[:-1]
+                # The same islands as the coastlines are left out.
+                if len(kept) < 3:
+                    continue
+                lon, lat = np.array(kept).T
+                counter_clockwise = np.sum(lon * np.roll(lat, -1) - np.roll(lon, -1) * lat) > 0
+                if counter_clockwise == bool(hole):
+                    kept.reverse()
+                rings.append([round(v * 10) for point in kept for v in point])
+    return rings
+
+
 def main(src: Path) -> None:
     dots = land_dots(land_mask(src / "ne_50m_land.geojson"))
     lines = coastlines(src / "ne_50m_coastline.geojson")
+    land = land_rings(src / "ne_50m_land.geojson")
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps({"dots": dots, "lines": lines}, separators=(",", ":")))
+    OUT.write_text(json.dumps({"dots": dots, "lines": lines, "land": land}, separators=(",", ":")))
     vertices = sum(len(line) for line in lines) // 2
-    print(f"{OUT.name}: {len(dots) // 2} dots, {len(lines)} lines / {vertices} vertices, {OUT.stat().st_size // 1024} KB")
+    land_vertices = sum(len(ring) for ring in land) // 2
+    print(
+        f"{OUT.name}: {len(dots) // 2} dots, {len(lines)} lines / {vertices} vertices,"
+        f" {len(land)} land rings / {land_vertices} vertices, {OUT.stat().st_size // 1024} KB"
+    )
 
 
 if __name__ == "__main__":
