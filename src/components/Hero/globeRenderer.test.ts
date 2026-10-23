@@ -67,6 +67,12 @@ describe('landPath', () => {
     { lat: 70, lon: 100 },
     { lat: -70, lon: 0 },
     { lat: 45, lon: -100 },
+    // Each of these cut a degenerate or self-crossing ring of the old geometry at the horizon: closed along the
+    // whole limb, it filled the ocean with land for a frame, the green flash at the edge of the spinning globe.
+    { lat: 45, lon: 59.76 },
+    { lat: 45, lon: -121.54 },
+    { lat: 25, lon: -2.4 },
+    { lat: -20, lon: -161.87 },
   ])('fills exactly the visible land in view %o', (view) => {
     const project: Project = (p, i, out) => {
       const g = projectToGlobe(
@@ -96,5 +102,58 @@ describe('landPath', () => {
       }
     // Straight chords on screen differ from the coast between its vertices only along the very coastline.
     expect(wrong / samples).toBeLessThan(0.01)
+  })
+})
+
+/** Sign of the turn from (ax, ay)→(bx, by) to (cx, cy). */
+const turn = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number) =>
+  Math.sign((bx - ax) * (cy - ay) - (by - ay) * (cx - ax))
+
+/** Whether the segments a–b and c–d cross at a point inside both. */
+const cross = (a: number[], b: number[], c: number[], d: number[]) =>
+  turn(a[0], a[1], b[0], b[1], c[0], c[1]) * turn(a[0], a[1], b[0], b[1], d[0], d[1]) < 0 &&
+  turn(c[0], c[1], d[0], d[1], a[0], a[1]) * turn(c[0], c[1], d[0], d[1], b[0], b[1]) < 0
+
+// hero-globe, Requirement: Цвета Земли
+describe('land geometry', () => {
+  const { land: rings }: { land: number[][] } = JSON.parse(readFileSync('public/data/globe.json', 'utf8'))
+  const edges = rings.map((ring) =>
+    Array.from({ length: ring.length / 2 }, (_, k) => {
+      const next = (2 * k + 2) % ring.length
+      return [
+        [ring[2 * k], ring[2 * k + 1]],
+        [ring[next], ring[next + 1]],
+      ]
+    }),
+  )
+
+  // landPath() closes a cut ring along the limb on the side the land lies: a ring with no area or crossing
+  // itself or another one has no such side, and the fill went round the whole disc.
+  it('has rings with area that cross neither themselves nor each other', () => {
+    for (const ring of rings) {
+      let area = 0
+      for (let i = 0; i < ring.length; i += 2) {
+        const j = (i + 2) % ring.length
+        area += ring[i] * ring[j + 1] - ring[j] * ring[i + 1]
+      }
+      expect(area).not.toBe(0)
+    }
+    const boxes = rings.map((ring) => {
+      const lons = ring.filter((_, i) => i % 2 === 0)
+      const lats = ring.filter((_, i) => i % 2 === 1)
+      return [Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)]
+    })
+    const crossings: string[] = []
+    for (let a = 0; a < rings.length; a++)
+      for (let b = a; b < rings.length; b++) {
+        const [p, q] = [boxes[a], boxes[b]]
+        if (p[0] > q[2] || q[0] > p[2] || p[1] > q[3] || q[1] > p[3]) continue
+        edges[a].forEach(([e1, e2], i) =>
+          edges[b].forEach(([f1, f2], j) => {
+            if ((a !== b || j > i) && cross(e1, e2, f1, f2)) crossings.push(`ring ${a} edge ${i} × ring ${b} edge ${j}`)
+          }),
+        )
+      }
+    expect(crossings).toEqual([])
   })
 })

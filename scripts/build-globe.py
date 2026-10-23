@@ -1,7 +1,7 @@
 """Builds public/data/globe.json, the geometry of the dotted hero globe, from Natural Earth.
 
 Usage:
-    uv run --with pillow --with numpy python scripts/build-globe.py <sources-dir>
+    uv run --with pillow --with numpy --with shapely python scripts/build-globe.py <sources-dir>
 
 Expected files in <sources-dir> (public domain, https://github.com/nvkelso/natural-earth-vector/tree/master/geojson):
     ne_50m_land.geojson       land polygons, filled green and with dots
@@ -11,7 +11,8 @@ Output, all coordinates in tenths of a degree:
     dots   flat [lon, lat, lon, lat, …] of land dots on an even grid
     lines  polylines [[lon, lat, lon, lat, …], …] of the coastlines
     land   rings [[lon, lat, lon, lat, …], …] of the land polygons, open (the last point is not repeated),
-           outer rings counter-clockwise and holes clockwise with north up, so the land is always on the left
+           outer rings counter-clockwise and holes clockwise with north up, so the land is always on the left;
+           the rings are simple and do not cross each other, as the renderer's clip against the horizon requires
 """
 
 import json
@@ -19,7 +20,10 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import shapely
 from PIL import Image, ImageDraw
+from shapely.geometry import Polygon
+from shapely.geometry.polygon import orient
 
 # Distance between neighbouring dots, degrees of arc.
 DOT_STEP = 1.25
@@ -87,21 +91,26 @@ def coastlines(path: Path) -> list[list[int]]:
 
 
 def land_rings(path: Path) -> list[list[int]]:
-    rings = []
+    polygons = []
     for feature in json.loads(path.read_text())["features"]:
         geometry = feature["geometry"]
-        polygons = geometry["coordinates"] if geometry["type"] == "MultiPolygon" else [geometry["coordinates"]]
-        for polygon in polygons:
-            for hole, ring in enumerate(polygon):
-                kept = thin(ring)[:-1]
-                # The same islands as the coastlines are left out.
-                if len(kept) < 3:
-                    continue
-                lon, lat = np.array(kept).T
-                counter_clockwise = np.sum(lon * np.roll(lat, -1) - np.roll(lon, -1) * lat) > 0
-                if counter_clockwise == bool(hole):
-                    kept.reverse()
-                rings.append([round(v * 10) for point in kept for v in point])
+        parts = geometry["coordinates"] if geometry["type"] == "MultiPolygon" else [geometry["coordinates"]]
+        for part in parts:
+            rings = [[[round(v * 10) for v in point] for point in thin(ring)[:-1]] for ring in part]
+            # The same islands as the coastlines are left out.
+            if len(rings[0]) < 3:
+                continue
+            polygon = Polygon(rings[0], [ring for ring in rings[1:] if len(ring) >= 3])
+            polygons.append(shapely.make_valid(polygon, method="structure", keep_collapsed=False))
+    # Thinning and rounding to tenths of a degree flatten some islets into lines, turn others inside out and let
+    # some coasts cross themselves; on the globe each such ring was closed along the whole limb, filling the ocean
+    # with land for a frame. Merging the polygons on the 0.1° grid makes them valid, disjoint and non-degenerate.
+    land = shapely.union_all(polygons, grid_size=1)
+    rings = []
+    for polygon in getattr(land, "geoms", [land]):
+        polygon = orient(polygon, 1.0)
+        for ring in [polygon.exterior, *polygon.interiors]:
+            rings.append([round(v) for point in ring.coords[:-1] for v in point])
     return rings
 
 
