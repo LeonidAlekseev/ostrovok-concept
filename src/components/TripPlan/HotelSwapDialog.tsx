@@ -69,7 +69,10 @@ export function HotelSwapDialog({ trip, plan, hotels, stop, onClose, onPick }: P
   const profile = scores ? (hotel: Hotel) => scores[hotel.id] ?? 0 : undefined
   const ranked =
     stay && loaded.status === 'done' && scores !== undefined
-      ? rankHotelAlternatives(stay.hotel, loaded.hotels, profile, new Set(plan.stays.map((s) => s.hotel.id))).slice(0, SHOWN)
+      ? rankHotelAlternatives(stay.hotel, loaded.hotels, profile, new Set(plan.stays.map((s) => s.hotel.id))).slice(
+          0,
+          SHOWN,
+        )
       : []
   const waiting = stay && (loaded.status === 'loading' || (loaded.status === 'done' && scores === undefined))
 
