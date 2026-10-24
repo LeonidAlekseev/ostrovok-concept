@@ -218,11 +218,13 @@ export function PlanView({ plan, onChoose }: PlanProps) {
   return (
     <div data-slot="plan" className="flex flex-col gap-2">
       <div className="flex flex-col gap-1 rounded-[18px_18px_18px_6px] bg-(--decor-light) px-3.5 py-2.5 shadow-[0_1px_3px_color-mix(in_srgb,var(--shadow-color)_8%,transparent)]">
-        <p className="flex items-center gap-2">
+        <p className="flex flex-wrap items-center gap-x-2">
+          <span className="w-full text-xs/[normal] tracking-[0.06em] text-muted-foreground uppercase">
+            Атмосфера поездки
+          </span>
           <span className="text-xl/none" aria-hidden>
             {plan.emoji}
           </span>
-          <span className="text-xs/[normal] tracking-[0.06em] text-muted-foreground uppercase">Атмосфера поездки</span>
           <strong className="font-bold">{plan.atmosphere}</strong>
         </p>
         <p className={messageTextClass}>{plan.why}</p>
@@ -301,8 +303,9 @@ function featureLines(option: AssistantOption, hotel: Hotel | undefined): { icon
   if (hotel?.amenities.includes('parking')) lines.push({ icon: Car, text: 'Парковка' })
   else if (hotel?.amenities.includes('parking-nearby')) lines.push({ icon: Car, text: 'Парковка рядом' })
   const view = option.views?.[0]
-  // The view is of some room types, as their names say.
-  if (view) lines.push({ icon: Eye, text: `Номера с видом ${VIEW_LABEL[view]}` })
+  // The view is of some room types, as their names say; a reason of the wish for a view tells it already.
+  const told = option.reasons?.some((reason) => reason.includes(' вид'))
+  if (view && !told) lines.push({ icon: Eye, text: `Номера с видом ${VIEW_LABEL[view]}` })
   return lines.slice(0, 2)
 }
 

@@ -2,6 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useId, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from 'react'
 import { CalendarDays, ChevronRight, MapPin, Mic, RefreshCw, SendHorizontal, SlidersHorizontal } from 'lucide-react'
+import { cn } from 'cn'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '@/components/ui/input-group'
 import { useToday } from '@/hooks/useToday'
@@ -126,7 +127,7 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
         className="-mx-0.5 flex gap-2 overflow-x-auto px-0.5 py-0.5 [scrollbar-width:none]"
       >
         {shown.options.some((o) => o.hotel) && (
-          <Link href={planMapHref(shown)} className={buttonVariants({ shape: 'pill', className: actionClass })}>
+          <Link href={planMapHref(shown)} className={cn(buttonVariants({ shape: 'pill' }), actionClass)}>
             <MapPin className="size-4" aria-hidden />
             Показать на карте
           </Link>
@@ -168,7 +169,7 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
   return (
     <div
       data-assistant-app={screen}
-      className="grid min-h-0 flex-1 gap-4 [--glass-field:color-mix(in_srgb,var(--decor-light)_60%,transparent)] [--glass-plaque:color-mix(in_srgb,var(--decor-light)_72%,transparent)] max-lg:data-[assistant-app=chat]:h-(--chat-screen,100dvh) lg:h-full lg:grid-cols-[clamp(240px,20vw,290px)_minmax(0,1fr)_clamp(250px,21vw,320px)]"
+      className="grid min-h-0 flex-1 gap-4 [--glass-field:color-mix(in_srgb,var(--decor-light)_60%,transparent)] [--glass-plaque:color-mix(in_srgb,var(--decor-light)_72%,transparent)] max-lg:data-[assistant-app=chat]:h-(--chat-screen,100dvh) grid-cols-[minmax(0,1fr)] lg:h-full lg:grid-cols-[clamp(228px,19vw,290px)_minmax(0,1fr)_clamp(240px,21vw,320px)] xl:gap-5"
       // The phone's keyboard is open: the chat fits above it.
       style={viewport && screen === 'chat' ? ({ '--chat-screen': `${viewport}px` } as CSSProperties) : undefined}
     >

@@ -194,12 +194,12 @@ function SharePopover({ chat, signedIn }: { chat: Chat; signedIn: boolean }) {
             variant="outline"
             size="sm"
             shape="pill"
-            className="h-9 bg-(--decor-light) text-foreground max-sm:w-9 max-sm:p-0"
+            className="h-9 bg-(--decor-light) text-foreground max-xl:w-9 max-xl:p-0"
           />
         }
       >
         <Share2 className="size-4" aria-hidden />
-        <span className="max-sm:sr-only">Поделиться</span>
+        <span className="max-xl:sr-only">Поделиться</span>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[min(340px,calc(100vw-24px))] gap-3 p-4 shadow-(--shadow-popover)">
         <p className="font-semibold">Поделиться чатом</p>
