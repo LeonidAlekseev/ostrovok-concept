@@ -2,7 +2,6 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { getHotel } from '@/lib/catalogGenerator'
-import { formatDecimal } from '@/lib/format'
 import { Gallery } from './Gallery'
 
 const hotel = getHotel('prague-old-town-lantern')!
@@ -15,7 +14,6 @@ describe('Gallery mosaic', () => {
     const user = userEvent.setup()
     render(<Gallery hotel={hotel} />)
     await user.click(screen.getAllByRole('button', { name: /^Фото \d+: / })[3])
-    await user.click(screen.getByRole('button', { name: /^Открыть фото:/ }))
 
     const tabs = within(mosaic()).getAllByRole('tab')
     expect(tabs.map((t) => t.textContent)).toEqual([
@@ -37,7 +35,7 @@ describe('Gallery mosaic', () => {
   it('has no guests tab without guest photos', async () => {
     const user = userEvent.setup()
     render(<Gallery hotel={{ ...hotel, guestPhotos: [] }} />)
-    await user.click(screen.getByRole('button', { name: /^Открыть фото:/ }))
+    await user.click(screen.getAllByRole('button', { name: /^Фото \d+: / })[0])
     expect(
       within(mosaic())
         .getAllByRole('tab')
@@ -48,7 +46,7 @@ describe('Gallery mosaic', () => {
   it('lays the photos out in the pattern of six: a pair, a wide one, a tall one beside two', async () => {
     const user = userEvent.setup()
     render(<Gallery hotel={hotel} />)
-    await user.click(screen.getByRole('button', { name: /^Открыть фото:/ }))
+    await user.click(screen.getAllByRole('button', { name: /^Фото \d+: / })[0])
     const tiles = within(mosaic())
       .getAllByRole('button', { name: /^Открыть фото \d+:/ })
       .map((tile) => tile.parentElement!.className)
@@ -64,12 +62,12 @@ describe('Gallery mosaic', () => {
     const user = userEvent.setup()
     render(<Gallery hotel={hotel} />)
     const length = window.history.length
-    await user.click(screen.getByRole('button', { name: /^Открыть фото:/ }))
+    await user.click(screen.getAllByRole('button', { name: /^Фото \d+: / })[0])
     expect(window.history.length).toBe(length + 1)
     window.history.back()
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 
-    await user.click(screen.getByRole('button', { name: /^Открыть фото:/ }))
+    await user.click(screen.getAllByRole('button', { name: /^Фото \d+: / })[0])
     const back = vi.spyOn(window.history, 'back')
     await user.click(within(mosaic()).getByRole('button', { name: 'Закрыть' }))
     expect(back).toHaveBeenCalledOnce()
@@ -82,7 +80,7 @@ describe('Gallery mosaic', () => {
 describe('Gallery viewer', () => {
   const openViewer = async (user: ReturnType<typeof userEvent.setup>) => {
     render(<Gallery hotel={hotel} />)
-    await user.click(screen.getByRole('button', { name: /^Открыть фото:/ }))
+    await user.click(screen.getAllByRole('button', { name: /^Фото \d+: / })[0])
     const mosaic = screen.getByRole('dialog', { name: `${hotel.name}: фотографии` })
     const first = within(mosaic).getAllByRole('button', { name: /^Открыть фото \d+:/ })[0]
     await user.click(first)
@@ -124,75 +122,74 @@ describe('Gallery viewer', () => {
 })
 
 // hotel-page, Requirement: Галерея (Миниатюра)
-describe('Gallery thumbnails', () => {
-  const thumbnails = () => screen.getAllByRole('button', { name: /^Фото \d+: / })
-
-  it('show every photo under the large one, the first selected', () => {
-    render(<Gallery hotel={hotel} />)
-    expect(thumbnails()).toHaveLength(hotel.photos.length)
-    expect(thumbnails().map((t) => t.getAttribute('aria-pressed'))).toEqual(hotel.photos.map((_, i) => String(i === 0)))
-    expect(screen.getByRole('button', { name: /^Открыть фото/ }).getAttribute('aria-label')).toBe(
-      `Открыть фото: ${hotel.photos[0].caption}`,
-    )
+describe('Gallery tile', () => {
+  const tiles = () => screen.getAllByRole('button', { name: /^Фото \d+: / })
+  const withPhotos = (n: number) => ({
+    ...hotel,
+    photos: Array.from({ length: n }, (_, i) => ({ ...hotel.photos[i % hotel.photos.length], id: `p${i}` })),
   })
 
-  it('run from edge to edge, starting and ending at the edge of the text, over the fade of the photo', () => {
-    const { unmount } = render(<Gallery hotel={hotel} />)
-    const row = thumbnails()[0].closest('ul')!
-    const column = 'calc(max((100%-var(--page-max))/2,0px)+var(--page-x))'
-    expect(row.className).toContain(`px-[${column}]`)
-    expect(row.className).toContain(`scroll-px-[${column}]`)
-    expect(row.className).toMatch(/\bsnap-x\b/)
-    const fade = screen.getByRole('region', { name: 'Фотографии отеля' }).querySelector('.bg-linear-to-t')!
-    expect(fade.className).toContain('from-(--decor-surface-soft)')
-    unmount()
-
-    // In the hotel dialog the row starts at the dialog's text.
-    render(<Gallery hotel={hotel} inDialog />)
-    expect(thumbnails()[0].closest('ul')!.className).toMatch(/\bpx-4\b/)
-  })
-
-  it('a thumbnail makes its photo the large one and frames itself', async () => {
+  it('shows seven photos and "+N фото" over the last when there are more', async () => {
     const user = userEvent.setup()
-    render(<Gallery hotel={hotel} />)
-    await user.click(thumbnails()[2])
-    expect(thumbnails()[2].getAttribute('aria-pressed')).toBe('true')
-    expect(thumbnails()[2].className).toMatch(/\bborder-primary\b/)
-    expect(thumbnails()[0].getAttribute('aria-pressed')).toBe('false')
-    const large = screen.getByRole('button', { name: /^Открыть фото/ })
-    expect(large.getAttribute('aria-label')).toBe(`Открыть фото: ${hotel.photos[2].caption}`)
-
-    await user.click(large)
-    // The dialog moves focus after it opens, which can lag behind the click on a slow runner.
-    await waitFor(() =>
-      expect(document.activeElement?.getAttribute('aria-label')).toBe(`Открыть фото 3: ${hotel.photos[2].caption}`),
-    )
+    const many = withPhotos(10)
+    render(<Gallery hotel={many} />)
+    expect(tiles()).toHaveLength(7)
+    const more = screen.getByRole('button', { name: 'Ещё 3 фото: открыть все' })
+    expect(more.textContent).toBe('+3 фото')
+    await user.click(more)
+    expect(screen.getByRole('dialog', { name: `${hotel.name}: фотографии` })).toBeDefined()
   })
 
-  it('a swipe of the large photos selects the photo it stops on', () => {
-    render(<Gallery hotel={hotel} />)
-    const large = screen.getByRole('button', { name: /^Открыть фото/ })
-    const row = large.parentElement!
-    Object.defineProperty(row, 'clientWidth', { value: 360, configurable: true })
-    row.scrollLeft = 360 * 3
-    fireEvent.scroll(row)
-    expect(thumbnails()[3].getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getByRole('button', { name: /^Открыть фото/ }).getAttribute('aria-label')).toBe(
-      `Открыть фото: ${hotel.photos[3].caption}`,
+  it('has no "+N фото" with seven photos or fewer', () => {
+    render(<Gallery hotel={withPhotos(7)} />)
+    expect(tiles()).toHaveLength(7)
+    expect(screen.queryByText(/^\+\d+ фото$/)).toBeNull()
+  })
+
+  it.each([1, 2, 3, 4, 5, 6])('lays %i photos out without empty cells', (n) => {
+    const { container } = render(<Gallery hotel={withPhotos(n)} />)
+    expect(tiles()).toHaveLength(n)
+    const grid = container.querySelector('.grid-rows-2') as HTMLElement | null
+    if (n === 1) return expect(grid).toBeNull()
+    const columns = Number(/repeat\((\d)/.exec(grid!.style.gridTemplateColumns)![1])
+    const cells = Array.from(grid!.children).reduce(
+      (sum, cell) =>
+        sum + (cell.className.includes('row-span-2') ? 2 : 1) * (cell.className.includes('col-span-2') ? 2 : 1),
+      0,
     )
+    expect(cells).toBe(columns * 2)
+  })
+
+  it('is flat: no shadow and no gradient over the photos', () => {
+    const { container } = render(<Gallery hotel={withPhotos(10)} />)
+    const own = Array.from(container.querySelectorAll('section *:not([role="img"], [role="img"] *)'))
+    for (const el of own) expect(el.className).not.toMatch(/shadow|gradient|bg-linear/)
   })
 })
 
 // hotel-page, Requirement: Галерея (Телефон)
-describe('Gallery without badges', () => {
-  it('has only the large photo and the thumbnails: no badges, counter, rating or favourite toggle', () => {
+describe('Gallery carousel', () => {
+  const slides = () => screen.getAllByRole('button', { name: /^Открыть фото: / })
+
+  it('counts "N / M" and has no row of thumbnails', () => {
     render(<Gallery hotel={hotel} />)
-    const gallery = screen.getByRole('region', { name: 'Фотографии отеля' })
-    const buttons = within(gallery).getAllByRole('button')
-    expect(buttons).toHaveLength(hotel.photos.length + 1)
-    for (const button of buttons) expect(button.getAttribute('aria-label')).toMatch(/^(Открыть фото|Фото \d+): /)
-    expect(gallery.textContent).not.toContain(formatDecimal(hotel.rating))
-    expect(gallery.textContent).not.toContain('Бесплатная отмена')
-    expect(gallery.textContent).not.toMatch(/\d+ \/ \d+/)
+    expect(screen.getByText(`1 / ${hotel.photos.length}`)).toBeDefined()
+    expect(screen.queryByRole('list')).toBeNull()
+  })
+
+  it('a swipe selects the photo it stops on and updates the counter', () => {
+    render(<Gallery hotel={hotel} />)
+    const row = slides()[0].parentElement!
+    Object.defineProperty(row, 'clientWidth', { value: 360, configurable: true })
+    row.scrollLeft = 360
+    fireEvent.scroll(row)
+    expect(screen.getByText(`2 / ${hotel.photos.length}`)).toBeDefined()
+  })
+
+  it('a slide opens the mosaic at its photo', async () => {
+    const user = userEvent.setup()
+    render(<Gallery hotel={hotel} />)
+    await user.click(slides()[0])
+    expect(screen.getByRole('dialog', { name: `${hotel.name}: фотографии` })).toBeDefined()
   })
 })

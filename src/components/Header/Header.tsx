@@ -12,13 +12,9 @@ import { cn } from '@/lib/utils'
 
 // The header's look follows the page content, not the pathname: `usePathname()` is not reliable in the server
 // HTML of a prerendered page, and React does not fix attributes at hydration. The body is `group/page`; the home
-// hero has `#hero-title`, the hotel page's `main` has `data-header-photo` (its photo starts under the header).
-// Blue on the lime hero, where the white glaze replaces ghost's grey hover; white over the photo of the hotel
-// page, under a glaze of the same white.
-const iconButton = cn(
-  'text-primary hover:bg-card/35 hover:text-primary-hover aria-expanded:bg-card/35 aria-expanded:text-primary-hover',
-  'group-has-[[data-header-photo]]/page:text-white group-has-[[data-header-photo]]/page:hover:bg-white/20 group-has-[[data-header-photo]]/page:hover:text-white group-has-[[data-header-photo]]/page:aria-expanded:bg-white/20 group-has-[[data-header-photo]]/page:aria-expanded:text-white',
-)
+// hero has `#hero-title`. The logo and the menu are blue on every page; the white glaze replaces ghost's grey hover.
+const iconButton =
+  'text-primary hover:bg-card/35 hover:text-primary-hover aria-expanded:bg-card/35 aria-expanded:text-primary-hover'
 
 // Placement comes from the popover (portaled, aligned to its trigger); only the size and the entrance are here.
 const panelClass =
@@ -52,13 +48,7 @@ export function Header() {
   // The wrapper keeps the header's place in the flow; the header scrolls away with the page.
   return (
     <div className="relative z-20 h-(--header-height)">
-      <header
-        className={cn(
-          'absolute inset-x-0 top-0 bg-background',
-          'group-has-[#hero-title]/page:bg-transparent',
-          'group-has-[[data-header-photo]]/page:bg-transparent',
-        )}
-      >
+      <header className={cn('absolute inset-x-0 top-0 bg-background', 'group-has-[#hero-title]/page:bg-transparent')}>
         <div
           className={cn(
             'mx-auto flex h-(--header-height) max-w-(--page-max) items-center justify-between gap-4 px-[calc(var(--page-x)+8px)]',
@@ -66,10 +56,7 @@ export function Header() {
           )}
         >
           <a
-            className={cn(
-              'rounded-sm text-[clamp(26px,6.6vw,32px)] leading-none font-extrabold tracking-[-0.035em] whitespace-nowrap no-underline',
-              'text-primary group-has-[[data-header-photo]]/page:text-white',
-            )}
+            className="rounded-sm text-[clamp(26px,6.6vw,32px)] leading-none font-extrabold tracking-[-0.035em] whitespace-nowrap text-primary no-underline"
             href="/"
             onClick={close}
             aria-label="О!бъективно — на главную"

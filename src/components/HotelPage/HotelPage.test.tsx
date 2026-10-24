@@ -258,17 +258,17 @@ describe('PriceBar', () => {
 // hotel-page, Requirement: Плоская страница отеля
 describe('HotelPage', () => {
   // site-header, Requirement: Оформление шапки — Страница отеля
-  it('marks the page so the layout header turns transparent with white icons in the server HTML', () => {
+  it('does not mark the page for a transparent header: the photo is not under it', () => {
     render(<HotelPage hotel={hotel} />)
-    expect(screen.getByRole('main').hasAttribute('data-header-photo')).toBe(true)
+    expect(screen.getByRole('main').hasAttribute('data-header-photo')).toBe(false)
   })
 
   it('stands on the page background: the heart beside the name, no white blocks around the sections', () => {
     render(<HotelPage hotel={hotel} />)
     const main = screen.getByRole('main')
-    // The photo across the screen, then the column.
-    expect(main.children).toHaveLength(2)
-    expect(main.children[0]).toBe(screen.getByRole('region', { name: 'Фотографии отеля' }))
+    // The photos open the column.
+    expect(main.children).toHaveLength(1)
+    expect(main.children[0].firstElementChild).toBe(screen.getByRole('region', { name: 'Фотографии отеля' }))
     const title = screen.getByRole('heading', { level: 1, name: hotel.name })
     expect(within(title.parentElement!).getByRole('button', { name: /избранное/i })).toBeDefined()
     expect(main.querySelectorAll('section.bg-card, section.rounded-2xl, header.bg-card')).toHaveLength(0)
