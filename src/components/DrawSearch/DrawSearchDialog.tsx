@@ -73,7 +73,6 @@ export function DrawSearchDialog({ open, onOpenChange, colorId, onColorIdChange 
   // The chosen colour: the window opens on it.
   const chosenRef = useRef<HTMLButtonElement>(null)
   const titleRef = useRef<HTMLHeadingElement>(null)
-  const color = PALETTE.find((c) => c.id === colorId)!
 
   // A new step takes the focus to its title; the first opening keeps it on the chosen colour.
   const shownStep = useRef(step)
@@ -246,7 +245,7 @@ export function DrawSearchDialog({ open, onOpenChange, colorId, onColorIdChange 
               </Button>
               <RainbowButton
                 disabled={!ready}
-                aria-describedby="draw-hint"
+                aria-describedby={ready ? 'draw-hint' : undefined}
                 onClick={search}
                 className="h-[clamp(52px,12vw,64px)] rounded-2xl text-[clamp(17px,4.4vw,22px)]"
               >
@@ -254,11 +253,12 @@ export function DrawSearchDialog({ open, onOpenChange, colorId, onColorIdChange 
                 <ArrowRight aria-hidden />
               </RainbowButton>
             </div>
-            <p id="draw-hint" className={cn('-mt-1 text-center text-sm text-muted-foreground', ready && 'sr-only')}>
-              {ready
-                ? 'По цветам рисунка подберём отели.'
-                : `Закрасьте ещё немного холста — цветом «${color.label}» или любым другим.`}
-            </p>
+            {ready && (
+              // Read by screen readers only: «Далее» is described by it once it is enabled.
+              <p id="draw-hint" className="sr-only">
+                По цветам рисунка подберём отели.
+              </p>
+            )}
           </div>
         )}
 
