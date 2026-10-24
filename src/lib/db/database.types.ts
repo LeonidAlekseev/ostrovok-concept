@@ -3,6 +3,85 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      assistant_chats: {
+        Row: {
+          brief: NonNullable<Json>
+          created_at: string
+          id: string
+          question: Json | null
+          title: string
+          unread: boolean
+          updated_at: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          brief?: NonNullable<Json>
+          created_at?: string
+          id: string
+          question?: Json | null
+          title?: string
+          unread?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          brief?: NonNullable<Json>
+          created_at?: string
+          id?: string
+          question?: Json | null
+          title?: string
+          unread?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      assistant_messages: {
+        Row: {
+          chat_id: string
+          created_at: string
+          data: NonNullable<Json>
+          id: string
+          role: string
+          status: string
+          text: string
+          updated_at: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          chat_id: string
+          created_at?: string
+          data?: NonNullable<Json>
+          id: string
+          role: string
+          status?: string
+          text?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          chat_id?: string
+          created_at?: string
+          data?: NonNullable<Json>
+          id?: string
+          role?: string
+          status?: string
+          text?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'assistant_messages_chat_id_user_id_fkey'
+            columns: ['chat_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'assistant_chats'
+            referencedColumns: ['id', 'user_id']
+          },
+        ]
+      }
       destinations: {
         Row: {
           data: NonNullable<Json>
@@ -128,6 +207,100 @@ export type Database = {
           source?: string
         }
         Relationships: []
+      }
+      hotel_features: {
+        Row: {
+          building_id: string | null
+          floors: number | null
+          height_m: number | null
+          hotel_id: string
+          lden_max: number | null
+          lden_min: number | null
+          lden_source: string | null
+          lnight_max: number | null
+          lnight_min: number | null
+          lnight_source: string | null
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          building_id?: string | null
+          floors?: number | null
+          height_m?: number | null
+          hotel_id: string
+          lden_max?: number | null
+          lden_min?: number | null
+          lden_source?: string | null
+          lnight_max?: number | null
+          lnight_min?: number | null
+          lnight_source?: string | null
+          updated_at?: string
+        }
+        Update: {
+          building_id?: string | null
+          floors?: number | null
+          height_m?: number | null
+          hotel_id?: string
+          lden_max?: number | null
+          lden_min?: number | null
+          lden_source?: string | null
+          lnight_max?: number | null
+          lnight_min?: number | null
+          lnight_source?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'hotel_features_hotel_id_fkey'
+            columns: ['hotel_id']
+            isOneToOne: true
+            referencedRelation: 'hotels'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      hotel_room_views: {
+        Row: {
+          hotel_id: string
+          master_id: number
+          rg_hash: string
+          source: string
+          updated_at: string
+          view: string
+        }
+        ComputedFields: never
+        Insert: {
+          hotel_id: string
+          master_id: number
+          rg_hash: string
+          source?: string
+          updated_at?: string
+          view: string
+        }
+        Update: {
+          hotel_id?: string
+          master_id?: number
+          rg_hash?: string
+          source?: string
+          updated_at?: string
+          view?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'hotel_room_views_hotel_id_fkey'
+            columns: ['hotel_id']
+            isOneToOne: false
+            referencedRelation: 'hotels'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'hotel_room_views_master_id_fkey'
+            columns: ['master_id']
+            isOneToOne: false
+            referencedRelation: 'ota_hotels'
+            referencedColumns: ['master_id']
+          },
+        ]
       }
       hotels: {
         Row: {
@@ -269,7 +442,25 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      hotel_room_views_named: {
+        Row: {
+          hotel_id: string | null
+          rg_hash: string | null
+          room_name: string | null
+          source: string | null
+          view: string | null
+        }
+        ComputedFields: never
+        Relationships: [
+          {
+            foreignKeyName: 'hotel_room_views_hotel_id_fkey'
+            columns: ['hotel_id']
+            isOneToOne: false
+            referencedRelation: 'hotels'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Functions: {
       hotel_geo: { Args: { lat: number; lon: number }; Returns: Json }
