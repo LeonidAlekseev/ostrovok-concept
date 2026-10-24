@@ -50,17 +50,21 @@ export function startStay(today: IsoDate): Stay | null {
 
 export const normalize = (s: string) => s.trim().toLocaleLowerCase('ru').replace(/ё/g, 'е')
 
-export function findScenario(text: string): Scenario | undefined {
+/** The scenario named by `text`, if one of `destinations` has it: production hides those of no city shown. */
+export function findScenario(text: string, destinations: readonly Destination[]): Scenario | undefined {
   const q = normalize(text)
-  return q ? scenarios.find((s) => normalize(s.title) === q) : undefined
+  return q ? scenarios.find((s) => normalize(s.title) === q && hasScenario(s.id, destinations)) : undefined
 }
+
+const hasScenario = (id: ScenarioId, destinations: readonly Destination[]) =>
+  destinations.some((d) => d.scenarios.includes(id))
 
 export function resolveTarget(text: string, destinations: readonly Destination[]): SearchTarget | null {
   const q = normalize(text)
   if (!q) return null
   const destination = destinations.find((d) => normalize(d.name) === q)
   if (destination) return { kind: 'destination', destination }
-  const scenario = findScenario(q)
+  const scenario = findScenario(q, destinations)
   if (scenario) return { kind: 'scenario', scenario: scenario.id, title: scenario.title }
   return null
 }
@@ -68,7 +72,7 @@ export function resolveTarget(text: string, destinations: readonly Destination[]
 export function suggestDestinations(text: string, destinations: readonly Destination[], limit = 6): Destination[] {
   const q = normalize(text)
   if (!q) return destinations.filter((d) => d.onGlobe).slice(0, limit)
-  const scenario = findScenario(q)
+  const scenario = findScenario(q, destinations)
   if (scenario) return destinations.filter((d) => d.scenarios.includes(scenario.id)).slice(0, limit)
   const starts = destinations.filter((d) => normalize(d.name).startsWith(q) || normalize(d.country).startsWith(q))
   const contains = destinations.filter(
@@ -177,7 +181,7 @@ export function fromSearchParams(
   const scenarioId = params.get('scenario')
   const destination = destinationId
     ? destinations.find((d) => d.id === destinationId)?.name
-    : scenarios.find((s) => s.id === scenarioId)?.title
+    : scenarios.find((s) => s.id === scenarioId && hasScenario(s.id, destinations))?.title
   const stay = parseStayParams(params)
   return {
     destination: destination ?? '',

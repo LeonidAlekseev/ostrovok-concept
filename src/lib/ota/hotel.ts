@@ -1,6 +1,7 @@
 import {
   AMENITIES,
   PHOTO_TONE_COUNT,
+  REAL_HOTEL_ID_PREFIX,
   roundUp100,
   type Amenity,
   type Cancellation,
@@ -48,7 +49,7 @@ export function searchStay(search: Pick<OtaSearch, 'hotels'>): OtaStay {
   return { checkIn, nights: [...nights][0] }
 }
 
-export const otaHotelId = (masterId: number) => `ota-${masterId}`
+export const otaHotelId = (masterId: number) => `${REAL_HOTEL_ID_PREFIX}${masterId}`
 
 const STAY_TYPE_OF_KIND: Record<string, StayType> = {
   Hostel: 'hostel',

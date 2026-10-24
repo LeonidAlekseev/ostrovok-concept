@@ -2,14 +2,16 @@ import 'server-only'
 import { createClient, type PostgrestError } from '@supabase/supabase-js'
 import { unstable_cache } from 'next/cache'
 import type { Destination } from '@/data/destinations'
-import type { Hotel, HotelSummary } from '@/lib/catalog'
+import { isVisibleHotel, type Hotel, type HotelSummary } from '@/lib/catalog'
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/config'
 
 /**
  * The one way into the catalogue: pages, route handlers and server actions read destinations and hotels
  * here and hand them to the calculations and to the client components as props. The catalogue lives in
  * Supabase (read with the anon key under RLS) and is cached by Next under the `catalog` tag: for an hour,
- * or until `POST /api/revalidate` after `npm run db:seed`.
+ * or until `POST /api/revalidate` after `npm run db:seed`. Every loader gives only the hotels shown in this
+ * environment (`isVisibleHotel`: production hides the synthetic ones) and only the destinations with such hotels;
+ * the cache keeps the whole catalogue, so a build of another environment reads the same entries.
  */
 
 export const CATALOG_TAG = 'catalog'
@@ -47,8 +49,7 @@ const cached = <Args extends unknown[], Result>(name: string, read: (...args: Ar
 const SUMMARY =
   'id, destinationId:destination_id, name:data->>name, stayType:stay_type, stars:data->stars, rating, reviewCount:data->reviewCount, priceFrom:price_from, wifiMbps:wifi_mbps, workspace, isNew:data->isNew'
 
-/** All destinations, in the catalogue's order. */
-export const loadDestinations: () => Promise<Destination[]> = cached('destinations', async () =>
+const readDestinations = cached('destinations', async (): Promise<Destination[]> =>
   rowsOf(
     await database()
       .from('destinations')
@@ -59,11 +60,17 @@ export const loadDestinations: () => Promise<Destination[]> = cached('destinatio
   ).map((row) => row.data),
 )
 
+/** The destinations with a hotel shown, in the catalogue's order. */
+export async function loadDestinations(): Promise<Destination[]> {
+  const [destinations, hotels] = await Promise.all([readDestinations(), loadHotelSummaries()])
+  const shown = new Set(hotels.map((h) => h.destinationId))
+  return destinations.filter((d) => shown.has(d.id))
+}
+
 export const loadDestination = async (id: string): Promise<Destination | undefined> =>
   (await loadDestinations()).find((d) => d.id === id)
 
-/** Summaries of all hotels, grouped by city in the order of the destinations. */
-export const loadHotelSummaries: () => Promise<HotelSummary[]> = cached('summaries', async () =>
+const readHotelSummaries = cached('summaries', async (): Promise<HotelSummary[]> =>
   rowsOf(
     await database()
       .from('hotels')
@@ -74,16 +81,39 @@ export const loadHotelSummaries: () => Promise<HotelSummary[]> = cached('summari
   ),
 )
 
-/** The hand-picked "recently added" hotels, in the catalogue's order. */
-export const loadNewHotels = async (): Promise<HotelSummary[]> => (await loadHotelSummaries()).filter((h) => h.isNew)
+/** Summaries of the hotels shown, grouped by city in the order of the destinations. */
+export const loadHotelSummaries = async (): Promise<HotelSummary[]> =>
+  (await readHotelSummaries()).filter(isVisibleHotel)
+
+/** Hotels the hero globe spotlights in a city without hand-picked ones: as many as the generator picks. */
+const SPOTLIGHT_PER_CITY = 3
+
+/**
+ * The hotels the hero globe spotlights, in the catalogue's order: the hand-picked "recently added" ones, and the
+ * first hotels of a city with none of them, so every city shown has its pin (the real hotels are never picked).
+ */
+export async function loadNewHotels(): Promise<HotelSummary[]> {
+  const hotels = await loadHotelSummaries()
+  const picked = new Set(hotels.filter((h) => h.isNew).map((h) => h.destinationId))
+  const taken = new Map<string, number>()
+  return hotels.filter((h) => {
+    if (picked.has(h.destinationId)) return h.isNew
+    const count = taken.get(h.destinationId) ?? 0
+    taken.set(h.destinationId, count + 1)
+    return count < SPOTLIGHT_PER_CITY
+  })
+}
 
 const readHotel = cached('hotel', async (id: string): Promise<Hotel | null> => {
   const rows = rowsOf(await database().from('hotels').select('data').eq('id', id).returns<{ data: Hotel }[]>())
   return rows[0]?.data ?? null
 })
 
-/** The full hotel, or `undefined` for an unknown id. */
-export const loadHotel = async (id: string): Promise<Hotel | undefined> => (await readHotel(id)) ?? undefined
+/** The full hotel, or `undefined` for an unknown id or a hotel not shown. */
+export async function loadHotel(id: string): Promise<Hotel | undefined> {
+  if (!isVisibleHotel({ id })) return undefined
+  return (await readHotel(id)) ?? undefined
+}
 
 const readHotels = cached('hotels', async (ids: string[]): Promise<Hotel[]> =>
   rowsOf(await database().from('hotels').select('data').in('id', ids).returns<{ data: Hotel }[]>()).map(
@@ -91,9 +121,9 @@ const readHotels = cached('hotels', async (ids: string[]): Promise<Hotel[]> =>
   ),
 )
 
-/** Full hotels by id, in the order of the ids; unknown ids are skipped. */
+/** Full hotels by id, in the order of the ids; unknown ids and the hotels not shown are skipped. */
 export async function loadHotels(ids: readonly string[]): Promise<Hotel[]> {
-  const unique = [...new Set(ids)].sort()
+  const unique = [...new Set(ids)].filter((id) => isVisibleHotel({ id })).sort()
   if (unique.length === 0) return []
   const byId = new Map((await readHotels(unique)).map((h) => [h.id, h]))
   return ids.flatMap((id) => byId.get(id) ?? [])
@@ -112,9 +142,9 @@ const readCityHotels = cached('city', async (destinationId: string): Promise<Hot
   ).map((row) => row.data),
 )
 
-/** Full hotels of the cities, city by city in the given order. */
+/** Full hotels shown of the cities, city by city in the given order. */
 export const loadCityHotels = async (destinationIds: readonly string[]): Promise<Hotel[]> =>
-  (await Promise.all(destinationIds.map((id) => readCityHotels(id)))).flat()
+  (await Promise.all(destinationIds.map((id) => readCityHotels(id)))).flat().filter(isVisibleHotel)
 
-/** Every full hotel of the catalogue, in the order of `loadHotelSummaries`. */
+/** Every full hotel shown, in the order of `loadHotelSummaries`. */
 export const loadAllHotels = async (): Promise<Hotel[]> => loadCityHotels((await loadDestinations()).map((d) => d.id))

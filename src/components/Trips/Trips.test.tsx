@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { sessionStore } from '@/lib/session'
 import { bookingsStore, saveBooking } from '@/lib/storage'
+import { setProduction } from '@/test/env'
 import { BookingDetailsPage } from './BookingDetailsPage'
 import { makeBooking } from './testBooking'
 import { TripsPage } from './TripsPage'
@@ -158,5 +159,18 @@ describe('BookingDetailsPage', () => {
     await user.click(screen.getByRole('button', { name: 'Сохранить' }))
     expect(screen.getByText('Введите телефон')).toBeTruthy()
     expect(bookingsStore.get()[0].contact.phone).toBe('+7 900 123-45-67')
+  })
+})
+
+// hotel-catalog, Requirement: Синтетические отели только вне production
+describe('TripsPage in production', () => {
+  it('lists a booking of a synthetic hotel without an error', async () => {
+    setProduction(true)
+    signIn()
+    saveBooking(makeBooking('OS-UP0001', 7))
+    render(<TripsPage />)
+    await waitForCatalog()
+    expect(within(screen.getByRole('tabpanel')).getByText('Бронирование OS-UP0001')).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 })

@@ -1,11 +1,12 @@
 import { destinations } from '@/data/destinations'
-import type { Hotel } from '@/lib/catalog'
+import { isVisibleHotel, type Hotel } from '@/lib/catalog'
 import { buildCatalog, fullHotelsIn, getHotel, hotels, newHotels } from '@/lib/catalogGenerator'
 
 /**
  * The tests' catalogue: the generator stands in for Supabase, so no test goes to the network. The loaders
  * mirror src/lib/db/catalog.ts (`vi.mock('@/lib/db/catalog', () => import('@/test/catalog'))`), and
- * `catalogFetch` answers `GET /api/hotels` in the browser tests (src/test/setup.ts).
+ * `catalogFetch` answers `GET /api/hotels` in the browser tests (src/test/setup.ts). Like the loaders, they give
+ * only the hotels `isVisibleHotel` shows: all of the generator's outside production (src/test/env.ts).
  */
 
 export const CATALOG_TAG = 'catalog'
@@ -15,12 +16,14 @@ export class CatalogUnavailableError extends Error {}
 
 export const loadDestinations = async () => destinations
 export const loadDestination = async (id: string) => destinations.find((d) => d.id === id)
-export const loadHotelSummaries = async () => hotels
-export const loadNewHotels = async () => newHotels
-export const loadHotel = async (id: string) => getHotel(id)
-export const loadHotels = async (ids: readonly string[]) => ids.flatMap((id) => getHotel(id) ?? [])
-export const loadCityHotels = async (destinationIds: readonly string[]) => destinationIds.flatMap(fullHotelsIn)
-export const loadAllHotels = async () => hotels.map((h) => getHotel(h.id)!)
+export const loadHotelSummaries = async () => hotels.filter(isVisibleHotel)
+export const loadNewHotels = async () => newHotels.filter(isVisibleHotel)
+export const loadHotel = async (id: string) => (isVisibleHotel({ id }) ? getHotel(id) : undefined)
+export const loadHotels = async (ids: readonly string[]) =>
+  ids.filter((id) => isVisibleHotel({ id })).flatMap((id) => getHotel(id) ?? [])
+export const loadCityHotels = async (destinationIds: readonly string[]) =>
+  destinationIds.flatMap(fullHotelsIn).filter(isVisibleHotel)
+export const loadAllHotels = async () => (await loadHotelSummaries()).map((h) => getHotel(h.id)!)
 
 /** The whole catalogue, built once for the tests that need every full hotel. */
 let all: Hotel[] | undefined

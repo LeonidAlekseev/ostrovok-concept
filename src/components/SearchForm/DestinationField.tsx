@@ -35,7 +35,7 @@ export function DestinationField({ value, error, inputRef, onChange }: Props) {
 
   // The suggestions are computed from the typed text here, so Base UI must not filter them again.
   const options = useMemo<Option[]>(() => {
-    const scenario = findScenario(value)
+    const scenario = findScenario(value, destinations)
     const places = suggestDestinations(value, destinations).map((d) => ({
       id: d.id,
       label: d.name,

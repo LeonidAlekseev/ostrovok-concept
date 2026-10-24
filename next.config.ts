@@ -2,8 +2,8 @@ import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  // Inlined into the client bundle; see src/lib/env.ts.
-  env: { APP_ENV: process.env.VERCEL_ENV ?? '' },
+  // Inlined into the client bundle; see src/lib/env.ts. A local build takes APP_ENV of its shell.
+  env: { APP_ENV: process.env.VERCEL_ENV ?? process.env.APP_ENV ?? '' },
   // src/lib/secrets.ts decrypts the API keys at runtime; the file is read by path, so tracing needs a hint.
   outputFileTracingIncludes: { '/*': ['./.env.local.secret'] },
   turbopack: {

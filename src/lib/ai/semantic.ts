@@ -1,6 +1,7 @@
 import 'server-only'
 import { createClient } from '@supabase/supabase-js'
 import { embed, rerank } from 'ai'
+import { isVisibleHotel } from '@/lib/catalog'
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/config'
 import { getSecret } from '../secrets'
 import { embeddingModel, toVector } from './embedding'
@@ -93,7 +94,10 @@ export interface SemanticOptions {
   signal?: AbortSignal
 }
 
-/** The `k` hotels closest in meaning to `text`, best first, or `null` to fall back to the rules. */
+/**
+ * The `k` hotels shown (`isVisibleHotel`) closest in meaning to `text`, best first, or `null` to fall back to the
+ * rules.
+ */
 export async function semanticSearch(
   text: string,
   { destinationIds, k = 5, candidates = 30, timeoutMs = SEMANTIC_TIMEOUT_MS, signal }: SemanticOptions,
@@ -117,7 +121,8 @@ export async function semanticSearch(
       })
       .abortSignal(abortSignal)
     if (error) throw new Error(error.message)
-    matches = (data ?? []) as Match[]
+    // The vectors cover the whole catalogue; only the hotels shown in this environment are found.
+    matches = ((data ?? []) as Match[]).filter((m) => isVisibleHotel({ id: m.ref_id }))
   } catch (error) {
     warn('no vectors, using the rules', error)
     return null

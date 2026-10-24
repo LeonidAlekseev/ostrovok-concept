@@ -331,3 +331,17 @@ describe('HotelPage', () => {
     expect(screen.getByRole('dialog', { name: 'Отзывы' })).toBeDefined()
   })
 })
+
+// hotel-page, Requirement: Плашка сгенерированного отеля
+describe('HotelPage generated', () => {
+  it('marks a synthetic hotel beside its kind of stay (Scenario: Синтетический отель вне production)', () => {
+    render(<HotelPage hotel={hotel} />)
+    const header = screen.getByRole('heading', { level: 1 }).closest('header')!
+    expect(within(header).getByText('generated')).toBeDefined()
+  })
+
+  it('does not mark a real hotel (Scenario: Настоящий отель)', () => {
+    render(<HotelPage hotel={{ ...hotel, id: 'ota-9322089' }} />)
+    expect(screen.queryByText('generated')).toBeNull()
+  })
+})

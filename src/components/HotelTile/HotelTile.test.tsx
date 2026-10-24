@@ -158,3 +158,21 @@ describe('HotelTile plain', () => {
     expect(within(card).getByRole('img', { name: 'GURU' })).toBeDefined()
   })
 })
+
+// hotel-tile, Requirement: Плашка generated на карточке
+describe('HotelTile generated', () => {
+  const real: Hotel = { ...hotel, id: 'ota-9322089' }
+
+  it.each([
+    ['the results card', false],
+    ['the plain card of the selections', true],
+  ])('marks a synthetic hotel on %s (Scenario: Карточка в выдаче)', (_, plain) => {
+    render(<HotelTile hotel={hotel} href="/" plain={plain} />)
+    expect(screen.getByText('generated').className).toMatch(/\bbg-black\/40\b/)
+  })
+
+  it.each([false, true])('does not mark a real hotel, plain: %s (Scenario: Настоящий отель)', (plain) => {
+    render(<HotelTile hotel={real} href="/" plain={plain} />)
+    expect(screen.queryByText('generated')).toBeNull()
+  })
+})

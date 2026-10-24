@@ -7,6 +7,7 @@ import { hasFreeCancellation, STAY_TYPES, TILE_PHOTOS, type TileHotel } from '..
 import { formatDecimal, formatPrice } from '../../lib/format'
 import { guruPrice } from '../../lib/offer'
 import { useDestination } from '../Catalog/useDestinations'
+import { GeneratedBadge } from '../GeneratedBadge/GeneratedBadge'
 import { GuruLogo } from '../GuruLogo/GuruLogo'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import { PhotoCarousel } from '../PhotoCarousel/PhotoCarousel'
@@ -29,7 +30,8 @@ interface Props extends Omit<ComponentProps<'article'>, 'children'> {
  * The hotel card of the vibe, the stars, favourites and search results: the photo carousel with the free
  * cancellation, the guest rating, the favourite toggle and the stars on it, then the name, the
  * kind of stay if it is not a hotel with the distance to the city centre and the regular and GURU prices.
- * The plain card has the first photo alone and no badges, and no kind of stay.
+ * The plain card has the first photo alone and no badges, and no kind of stay. A made-up hotel has the
+ * «generated» mark on the photo in both.
  */
 export function HotelTile({
   hotel,
@@ -57,9 +59,10 @@ export function HotelTile({
           href={href}
           tabIndex={-1}
           aria-hidden
-          className="z-10 block aspect-[4/3] w-full overflow-hidden rounded-xl"
+          className="relative z-10 block aspect-[4/3] w-full overflow-hidden rounded-xl"
         >
           <PhotoPlaceholder photo={hotel.photos[0]} className="size-full" />
+          <GeneratedBadge hotel={hotel} className="absolute bottom-3 left-1/2 -translate-x-1/2" />
         </Link>
       ) : (
         <PhotoCarousel
@@ -68,6 +71,7 @@ export function HotelTile({
           className="@container z-10 aspect-[4/3] w-full rounded-xl"
         >
           <PhotoBadges hotel={hotel} freeCancellation={freeCancellation} />
+          <GeneratedBadge hotel={hotel} className="absolute bottom-3 left-1/2 -translate-x-1/2" />
         </PhotoCarousel>
       )}
 

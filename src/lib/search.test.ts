@@ -43,13 +43,22 @@ describe('resolveTarget', () => {
 
 describe('findScenario', () => {
   it('finds a scenario by title ignoring case, outer spaces and ё/е', () => {
-    expect(findScenario('  нА вЫХОДНЫЕ ')).toMatchObject({ id: 'weekend' })
-    expect(findScenario('Города Ёвропы')).toMatchObject({ id: 'europe' })
+    expect(findScenario('  нА вЫХОДНЫЕ ', destinations)).toMatchObject({ id: 'weekend' })
+    expect(findScenario('Города Ёвропы', destinations)).toMatchObject({ id: 'europe' })
   })
 
   it('returns undefined for empty or unknown text', () => {
-    expect(findScenario('   ')).toBeUndefined()
-    expect(findScenario('В горы')).toBeUndefined()
+    expect(findScenario('   ', destinations)).toBeUndefined()
+    expect(findScenario('В горы', destinations)).toBeUndefined()
+  })
+
+  // hotel-catalog, Requirement: Синтетические отели только вне production
+  it('hides a scenario no destination shown has', () => {
+    const valencia = destinations.filter((d) => d.id === 'valencia')
+    expect(findScenario('На выходные', valencia)).toBeUndefined()
+    expect(resolveTarget('На выходные', valencia)).toBeNull()
+    expect(fromSearchParams(new URLSearchParams('scenario=weekend'), valencia).destination).toBe('')
+    expect(findScenario('Города Европы', valencia)).toMatchObject({ id: 'europe' })
   })
 })
 

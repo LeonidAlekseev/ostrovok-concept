@@ -30,7 +30,12 @@ export async function vibeHotelsAction(answers: Answer[]): Promise<Hotel[]> {
     () => 'local',
   )
   if (!wish || !allowRequest(ip)) return byRules
-  const hits = await semanticSearch(wish, { k: CANDIDATES, candidates: CANDIDATES })
+  // The cities shown: in production the nearest vectors are not spent on the hidden hotels.
+  const hits = await semanticSearch(wish, {
+    destinationIds: destinations.map((d) => d.id),
+    k: CANDIDATES,
+    candidates: CANDIDATES,
+  })
   if (!hits) return byRules
   const byId = new Map(hotels.map((h) => [h.id, h]))
   return onePerCity([...hits.flatMap((hit) => byId.get(hit.id) ?? []), ...byRules])
