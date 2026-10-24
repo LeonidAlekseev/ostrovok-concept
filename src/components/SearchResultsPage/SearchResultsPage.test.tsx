@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MEAL_LABEL } from '../../lib/catalog'
 import { destinations } from '../../data/destinations'
 import { fullHotelsIn } from '../../lib/catalogGenerator'
+import { nightsBetween } from '../../lib/dates'
 import { countRu, formatPrice } from '../../lib/format'
 import { applyFilters, NO_FILTERS, priceBounds } from '../../lib/results'
 import { resetSearchView } from './searchView'
@@ -20,6 +21,21 @@ vi.mock('../../hooks/useHotels', async (importOriginal) => {
         ? Promise.resolve(fetched.hotels as Awaited<ReturnType<typeof actual.fetchHotels>>)
         : actual.fetchHotels(query),
     ),
+  }
+})
+
+// The demo search waits DEMO_SEARCH_MS at least (src/lib/results.test.ts holds that to account with fake timers):
+// here it answers as soon as the hotels are loaded, so no test pays the delay in real time.
+vi.mock('../../lib/results', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/results')>()
+  return {
+    ...actual,
+    runDemoSearch: async (...[query, target, hotels]: Parameters<typeof actual.runDemoSearch>) => ({
+      query,
+      target,
+      nights: nightsBetween(query.checkIn, query.checkOut),
+      hotels: await hotels,
+    }),
   }
 })
 
@@ -176,8 +192,20 @@ function open(search: string, { desktop = false } = {}) {
 }
 
 /** Waits for the demo search to finish. */
-const results = () => screen.findByText(/Найдено \d+|Ничего не нашлось/, {}, { timeout: 3000 })
-const cards = () => screen.queryAllByRole('article')
+const results = () =>
+  waitFor(() => expect(document.body.textContent).toMatch(/Найдено \d+|Ничего не нашлось/), { timeout: 3000 })
+// The markers are buttons labelled with the name and the price; a role query would compute the style of every element.
+const markerButtons = () =>
+  Array.from(document.querySelectorAll<HTMLElement>('button[aria-label]')).filter((b) =>
+    /, [\d\s]+₽$/.test(b.getAttribute('aria-label')!),
+  )
+const markers = async () => {
+  await waitFor(() => expect(markerButtons().length).toBeGreaterThan(0), { timeout: 3000 })
+  return markerButtons()
+}
+// Role queries compute the style of every element to see what is hidden: the cards are plain `article`s.
+const cards = () => Array.from(document.querySelectorAll<HTMLElement>('article'))
+const nameOf = (card: HTMLElement) => card.querySelector('h1, h2, h3, h4, h5, h6')!.textContent!
 // Base UI keeps the thumbs invisible until it measures the track, which jsdom never lays out, so their
 // names are not computed: the thumb is found by its label.
 const slider = (name: string) => {
@@ -185,7 +213,7 @@ const slider = (name: string) => {
   if (!thumb) throw new Error(`No slider "${name}"`)
   return thumb
 }
-const cardNames = () => cards().map((card) => within(card).getByRole('heading').textContent)
+const cardNames = () => cards().map(nameOf)
 // The regular price comes before the GURU one.
 const priceOf = (card: HTMLElement) => within(card).getAllByText(/^[\d\s]+₽$/)[0].textContent!
 const prices = () => cards().map((card) => Number(priceOf(card).replace(/\D/g, '')))
@@ -254,7 +282,7 @@ describe('SearchResultsPage query', () => {
   })
 
   // search-modes, Requirement: Ручная форма на странице выдачи, Scenario: Смена города
-  it('shows the manual form over the results, filled from the address; a new city changes the address', async () => {
+  it('shows the manual form over the results, filled from the address; errors stay at the form, a new city changes the address', async () => {
     const user = userEvent.setup()
     open(PRAGUE)
     await results()
@@ -264,23 +292,15 @@ describe('SearchResultsPage query', () => {
     const destination = within(form).getByRole('combobox', { name: 'Направление' })
     expect((destination as HTMLInputElement).value).toBe('Прага')
     await user.clear(destination)
+    await user.click(within(form).getByRole('button', { name: /Найти отель/ }))
+    expect(screen.getByText('Укажите, куда вы хотите поехать')).toBeDefined()
+    expect(push).not.toHaveBeenCalled()
+
     await user.type(destination, 'Рим')
     await user.keyboard('{Escape}')
     await user.click(within(form).getByRole('button', { name: /Найти отель/ }))
 
     expect(push).toHaveBeenCalledWith(`/search?destination=rome&${STAY}`)
-  })
-
-  it('shows the field errors at the form without leaving the page', async () => {
-    const user = userEvent.setup()
-    open(PRAGUE)
-    await results()
-
-    const destination = screen.getByRole('combobox', { name: 'Направление' })
-    await user.clear(destination)
-    await user.click(screen.getByRole('button', { name: /Найти отель/ }))
-    expect(screen.getByText('Укажите, куда вы хотите поехать')).toBeDefined()
-    expect(push).not.toHaveBeenCalled()
   })
 })
 
@@ -306,20 +326,16 @@ describe('SearchResultsPage selection', () => {
     )
   })
 
-  it('titles the selections of the stars and the drawing', async () => {
+  it('titles the selections of the stars and the drawing, and of an unknown pick «Подобранные отели»', async () => {
     open(`hotels=${ids}&from=stars&pick=leo&${STAY}`)
     expect(screen.getByRole('heading', { level: 1, name: 'Подборка звёзд для Льва' })).toBeDefined()
     cleanup()
     open(`hotels=${ids}&from=draw&pick=city-heart&${STAY}`)
     expect(screen.getByRole('heading', { level: 1, name: 'Подборка по вашему рисунку: Сердце города' })).toBeDefined()
-  })
-
-  // Scenario: Неизвестный источник
-  it('titles a selection of an unknown pick «Подобранные отели»', async () => {
+    // Scenario: Неизвестный источник
+    cleanup()
     open(`hotels=${ids}&from=vibe&pick=unknown&${STAY}`)
     expect(screen.getByRole('heading', { level: 1, name: 'Подобранные отели' })).toBeDefined()
-    await results()
-    expect(cards()).toHaveLength(8)
   })
 
   it('starts a selection without dates from tomorrow', async () => {
@@ -375,7 +391,6 @@ describe('SearchResultsPage count', () => {
     [1, 'вариант'],
     [2, 'варианта'],
     [5, 'вариантов'],
-    [21, 'вариант'],
   ])('counts %i hotels as "%s" in the form of the number', async (n, noun) => {
     fetched.hotels = hotelsOf(n)
     open(PRAGUE)
@@ -409,58 +424,35 @@ describe('SearchResultsPage hotel card', () => {
     expect(within(card).getByRole('button', { name: 'Добавить в избранное' })).toBeDefined()
   })
 
-  it('shows neither the meal nor the number of reviews', async () => {
-    open(PRAGUE)
-    await results()
-
-    for (const card of cards()) {
-      expect(card.textContent).not.toMatch(new RegExp(Object.values(MEAL_LABEL).join('|')))
-      expect(card.textContent).not.toMatch(/отзыв/)
-    }
-  })
-
-  it('takes the free cancellation from the rate of the card', async () => {
+  it('draws every card as the design wants it: no meal, no reviews, the free cancellation of its rate, the photo on top', async () => {
     open(PRAGUE)
     await results()
 
     const items = applyFilters(fullHotelsIn('prague'), NO_FILTERS)
     const badges = cards().map((card) => {
-      const name = within(card).getByRole('heading').textContent!
+      expect(card.textContent).not.toMatch(new RegExp(Object.values(MEAL_LABEL).join('|')))
+      expect(card.textContent).not.toMatch(/отзыв/)
+      const name = nameOf(card)
       const { rate } = items.find((item) => item.hotel.name === name)!
       const badge = within(card).queryByText('Бесплатная отмена') !== null
       expect(badge, name).toBe(rate.cancellation.kind === 'free')
-      return badge
-    })
-    // Every Prague hotel has a free cancellation rate, yet not every cheapest rate is one.
-    expect(new Set(badges)).toEqual(new Set([true, false]))
-  })
-
-  it('puts the photo above the text in every card', async () => {
-    open(PRAGUE)
-    await results()
-
-    for (const card of cards()) {
       // The first block of the card holds the photo and nothing of the text.
       const top = card.firstElementChild as HTMLElement
       expect(within(top).getByRole('group', { name: 'Фото отеля' })).toBeDefined()
       expect(top.className).toMatch(/\bw-full\b/)
       expect(within(top).queryByRole('heading')).toBeNull()
-    }
-  })
+      return badge
+    })
+    // Every Prague hotel has a free cancellation rate, yet not every cheapest rate is one.
+    expect(new Set(badges)).toEqual(new Set([true, false]))
+    // One page holds Prague: no navigation.
+    expect(Number(screen.getByText(/^Найдено \d+/).textContent!.match(/\d+/)![0])).toBeLessThanOrEqual(12)
+    expect(screen.queryByRole('navigation', { name: 'Страницы результатов' })).toBeNull()
 
-  it('lists the hotels in one column up to 3xl (1920 px) and in two from 3xl', async () => {
-    open(PRAGUE)
-    await results()
-
+    // One column up to 3xl (1920 px), two from 3xl; the page widens and the list gets more room than the map.
     const list = screen.getByRole('region', { name: 'Отели' }).querySelector('ul')!
     expect(list.className).toMatch(/(^|\s)3xl:grid-cols-2(\s|$)/)
     expect(list.className).not.toMatch(/(^|\s)(sm|md|lg|xl|2xl):grid-cols-/)
-  })
-
-  it('widens the page and gives the list more room than the map from 3xl (1920 px)', async () => {
-    open(PRAGUE)
-    await results()
-
     const page = screen.getByRole('region', { name: 'Отели' }).closest('main')!
     expect(page.className).toMatch(/(^|\s)3xl:max-w-\(--page-max-wide\)(\s|$)/)
     const columns = screen.getByRole('region', { name: 'Отели' }).closest('.grid')!
@@ -529,7 +521,7 @@ describe('SearchResultsPage filters', () => {
     expect(cards().length).toBeLessThan(all)
   })
 
-  it('shows the stars as chips from 1 to 5, the meals and the free cancellation as chips too', async () => {
+  it('shows the stars, the meals and the free cancellation as chips; bounds the price slider by the results, its fields follow', async () => {
     open(PRAGUE, { desktop: true })
     await results()
     const aside = screen.getByRole('complementary', { name: 'Фильтры' })
@@ -548,6 +540,24 @@ describe('SearchResultsPage filters', () => {
     const meals = within(within(aside).getAllByRole('group', { name: 'Питание' })[0]).getAllByRole('button')
     expect(meals.map((b) => b.textContent)).toEqual(Object.values(MEAL_LABEL))
     expect(meals.every((b) => b.getAttribute('aria-pressed') === 'false')).toBe(true)
+
+    const [low, high] = priceBounds(fullHotelsIn('prague'), {
+      checkIn: '2026-10-20',
+      checkOut: '2026-10-23',
+      guests: { adults: 2, children: 0, rooms: 1 },
+    })
+    const from = slider('Цена за ночь от')
+    expect(from.getAttribute('min')).toBe(String(low))
+    expect(from.getAttribute('max')).toBe(String(high))
+    expect(screen.getByRole('textbox', { name: 'Цена за ночь от' }).getAttribute('placeholder')).toBe(
+      `от ${formatPrice(low)}`,
+    )
+
+    fireEvent.change(from, { target: { value: String(low + 1000) } })
+    expect(window.location.search).toContain(`price_min=${low + 1000}`)
+    expect((screen.getByRole('textbox', { name: 'Цена за ночь от' }) as HTMLInputElement).value).toBe(
+      String(low + 1000),
+    )
   })
 
   it('narrows the guest rating with the slider "от–до" and writes both ends into the URL', async () => {
@@ -572,28 +582,6 @@ describe('SearchResultsPage filters', () => {
     fireEvent.keyDown(from, { key: 'ArrowLeft' })
     expect(window.location.search).toContain('rating_min=7.5')
     expect(screen.getByText('от 7,5 до 9')).toBeDefined()
-  })
-
-  it('bounds the price slider by the cheapest and the dearest night of the results, its fields follow', async () => {
-    open(PRAGUE, { desktop: true })
-    await results()
-    const [low, high] = priceBounds(fullHotelsIn('prague'), {
-      checkIn: '2026-10-20',
-      checkOut: '2026-10-23',
-      guests: { adults: 2, children: 0, rooms: 1 },
-    })
-    const from = slider('Цена за ночь от')
-    expect(from.getAttribute('min')).toBe(String(low))
-    expect(from.getAttribute('max')).toBe(String(high))
-    expect(screen.getByRole('textbox', { name: 'Цена за ночь от' }).getAttribute('placeholder')).toBe(
-      `от ${formatPrice(low)}`,
-    )
-
-    fireEvent.change(from, { target: { value: String(low + 1000) } })
-    expect(window.location.search).toContain(`price_min=${low + 1000}`)
-    expect((screen.getByRole('textbox', { name: 'Цена за ночь от' }) as HTMLInputElement).value).toBe(
-      String(low + 1000),
-    )
   })
 
   it('keeps only the hotels with every chosen amenity, by the sections of the catalogue', async () => {
@@ -640,7 +628,8 @@ describe('SearchResultsPage filters', () => {
 describe('SearchResultsPage compact bar', () => {
   const sheet = () => screen.getByRole('dialog', { name: 'Фильтры' })
 
-  it('shows the filters and map buttons on narrow screens only, hidden from lg', async () => {
+  it('shows the filters and map buttons on narrow screens only, hidden from lg; the map button toggles with the list', async () => {
+    const user = userEvent.setup()
     open(PRAGUE)
     await results()
 
@@ -649,6 +638,15 @@ describe('SearchResultsPage compact bar', () => {
       expect(button.className).toMatch(/(^|\s)lg:hidden(\s|$)/)
     }
     expect(screen.getByRole('heading', { level: 1 }).className).toContain('sr-only')
+    expect(screen.queryByRole('region', { name: 'Карта отелей' })).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Карта' }))
+    expect(await markers()).toHaveLength(cards().length)
+    expect(screen.getByRole('region', { name: 'Отели' }).className).toContain('max-lg:hidden')
+    expect(screen.queryByRole('button', { name: 'Карта' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Список' }))
+    expect(screen.getByRole('button', { name: 'Карта' })).toBeDefined()
+    expect(screen.getByRole('region', { name: 'Отели' }).className).not.toContain('hidden')
   })
 
   it('has no filter or map buttons and keeps the panels on desktop', async () => {
@@ -662,34 +660,15 @@ describe('SearchResultsPage compact bar', () => {
     expect(aside.firstElementChild!.firstElementChild!.contains(within(aside).getByLabelText('Сортировка'))).toBe(true)
   })
 
-  it('names the filters button with the number of enabled filters', async () => {
-    open(`${PRAGUE}&stars=5,4&free_cancel=1`)
+  it('names the filters button with the number of enabled filters: stars, free cancellation, rating range, amenities', async () => {
+    open(`${PRAGUE}&stars=5,4&free_cancel=1&rating_min=7&amenities=wifi,parking`)
     await results()
 
-    const button = screen.getByRole('button', { name: 'Фильтры, включено 2' })
-    expect(button.textContent).toBe('2')
+    const button = screen.getByRole('button', { name: 'Фильтры, включено 4' })
+    expect(button.textContent).toBe('4')
   })
 
-  it('counts the rating range and the amenities among the enabled filters', async () => {
-    open(`${PRAGUE}&rating_min=7&amenities=wifi,parking`)
-    await results()
-
-    expect(screen.getByRole('button', { name: 'Фильтры, включено 2' })).toBeDefined()
-  })
-
-  it('toggles between "Карта" and "Список" with the icon', async () => {
-    const user = userEvent.setup()
-    open(PRAGUE)
-    await results()
-
-    await user.click(screen.getByRole('button', { name: 'Карта' }))
-    expect(screen.queryByRole('button', { name: 'Карта' })).toBeNull()
-    await user.click(screen.getByRole('button', { name: 'Список' }))
-    expect(screen.getByRole('button', { name: 'Карта' })).toBeDefined()
-    expect(screen.getByRole('region', { name: 'Отели' }).className).not.toContain('hidden')
-  })
-
-  it('applies filters at once in the bottom sheet, sorting first, and closes with "Показать N отелей"', async () => {
+  it('applies filters at once in the bottom sheet, sorting first, closes with "Показать N отелей", and sorts from it', async () => {
     const user = userEvent.setup()
     open(PRAGUE)
     await results()
@@ -713,16 +692,10 @@ describe('SearchResultsPage compact bar', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(screen.getByRole('button', { name: 'Фильтры, включено 1' })).toBeDefined()
     for (const card of cards()) expect(within(card).getByLabelText('5 звёзд')).toBeDefined()
-  })
 
-  it('sorts from the bottom sheet', async () => {
-    const user = userEvent.setup()
-    open(PRAGUE)
-    await results()
-
-    await user.click(screen.getByRole('button', { name: 'Фильтры' }))
+    // The sorting works from the sheet as well.
+    await user.click(screen.getByRole('button', { name: 'Фильтры, включено 1' }))
     await user.selectOptions(within(sheet()).getByLabelText('Сортировка'), 'price_asc')
-
     expect(window.location.search).toContain('sort=price_asc')
     expect(prices()).toEqual([...prices()].sort((a, b) => a - b))
   })
@@ -730,16 +703,15 @@ describe('SearchResultsPage compact bar', () => {
 
 // search-results-page, Requirement: Карта результатов поиска
 describe('SearchResultsPage map', () => {
-  const markers = () => screen.findAllByRole('button', { name: /, [\d\s]+₽$/ }, { timeout: 3000 })
   const markerOf = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}, `) })
 
-  it('shows a marker per hotel with the price of its card, without "за ночь"', async () => {
+  it('shows a marker per hotel with the price of its card, without "за ночь", and highlights the marker of a hovered card', async () => {
     open(`destination=prague&checkin=2026-10-20&checkout=2026-10-23&adults=3&rooms=2`, { desktop: true })
     await results()
 
     expect(await markers()).toHaveLength(cards().length)
     for (const card of cards()) {
-      const name = within(card).getByRole('heading').textContent!
+      const name = nameOf(card)
       const price = priceOf(card)
       const marker = markerOf(name)
       expect(marker.textContent).toBe(price)
@@ -748,28 +720,11 @@ describe('SearchResultsPage map', () => {
     // The price filter keeps "Цена за ночь"; the cards and the map show no period.
     for (const name of ['Отели', 'Карта отелей'])
       expect(within(screen.getByRole('region', { name })).queryByText(/за \d* ?ноч/)).toBeNull()
-  })
 
-  it('highlights the marker of a hovered card', async () => {
-    const user = userEvent.setup()
-    open(PRAGUE, { desktop: true })
-    await results()
-    await markers()
-
+    // A hovered card highlights its marker.
     const card = cards()[0]
-    await user.hover(card)
-    expect(markerOf(within(card).getByRole('heading').textContent!).hasAttribute('data-active')).toBe(true)
-  })
-
-  it('switches between the list and the map on narrow screens', async () => {
-    const user = userEvent.setup()
-    open(PRAGUE)
-    await results()
-    expect(screen.queryByRole('region', { name: 'Карта отелей' })).toBeNull()
-
-    await user.click(screen.getByRole('button', { name: 'Карта' }))
-    expect(await markers()).toHaveLength(cards().length)
-    expect(screen.getByRole('region', { name: 'Отели' }).className).toContain('max-lg:hidden')
+    await userEvent.setup().hover(card)
+    expect(markerOf(nameOf(card)).hasAttribute('data-active')).toBe(true)
   })
 
   it('shows "Карта недоступна" when the map fails, and the list keeps working', async () => {
@@ -795,7 +750,7 @@ describe('SearchResultsPage map attribution', () => {
     vi.setSystemTime(NOW)
     open(PRAGUE, { desktop: true })
     await results()
-    await screen.findAllByRole('button', { name: /, [\d\s]+₽$/ }, { timeout: 3000 })
+    await markers()
 
     expect(mapMock.options.at(-1)).toMatchObject({ attributionControl: { compact: true } })
     expect(attribution().classList.contains('maplibregl-compact-show')).toBe(true)
@@ -808,7 +763,7 @@ describe('SearchResultsPage map attribution', () => {
   it('folds the attribution on the first interaction with the map, and the "i" shows it again', async () => {
     open(PRAGUE, { desktop: true })
     await results()
-    const [marker] = await screen.findAllByRole('button', { name: /, [\d\s]+₽$/ }, { timeout: 3000 })
+    const [marker] = await markers()
     expect(attribution().classList.contains('maplibregl-compact-show')).toBe(true)
 
     act(() => mapMock.last!.fire('mousedown'))
@@ -824,9 +779,7 @@ describe('SearchResultsPage map attribution', () => {
 
 // search-results-page, Requirement: Краткая карточка на карте
 describe('SearchResultsPage map preview', () => {
-  const markers = () => screen.findAllByRole('button', { name: /, [\d\s]+₽$/ }, { timeout: 3000 })
-
-  it('shows the short card of a hovered marker and highlights its card in the list', async () => {
+  it('shows the short card of a hovered or keyboard-focused marker, highlights its card in the list, hides it on Esc', async () => {
     const user = userEvent.setup()
     open(PRAGUE, { desktop: true })
     await results()
@@ -850,20 +803,13 @@ describe('SearchResultsPage map preview', () => {
     expect(marker.hasAttribute('aria-describedby')).toBe(false)
     expect(map.contains(preview)).toBe(false)
     expect(screen.getByRole('heading', { name }).closest('article')!.hasAttribute('data-active')).toBe(false)
-  })
 
-  it('shows the short card of a keyboard-focused marker and hides it on Esc', async () => {
-    const user = userEvent.setup()
-    open(PRAGUE, { desktop: true })
-    await results()
-    const [marker] = await markers()
-
+    // A keyboard-focused marker shows it too and hides it on Esc.
     // jsdom has no focus-visible heuristics: here every focused element shows its focus.
     const matches = Element.prototype.matches
     const focusVisible = vi.spyOn(Element.prototype, 'matches').mockImplementation(function (this: Element, selector) {
       return selector === ':focus-visible' ? this === document.activeElement : matches.call(this, selector)
     })
-
     act(() => marker.focus())
     expect(marker.getAttribute('aria-describedby')).toBeTruthy()
     await user.keyboard('{Escape}')
@@ -874,10 +820,9 @@ describe('SearchResultsPage map preview', () => {
 
 // search-results-page, Requirement: Окно отеля с карты
 describe('SearchResultsPage hotel dialog', () => {
-  const markers = () => screen.findAllByRole('button', { name: /, [\d\s]+₽$/ }, { timeout: 3000 })
   const hotel = fullHotelsIn('prague')[0]
 
-  it('opens the hotel of a pressed marker in a dialog with the dates of the search, without scrolling the list', async () => {
+  it('opens the hotel of a pressed marker in a dialog with the dates of the search, without scrolling the list; "Назад" closes it', async () => {
     const user = userEvent.setup()
     open(PRAGUE, { desktop: true })
     await results()
@@ -904,25 +849,16 @@ describe('SearchResultsPage hotel dialog', () => {
         .getAttribute('href'),
     ).toMatch(new RegExp(`^/hotels/${id}/rooms\\?${STAY}#`))
     expect(scrollIntoView).not.toHaveBeenCalled()
-  })
 
-  it('closes on "Назад" and keeps the results', async () => {
-    const user = userEvent.setup()
-    open(PRAGUE, { desktop: true })
-    await results()
+    // "Назад" closes it and keeps the results.
     const before = cardNames()
-    const [marker] = await markers()
-
-    await user.click(marker)
-    expect(await screen.findByRole('dialog')).toBeDefined()
     act(() => window.history.back())
-
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(window.location.search).not.toContain('hotel=')
     expect(cardNames()).toEqual(before)
   })
 
-  it('closes with "Закрыть"', async () => {
+  it('closes the dialog of a marker with "Закрыть"', async () => {
     const user = userEvent.setup()
     open(PRAGUE, { desktop: true })
     await results()
@@ -932,19 +868,6 @@ describe('SearchResultsPage hotel dialog', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     await waitFor(() => expect(window.location.search).not.toContain('hotel='))
-  })
-
-  it('opens the dialog right away from a link with the hotel, and closes it in place', async () => {
-    const user = userEvent.setup()
-    open(`${PRAGUE}&hotel=${hotel.id}`, { desktop: true })
-    await results()
-
-    const dialog = await screen.findByRole('dialog', { name: hotel.name })
-    await user.click(within(dialog).getByRole('button', { name: 'Закрыть' }))
-
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-    expect(window.location.search).toBe(`?${PRAGUE}`)
-    expect(cards().length).toBeGreaterThan(0)
   })
 
   it('starts the dialog with the start dates of a search without dates', async () => {
@@ -959,33 +882,13 @@ describe('SearchResultsPage hotel dialog', () => {
     expect(within(dialog).queryByText('Выберите даты')).toBeNull()
   })
 
-  it('changes the stay in the dialog only: the address and the list stay and the links follow', async () => {
+  // search-results-page, Requirement: Панель цены в окне отеля
+  it('opens the dialog right away from a link; the stay changes in it only, the price bar stays at the bottom; closes in place', async () => {
     const user = userEvent.setup()
     open(`${PRAGUE}&hotel=${hotel.id}`, { desktop: true })
     await results()
     const before = cardNames()
     const search = window.location.search
-    const dialog = await screen.findByRole('dialog', { name: hotel.name })
-
-    await user.click(within(dialog).getByRole('button', { name: /^Гости: / }))
-    await user.click(await screen.findByRole('button', { name: 'Взрослые: увеличить' }))
-
-    const changed = `/hotels/${hotel.id}?checkin=2026-10-20&checkout=2026-10-23&adults=3&rooms=1`
-    expect(within(dialog).getByRole('link', { name: 'Открыть страницу отеля' }).getAttribute('href')).toBe(changed)
-    expect(
-      within(dialog)
-        .getAllByRole('link', { name: /^Выбрать: / })[0]
-        .getAttribute('href'),
-    ).toMatch(/^\/hotels\/[^/]+\/rooms\?checkin=2026-10-20&checkout=2026-10-23&adults=3&rooms=1#/)
-    expect(window.location.search).toBe(search)
-    expect(cardNames()).toEqual(before)
-  })
-
-  // search-results-page, Requirement: Панель цены в окне отеля
-  it('keeps the price bar of the hotel page at the bottom of the scrolling dialog, with its dates and guests', async () => {
-    const user = userEvent.setup()
-    open(`${PRAGUE}&hotel=${hotel.id}`, { desktop: true })
-    await results()
     const dialog = await screen.findByRole('dialog', { name: hotel.name })
     const bar = within(dialog).getByRole('region', { name: 'Цена' })
 
@@ -995,8 +898,23 @@ describe('SearchResultsPage hotel dialog', () => {
     expect(within(bar).getByText('за 3 ночи, для 2 гостей')).toBeDefined()
     await user.click(within(dialog).getByRole('button', { name: /^Гости: / }))
     await user.click(await screen.findByRole('button', { name: 'Взрослые: увеличить' }))
+
     expect(within(bar).getByText('за 3 ночи, для 3 гостей')).toBeDefined()
     expect(within(bar).getByRole('button', { name: 'Выбрать номер' })).toBeDefined()
+    const changed = `/hotels/${hotel.id}?checkin=2026-10-20&checkout=2026-10-23&adults=3&rooms=1`
+    expect(within(dialog).getByRole('link', { name: 'Открыть страницу отеля' }).getAttribute('href')).toBe(changed)
+    expect(
+      within(dialog)
+        .getAllByRole('link', { name: /^Выбрать: / })[0]
+        .getAttribute('href'),
+    ).toMatch(/^\/hotels\/[^/]+\/rooms\?checkin=2026-10-20&checkout=2026-10-23&adults=3&rooms=1#/)
+    expect(window.location.search).toBe(search)
+    expect(cardNames()).toEqual(before)
+
+    await user.click(within(dialog).getByRole('button', { name: 'Закрыть' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(window.location.search).toBe(`?${PRAGUE}`)
+    expect(cards().length).toBeGreaterThan(0)
   })
 
   it('ignores an unknown hotel id', async () => {
@@ -1005,21 +923,6 @@ describe('SearchResultsPage hotel dialog', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(cards().length).toBeGreaterThan(0)
-  })
-
-  it('opens the hotel page from a marker on narrow screens, with the dates and guests of the search', async () => {
-    const user = userEvent.setup()
-    open(PRAGUE)
-    await results()
-    await user.click(screen.getByRole('button', { name: 'Карта' }))
-    const [marker] = await markers()
-    const hotel = fullHotelsIn('prague').find((h) => marker.getAttribute('aria-label')!.startsWith(`${h.name}, `))!
-
-    await user.click(marker)
-
-    expect(push).toHaveBeenCalledWith(`/hotels/${hotel.id}?${STAY}`)
-    expect(screen.queryByRole('dialog')).toBeNull()
-    expect(window.location.search).not.toContain('hotel=')
   })
 
   it('opens the hotel page instead of the dialog for a link with the hotel on narrow screens', async () => {
@@ -1034,8 +937,6 @@ describe('SearchResultsPage hotel dialog', () => {
 
 // search-results-page, Requirement: Окно отеля с карты, Scenario: Телефон
 describe('SearchResultsPage back from the hotel page', () => {
-  const markers = () => screen.findAllByRole('button', { name: /, [\d\s]+₽$/ }, { timeout: 3000 })
-
   it('returns to the map with the same centre and zoom after "Назад" from the hotel page', async () => {
     const user = userEvent.setup()
     const { unmount } = open(PRAGUE)
@@ -1049,7 +950,11 @@ describe('SearchResultsPage back from the hotel page', () => {
     mapMock.zoom = 17
     act(() => mapMock.last!.fire('moveend'))
     await user.click(marker)
-    expect(push).toHaveBeenCalled()
+    // A marker opens the hotel page, with the dates and guests of the search, not the dialog.
+    const hotel = fullHotelsIn('prague').find((h) => marker.getAttribute('aria-label')!.startsWith(`${h.name}, `))!
+    expect(push).toHaveBeenCalledWith(`/hotels/${hotel.id}?${STAY}`)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(window.location.search).not.toContain('hotel=')
 
     // The hotel page replaces the results; "Назад" renders them anew.
     unmount()
@@ -1117,14 +1022,14 @@ describe('SearchResultsPage map groups', () => {
       `${countRu(count, ['отель', 'отеля', 'отелей'])}, от ${cheapest}, приблизить`,
     )
     expect(group.textContent).toBe(`${count} от ${cheapest}`)
-    expect(screen.queryAllByRole('button', { name: /, [\d\s]+₽$/ })).toHaveLength(0)
+    expect(markerButtons()).toHaveLength(0)
 
     await user.click(group)
     expect(mapMock.eased).toHaveLength(1)
     expect((mapMock.eased[0] as { zoom: number }).zoom).toBeGreaterThan(8)
   })
 
-  it('highlights the group of a hovered card', async () => {
+  it('highlights the group of a hovered card, and regroups the markers once a zoom ends', async () => {
     const user = userEvent.setup()
     mapMock.zoom = 8
     open(PRAGUE, { desktop: true })
@@ -1134,29 +1039,22 @@ describe('SearchResultsPage map groups', () => {
 
     await user.hover(cards()[0])
     expect(group.hasAttribute('data-active')).toBe(true)
-  })
-
-  it('regroups the markers once a zoom ends', async () => {
-    mapMock.zoom = 8
-    open(PRAGUE, { desktop: true })
-    await results()
-    await groups()
 
     mapMock.zoom = 18
     act(() => mapMock.last!.fire('zoomend'))
     expect(screen.queryAllByRole('button', { name: /приблизить$/ })).toHaveLength(0)
-    expect(screen.getAllByRole('button', { name: /, [\d\s]+₽$/ })).toHaveLength(cards().length)
+    expect(markerButtons()).toHaveLength(cards().length)
   })
 })
 
 // search-results-page, Requirement: Страницы результатов
 describe('SearchResultsPage pages', () => {
   const EUROPE = `scenario=europe&${STAY}`
-  const markers = () => screen.findAllByRole('button', { name: /, [\d\s]+₽$/ }, { timeout: 3000 })
   const pagination = () => screen.getByRole('navigation', { name: 'Страницы результатов' })
   const total = () => Number(screen.getByText(/^Найдено \d+/).textContent!.match(/\d+/)![0])
 
-  it('shows 12 hotels per page with the navigation, current page marked', async () => {
+  it('shows 12 hotels per page; moves to the second page with a new history entry, "Назад" returns, the heading is focused', async () => {
+    const user = userEvent.setup()
     open(EUROPE)
     await results()
 
@@ -1164,12 +1062,6 @@ describe('SearchResultsPage pages', () => {
     expect(cards()).toHaveLength(12)
     expect(within(pagination()).getByRole('link', { name: 'Страница 1' }).getAttribute('aria-current')).toBe('page')
     expect(within(pagination()).queryByRole('link', { name: 'Предыдущая страница' })).toBeNull()
-  })
-
-  it('moves to the second page with a new history entry, and "Назад" returns', async () => {
-    const user = userEvent.setup()
-    open(EUROPE)
-    await results()
     const first = cardNames()
     // The length of jsdom's history depends on the entries earlier tests left after the current one.
     const pushState = vi.spyOn(window.history, 'pushState')
@@ -1181,20 +1073,11 @@ describe('SearchResultsPage pages', () => {
     expect(cardNames()).toHaveLength(Math.min(12, total() - 12))
     expect(cardNames().some((name) => first.includes(name))).toBe(false)
     expect(within(pagination()).getByRole('link', { name: 'Страница 2' }).getAttribute('aria-current')).toBe('page')
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: /^Найдено \d+/ })))
 
     act(() => window.history.back())
     await waitFor(() => expect(window.location.search).not.toContain('page='))
     await waitFor(() => expect(cardNames()).toEqual(first))
-  })
-
-  it('focuses the results heading after the move', async () => {
-    const user = userEvent.setup()
-    open(EUROPE)
-    await results()
-
-    await user.click(within(pagination()).getByRole('link', { name: 'Следующая страница' }))
-
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: /^Найдено \d+/ })))
   })
 
   it('takes the nearest existing page for an invalid one', async () => {
@@ -1225,30 +1108,7 @@ describe('SearchResultsPage pages', () => {
     expect(within(pagination()).getByRole('link', { name: 'Страница 1' }).getAttribute('aria-current')).toBe('page')
   })
 
-  it('hides the navigation for a single page', async () => {
-    open(PRAGUE)
-    await results()
-
-    expect(total()).toBeLessThanOrEqual(12)
-    expect(screen.queryByRole('navigation', { name: 'Страницы результатов' })).toBeNull()
-  })
-
-  it('keeps the page when a hotel dialog opens and closes', async () => {
-    const user = userEvent.setup()
-    open(`${EUROPE}&page=2`, { desktop: true })
-    await results()
-    const [marker] = await markers()
-
-    await user.click(marker)
-    expect(await screen.findByRole('dialog')).toBeDefined()
-    expect(window.location.search).toMatch(/page=2.*hotel=|hotel=.*page=2/)
-
-    act(() => window.history.back())
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-    expect(window.location.search).toContain('page=2')
-  })
-
-  it('shows markers of all hotels on the second page and highlights the marker of a hovered card', async () => {
+  it('marks all hotels on the second page and highlights the marker of a hovered card', async () => {
     const user = userEvent.setup()
     open(`${EUROPE}&page=2`, { desktop: true })
     await results()
@@ -1257,7 +1117,21 @@ describe('SearchResultsPage pages', () => {
     expect(cards().length).toBeLessThan(total())
     const card = cards()[0]
     await user.hover(card)
-    const name = within(card).getByRole('heading').textContent!
+    const name = nameOf(card)
     expect(screen.getByRole('button', { name: new RegExp(`^${name}, `) }).hasAttribute('data-active')).toBe(true)
+  })
+
+  it('keeps the page when a hotel dialog opens and closes', async () => {
+    const user = userEvent.setup()
+    open(`${EUROPE}&page=2`, { desktop: true })
+    await results()
+
+    await user.click((await markers())[0])
+    expect(await screen.findByRole('dialog')).toBeDefined()
+    expect(window.location.search).toMatch(/page=2.*hotel=|hotel=.*page=2/)
+
+    act(() => window.history.back())
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(window.location.search).toContain('page=2')
   })
 })

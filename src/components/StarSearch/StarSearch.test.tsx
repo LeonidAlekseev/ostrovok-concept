@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { addDays, formatLongDate, todayIso } from '../../lib/dates'
 import { StarSearch } from './StarSearch'
-import { StarSearchDialog } from './StarSearchDialog'
+import { READING_MS, StarSearchDialog } from './StarSearchDialog'
 import { ZodiacRing } from './ZodiacRing'
 import { renderReadingVideo } from './starVideo'
 
@@ -19,11 +19,16 @@ beforeEach(() => {
   // Tuesday, 20 October 2026: the calendar's past days and the +10 day check-in stay in one month.
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(2026, 9, 20, 12))
+  // The reading lasts READING_MS: the tests do not wait for it in real time.
+  const realSetTimeout = globalThis.setTimeout
+  vi.spyOn(globalThis, 'setTimeout').mockImplementation(((handler: TimerHandler, ms?: number, ...args: unknown[]) =>
+    realSetTimeout(handler, ms === READING_MS ? 50 : ms, ...args)) as typeof setTimeout)
   URL.createObjectURL = vi.fn(() => 'blob:video')
   URL.revokeObjectURL = vi.fn()
 })
 
 afterEach(() => {
+  vi.restoreAllMocks()
   vi.useRealTimers()
   vi.unstubAllGlobals()
   share.mockReset()
@@ -155,7 +160,7 @@ describe('StarSearch form', () => {
 
 // star-search, Requirement: Гадание и результат
 describe('StarSearch reading', () => {
-  it('reads the stars for 2.5 s, then shows the result', async () => {
+  it('reads the stars, then shows the result', async () => {
     const user = userEvent.setup()
     renderDialog()
     await fillForm(user)
@@ -163,7 +168,7 @@ describe('StarSearch reading', () => {
 
     expect(screen.getByRole('status').textContent).toBe('Звёзды совещаются…')
     expect(screen.queryByRole('heading', { name: /ваш знак/ })).toBeNull()
-    expect(await screen.findByRole('heading', { name: /Анна, ваш знак — Овен/ }, { timeout: 4000 })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: /Анна, ваш знак — Овен/ }, {})).toBeTruthy()
   })
 
   it("skips the animation under reduced motion and answers with a selection of the stars' hotels", async () => {
@@ -266,7 +271,7 @@ describe('StarSearch video', () => {
     vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _type, { onProgress }) => {
       await new Promise<void>((resolve) => (finish = resolve))
       onProgress(0)
-      for (let i = 1; i <= 300; i++) {
+      for (let i = 1; i <= 100; i++) {
         onProgress(i / 1000)
         await new Promise((resolve) => setTimeout(resolve, 0))
       }
@@ -280,11 +285,11 @@ describe('StarSearch video', () => {
     const observer = new MutationObserver(() => writes.push(bar.getAttribute('aria-valuenow')!))
     observer.observe(bar, { attributes: true, subtree: true })
     finish()
-    await screen.findByRole('button', { name: /Скачать видео|Поделиться видео/ }, { timeout: 12_000 })
+    await screen.findByRole('button', { name: /Скачать видео|Поделиться видео/ }, {})
     observer.disconnect()
-    // 300 frames cover 30 % of the bar.
-    expect(writes.length).toBeLessThanOrEqual(31)
-  }, 15_000)
+    // 100 frames cover 10 % of the bar.
+    expect(writes.length).toBeLessThanOrEqual(11)
+  })
 
   it('warns not to hide the tab while recording and says so after a restart', async () => {
     vi.stubGlobal('MediaRecorder', { isTypeSupported: () => true })
