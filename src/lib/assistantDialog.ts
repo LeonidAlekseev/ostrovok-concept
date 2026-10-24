@@ -1,17 +1,15 @@
 import type { Brief, Plan, Question } from './assistant'
-import type { RouteCardData } from './routes'
 
 /**
  * The assistant's dialog in sessionStorage, so a reload of the tab keeps what Эвал has already written down.
- * The pending reply is not kept. A damaged or foreign value reads as no dialog.
+ * The pending reply is not kept. A damaged or foreign value reads as no dialog; the ready-made route a plan of
+ * an older version kept is dropped, its plan stays.
  */
 
 export interface DialogMessage {
   from: 'agent' | 'user'
   text: string
   plan?: Plan
-  /** The ready-made route over the plan's options. */
-  route?: RouteCardData | null
 }
 
 export interface Dialog {
@@ -69,20 +67,19 @@ const isPlan = (value: unknown): value is Plan =>
       typeof o.fitsBudget === 'boolean',
   )
 
-const isRoute = (value: unknown) => isObject(value) && isString(value.id) && isString(value.title)
-
 const isMessage = (value: unknown): value is DialogMessage =>
   isObject(value) &&
   (value.from === 'agent' || value.from === 'user') &&
   isString(value.text) &&
-  (value.plan === undefined || isPlan(value.plan)) &&
-  (value.route === undefined || value.route === null || isRoute(value.route))
+  (value.plan === undefined || isPlan(value.plan))
 
 function parse(value: unknown): Dialog | null {
   if (!isObject(value) || !Array.isArray(value.messages) || !value.messages.every(isMessage)) return null
   if (!isBrief(value.brief)) return null
   if (value.question !== null && !isQuestion(value.question)) return null
-  return { messages: value.messages, brief: value.brief, question: value.question }
+  // Only the known fields: a route of an older version stays behind.
+  const messages = value.messages.map(({ from, text, plan }) => (plan ? { from, text, plan } : { from, text }))
+  return { messages, brief: value.brief, question: value.question }
 }
 
 /** The saved dialog, or `null` if there is none, it is damaged, or the storage is unavailable. */

@@ -1,19 +1,18 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
-import { ChevronRight, Dices, Route as RouteIcon } from 'lucide-react'
+import { BedDouble, ChevronRight } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import type { Destination } from '@/data/destinations'
-import { GLOBE_CENTER, spinTarget, spinView, viewPlacing, type GlobeSpin, type GlobeView } from '../../lib/globe'
+import type { HotelSummary } from '@/lib/catalog'
+import { hotelHref } from '@/lib/search'
+import { GLOBE_CENTER, viewPlacing, type GlobeView } from '../../lib/globe'
 import { appEnv, isProduction } from '../../lib/env'
 import { formatPrice } from '../../lib/format'
 import { SLOGAN } from '../../lib/shareMedia'
-import type { RouteCardData } from '../../lib/routes'
-import { useDestinations } from '../Catalog/useDestinations'
 import { createFrameMeter, type FrameWindow } from './globePerformance'
 import { createGlobeRenderer, type GlobeRenderer } from './globeRenderer'
 import {
-  createRouteFeed,
+  createHotelFeed,
   depthOpacity,
   pickOther,
   pickSpotlightCity,
@@ -21,12 +20,14 @@ import {
   type Scene,
   type Spotlight,
 } from './globeScene'
+import { cardShift, type CardFit } from './cardFit'
 import { StatsPanel, type StatsPanelHandle } from './StatsPanel'
 
 interface Props {
-  /** The cities with routes: a pin each. */
+  /** The cities with new hotels: a pin each. */
   cities: Destination[]
-  routes: readonly RouteCardData[]
+  /** The new hotels the cards show. */
+  hotels: readonly HotelSummary[]
   /** City spotlighted first (and in the server-rendered page). */
   featured: Destination
 }
@@ -42,12 +43,10 @@ const MAX_DRAG_SPEED = 400
 const MAX_TILT = 85
 /** How quickly the globe turns a selected pin into place (per second). */
 const CENTER_RATE = 3
-/** Length of the spin to a random idea, ms. */
-const SPIN_MS = 2000
 /** Share of the hero's height covered by the search form, and the gap kept above it, px. */
 const FORM_OVERLAP = 0.24
 const SELECTED_GAP = 16
-/** Seconds each route stays in the spotlight. */
+/** Seconds each hotel stays in the spotlight. */
 const SPOTLIGHT_SECONDS = 5
 const REDUCED_MOTION_SPOTLIGHT_SECONDS = 8
 /** The globe holds still while the page scrolls and this long after: the browser needs the frame budget to paint the page. */
@@ -56,13 +55,9 @@ const SCROLL_PAUSE_MS = 150
 const MIN_FRAME_MS = 10
 /** Below this speed (degrees per second) the globe is considered standing, so it is not redrawn. */
 const MIN_SPEED = 0.001
-/** Entrance of a new spotlight: the card fades in, then the routes to its city. */
+/** Entrance of a new spotlight: the card fades in. */
 const SPOTLIGHT_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
 const CARD_FADE_MS = 700
-const ROUTE_FADE_MS = 1000
-const ROUTE_DELAY_MS = 200
-/** Routes to the first spotlight, matching the reference composition. */
-const initialSourceIds = ['london', 'lisbon', 'tbilisi']
 
 const hero = [
   // The sphere is much larger than the viewport: it rises from the lower right behind the title.
@@ -71,14 +66,24 @@ const hero = [
   'md:[--globe-size:clamp(760px,76vw,980px)] md:[--globe-top:calc(var(--header-height)+32px)] md:[--globe-x:64%]',
   'relative isolate h-[calc(var(--globe-top)+var(--globe-size)*0.76)] overflow-hidden text-brand-foreground md:h-[calc(var(--globe-top)+var(--globe-size)*0.62)]',
   'bg-brand bg-[radial-gradient(ellipse_60%_45%_at_85%_30%,color-mix(in_srgb,var(--decor-glow)_75%,transparent),transparent_70%)]',
-  // A long press on the globe must not start selecting the title or the hint (iOS) or open the callout.
+  // A long press on the globe must not start selecting the title (iOS) or open the callout.
   'select-none [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none]',
-  // Fade the bottom of the scene into the page behind the search form.
-  "after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:z-3 after:h-[30%] after:bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_0%,transparent)_0%,color-mix(in_srgb,var(--decor-haze)_80%,transparent)_60%,var(--background)_100%)] after:content-['']",
+  // Fade the bottom of the scene into the page behind the search form, lightly at first: the globe shows through
+  // the top of the assistant's glass.
+  "after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:z-3 after:h-[30%] after:bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_0%,transparent)_0%,color-mix(in_srgb,var(--decor-haze)_45%,transparent)_75%,var(--background)_100%)] after:content-['']",
 ].join(' ')
 const earth =
-  // Translucent glassy sphere: the dots and lines on top carry the geography.
-  'relative size-full rounded-full bg-[radial-gradient(circle_at_65%_15%,color-mix(in_srgb,var(--decor-light)_45%,transparent),transparent_40%),radial-gradient(circle_at_50%_50%,color-mix(in_srgb,var(--decor-light)_12%,transparent)_50%,color-mix(in_srgb,var(--decor-light)_50%,transparent)_100%)]'
+  // The ocean, lit from the upper right like the land dots on the canvas; it is also the whole globe until they load.
+  'relative size-full rounded-full bg-[radial-gradient(circle_at_68%_28%,var(--decor-ocean-light),var(--decor-ocean)_42%,var(--decor-ocean-deep)_95%)]'
+const earthShade = [
+  // Over the land and the ocean alike: a highlight on the sunlit side, the night side darkens towards the limb,
+  // and the atmosphere lights the rim from inside.
+  'pointer-events-none absolute inset-0 rounded-full',
+  'bg-[radial-gradient(circle_at_68%_28%,color-mix(in_srgb,var(--decor-light)_30%,transparent),transparent_28%,transparent_45%,color-mix(in_srgb,var(--decor-ocean-deep)_55%,transparent)_80%)]',
+  'shadow-[inset_0_0_28px_6px_color-mix(in_srgb,var(--decor-atmosphere)_75%,transparent)]',
+].join(' ')
+const atmosphere =
+  'absolute inset-0 rounded-full shadow-[0_0_0_1.5px_color-mix(in_srgb,var(--decor-light)_70%,transparent),0_0_26px_8px_color-mix(in_srgb,var(--decor-atmosphere)_85%,transparent),0_0_90px_28px_color-mix(in_srgb,var(--decor-atmosphere)_55%,transparent)]'
 const sun = [
   // The glare sits exactly on the limb, at this angle from the globe's centre (clockwise from 3 o'clock).
   // The globe overflows a phone's screen sideways: there the glare stays on the visible part of the limb.
@@ -89,7 +94,6 @@ const sun = [
 // Markers are placed by --x/--y, percent of the globe box: --unit is 1% of it.
 const cityGlow =
   'pointer-events-none absolute top-0 left-0 aspect-[1.3] w-[16%] translate-x-[calc(var(--x)_*_var(--unit)_-_50%)] translate-y-[calc(var(--y)_*_var(--unit)_-_50%)] bg-[radial-gradient(ellipse,color-mix(in_srgb,var(--decor-light)_70%,transparent)_0%,color-mix(in_srgb,var(--decor-glow-soft)_30%,transparent)_35%,transparent_70%)] opacity-[var(--o,1)] mix-blend-screen'
-const routeStroke = 'fill-none [stroke-linecap:round] [vector-effect:non-scaling-stroke]'
 const pin = [
   'group absolute top-0 left-0 touch-none rounded-[50%_50%_50%_50%/40%_40%_60%_60%] text-primary opacity-[var(--o,1)] will-change-[translate,scale] data-hidden:invisible',
   'translate-x-[calc(var(--x)_*_var(--unit)_-_50%)] translate-y-[calc(var(--y)_*_var(--unit)_-_100%)]',
@@ -115,8 +119,10 @@ const placeCard = [
   'max-md:[--card-dx:-50%] max-md:[--card-dy:12px]',
   // Inset of the picture, the same on every side; its size equals the text block's height.
   '[--card-pad:clamp(5px,1.4vw,7px)] [--badge-size:clamp(9px,2.5vw,12px)] [--name-size:clamp(13px,3.5vw,17px)] [--meta-size:clamp(10px,2.75vw,13px)] [--text-gap:2px]',
-  'absolute top-0 left-0 z-5 w-max max-w-[min(26rem,calc(100vw-24px))] md:max-w-[min(26rem,calc(50vw-40px))] rounded-[clamp(10px,3vw,14px)] border-0 bg-card py-(--card-pad) pr-[calc(var(--card-pad)_+_4px)] pl-(--card-pad) text-left text-foreground',
-  'translate-x-[calc(var(--x)_*_var(--unit)_+_var(--card-dx))] translate-y-[calc(var(--y)_*_var(--unit)_+_var(--card-dy)_-_var(--card-lift))] touch-none opacity-[var(--o,1)] will-change-transform',
+  // The window of the assistant under the globe (SearchPanel: the glass between the page margins), marked
+  // [data-assistant-window]. On phones the card is no wider than it (here) and is kept inside it (cardShift).
+  'absolute top-0 left-0 z-5 w-max max-w-[min(26rem,calc(100vw-2*var(--page-x)))] md:max-w-[min(26rem,calc(50vw-40px))] rounded-[clamp(10px,3vw,14px)] border-0 bg-card py-(--card-pad) pr-[calc(var(--card-pad)_+_4px)] pl-(--card-pad) text-left text-foreground',
+  'translate-x-[calc(var(--x)_*_var(--unit)_+_var(--card-dx)_+_var(--card-shift,0px))] translate-y-[calc(var(--y)_*_var(--unit)_+_var(--card-dy)_-_var(--card-lift))] touch-none opacity-[var(--o,1)] will-change-transform',
   'shadow-[0_14px_34px_color-mix(in_srgb,var(--decor-hotel-shadow)_25%,transparent)] transition-shadow duration-200 ease-[ease]',
   'hover:shadow-[0_18px_40px_color-mix(in_srgb,var(--decor-hotel-shadow)_32%,transparent)] hover:[--card-lift:4px]',
 ].join(' ')
@@ -124,44 +130,34 @@ const placeIcon =
   // Concentric with the card's corner.
   'grid aspect-square w-[calc(1.25_*_(var(--badge-size)_+_var(--name-size)_+_var(--meta-size))_+_2_*_var(--text-gap))] flex-none place-items-center rounded-[calc(clamp(10px,3vw,14px)_-_var(--card-pad)_+_2px)] bg-[linear-gradient(135deg,var(--decor-hotel-from),var(--decor-hotel-to))] text-primary-foreground [&_svg]:h-auto [&_svg]:w-[48%]'
 
-export function Hero({ cities: markers, routes, featured }: Props) {
-  const destinations = useDestinations()
-  const [feed] = useState(() => createRouteFeed(routes))
+export function Hero({ cities: markers, hotels, featured }: Props) {
+  const [feed] = useState(() => createHotelFeed(hotels))
   const [spotlight, setSpotlight] = useState<Spotlight>(() => ({
     destination: featured,
-    route: feed.has(featured.id) ? feed.next(featured.id)! : null,
-    sources: initialSourceIds.flatMap((id) => destinations.find((d) => d.id === id) ?? []),
+    hotel: feed.has(featured.id) ? feed.next(featured.id)! : null,
   }))
-  /** The chosen pin: the globe turns it to the middle and its card shows one of the city's ideas. */
+  /** The chosen pin: the globe turns it to the middle and its card shows one of the city's hotels. */
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // The initial layout is rendered once; afterwards the animation loop owns all positions.
   const [initialScene] = useState(() => sceneAt(markers, spotlight, GLOBE_CENTER))
   const [spinning, setSpinning] = useState(false)
-  /** Read out once a random idea is shown. */
-  const [announcement, setAnnouncement] = useState('')
 
   const heroRef = useRef<HTMLElement>(null)
   const copyRef = useRef<HTMLDivElement>(null)
-  const hintRef = useRef<HTMLParagraphElement>(null)
-  const randomRef = useRef<HTMLButtonElement>(null)
   const globeRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const pinRefs = useRef(new Map<string, HTMLButtonElement>())
-  const routeRefs = useRef<(SVGGElement | null)[]>([])
   const glowRef = useRef<HTMLDivElement>(null)
   const cardRef = useRef<HTMLDivElement>(null)
   const statsRef = useRef<StatsPanelHandle>(null)
+  const fitRef = useRef<CardFit | null>(null)
   const spotlightRef = useRef(spotlight)
   const pausedRef = useRef({ hover: false, focus: false, selected: false })
   const viewRef = useRef({ ...GLOBE_CENTER })
   /** View the globe is turning to, so that the selected pin comes to the middle of the visible globe. */
   const targetRef = useRef<GlobeView | null>(null)
-  /** The spin to a random idea; while it lasts, the drag, the own spin and the turn to a pin wait. */
-  const spinRef = useRef<(GlobeSpin & { onEnd: () => void }) | null>(null)
-  /** The idea each city showed last, so that the next opening of its pin shows another one. */
+  /** The hotel each city showed last, so that the next opening of its pin shows another one. */
   const shownRef = useRef(new Map<string, string>())
-  /** Set when a random idea opens: its card takes the focus once painted. */
-  const focusCardRef = useRef(false)
 
   /** Writes the current scene straight to the DOM, bypassing React on every frame. */
   const paint = useCallback((scene: Scene) => {
@@ -176,36 +172,52 @@ export function Hero({ cities: markers, routes, featured }: Props) {
       if (!el) continue
       setPosition(el, scene.hub.x, scene.hub.y)
       el.style.setProperty('--o', hubOpacity)
+      if (el === cardRef.current) el.style.setProperty('--card-shift', `${cardShift(fitRef.current, scene.hub.x)}px`)
     }
-    routeRefs.current.forEach((g, i) => {
-      const route = scene.routes[i]
-      if (!g) return
-      if (route) for (const path of g.children) path.setAttribute('d', route.d)
-      g.style.opacity = String(route?.opacity ?? 0)
-    })
   }, [])
+
+  // Measures what keeps the card inside the assistant's window on phones; measured again when any of them resizes.
+  useLayoutEffect(() => {
+    const globe = globeRef.current
+    const card = cardRef.current
+    const win = document.querySelector('[data-assistant-window]')
+    if (!globe || !card || !win) return
+    const measure = () => {
+      const g = globe.getBoundingClientRect()
+      const w = win.getBoundingClientRect()
+      fitRef.current = {
+        globeLeft: g.left,
+        globeWidth: g.width,
+        winLeft: w.left,
+        winRight: w.right,
+        cardWidth: card.getBoundingClientRect().width,
+        phone: !window.matchMedia('(min-width: 768px)').matches,
+      }
+      card.style.setProperty(
+        '--card-shift',
+        `${cardShift(fitRef.current, Number(card.style.getPropertyValue('--x')))}px`,
+      )
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    for (const el of [globe, card, win]) observer.observe(el)
+    window.addEventListener('resize', measure)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [spotlight.hotel])
 
   // A new spotlight is painted before the browser shows it, so the card never flashes at a stale spot.
   useLayoutEffect(() => {
     const changed = spotlightRef.current !== spotlight
     spotlightRef.current = spotlight
-    if (spotlight.route) shownRef.current.set(spotlight.destination.id, spotlight.route.id)
+    if (spotlight.hotel) shownRef.current.set(spotlight.destination.id, spotlight.hotel.id)
     paint(sceneAt(markers, spotlight, viewRef.current))
-    if (focusCardRef.current) {
-      focusCardRef.current = false
-      cardRef.current?.querySelector('a')?.focus({ preventScroll: true })
-    }
-    // The card and its routes fade in at the new city instead of jumping there (not on the first render:
-    // the server-rendered card is already in place). Animations override the per-frame depth opacity
-    // only while they run.
+    // The card fades in at the new city instead of jumping there (not on the first render: the server-rendered
+    // card is already in place). The animation overrides the per-frame depth opacity only while it runs.
     if (!changed || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     cardRef.current?.animate({ opacity: [0, 1] }, { duration: CARD_FADE_MS, easing: SPOTLIGHT_EASE })
-    for (const group of routeRefs.current)
-      for (const path of group?.children ?? [])
-        path.animate(
-          { opacity: [0, 1] },
-          { duration: ROUTE_FADE_MS, delay: ROUTE_DELAY_MS, easing: SPOTLIGHT_EASE, fill: 'backwards' },
-        )
   }, [markers, spotlight, paint])
 
   useEffect(() => {
@@ -252,15 +264,15 @@ export function Hero({ cities: markers, routes, featured }: Props) {
         {
           globe: globeRect,
           hero: hero.getBoundingClientRect(),
-          avoid: [copyRef, hintRef, randomRef].map((ref) => ref.current!.getBoundingClientRect()),
+          avoid: [copyRef.current!.getBoundingClientRect()],
           card: { left: card.left - hubX, right: card.right - hubX, top: card.top - hubY, bottom: card.bottom - hubY },
         },
         recent,
       )
       if (!picked) return
-      recent.unshift(picked.city.id)
+      recent.unshift(picked.id)
       recent.length = Math.min(recent.length, 4)
-      setSpotlight({ destination: picked.city, route: feed.next(picked.city.id)!, sources: picked.sources })
+      setSpotlight({ destination: picked, hotel: feed.next(picked.id)! })
     }
 
     const tick = (now: number) => {
@@ -277,18 +289,7 @@ export function Hero({ cities: markers, routes, featured }: Props) {
       const canSpin = ready && !reducedMotion.matches
       const view = viewRef.current
 
-      const spin = spinRef.current
-      if (spin) {
-        // The spin to a random idea alone turns the globe; the own spin picks up from rest afterwards.
-        if (Number.isNaN(spin.start)) spin.start = now
-        Object.assign(view, spinView(spin, now))
-        speed = 0
-        if (now >= spin.start + spin.duration) {
-          spinRef.current = null
-          elapsed = 0
-          spin.onEnd()
-        }
-      } else if (drag && dt > 0) {
+      if (drag && dt > 0) {
         // Ease in and out of rotation instead of starting or stopping abruptly. A drag pulls the spin
         // towards the pointer's speed; once released, the globe coasts back to its own pace.
         // Near the centre one radius of pointer travel turns the globe by one radian.
@@ -306,7 +307,7 @@ export function Hero({ cities: markers, routes, featured }: Props) {
       }
       view.lon -= speed * dt
       const target = targetRef.current
-      if (target && !drag && !spin) {
+      if (target && !drag) {
         const k = reducedMotion.matches ? 1 : Math.min(dt * CENTER_RATE, 1)
         const dLat = target.lat - view.lat
         const dLon = ((((target.lon - view.lon) % 360) + 540) % 360) - 180
@@ -315,7 +316,7 @@ export function Hero({ cities: markers, routes, featured }: Props) {
         if (Math.abs(dLat) < 0.01 && Math.abs(dLon) < 0.01) targetRef.current = null
       }
       const period = reducedMotion.matches ? REDUCED_MOTION_SPOTLIGHT_SECONDS : SPOTLIGHT_SECONDS
-      if (!paused && !spinRef.current) elapsed += dt
+      if (!paused) elapsed += dt
       const scene = sceneAt(markers, spotlightRef.current, view)
 
       let drew = false
@@ -343,7 +344,7 @@ export function Hero({ cities: markers, routes, featured }: Props) {
     }
 
     const onPointerDown = (e: PointerEvent) => {
-      if (!ready || drag || spinRef.current || e.button !== 0) return
+      if (!ready || drag || e.button !== 0) return
       drag = { pointerId: e.pointerId, lastX: e.clientX, lastY: e.clientY, dx: 0, dy: 0 }
       // A drag takes over from turning to the selected pin.
       targetRef.current = null
@@ -400,54 +401,17 @@ export function Hero({ cities: markers, routes, featured }: Props) {
     )
   }, [markers, feed, selectedId, spotlight])
 
-  /** Opens the city's pin with a random idea of the city, another than it showed last; returns the idea. */
-  const openIdea = (city: Destination) => {
-    const route = pickOther(feed.all(city.id), shownRef.current.get(city.id)) ?? null
+  /** Opens the city's pin with a random new hotel of the city, another than it showed last. */
+  const openHotel = (city: Destination) => {
     setSelectedId(city.id)
     // The card moves to the city, so it never covers the pin.
-    setSpotlight((current) => ({
-      destination: city,
-      route,
-      sources: current.destination.id === city.id ? current.sources : [],
-    }))
-    return route
+    setSpotlight({ destination: city, hotel: pickOther(feed.all(city.id), shownRef.current.get(city.id)) ?? null })
   }
 
   /** A pin toggles its choice. */
   const choosePin = (city: Destination) => {
     if (selectedId === city.id) return setSelectedId(null)
-    openIdea(city)
-  }
-
-  /** Spins the globe more than a full turn to a random city with routes and opens its pin; ignored mid-spin. */
-  const showRandomIdea = () => {
-    if (spinRef.current) return
-    const city = pickOther(
-      markers.filter((d) => feed.has(d.id)),
-      spotlightRef.current.destination.id,
-    )
-    if (!city) return
-    const reveal = () => {
-      const route = openIdea(city)
-      focusCardRef.current = true
-      setAnnouncement(route ? `Случайная идея: ${route.title}, ${city.name}` : '')
-    }
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return reveal()
-    setSelectedId(null)
-    targetRef.current = null
-    const view = viewRef.current
-    // The city stops where its open pin is turned to anyway, so the globe barely moves after the spin.
-    const end = viewAboveForm(city, heroRef.current!, globeRef.current!, cardRef.current, () =>
-      sceneAt(markers, spotlightRef.current, view),
-    ) ?? { lat: view.lat, lon: city.lon }
-    spinRef.current = {
-      from: { ...view },
-      to: spinTarget(view, end),
-      // Set by the first frame of the spin.
-      start: Number.NaN,
-      duration: SPIN_MS,
-      onEnd: reveal,
-    }
+    openHotel(city)
   }
 
   const pause = (key: 'hover' | 'focus', value: boolean) => () => {
@@ -460,7 +424,7 @@ export function Hero({ cities: markers, routes, featured }: Props) {
     onBlur: pause('focus', false),
   }
 
-  const { destination, route } = spotlight
+  const { destination, hotel } = spotlight
 
   return (
     <section ref={heroRef} className={hero} aria-labelledby="hero-title">
@@ -474,40 +438,14 @@ export function Hero({ cities: markers, routes, featured }: Props) {
         </h1>
       </div>
 
-      {/* The button sits beside the hint on phones, under it on wide screens: either way clear of the open pin. */}
-      <div className="pointer-events-none relative z-4 mt-[clamp(32px,9vw,64px)] flex flex-wrap items-start gap-x-3 gap-y-4 pr-(--page-x) pl-[calc(var(--page-x)+4px)] md:flex-col md:gap-[clamp(20px,6vw,36px)] md:pl-[calc(max(0px,(100%-var(--page-max))/2)+var(--page-x)+8px)]">
-        <p
-          ref={hintRef}
-          className="w-[7em] origin-top-left -rotate-10 font-hand text-[clamp(17px,4.6vw,27px)]/[1.05] font-semibold text-primary"
-          aria-hidden
-        >
-          Вращай глобус — воплощай мечту
-        </p>
-        <Button
-          ref={randomRef}
-          shape="pill"
-          className="pointer-events-auto shadow-(--shadow-primary) max-md:ml-auto max-md:h-9 max-md:px-3.5 max-md:text-sm"
-          onClick={showRandomIdea}
-        >
-          <Dices aria-hidden />
-          Случайная идея
-        </Button>
-      </div>
-      <p role="status" className="sr-only">
-        {announcement}
-      </p>
-
-      {/* No z-index or transform: the globe makes no stacking context of its own, so the route card can rise
-          above the hint while the pins stay under the faded bottom. No container query units for --unit: Safari
-          turns a query container into its own stacking layer, trapping the route card under the hint. */}
+      {/* No z-index or transform: the globe makes no stacking context of its own, so the hotel card can rise
+          above the title while the pins stay under the faded bottom. No container query units for --unit: Safari
+          turns a query container into its own stacking layer, trapping the hotel card under the title. */}
       <div
         ref={globeRef}
         className="absolute top-(--globe-top) left-[calc(var(--globe-x)_-_var(--globe-size)/2)] aspect-square w-(--globe-size) [--unit:calc(var(--globe-size)/100)]"
       >
-        <div
-          className="absolute inset-0 rounded-full shadow-[0_0_0_1.5px_color-mix(in_srgb,var(--decor-light)_60%,transparent),0_0_24px_6px_color-mix(in_srgb,var(--decor-glow-soft)_70%,transparent),0_0_80px_24px_color-mix(in_srgb,var(--decor-glow)_55%,transparent)]"
-          aria-hidden
-        />
+        <div className={atmosphere} aria-hidden />
         <div className={earth} aria-hidden />
         {/* Only the disc itself can be grabbed; on it, swipes in any direction turn the globe. */}
         <canvas
@@ -515,44 +453,9 @@ export function Hero({ cities: markers, routes, featured }: Props) {
           className={`absolute inset-0 size-full touch-none transition-opacity duration-600 ease-[ease] [clip-path:circle(50%)] data-dragging:cursor-grabbing ${spinning ? 'cursor-grab opacity-100' : 'opacity-0'}`}
           aria-hidden
         />
-        <div
-          className="pointer-events-none absolute inset-0 rounded-full shadow-[inset_0_0_30px_6px_color-mix(in_srgb,var(--decor-rim)_55%,transparent)]"
-          aria-hidden
-        />
+        <div className={earthShade} aria-hidden />
         <div className={sun} aria-hidden />
         <div ref={glowRef} className={cityGlow} style={positionStyle(initialScene.hub)} aria-hidden />
-
-        <svg
-          className="pointer-events-none absolute inset-0 size-full overflow-visible"
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-          aria-hidden
-        >
-          {initialScene.routes.map((route, i) => (
-            <g
-              key={i}
-              ref={(el) => {
-                routeRefs.current[i] = el
-              }}
-              className="transition-opacity duration-400 ease-[ease]"
-              style={{ opacity: route.opacity }}
-            >
-              {/* Two wide translucent strokes fake the glow: a blur filter would re-run on every frame. */}
-              <path
-                className={`${routeStroke} stroke-[color-mix(in_srgb,var(--decor-light)_12%,transparent)] stroke-10`}
-                d={route.d}
-              />
-              <path
-                className={`${routeStroke} stroke-[color-mix(in_srgb,var(--decor-light)_30%,transparent)] stroke-4`}
-                d={route.d}
-              />
-              <path
-                className={`${routeStroke} stroke-[color-mix(in_srgb,var(--decor-light)_95%,transparent)] stroke-[1.3]`}
-                d={route.d}
-              />
-            </g>
-          ))}
-        </svg>
 
         {markers.map((d) => {
           const isHub = d.id === destination.id
@@ -572,7 +475,7 @@ export function Hero({ cities: markers, routes, featured }: Props) {
               }`}
               style={{ ...positionStyle(point), '--o': depthOpacity(point.depth).toFixed(3) } as CSSProperties}
               data-hidden={point.depth <= 0.05 || undefined}
-              aria-label={`${d.name}, ${d.country} — идеи путешествий`}
+              aria-label={`${d.name}, ${d.country} — отели`}
               aria-pressed={selectedId === d.id}
               onClick={() => choosePin(d)}
               {...pauseHandlers}
@@ -585,15 +488,15 @@ export function Hero({ cities: markers, routes, featured }: Props) {
           )
         })}
 
-        {route && (
+        {hotel && (
           <div ref={cardRef} className={placeCard} style={positionStyle(initialScene.hub)} {...pauseHandlers}>
-            {/* Re-keyed per idea so every new one plays the entrance animation. */}
+            {/* Re-keyed per hotel so every new one plays the entrance animation. */}
             <div
-              key={`${destination.id}/${route.id}`}
+              key={`${destination.id}/${hotel.id}`}
               className="flex animate-in items-center gap-[clamp(7px,2vw,12px)] animation-duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] fade-in zoom-in-97 slide-in-from-bottom-2 motion-reduce:animate-none"
             >
               <span className={placeIcon} aria-hidden>
-                <RouteIcon />
+                <BedDouble />
               </span>
               <div className="flex min-w-0 flex-col gap-(--text-gap) leading-[1.25]">
                 {/* Line height 1.25 and no vertical padding: the picture is sized from the three text lines. */}
@@ -601,16 +504,16 @@ export function Hero({ cities: markers, routes, featured }: Props) {
                   variant="success"
                   className="self-start rounded-sm px-1 py-0 text-(length:--badge-size) leading-[1.25] tracking-[0.02em] uppercase"
                 >
-                  Маршрут · {destination.name}
+                  Новый отель · {destination.name}
                 </Badge>
                 {/* The link covers the whole card. */}
                 <Link
-                  href={`/routes/${route.id}`}
+                  href={hotelHref(hotel.id)}
                   className="flex min-w-0 flex-col rounded-sm after:absolute after:inset-0 after:content-['']"
                 >
-                  <span className="truncate text-(length:--name-size) font-[650]">{route.title}</span>
+                  <span className="truncate text-(length:--name-size) font-[650]">{hotel.name}</span>
                   <span className="truncate text-(length:--meta-size) text-muted-foreground">
-                    {route.author} · ≈ {formatPrice(route.price)}
+                    {destination.name} · от {formatPrice(hotel.priceFrom)} за ночь
                   </span>
                 </Link>
               </div>

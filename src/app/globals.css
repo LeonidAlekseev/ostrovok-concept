@@ -90,10 +90,14 @@
   /* Hero and globe. */
   --decor-glow: #d6ffb0;
   --decor-glow-soft: #f0ffe1;
-  --decor-rim: #f5ffeb;
   --decor-haze: #ecf6e8;
   --decor-glass-fallback: #eefbe4;
   --decor-pin-selected: #0331a8;
+  /* The Earth: sunlit, mid and night-side ocean and the atmosphere around it. */
+  --decor-ocean-light: #b8ecff;
+  --decor-ocean: #62c4f5;
+  --decor-ocean-deep: #2c87d6;
+  --decor-atmosphere: #c9f1ff;
   --decor-hotel-from: #3d8bff;
   --decor-hotel-to: #0b3aa8;
   --decor-hotel-shadow: #1e5014;
@@ -116,6 +120,38 @@
   --decor-gold-gradient: linear-gradient(to bottom, var(--decor-light), var(--decor-gold) 45%, var(--decor-gold-deep));
   --decor-star-button: linear-gradient(100deg, var(--brand-blue), var(--decor-violet));
   --decor-spin-shadow: 0 10px 24px color-mix(in srgb, var(--decor-violet) 30%, transparent);
+  /* The star search window: the deep sky under the picture, violet glass fields, light text and errors that
+     keep 4.5:1 on the glass; the button's cosmic pill is stretched only between its round ends. */
+  --decor-star-sky: #0a0626;
+  --decor-star-glass: color-mix(in srgb, #120a3a 78%, transparent);
+  --decor-star-line: #8a6bff;
+  --decor-star-text: #f1edff;
+  --decor-star-muted: #c3bbef;
+  --decor-star-error: #ff9d9d;
+  --decor-star-button-image: url('/images/stars/button.webp') 0 14% fill / 0 39px;
+  --decor-star-choice: linear-gradient(
+    100deg,
+    var(--decor-violet),
+    color-mix(in srgb, var(--decor-magenta) 60%, var(--decor-violet))
+  );
+  /* A veil over the sky picture, darker in the middle where the fields are. */
+  --decor-star-veil: radial-gradient(
+    ellipse 70% 60% at 50% 55%,
+    color-mix(in srgb, var(--decor-star-sky) 55%, transparent),
+    color-mix(in srgb, var(--decor-star-sky) 10%, transparent)
+  );
+  /* The assistant window: sky-to-mint glass over the globe, an opaque fallback, a darker secondary text that keeps
+     4.5:1 on the light glass, the glow of the avatar and cards, the green spark and the round send button. */
+  --decor-assistant-sky: #63c8f5;
+  --decor-assistant-mint: #8fe3b4;
+  --decor-assistant-fallback: #d3f0f3;
+  --decor-assistant-text-2: #475467;
+  --decor-assistant-glow: #4fc3ff;
+  --decor-assistant-spark: #22c55e;
+  --decor-assistant-send: linear-gradient(145deg, #3db8ff, var(--brand-blue) 75%);
+  --decor-assistant-send-glow:
+    inset 0 1px 0 color-mix(in srgb, var(--brand-white) 45%, transparent),
+    0 8px 22px color-mix(in srgb, #1f8bff 45%, transparent);
   /* Vibe search: the calm blue-lilac and the loud pink-orange sides; white text keeps 3:1 on both. */
   --decor-vibe-calm-from: #3b5bdb;
   --decor-vibe-calm-to: #7048e8;
@@ -126,6 +162,18 @@
   /* The «N из 7» bar fills blue to violet; the shade under the white captions of the vibe photos. */
   --decor-vibe-progress: linear-gradient(90deg, var(--brand-blue), var(--decor-violet));
   --decor-vibe-shade: linear-gradient(to top, color-mix(in srgb, var(--decor-night) 85%, transparent), transparent 65%);
+  /* Draw search: the rainbow of its main buttons and of the «Подбираем отель» bar, and the glow under them. */
+  --decor-rainbow: linear-gradient(
+    100deg,
+    #0fb5a8,
+    #22a94f 20%,
+    #d9a400 36%,
+    #ea5a0c 52%,
+    #d6336c 68%,
+    #8b3df5 84%,
+    #3d6bff
+  );
+  --decor-rainbow-shadow: 0 12px 28px color-mix(in srgb, var(--decor-violet) 28%, transparent);
 
   --page-x: clamp(14px, 4vw, 40px);
   --page-max: 1240px;
@@ -172,6 +220,9 @@
   /* The vibe search: the «vs» between the sides beats, and each new pair of opposites slides in. */
   --animate-vibe-beat: vibe-beat 2.4s ease-in-out infinite;
   --animate-vibe-in: vibe-in 0.3s ease-out both;
+  /* The draw search: the preview drawing shows from left to right, and the bar of the search runs across. */
+  --animate-draw-reveal: draw-reveal 1.2s ease-out both;
+  --animate-draw-progress: draw-progress 1.4s ease-in-out infinite;
 
   /* The ui/accordion panel opens and closes to the height Base UI measures. */
   --animate-accordion-down: accordion-down 0.2s ease-out;
@@ -261,9 +312,26 @@
       translate: 0 8px;
     }
   }
+
+  @keyframes draw-reveal {
+    from {
+      clip-path: inset(0 100% 0 0);
+    }
+  }
+
+  @keyframes draw-progress {
+    from {
+      translate: -100% 0;
+    }
+    to {
+      translate: 250% 0;
+    }
+  }
 }
 
 @theme inline {
+  /* The star search's antiqua: next/font declares --font-star-serif on the window. */
+  --font-star: var(--font-star-serif), Georgia, serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

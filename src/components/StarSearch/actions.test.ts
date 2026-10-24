@@ -1,14 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { semanticSearch } from '@/lib/ai/semantic'
+import { describe, expect, it, vi } from 'vitest'
 import { readStarsAction } from './actions'
 
 vi.mock('@/lib/db/catalog', () => import('@/test/catalog'))
-vi.mock('@/lib/ai/semantic', () => ({ semanticSearch: vi.fn() }))
-vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'x-forwarded-for': '198.51.100.8' }) }))
-
-beforeEach(() => {
-  vi.mocked(semanticSearch).mockReset().mockResolvedValue(null)
-})
 
 const input = {
   name: 'Анна',
@@ -31,18 +24,13 @@ describe('readStarsAction', () => {
     await expect(readStarsAction({ ...input, checkIn: 'tomorrow' })).rejects.toThrow()
   })
 
-  // star-search, Requirement: Готовый маршрут в итоге
-  it('adds the route found for the reading within the swirl, never sending the name', async () => {
-    vi.mocked(semanticSearch).mockResolvedValue([{ id: 'rome-luxury', destinationId: 'rome', score: 1 }])
+  // star-search, Requirement: Выбор отеля звёзд
+  it('leads with the best rated hotel of the stars’ city', async () => {
     const reading = await readStarsAction(input)
-    expect(reading.routeId).toBe('rome-luxury')
-    const [text, options] = vi.mocked(semanticSearch).mock.calls[0]
-    expect(text).toContain('Поездка вдвоём')
-    expect(text).not.toContain('Анна')
-    expect(options).toEqual({ kind: 'route', k: 1, timeoutMs: 2500 })
-  })
-
-  it('keeps the rules when the search is unavailable', async () => {
-    expect(await readStarsAction(input)).not.toHaveProperty('routeId')
+    const [hotel] = reading.hotels
+    expect(hotel.destinationId).toBe(reading.city.id)
+    const { loadCityHotels } = await import('@/test/catalog')
+    const best = Math.max(...(await loadCityHotels([reading.city.id])).map((h) => h.rating))
+    expect(hotel.rating).toBe(best)
   })
 })

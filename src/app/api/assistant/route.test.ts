@@ -242,11 +242,11 @@ describe('POST /api/assistant: the semantic search', () => {
 
   it('adds the hotels found for all the traveller’s words in the plan’s cities once the plan is due', async () => {
     setModel(undefined)
-    vi.mocked(semanticSearch).mockImplementation(async (_, { kind }) =>
-      kind === 'route'
-        ? [hit('lisbon-workation')]
-        : [hit('prague-skyline-hostel'), hit('unknown'), hit('prague-central-hostel')],
-    )
+    vi.mocked(semanticSearch).mockResolvedValue([
+      hit('prague-skyline-hostel'),
+      hit('unknown'),
+      hit('prague-central-hostel'),
+    ])
     const response = await post({
       messages: [
         { role: 'user', text: 'тихий хостел с быстрым Wi‑Fi' },
@@ -255,18 +255,15 @@ describe('POST /api/assistant: the semantic search', () => {
       ],
       brief: complete,
     })
-    const { matches, routeId } = await response.json()
+    const body = await response.json()
+    const { matches } = body
     expect(matches.map((h: { id: string }) => h.id)).toEqual(['prague-skyline-hostel', 'prague-central-hostel'])
     const [text, options] = vi.mocked(semanticSearch).mock.calls[0]
     expect(text).toBe('тихий хостел с быстрым Wi‑Fi. в Прагу')
-    expect(options).toMatchObject({ kind: 'hotel', destinationIds: ['prague'] })
-    // assistant-search, Requirement: Готовый маршрут в плане — the route at once, over all the routes.
-    const [routeText, routeOptions] = vi.mocked(semanticSearch).mock.calls[1]
-    expect(routeText).toBe(text)
-    expect(routeOptions).toMatchObject({ kind: 'route', k: 1 })
-    expect(routeOptions).not.toHaveProperty('destinationIds')
-    expect(routeOptions?.timeoutMs).toBe(options?.timeoutMs)
-    expect(routeId).toBe('lisbon-workation')
+    expect(options).toMatchObject({ destinationIds: ['prague'] })
+    // Only the hotels: no search for routes, no route in the answer.
+    expect(semanticSearch).toHaveBeenCalledTimes(1)
+    expect(body).not.toHaveProperty('routeId')
   })
 
   it('does not search while the assistant still has a question', async () => {
@@ -278,9 +275,8 @@ describe('POST /api/assistant: the semantic search', () => {
   it('answers by the rules when the search is unavailable', async () => {
     setModel(undefined)
     const body = await (await ask('тихо', complete)).json()
-    expect(semanticSearch).toHaveBeenCalledTimes(2)
+    expect(semanticSearch).toHaveBeenCalledTimes(1)
     expect(body.matches).toBeUndefined()
-    expect(body.routeId).toBeUndefined()
     expect(body.source).toBe('rules')
   })
 })

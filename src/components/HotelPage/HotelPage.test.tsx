@@ -242,6 +242,12 @@ describe('PriceBar', () => {
 
 // hotel-page, Requirement: Плоская страница отеля
 describe('HotelPage', () => {
+  // site-header, Requirement: Оформление шапки — Страница отеля
+  it('marks the page so the layout header turns transparent with white icons in the server HTML', () => {
+    render(<HotelPage hotel={hotel} />)
+    expect(screen.getByRole('main').hasAttribute('data-header-photo')).toBe(true)
+  })
+
   it('stands on the page background: the heart beside the name, no white blocks around the sections', () => {
     render(<HotelPage hotel={hotel} />)
     const main = screen.getByRole('main')

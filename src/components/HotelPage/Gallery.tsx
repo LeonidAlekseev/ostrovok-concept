@@ -48,7 +48,7 @@ export function Gallery({ hotel, inDialog = false }: Props) {
               className="h-full w-full shrink-0 snap-center snap-always"
               onClick={() => mosaic.open({ tab: 'hotel', index })}
             >
-              <PhotoPlaceholder photo={photo} className="size-full text-base" />
+              <PhotoPlaceholder photo={photo} large className="size-full text-base" />
             </button>
           ))}
         </div>

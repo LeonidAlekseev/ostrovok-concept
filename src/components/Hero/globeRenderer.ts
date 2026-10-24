@@ -12,8 +12,10 @@ const DOT_LEVELS = [
   { depth: 0.25, alpha: 0.6 },
   { depth: 0.5, alpha: 0.95 },
 ]
-const GRID_STYLE = 'rgba(255, 255, 255, 0.4)'
-const COAST_STYLE = 'rgba(255, 255, 255, 0.85)'
+/** The land under the dots; the CSS shading over the canvas lights and darkens it with the ocean. */
+const LAND_STYLE = '#86d264'
+const GRID_STYLE = 'rgba(255, 255, 255, 0.22)'
+const COAST_STYLE = 'rgba(255, 255, 255, 0.7)'
 /** Planes cruise slowly, balloons drift slower still; speeds in degrees of arc per second. */
 const PLANE_COUNT = 9
 const PLANE_SPEEDS: Flyer['speeds'] = [0.8, 1.6]
@@ -71,13 +73,13 @@ export interface GlobeRenderer {
  * Points on the unit sphere as (cosφ·cosλ, cosφ·sinλ, sinφ) triples: turning the globe then needs
  * no trigonometry per point, only the sine and cosine of the view longitude.
  */
-interface Polylines {
+export interface Polylines {
   points: Float32Array
   /** Index of each polyline's first point, plus the total count at the end. */
   starts: number[]
 }
 
-/** Dotted wireframe globe drawn with Canvas 2D: land dots, coastlines and a latitude/longitude grid. */
+/** Globe drawn with Canvas 2D over the CSS ocean: sunlit green land under white dots, coastlines and a latitude/longitude grid. */
 export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): GlobeRenderer | null {
   const ctx = canvas.getContext('2d')
   if (!ctx) return null
@@ -85,6 +87,9 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
   const grid = polylines(graticule())
   let dots: Float32Array = new Float32Array()
   let coast: Polylines = { points: new Float32Array(), starts: [0] }
+  let land: Polylines = { points: new Float32Array(), starts: [0] }
+  /** Projected points of one land ring: x, y and depth, reused ring after ring. */
+  let ring = new Float32Array()
   let drawn = ''
   const planes = createFlyers(PLANE_COUNT, PLANE_SPEEDS)
   const balloons = createFlyers(BALLOON_COUNT, BALLOON_SPEEDS)
@@ -103,9 +108,11 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
     })
     if (!response) return
     if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`)
-    const data: { dots: number[]; lines: number[][] } = await response.json()
+    const data: { dots: number[]; lines: number[][]; land: number[][] } = await response.json()
     dots = toSphere(data.dots)
     coast = polylines(data.lines)
+    land = polylines(data.land)
+    ring = new Float32Array(3 * Math.max(0, ...data.land.map((r) => r.length / 2)))
   })()
 
   return {
@@ -144,6 +151,9 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
       const projectVec = (v: Vec3, out: { x: number; y: number; depth: number }) => projectPoint(v[0], v[1], v[2], out)
       const q = { x: 0, y: 0, depth: 0 }
 
+      ctx.fillStyle = LAND_STYLE
+      ctx.fill(landPath(land, ring, r, project))
+
       ctx.lineWidth = pixelRatio
       ctx.lineJoin = 'round'
       for (const [lines, style] of [
@@ -169,17 +179,19 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
       }
 
       const side = DOT_SIZE * pixelRatio
+      // One projection per dot: each lands in the path of its opacity level, and every level is filled once.
+      const levels = DOT_LEVELS.map(() => new Path2D())
+      for (let i = 0; i < dots.length; i += 3) {
+        project(dots, i, q)
+        if (q.depth < DOT_LEVELS[0].depth || q.y >= visible + side) continue
+        let level = DOT_LEVELS.length - 1
+        while (q.depth < DOT_LEVELS[level].depth) level--
+        levels[level].rect(q.x - side / 2, q.y - side / 2, side, side)
+      }
       ctx.fillStyle = '#fff'
-      DOT_LEVELS.forEach(({ depth, alpha }, level) => {
-        const until = DOT_LEVELS[level + 1]?.depth ?? Infinity
-        ctx.beginPath()
-        for (let i = 0; i < dots.length; i += 3) {
-          project(dots, i, q)
-          if (q.depth >= depth && q.depth < until && q.y < visible + side)
-            ctx.rect(q.x - side / 2, q.y - side / 2, side, side)
-        }
+      DOT_LEVELS.forEach(({ alpha }, level) => {
         ctx.globalAlpha = alpha
-        ctx.fill()
+        ctx.fill(levels[level])
       })
 
       /** Projects a flyer into `q`; returns its opacity, 0 when it is out of sight. */
@@ -251,7 +263,7 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
     describe() {
       const vertices = coast.starts.at(-1)! + grid.starts.at(-1)!
       return {
-        geometry: `${dots.length / 3} dots · ${vertices} line vertices`,
+        geometry: `${dots.length / 3} dots · ${vertices} line vertices · ${land.starts.at(-1)!} land vertices`,
         canvas: `${canvas.width}×${canvas.height}`,
       }
     },
@@ -260,6 +272,89 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
     },
   } satisfies GlobeRenderer
 }
+
+export type Project = (p: Float32Array, i: number, out: { x: number; y: number; depth: number }) => void
+
+/**
+ * The visible part of the land as one path, filled with the non-zero rule. The land is on the left of every ring,
+ * so a ring cut by the horizon is closed along the limb counter-clockwise on screen, from where it leaves the
+ * visible hemisphere to the next point where any ring comes back: the Weiler–Atherton clip against a circle.
+ */
+export function landPath(land: Polylines, ring: Float32Array, r: number, project: Project): Path2D {
+  const path = new Path2D()
+  /** Visible stretches of the cut rings, as x, y pairs from the point of entry to the point of exit on the limb. */
+  const runs: { enter: number; exit: number; points: number[] }[] = []
+  const q = { x: 0, y: 0, depth: 0 }
+  /** Where the edge from point a to point b of `ring` crosses the horizon, on the limb. */
+  const horizon = (a: number, b: number, points: number[]) => {
+    const t = ring[a + 2] / (ring[a + 2] - ring[b + 2])
+    const dx = ring[a] - r + t * (ring[b] - ring[a])
+    const dy = ring[a + 1] - r + t * (ring[b + 1] - ring[a + 1])
+    const angle = Math.atan2(dy, dx)
+    points.push(r + r * Math.cos(angle), r + r * Math.sin(angle))
+    return angle
+  }
+
+  for (let l = 0; l + 1 < land.starts.length; l++) {
+    const n = land.starts[l + 1] - land.starts[l]
+    let hidden = -1
+    for (let k = 0; k < n; k++) {
+      project(land.points, (land.starts[l] + k) * 3, q)
+      ring[k * 3] = q.x
+      ring[k * 3 + 1] = q.y
+      ring[k * 3 + 2] = q.depth
+      if (q.depth <= 0) hidden = k
+    }
+    if (hidden < 0) {
+      path.moveTo(ring[0], ring[1])
+      for (let k = 1; k < n; k++) path.lineTo(ring[k * 3], ring[k * 3 + 1])
+      path.closePath()
+      continue
+    }
+    // Walk the ring once, starting just after a hidden point, so every run is whole.
+    let run: (typeof runs)[number] | null = null
+    for (let step = 1; step <= n; step++) {
+      const prev = ((hidden + step - 1) % n) * 3
+      const cur = ((hidden + step) % n) * 3
+      if (ring[cur + 2] > 0) {
+        if (!run) {
+          run = { enter: 0, exit: 0, points: [] }
+          run.enter = horizon(prev, cur, run.points)
+        }
+        run.points.push(ring[cur], ring[cur + 1])
+      } else if (run) {
+        run.exit = horizon(prev, cur, run.points)
+        runs.push(run)
+        run = null
+      }
+    }
+  }
+
+  const done = new Set<number>()
+  for (let first = 0; first < runs.length; first++) {
+    if (done.has(first)) continue
+    let i = first
+    path.moveTo(runs[i].points[0], runs[i].points[1])
+    while (!done.has(i)) {
+      done.add(i)
+      const { points, exit } = runs[i]
+      for (let k = 2; k < points.length; k += 2) path.lineTo(points[k], points[k + 1])
+      // Counter-clockwise on screen is towards smaller canvas angles: the next entry is the nearest one that way.
+      let next = i
+      let gap = Infinity
+      runs.forEach(({ enter }, j) => {
+        const g = (((exit - enter) % TAU) + TAU) % TAU
+        if (g < gap) [next, gap] = [j, g]
+      })
+      path.arc(r, r, r, exit, runs[next].enter, true)
+      i = next
+    }
+    path.closePath()
+  }
+  return path
+}
+
+const TAU = 2 * Math.PI
 
 /** A white figure drawn on a `w`×`h` grid at `scale`, with its soft shadow, centred in its own canvas. */
 function sprite(path: Path2D, w: number, h: number, scale: number, pixelRatio: number): HTMLCanvasElement {
@@ -292,7 +387,7 @@ function toSphere(coords: number[]): Float32Array {
   return out
 }
 
-function polylines(lines: number[][]): Polylines {
+export function polylines(lines: number[][]): Polylines {
   const starts = [0]
   for (const line of lines) starts.push(starts.at(-1)! + line.length / 2)
   return { points: toSphere(lines.flat()), starts }

@@ -1,7 +1,7 @@
 /** Media to send to friends: a branded canvas frame, a canvas recorded into a video, sending or saving a file. */
 
-export const BRAND_NAME = 'О!Погнали'
-export const SLOGAN = 'Путешествуй легко'
+export const BRAND_NAME = 'О!бъективно'
+export const SLOGAN = 'За гранью поиска'
 
 /** MP4 where the browser records it (Safari, Chrome 126+), WebM otherwise; `null` without MediaRecorder. */
 export function videoType(): string | null {
@@ -25,26 +25,32 @@ export async function brandFont(): Promise<string> {
 /**
  * Paints the brand over a frame of any size, as in the header: the logo on top; the slogan and the site address
  * at the bottom. Sizes follow the frame width. Returns the band between them, free for the content.
+ * The colours are those of a light frame; a dark one passes its own.
  */
 export function drawBrandFrame(
   ctx: CanvasRenderingContext2D,
   font: string,
   site: string,
+  colors: { logo: string; slogan: string; site: string } = {
+    logo: cssColor('--primary'),
+    slogan: cssColor('--foreground'),
+    site: cssColor('--muted-foreground'),
+  },
 ): { top: number; bottom: number } {
   const { width, height } = ctx.canvas
   const unit = width / 1080
   ctx.save()
   ctx.textAlign = 'center'
   ctx.textBaseline = 'alphabetic'
-  ctx.fillStyle = cssColor('--primary')
+  ctx.fillStyle = colors.logo
   ctx.font = `800 ${112 * unit}px ${font}`
   ctx.letterSpacing = `${-0.035 * 112 * unit}px`
   ctx.fillText(BRAND_NAME, width / 2, 200 * unit)
   ctx.letterSpacing = '0px'
-  ctx.fillStyle = cssColor('--foreground')
+  ctx.fillStyle = colors.slogan
   ctx.font = `700 ${64 * unit}px ${font}`
   ctx.fillText(SLOGAN, width / 2, height - 150 * unit)
-  ctx.fillStyle = cssColor('--muted-foreground')
+  ctx.fillStyle = colors.site
   ctx.font = `500 ${40 * unit}px ${font}`
   ctx.fillText(site, width / 2, height - 80 * unit)
   ctx.restore()

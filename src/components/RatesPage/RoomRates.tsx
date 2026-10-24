@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import { cancellationLabel, effectiveCancellation } from '@/lib/booking'
-import { MEAL_LABEL, PAYMENT_LABEL, type Hotel, type Rate, type Room } from '@/lib/catalog'
+import { MEAL_LABEL, PAYMENT_LABEL, roomFacts, type Hotel, type Rate, type Room } from '@/lib/catalog'
 import { nightsBetween, todayIso } from '../../lib/dates'
 import { countRu, formatPrice } from '../../lib/format'
 import { toOfferParams } from '../../lib/offer'
@@ -37,9 +37,7 @@ export function RoomRates({ hotel, room, stay, guests, onPickDates }: Props) {
           <h2 id={`${room.id}-title`} className="text-heading font-bold">
             {room.name}
           </h2>
-          <p className="text-sm text-muted-foreground">
-            {room.area} м² · {room.beds} · до {countRu(room.capacity, ['гостя', 'гостей', 'гостей'])}
-          </p>
+          <p className="text-sm text-muted-foreground">{roomFacts(room)}</p>
           {reason && <p className="text-sm font-semibold text-destructive">Недоступен: {reason}</p>}
         </div>
       </div>

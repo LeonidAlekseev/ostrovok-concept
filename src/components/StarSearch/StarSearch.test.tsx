@@ -2,8 +2,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { addDays, todayIso } from '../../lib/dates'
-import { routeCards } from '../../test/catalog'
+import { addDays, formatLongDate, todayIso } from '../../lib/dates'
 import { StarSearch } from './StarSearch'
 import { StarSearchDialog } from './StarSearchDialog'
 import { ZodiacRing } from './ZodiacRing'
@@ -44,14 +43,14 @@ async function fillForm(user: ReturnType<typeof userEvent.setup>) {
 }
 
 function renderDialog() {
-  return render(<StarSearchDialog open onOpenChange={() => {}} routes={routeCards()} />)
+  return render(<StarSearchDialog open onOpenChange={() => {}} />)
 }
 
 // star-search, Requirement: Блок на главной
 describe('StarSearch section', () => {
   it('opens the window with the focus in the first field', async () => {
     const user = userEvent.setup()
-    render(<StarSearch routes={routeCards()} />)
+    render(<StarSearch />)
     expect(screen.getByRole('heading', { name: 'Поиск по звёздам' })).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: 'Найти по звёздам' }))
@@ -62,7 +61,7 @@ describe('StarSearch section', () => {
   // star-search, Scenario: Меньше движения. The turn is gated by `motion-safe:`, so the circle stands still
   // under `prefers-reduced-motion: reduce`; jsdom evaluates no media queries, hence the class is checked.
   it('turns the zodiac circle only where motion is allowed', () => {
-    const { container } = render(<StarSearch routes={routeCards()} />)
+    const { container } = render(<StarSearch />)
     const ring = container.querySelector('#stars svg')!
     expect(ring.getAttribute('aria-hidden')).toBe('true')
     const turning = [...ring.querySelectorAll('g')].filter((g) =>
@@ -75,7 +74,7 @@ describe('StarSearch section', () => {
   // star-search, Requirement: Знаки вращаются с кольцом. The signs sit inside the turning group and carry no
   // counter-rotation animation; their placement is a fixed, deterministic rotate().
   it('turns the signs with the circle, with deterministic coordinates', () => {
-    const { container } = render(<StarSearch routes={routeCards()} />)
+    const { container } = render(<StarSearch />)
     const turning = container.querySelector('#stars svg g[class*="animate-zodiac-spin"]')!
     const texts = [...turning.querySelectorAll('text')]
     expect(texts).toHaveLength(12)
@@ -106,12 +105,7 @@ describe('StarSearch form', () => {
     expect(day(addDays(today, -1))?.disabled).toBe(true)
     await user.click(day(later)!)
     expect(screen.queryByRole('dialog', { name: 'Выбор даты заезда' })).toBeNull()
-
-    await user.click(screen.getByRole('button', { name: 'Гадать' }))
-    const hotel = screen.getAllByRole('link').find((link) => link.getAttribute('href')!.startsWith('/hotels/'))!
-    const url = new URL(hotel.getAttribute('href')!, 'https://x')
-    expect(url.searchParams.get('checkin')).toBe(later)
-    expect(url.searchParams.get('checkout')).toBe(addDays(later, 2))
+    expect(screen.getByRole('button', { name: `Дата заезда: ${formatLongDate(later)}` })).toBeTruthy()
   })
 
   it('shows the sign as soon as the birthday is known', async () => {
@@ -172,7 +166,7 @@ describe('StarSearch reading', () => {
     expect(await screen.findByRole('heading', { name: /Анна, ваш знак — Овен/ }, { timeout: 4000 })).toBeTruthy()
   })
 
-  it('skips the animation under reduced motion and links the hotels with the dates of the trip', async () => {
+  it('skips the animation under reduced motion and answers with one hotel', async () => {
     reduceMotion()
     const user = userEvent.setup()
     renderDialog()
@@ -184,23 +178,58 @@ describe('StarSearch reading', () => {
     expect(screen.getAllByRole('status').some((s) => /^Звёзды выбрали: /.test(s.textContent!))).toBe(true)
     expect(screen.getByText(/Гороскоп — для настроения, а не для планов/)).toBeTruthy()
 
-    // star-search, Requirement: Готовый маршрут в итоге: a fire sign alone goes for the culture by the rules.
-    const ready = screen.getByRole('region', { name: 'Готовый маршрут' })
-    expect(within(ready).getByRole('link').getAttribute('href')).toMatch(/^\/routes\/[a-z-]+-culture$/)
+    // star-search, Requirement: Итог гадания — один отель: the hotel's page with the dates of the reading.
+    const hotel = screen.getByRole('region', { name: 'Звёзды выбрали отель' })
+    const links = screen.getAllByRole('link')
+    expect(links).toHaveLength(1)
+    expect(within(hotel).getByRole('link').getAttribute('href')).toMatch(
+      /^\/hotels\/[a-z-]+\?checkin=\d{4}-\d{2}-\d{2}&/,
+    )
+    expect(within(hotel).getByText(/^от .+ ₽ за ночь$/)).toBeTruthy()
+    expect(screen.queryByText('Запасные варианты')).toBeNull()
+    expect(screen.queryByText(/маршрут/i)).toBeNull()
+  })
 
-    const checkIn = addDays(todayIso(), 1)
-    const links = screen.getAllByRole('link').filter((link) => !ready.contains(link))
-    expect(links).toHaveLength(3)
-    for (const link of links) {
-      const url = new URL(link.getAttribute('href')!, 'https://x')
-      expect(url.pathname).toMatch(/^\/hotels\/[a-z0-9-]+$/)
-      expect(Object.fromEntries(url.searchParams)).toEqual({
-        checkin: checkIn,
-        checkout: addDays(checkIn, 2),
-        adults: '2',
-        rooms: '1',
-      })
-    }
+  // star-search, Requirement: Куда едем
+  it('reads the stars only on the chosen side of the world; a second press clears it', async () => {
+    reduceMotion()
+    const user = userEvent.setup()
+    renderDialog()
+    await fillForm(user)
+    const sides = screen.getByRole('group', { name: 'Сторона света' })
+    const north = within(sides).getByRole('button', { name: 'Север' })
+    await user.click(north)
+    expect(north.getAttribute('aria-pressed')).toBe('true')
+    await user.click(north)
+    expect(north.getAttribute('aria-pressed')).toBe('false')
+    await user.click(north)
+    await user.click(screen.getByRole('button', { name: 'Гадать' }))
+    const status = screen.getAllByRole('status').find((s) => /^Звёзды выбрали: /.test(s.textContent!))!
+    expect(status.textContent).toMatch(/, (Осло|Стокгольм|Хельсинки|Рейкьявик|Калининград)$/)
+  })
+
+  it('reads the stars in the chosen country and city', async () => {
+    reduceMotion()
+    const user = userEvent.setup()
+    renderDialog()
+    await fillForm(user)
+    await user.click(screen.getByRole('radio', { name: 'Страна' }))
+    expect(screen.queryByRole('group', { name: 'Сторона света' })).toBeNull()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Страна' }), 'Италия')
+    const city = screen.getByRole('combobox', { name: 'Город' })
+    expect(
+      within(city)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['Любой город', 'Рим', 'Флоренция'])
+    await user.selectOptions(city, 'Рим')
+    await user.click(screen.getByRole('button', { name: 'Гадать' }))
+    const status = screen.getAllByRole('status').find((s) => /^Звёзды выбрали: /.test(s.textContent!))!
+    expect(status.textContent).toMatch(/, Рим$/)
+    // star-search, Requirement: Гадание среди выбранных городов: the hotel of Rome.
+    const hotel = within(screen.getByRole('region', { name: 'Звёзды выбрали отель' })).getByRole('link')
+    expect(hotel.textContent).toContain('Рим, Италия')
+    expect(hotel.getAttribute('href')).toMatch(/^\/hotels\/rome-/)
   })
 
   it('is the same for the same answers', async () => {
@@ -228,7 +257,7 @@ describe('StarSearch video', () => {
   it('moves the progress bar in 1 % steps, not on every frame', async () => {
     vi.stubGlobal('MediaRecorder', { isTypeSupported: () => true })
     let finish!: () => void
-    vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _type, { onProgress }) => {
+    vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _pick, _type, { onProgress }) => {
       await new Promise<void>((resolve) => (finish = resolve))
       onProgress(0)
       for (let i = 1; i <= 300; i++) {
@@ -255,7 +284,7 @@ describe('StarSearch video', () => {
     vi.stubGlobal('MediaRecorder', { isTypeSupported: () => true })
     let restart!: () => void
     let finish!: () => void
-    vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _type, { onRestart }) => {
+    vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _pick, _type, { onRestart }) => {
       restart = onRestart
       await new Promise<void>((resolve) => (finish = resolve))
       return video

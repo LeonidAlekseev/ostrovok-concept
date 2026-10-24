@@ -4,14 +4,13 @@ import { destinations } from '../data/destinations'
 import {
   aspectBetween,
   citySigns,
+  destinationsFor,
   cuspOf,
   daysInMonth,
   moonLongitude,
   moonPhase,
   moonSign,
   readStars,
-  starPersona,
-  starWish,
   sunSign,
   zodiac,
   type ReadingInput,
@@ -151,28 +150,33 @@ describe('readStars', () => {
       expect(hotel.rating).toBe(Math.max(...hotelsIn(hotel.destinationId).map((h) => h.rating)))
   })
 
+  // star-search, Requirement: Куда едем
+  it('chooses among the cities of the chosen side, country or city', () => {
+    const ids = (where: Parameters<typeof destinationsFor>[0]) => destinationsFor(where, destinations).map((d) => d.id)
+    expect(ids({ direction: 'north' })).toEqual(['oslo', 'stockholm', 'helsinki', 'kaliningrad', 'reykjavik'])
+    for (const side of ['south', 'east', 'west'] as const) expect(ids({ direction: side }).length).toBeGreaterThan(4)
+    expect(ids({ direction: 'east' })).toContain('tokyo')
+    expect(ids({ direction: 'west' })).toContain('new-york')
+    expect(ids({ country: 'Италия' })).toEqual(['florence', 'rome'])
+    expect(ids({ country: 'Италия', destinationId: 'rome' })).toEqual(['rome'])
+    expect(ids({})).toHaveLength(destinations.length)
+    // A city the catalogue no longer has: the stars look everywhere.
+    expect(ids({ destinationId: 'atlantis' })).toHaveLength(destinations.length)
+  })
+
+  it('fills the three hotels from the one chosen city', () => {
+    const { city, hotels } = readStars({ ...input, destinationId: 'rome' }, destinations, catalogue)
+    expect(city.id).toBe('rome')
+    expect(hotels).toHaveLength(3)
+    expect(new Set(hotels).size).toBe(3)
+    for (const hotel of hotels) expect(hotel.destinationId).toBe('rome')
+    expect(hotels.map((h) => h.rating)).toEqual([...hotels.map((h) => h.rating)].sort((a, b) => b - a))
+  })
+
   it('lets a companion sign change the score', () => {
     const results = new Set(
       zodiac.map((z) => readStars({ ...input, company: 'pair', partnerSignId: z.id }, destinations, catalogue).city.id),
     )
     expect(results.size).toBeGreaterThan(1)
-  })
-})
-
-// routes, Requirement: Лучший готовый маршрут
-describe('starPersona', () => {
-  const sign = (element: string) => zodiac.find((z) => z.element === element)!
-
-  it('reads the company, then the element alone', () => {
-    expect(starPersona(sign('fire'), 'pair')).toBe('luxury')
-    expect(starPersona(sign('water'), 'group')).toBe('student')
-    expect(starPersona(sign('earth'), 'solo')).toBe('workation')
-    expect(starPersona(sign('air'), 'solo')).toBe('workation')
-    expect(starPersona(sign('fire'), 'solo')).toBe('culture')
-  })
-
-  it('words the reading for the search without the name', () => {
-    const city = destinations.find((d) => d.id === 'prague')!
-    expect(starWish({ sign: sign('fire'), city }, 'pair')).toMatch(/^Поездка вдвоём: Прага, Чехия\. Огненным/)
   })
 })

@@ -5,7 +5,6 @@ import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import type { RouteCardData } from '../../lib/routes'
 import { poleImage, VIBE_AXES, VIBE_STEPS, type Answer } from '../../lib/vibe'
 import { SmartImage } from '../ui/SmartImage'
 import { useVibeReading } from './useVibeReading'
@@ -14,8 +13,6 @@ import { VibeResult } from './VibeResult'
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** The routes the result picks its ready-made one from. */
-  routes: readonly RouteCardData[]
 }
 
 // The inner side of each caption is padded wider: the «vs» circle reaches into the photo.
@@ -46,7 +43,7 @@ function Option({ image, label, step, className, ...rest }: OptionProps) {
 
 const VIBE_ERROR = 'Не удалось подобрать отели. Попробуйте ещё раз.'
 
-export function VibeSearchDialog({ open, onOpenChange, routes }: Props) {
+export function VibeSearchDialog({ open, onOpenChange }: Props) {
   // Answers stay when going back: the pair shows what was chosen.
   const [answers, setAnswers] = useState<Answer[]>([])
   const [step, setStep] = useState(0)
@@ -54,7 +51,7 @@ export function VibeSearchDialog({ open, onOpenChange, routes }: Props) {
   const rightRef = useRef<HTMLButtonElement>(null)
   const done = step === VIBE_STEPS
   // The server picks the hotels over the whole catalogue.
-  const { vibe, route, stay, failed, retry } = useVibeReading(done ? answers : null, routes)
+  const { vibe, stay, failed, retry } = useVibeReading(done ? answers : null)
 
   const axis = VIBE_AXES[step]
   // The next pair's photos are fetched while this one is on screen.
@@ -107,7 +104,7 @@ export function VibeSearchDialog({ open, onOpenChange, routes }: Props) {
         </DialogHeader>
 
         {vibe ? (
-          <VibeResult vibe={vibe} route={route} stay={stay} onRestart={restart} />
+          <VibeResult vibe={vibe} stay={stay} onRestart={restart} />
         ) : done ? (
           <div className="flex flex-col items-start gap-4" aria-busy={!failed}>
             <p className="text-muted-foreground">{failed ? VIBE_ERROR : 'Подбираем отели…'}</p>

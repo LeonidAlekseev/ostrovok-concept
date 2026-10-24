@@ -1,8 +1,6 @@
 import { destinations } from '@/data/destinations'
 import type { Hotel } from '@/lib/catalog'
-import { seedRoutes } from '@/data/routes'
 import { buildCatalog, fullHotelsIn, getHotel, hotels, newHotels } from '@/lib/catalogGenerator'
-import { routeCard, type RouteCardData } from '@/lib/routes'
 
 /**
  * The tests' catalogue: the generator stands in for Supabase, so no test goes to the network. The loaders
@@ -39,9 +37,3 @@ export async function catalogFetch(input: RequestInfo | URL): Promise<Response> 
     : await loadCityHotels(listOf(url.searchParams.get('destinations')))
   return Response.json({ hotels: found })
 }
-
-/** The cards of the demo routes, in their order, as `loadRouteCards` gives them from the database. */
-export const routeCards = (): RouteCardData[] =>
-  seedRoutes.map((route) =>
-    routeCard(route, Object.fromEntries(route.stops.map(({ hotelId }) => [hotelId, getHotel(hotelId)!])), false),
-  )

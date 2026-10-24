@@ -1,5 +1,5 @@
 import { scenarios, type Destination } from '../../data/destinations'
-import { AMENITIES, STAY_TYPES, hasStars, type Hotel } from '../catalog'
+import { AMENITIES, STAY_TYPES, hasStars, isRated, type Hotel } from '../catalog'
 import { VIBE_AXES, type VibeScale } from '../vibe'
 
 /**
@@ -23,13 +23,13 @@ export const vibePoles = (hotel: Hotel, scale: VibeScale): string[] =>
 
 export function hotelDocument(hotel: Hotel, destination: Destination, scale: VibeScale): string {
   const kind = STAY_TYPES[hotel.stayType]
-  const stars = hasStars(hotel.stayType) ? `, ${hotel.stars}★` : ''
+  const stars = hasStars(hotel) ? `, ${hotel.stars}★` : ''
   const themes = scenarios.filter((s) => destination.scenarios.includes(s.id)).map((s) => s.title)
   const work = hotel.workspace ? ', есть рабочая зона' : ''
   const lines = [
     `${kind} «${hotel.name}»${stars} — ${destination.name}, ${destination.country}.`,
     themes.length ? `Город: ${themes.join(', ')}.` : '',
-    `Рейтинг гостей ${hotel.rating.toFixed(1)} из 10, ${hotel.reviewCount} отзывов. Цена от ${hotel.priceFrom} ₽ за ночь.`,
+    `${isRated(hotel) ? `Рейтинг гостей ${hotel.rating.toFixed(1)} из 10, ${hotel.reviewCount} отзывов.` : 'Оценок гостей пока нет.'} Цена от ${hotel.priceFrom} ₽ за ночь.`,
     `Wi‑Fi ${hotel.wifiMbps} Мбит/с${work}. ${hotel.distanceKm.toFixed(1)} км от центра.`,
     sentence(hotel.description),
     `Удобства: ${hotel.amenities.map((a) => AMENITIES[a].label).join(', ')}.`,
@@ -39,34 +39,4 @@ export function hotelDocument(hotel: Hotel, destination: Destination, scale: Vib
       .map((r) => `Отзыв: ${sentence(r.pros.slice(0, REVIEW_LENGTH))}${r.cons ? ` Минус: ${sentence(r.cons)}` : ''}`),
   ]
   return lines.filter(Boolean).join('\n')
-}
-
-const PERSONAS: Record<string, string> = {
-  student: 'студенческий, недорого',
-  luxury: 'роскошный',
-  workation: 'воркейшн — работа в поездке',
-  culture: 'культурный',
-}
-
-/** A route's row as `npm run db:embed` reads it: only what the text needs, everything optional. */
-export interface RouteText {
-  title?: string
-  persona?: string
-  description?: string
-  leisure?: { title?: string; category?: string }[]
-}
-
-export function routeDocument(route: RouteText, destination: Destination): string {
-  const persona = route.persona && (PERSONAS[route.persona] ?? route.persona)
-  const leisure = (route.leisure ?? []).flatMap((l) =>
-    l.title ? [l.category ? `${l.title} (${l.category.toLocaleLowerCase('ru')})` : l.title] : [],
-  )
-  return [
-    `Маршрут «${route.title ?? ''}» — ${destination.name}, ${destination.country}.`,
-    persona ? `Стиль: ${persona}.` : '',
-    route.description ? sentence(route.description) : '',
-    leisure.length ? `Досуг: ${leisure.join(', ')}.` : '',
-  ]
-    .filter(Boolean)
-    .join('\n')
 }

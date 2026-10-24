@@ -40,9 +40,12 @@ function rowsOf<T>({ data, error }: { data: T[] | null; error: PostgrestError | 
 const cached = <Args extends unknown[], Result>(name: string, read: (...args: Args) => Promise<Result>) =>
   unstable_cache(read, [CATALOG_TAG, name], { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME })
 
-/** The summary columns of a hotel; the full hotel is its `data`. */
+/**
+ * The summary columns of a hotel; the full hotel is its `data`. The stars come from `data` too: the column allows
+ * only 1…5 and keeps 1 for a real hotel without stars (0 in `data`).
+ */
 const SUMMARY =
-  'id, destinationId:destination_id, name:data->>name, stayType:stay_type, stars, rating, reviewCount:data->reviewCount, priceFrom:price_from, wifiMbps:wifi_mbps, workspace, isNew:data->isNew'
+  'id, destinationId:destination_id, name:data->>name, stayType:stay_type, stars:data->stars, rating, reviewCount:data->reviewCount, priceFrom:price_from, wifiMbps:wifi_mbps, workspace, isNew:data->isNew'
 
 /** All destinations, in the catalogue's order. */
 export const loadDestinations: () => Promise<Destination[]> = cached('destinations', async () =>

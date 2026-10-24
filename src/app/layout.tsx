@@ -10,10 +10,10 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: {
-    default: 'О!Погнали — бронирование отелей',
-    template: '%s — О!Погнали',
+    default: 'О!бъективно — за гранью поиска',
+    template: '%s — О!бъективно',
   },
-  description: 'О!Погнали — найдите отель для следующего путешествия',
+  description: 'О!бъективно — найдите отель для следующего путешествия',
   icons: {
     icon: [
       { url: '/favicon.svg', type: 'image/svg+xml' },
@@ -41,7 +41,7 @@ export default async function RootLayout({ children, modal }: { children: ReactN
     // bars: under the home page's lime hero it is lime too, not the grey page background.
     <html lang="ru" className="has-[#hero-title]:bg-brand">
       {/* Each page renders its own `main`; the footer sits at the bottom of short pages. */}
-      <body className="flex min-h-dvh flex-col">
+      <body className="group/page flex min-h-dvh flex-col">
         <CatalogProvider destinations={destinations}>
           <Header />
           {children}

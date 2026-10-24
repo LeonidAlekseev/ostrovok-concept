@@ -39,9 +39,7 @@ describe('signInDemo', () => {
   })
 
   it('opens an internal `next` itself, so no navigation of the browser races the new cookies', async () => {
-    await expect(signInDemo('/trip/new?route=prague-culture')).rejects.toThrow(
-      'redirect /trip/new?route=prague-culture',
-    )
+    await expect(signInDemo('/trips/booking?id=OS-UP0001')).rejects.toThrow('redirect /trips/booking?id=OS-UP0001')
     // An external address goes home, as the client does.
     await expect(signInDemo('//evil.com')).rejects.toThrow('redirect /')
     expect(nav.redirect).toHaveBeenLastCalledWith('/')
