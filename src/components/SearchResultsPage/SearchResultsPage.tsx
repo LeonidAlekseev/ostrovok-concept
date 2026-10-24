@@ -303,7 +303,9 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
         {status.state === 'error' && <p className="text-sm text-destructive">{status.message}</p>}
         {result && (
           <h2 ref={resultsRef} tabIndex={-1} className="scroll-mt-4 text-muted-foreground outline-none">
-            {items.length > 0 ? `Найдено ${countRu(items.length, ['отель', 'отеля', 'отелей'])}` : 'Ничего не нашлось'}
+            {items.length > 0
+              ? `Найдено ${countRu(items.length, ['вариант', 'варианта', 'вариантов'])}`
+              : 'Ничего не нашлось'}
           </h2>
         )}
       </div>
