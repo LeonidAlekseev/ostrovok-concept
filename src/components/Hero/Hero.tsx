@@ -68,8 +68,8 @@ const hero = [
   'bg-brand bg-[radial-gradient(ellipse_60%_45%_at_85%_30%,color-mix(in_srgb,var(--decor-glow)_75%,transparent),transparent_70%)]',
   // A long press on the globe must not start selecting the title (iOS) or open the callout.
   'select-none [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none]',
-  // Fade the bottom of the scene into the page behind the search form, lightly at first: the globe shows through
-  // the top of the assistant's glass.
+  // Fade the bottom of the scene into the page behind the search panel, lightly at first: the globe shows through
+  // the top of its glass.
   "after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:z-3 after:h-[30%] after:bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_0%,transparent)_0%,color-mix(in_srgb,var(--decor-haze)_45%,transparent)_75%,var(--background)_100%)] after:content-['']",
 ].join(' ')
 const earth =
@@ -119,8 +119,8 @@ const placeCard = [
   'max-md:[--card-dx:-50%] max-md:[--card-dy:12px]',
   // Inset of the picture, the same on every side; its size equals the text block's height.
   '[--card-pad:clamp(5px,1.4vw,7px)] [--badge-size:clamp(9px,2.5vw,12px)] [--name-size:clamp(13px,3.5vw,17px)] [--meta-size:clamp(10px,2.75vw,13px)] [--text-gap:2px]',
-  // The window of the assistant under the globe (SearchPanel: the glass between the page margins), marked
-  // [data-assistant-window]. On phones the card is no wider than it (here) and is kept inside it (cardShift).
+  // The search panel under the globe (SearchPanel: the glass between the page margins), marked
+  // [data-search-panel]. On phones the card is no wider than it (here) and is kept inside it (cardShift).
   'absolute top-0 left-0 z-5 w-max max-w-[min(26rem,calc(100vw-2*var(--page-x)))] md:max-w-[min(26rem,calc(50vw-40px))] rounded-[clamp(10px,3vw,14px)] border-0 bg-card py-(--card-pad) pr-[calc(var(--card-pad)_+_4px)] pl-(--card-pad) text-left text-foreground',
   'translate-x-[calc(var(--x)_*_var(--unit)_+_var(--card-dx)_+_var(--card-shift,0px))] translate-y-[calc(var(--y)_*_var(--unit)_+_var(--card-dy)_-_var(--card-lift))] touch-none opacity-[var(--o,1)] will-change-transform',
   'shadow-[0_14px_34px_color-mix(in_srgb,var(--decor-hotel-shadow)_25%,transparent)] transition-shadow duration-200 ease-[ease]',
@@ -176,11 +176,11 @@ export function Hero({ cities: markers, hotels, featured }: Props) {
     }
   }, [])
 
-  // Measures what keeps the card inside the assistant's window on phones; measured again when any of them resizes.
+  // Measures what keeps the card inside the search panel on phones; measured again when any of them resizes.
   useLayoutEffect(() => {
     const globe = globeRef.current
     const card = cardRef.current
-    const win = document.querySelector('[data-assistant-window]')
+    const win = document.querySelector('[data-search-panel]')
     if (!globe || !card || !win) return
     const measure = () => {
       const g = globe.getBoundingClientRect()

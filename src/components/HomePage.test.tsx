@@ -44,6 +44,15 @@ describe('HomePage', () => {
     expect(screen.queryByText('Вручную')).toBeNull()
     expect(screen.queryByRole('combobox', { name: 'Направление' })).toBeNull()
   })
+
+  // home-page, Requirement: Панель входа в поиск
+  it('has no chat: the search section links to /assistant and /search', () => {
+    render(<HomePage newHotels={newHotels} selections={selections} />)
+    expect(screen.queryByLabelText('Опишите поездку')).toBeNull()
+    const search = document.getElementById('search')!
+    expect(within(search).getByRole('link', { name: 'Спросить Эвал' }).getAttribute('href')).toBe('/assistant')
+    expect(within(search).getByRole('link', { name: 'Искать вручную' }).getAttribute('href')).toBe('/search')
+  })
 })
 
 // home-page, Requirement: Подборки отелей по персонам

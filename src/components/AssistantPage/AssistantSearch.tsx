@@ -239,7 +239,7 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
       )}
 
       {question ? (
-        // Bleeds to the window edge: the strip scrolls under the padding (--pad from SearchPanel).
+        // Bleeds to the window edge: the strip scrolls under the padding (--pad from AssistantPage).
         <ul
           className="-mx-(--pad) flex gap-2 overflow-x-auto px-(--pad) py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           aria-label="Быстрые ответы"

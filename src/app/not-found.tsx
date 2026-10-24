@@ -13,7 +13,7 @@ export default function NotFound() {
         <Link className={buttonVariants()} href="/">
           На главную
         </Link>
-        <Link className={buttonVariants({ variant: 'outline' })} href="/#search">
+        <Link className={buttonVariants({ variant: 'outline' })} href="/assistant">
           Найти отель
         </Link>
       </div>

@@ -214,8 +214,24 @@ describe('SearchResultsPage query', () => {
     expect(cards().length).toBeGreaterThan(6)
   })
 
-  it('shows the search form with the destination error for a query without a destination', () => {
+  // search-modes, Requirement: Пустая страница ручного поиска, Scenario: Открытие без параметров
+  it('shows a blank search form without errors until it is submitted', async () => {
+    const user = userEvent.setup()
     open('')
+
+    const form = screen.getByRole('form', { name: 'Поиск отелей' })
+    expect((within(form).getByRole('combobox', { name: 'Направление' }) as HTMLInputElement).value).toBe('')
+    expect(screen.queryByText('Укажите, куда вы хотите поехать')).toBeNull()
+    expect(screen.queryByText('Проверьте параметры поиска.')).toBeNull()
+    expect(screen.queryByText('Ищем варианты…')).toBeNull()
+
+    await user.click(within(form).getByRole('button', { name: /Найти отель/ }))
+    expect(screen.getByText('Укажите, куда вы хотите поехать')).toBeDefined()
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  it('shows the search form with the destination error for a query without a destination', () => {
+    open(STAY)
 
     expect(screen.getByRole('form', { name: 'Поиск отелей' })).toBeDefined()
     expect(screen.getByText('Укажите, куда вы хотите поехать')).toBeDefined()
