@@ -13,11 +13,13 @@ afterEach(() => localStorage.clear())
 
 // favorites
 describe('FavoritesPage', () => {
-  it('shows the empty state with a search link', async () => {
+  it('shows the empty state with two search links', async () => {
     render(<FavoritesPage />)
     await waitForCatalog()
     expect(screen.getByText('В избранном пока пусто')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Найти отель' }).getAttribute('href')).toBe('/')
+    expect(screen.getByRole('link', { name: 'Спросить Эвал' }).getAttribute('href')).toBe('/assistant')
+    expect(screen.getByRole('link', { name: 'Искать вручную' }).getAttribute('href')).toBe('/search')
+    expect(screen.queryByRole('link', { name: 'Найти отель' })).toBeNull()
   })
 
   it('lists a saved hotel with a link to it with the start dates, without signing in', async () => {

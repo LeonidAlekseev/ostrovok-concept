@@ -61,12 +61,14 @@ describe('TripsPage', () => {
     expect(screen.getByText('Бронирование OS-CANC01')).toBeTruthy()
   })
 
-  it('shows a message and a search link in an empty tab', async () => {
+  it('shows a message and two search links in an empty tab', async () => {
     signIn()
     render(<TripsPage />)
     await waitForCatalog()
     expect(screen.getByText('Предстоящих поездок пока нет')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Найти отель' }).getAttribute('href')).toBe('/')
+    expect(screen.getByRole('link', { name: 'Спросить Эвал' }).getAttribute('href')).toBe('/assistant')
+    expect(screen.getByRole('link', { name: 'Искать вручную' }).getAttribute('href')).toBe('/search')
+    expect(screen.queryByRole('link', { name: 'Найти отель' })).toBeNull()
   })
 })
 
