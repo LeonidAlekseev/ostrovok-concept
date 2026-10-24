@@ -168,24 +168,24 @@ describe('Header chrome', () => {
       window.history.pushState({}, '', path)
       const html = renderToString(<Header />)
       window.history.pushState({}, '', '/')
-      // Grey by default; the page content (the hero, the hotel photo) turns it transparent through CSS alone.
+      // Grey by default; the page content (the hero) turns it transparent through CSS alone.
       expect(html).toMatch(/<header class="[^"]*\bbg-background\b/)
       expect(html).toContain('group-has-[#hero-title]/page:bg-transparent')
-      expect(html).toContain('group-has-[[data-header-photo]]/page:bg-transparent')
-      expect(html).toContain('group-has-[[data-header-photo]]/page:text-white')
+      expect(html).not.toContain('data-header-photo')
     },
   )
 
-  it('turns the logo and icons white through CSS over the hotel photo, not by pathname', () => {
+  it('keeps the logo and icons blue on the hotel page', () => {
     window.history.pushState({}, '', '/hotels/prague-old-town-lantern')
     setup()
     window.history.pushState({}, '', '/')
-    expect(screen.getByRole('link', { name: 'О!бъективно — на главную' }).className).toMatch(
-      /(^|\s)group-has-\[\[data-header-photo\]\]\/page:text-white(\s|$)/,
-    )
-    expect(screen.getByRole('button', { name: 'Открыть меню' }).className).toMatch(
-      /(^|\s)group-has-\[\[data-header-photo\]\]\/page:text-white(\s|$)/,
-    )
+    for (const el of [
+      screen.getByRole('link', { name: 'О!бъективно — на главную' }),
+      screen.getByRole('button', { name: 'Открыть меню' }),
+    ]) {
+      expect(el.className).toMatch(/(^|\s)text-primary(\s|$)/)
+      expect(el.className).not.toContain('text-white')
+    }
   })
 
   it('is flat and blue, never sticky', () => {

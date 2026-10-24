@@ -17,21 +17,20 @@ interface Props {
 }
 
 /**
- * The large photo with its thumbnails (under the transparent header on the page, at the top of the
- * dialog), then text and headings straight on the page's background: the hotel, the guests' rating (if any),
+ * The photos (a tile, on a phone a carousel) at the top of the column, then text and headings straight on the page's background: the hotel, the guests' rating (if any),
  * the dates, the hotel's description and amenities and the rooms, then the price bar (stuck to the
  * bottom of a narrow screen).
  */
 export function HotelPage({ hotel, titleId, stay }: Props) {
   const content = (
     <HotelStay hotel={hotel} local={stay}>
-      <Gallery hotel={hotel} inDialog={Boolean(titleId)} />
       <div
         className={cn(
           'mx-auto flex w-full flex-1 flex-col gap-8 pt-[clamp(16px,4vw,28px)]',
           titleId ? 'px-4' : 'max-w-(--page-max) px-(--page-x)',
         )}
       >
+        <Gallery hotel={hotel} />
         <HotelHeader hotel={hotel} titleId={titleId} />
         {isRated(hotel) && <HotelRating hotel={hotel} />}
         <StayDates hotel={hotel} />
@@ -48,10 +47,5 @@ export function HotelPage({ hotel, titleId, stay }: Props) {
     </HotelStay>
   )
   if (titleId) return content
-  // The photo starts under the header, which is transparent over it.
-  return (
-    <main data-header-photo className="-mt-(--header-height) flex flex-1 flex-col bg-(--decor-surface-soft)">
-      {content}
-    </main>
-  )
+  return <main className="flex flex-1 flex-col bg-(--decor-surface-soft)">{content}</main>
 }
