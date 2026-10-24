@@ -1,7 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { glassPanel } from './glass'
+import { searchGlassPanel } from './glass'
 
 /** The two ways to search; the figures are drawn to face the middle of the panel. */
 const entries = [
@@ -20,8 +20,8 @@ export function SearchPanel() {
     <div
       data-search-panel
       className={cn(
-        glassPanel,
-        'grid grid-cols-2 divide-x divide-[color-mix(in_srgb,var(--brand-blue)_18%,transparent)] rounded-[clamp(24px,6vw,36px)]',
+        searchGlassPanel,
+        'grid grid-cols-2 divide-x divide-[color-mix(in_srgb,var(--decor-light)_55%,transparent)] rounded-[clamp(24px,6vw,36px)]',
       )}
     >
       {entries.map(({ href, label, src, width, side }) => (
@@ -42,7 +42,8 @@ export function SearchPanel() {
             loading="eager"
             sizes="(min-width: 768px) 270px, 40vw"
             className={cn(
-              'h-[clamp(116px,36vw,272px)] w-auto flex-none -mt-[clamp(48px,15vw,112px)] transition-transform duration-200 ease-out motion-safe:group-hover:-translate-y-1',
+              // Grows from its bottom edge on a fine pointer and on keyboard focus; transform leaves the layout as is.
+              'h-[clamp(116px,36vw,272px)] w-auto flex-none origin-bottom -mt-[clamp(48px,15vw,112px)] transition-transform duration-200 ease-out motion-safe:group-hover:-translate-y-1 motion-safe:[@media(hover:hover)_and_(pointer:fine)]:group-hover:scale-[1.06] motion-safe:group-focus-visible:scale-[1.06]',
               // From md the figure is taller than the card: aligned to its bottom, it rises above the panel.
               'md:mt-0 md:mb-[clamp(-14px,-1vw,-6px)] md:h-[clamp(212px,24vw,320px)]',
             )}
