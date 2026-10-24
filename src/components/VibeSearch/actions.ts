@@ -6,7 +6,7 @@ import { allowRequest, clientIp } from '@/lib/ai/rateLimit'
 import { semanticSearch } from '@/lib/ai/semantic'
 import type { Hotel } from '@/lib/catalog'
 import { loadAllHotels, loadDestinations } from '@/lib/db/catalog'
-import { onePerCity, vibeHotels, vibeWish, VIBE_STEPS, type Answer } from '@/lib/vibe'
+import { fillVibe, vibeHotels, vibeWish, VIBE_STEPS, type Answer } from '@/lib/vibe'
 
 const answersSchema = z.array(z.union([z.literal(-1), z.literal(0), z.literal(1)])).length(VIBE_STEPS)
 
@@ -38,5 +38,5 @@ export async function vibeHotelsAction(answers: Answer[]): Promise<Hotel[]> {
   })
   if (!hits) return byRules
   const byId = new Map(hotels.map((h) => [h.id, h]))
-  return onePerCity([...hits.flatMap((hit) => byId.get(hit.id) ?? []), ...byRules])
+  return fillVibe([...hits.flatMap((hit) => byId.get(hit.id) ?? []), ...byRules])
 }

@@ -227,11 +227,11 @@ export const axisShares = (answers: readonly Answer[]): AxisShare[] =>
     return { axis, left, right: 100 - left }
   })
 
-/** Hotels in a vibe result: one per city. */
+/** Hotels in a vibe result: one per city, then more from the same cities. */
 export const VIBE_HOTELS = 6
 
 /**
- * The `hotels` that fit the answers best, one per city: the sum of the answers times the hotel's fits; equal
+ * The `hotels` that fit the answers best, one per city first: the sum of the answers times the hotel's fits; equal
  * scores go to the better rated, then the cheaper, then by id, so the same answers give the same list.
  */
 export function vibeHotels(
@@ -251,20 +251,25 @@ export function vibeHotels(
       a.hotel.priceFrom - b.hotel.priceFrom ||
       a.hotel.id.localeCompare(b.hotel.id),
   )
-  return onePerCity(scored.map(({ hotel }) => hotel))
+  return fillVibe(scored.map(({ hotel }) => hotel))
 }
 
-/** The first `VIBE_HOTELS` of the `hotels`, one per city. */
-export function onePerCity(hotels: readonly Hotel[]): Hotel[] {
+/**
+ * `VIBE_HOTELS` of the ranked `hotels`: the best of each city first, then, while fewer than that, the next ones
+ * in order from the cities already taken. Keeps the ranking, so the same input gives the same list.
+ */
+export function fillVibe(hotels: readonly Hotel[]): Hotel[] {
   const cities = new Set<string>()
   const picked: Hotel[] = []
+  const rest: Hotel[] = []
   for (const hotel of hotels) {
-    if (cities.has(hotel.destinationId)) continue
-    cities.add(hotel.destinationId)
-    picked.push(hotel)
-    if (picked.length === VIBE_HOTELS) break
+    if (cities.has(hotel.destinationId)) rest.push(hotel)
+    else {
+      cities.add(hotel.destinationId)
+      picked.push(hotel)
+    }
   }
-  return picked
+  return [...picked, ...rest].slice(0, VIBE_HOTELS)
 }
 
 /**
