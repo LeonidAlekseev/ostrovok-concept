@@ -30,9 +30,9 @@ describe('VIBE_AXES', () => {
     expect(fits.at(-1)![1]).toBe(-1)
   })
 
-  it('has seven pairs, the first one is «Тихий вечер» / «Шумная вечеринка»', () => {
+  it('has seven pairs, the first one is «Уютный вечер» / «Шумная вечеринка»', () => {
     expect(VIBE_AXES).toHaveLength(7)
-    expect(VIBE_AXES[0]).toMatchObject({ left: 'Тихий вечер', right: 'Шумная вечеринка' })
+    expect(VIBE_AXES[0]).toMatchObject({ left: 'Уютный вечер', right: 'Шумная вечеринка' })
   })
 
   it('keeps every fit in [−1, 1]', () => {
@@ -90,7 +90,7 @@ describe('vibeArchetype', () => {
   })
 
   it('names the vibe by the two answers it matches', () => {
-    // «Тихий вечер» and «Подальше от суеты».
+    // «Уютный вечер» and «Подальше от суеты».
     expect(vibeArchetype([-1, 0, 0, 0, 0, 0, -1]).name).toBe('Тихая гавань')
     // «Шумная вечеринка» and «Гулять до ночи».
     expect(vibeArchetype([1, 0, 0, 1, 0, 0, 0]).name).toBe('Душа вечеринки')
@@ -134,7 +134,7 @@ describe('vibeHotels', () => {
     )
   })
 
-  it('fits «Тихий вечер» everywhere: far from the centre, without a bar', () => {
+  it('fits «Уютный вечер» everywhere: far from the centre, without a bar', () => {
     for (const hotel of vibeHotels(all(-1), catalogue, destinations)) {
       expect(hotel.amenities, hotel.id).not.toContain('bar')
       expect(hotel.distanceKm, hotel.id).toBeGreaterThan(2.5)
@@ -166,7 +166,7 @@ describe('readVibe', () => {
 describe('vibeWish', () => {
   it('names the archetype and the chosen sides', () => {
     expect(vibeWish([-1, -1, 0, 0, 0, 0, 0])).toBe(
-      'Тихая гавань: тишина, простор и вечер без спешки. Настроение: Тихий вечер, Море.',
+      'Тихая гавань: тишина, простор и вечер без спешки. Настроение: Уютный вечер, Море.',
     )
     expect(vibeWish(all(1))).toContain('Настроение: Шумная вечеринка, Город, Большой отель')
   })

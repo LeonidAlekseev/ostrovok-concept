@@ -5,6 +5,7 @@ import { useState } from 'react'
 import Image from 'next/image'
 import { ArrowRight, Moon, PartyPopper } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { VIBE_AXES } from '@/lib/vibe'
 
 // The window, the vibe and its picture load on the first click: the home page does not pay for them up front.
 const VibeSearchDialog = dynamic(() => import('./VibeSearchDialog').then((m) => m.VibeSearchDialog), { ssr: false })
@@ -25,7 +26,7 @@ interface Side {
 
 const sides: readonly Side[] = [
   {
-    title: 'Тихий вечер',
+    title: VIBE_AXES[0].left,
     image: '/images/vibe/card-calm.webp',
     Icon: Moon,
     tags: ['уют', 'спокойствие', 'красивые места'],
@@ -36,7 +37,7 @@ const sides: readonly Side[] = [
     plate: 'bg-[image:linear-gradient(135deg,var(--decor-vibe-calm-from),var(--decor-vibe-calm-to))]',
   },
   {
-    title: 'Шумная вечеринка',
+    title: VIBE_AXES[0].right,
     image: '/images/vibe/card-loud.webp',
     Icon: PartyPopper,
     tags: ['движ', 'новые знакомства', 'топовые места'],

@@ -14,7 +14,7 @@ const REVIEW_LENGTH = 240
 
 const sentence = (text: string) => text.trim().replace(/[.!?…]?$/, (end) => end || '.')
 
-/** The sides of the vibe axes the hotel leans to: «Тихий вечер, Море, …». */
+/** The sides of the vibe axes the hotel leans to: «Уютный вечер, Море, …». */
 export const vibePoles = (hotel: Hotel, scale: VibeScale): string[] =>
   VIBE_AXES.flatMap((axis) => {
     const fit = axis.fit(hotel, scale)

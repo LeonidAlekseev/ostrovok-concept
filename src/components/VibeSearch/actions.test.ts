@@ -36,7 +36,7 @@ describe('vibeHotelsAction with the semantic search', () => {
       [a, sameCity, b].map((h) => ({ id: h.id, destinationId: h.destinationId, score: 1 })),
     )
     const picked = await vibeHotelsAction(all(-1))
-    expect(vi.mocked(semanticSearch).mock.calls[0][0]).toContain('Тихий вечер')
+    expect(vi.mocked(semanticSearch).mock.calls[0][0]).toContain('Уютный вечер')
     // Only the hotels: no search for routes.
     expect(semanticSearch).toHaveBeenCalledTimes(1)
     expect(picked.slice(0, 2).map((h) => h.id)).toEqual([a.id, b.id])
