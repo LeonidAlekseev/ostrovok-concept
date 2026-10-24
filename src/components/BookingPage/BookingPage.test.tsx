@@ -62,7 +62,9 @@ describe('BookingPage summary', () => {
     render(<BookingPage />)
     await waitForCatalog()
     expect(screen.getByRole('heading', { name: 'Предложение не найдено' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Найти отель' }).getAttribute('href')).toBe('/assistant')
+    expect(screen.getByRole('link', { name: 'Спросить Эвал' }).getAttribute('href')).toBe('/assistant')
+    expect(screen.getByRole('link', { name: 'Искать вручную' }).getAttribute('href')).toBe('/search')
+    expect(screen.queryByRole('link', { name: 'Найти отель' })).toBeNull()
   })
 })
 

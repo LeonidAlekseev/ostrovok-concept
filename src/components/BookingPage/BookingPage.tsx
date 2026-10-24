@@ -25,9 +25,14 @@ function Booking() {
       <div className="flex flex-col items-start gap-3">
         <h1 className="text-title font-bold tracking-[-0.02em]">{result.error}</h1>
         <p className="text-muted-foreground">Выберите отель и тариф заново.</p>
-        <Link className={buttonVariants()} href="/assistant">
-          Найти отель
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <Link className={buttonVariants()} href="/assistant">
+            Спросить Эвал
+          </Link>
+          <Link className={buttonVariants({ variant: 'outline' })} href="/search">
+            Искать вручную
+          </Link>
+        </div>
       </div>
     )
   }
