@@ -281,14 +281,27 @@ function candidatesFor(vibe: VibeId, month: number, destinations: readonly Desti
   return list
 }
 
-/** The assistant's own pick when the traveller leaves the theme open. */
-function chooseVibe(brief: Brief, month: number): { vibe: VibeId; reason: string } {
-  if (brief.party === 'family') return { vibe: 'sea', reason: 'с детьми проще всего у тёплого моря' }
-  if (isWinter(month)) return { vibe: 'exotic', reason: 'зимой хочется туда, где лето' }
-  if (month >= 5 && month <= 7) return { vibe: 'sea', reason: 'лето создано для моря' }
-  if (brief.party === 'couple') return { vibe: 'romantic', reason: 'вдвоём лучше всего там, где красиво' }
-  if (brief.mood === 'active') return { vibe: 'metropolis', reason: 'для движа нужен большой город' }
-  return { vibe: 'europe', reason: 'межсезонье — лучшее время гулять по старым городам' }
+/**
+ * The assistant's own pick when the traveller leaves the theme open: the seasonal favourites first, then the other
+ * themes, and only a theme with a city shown for the season. `null` when no theme has one.
+ */
+function chooseVibe(
+  brief: Brief,
+  month: number,
+  destinations: readonly Destination[],
+): { vibe: VibeId; reason: string } | null {
+  const favourites: { vibe: VibeId; reason: string }[] = []
+  if (brief.party === 'family') favourites.push({ vibe: 'sea', reason: 'с детьми проще всего у тёплого моря' })
+  if (isWinter(month)) favourites.push({ vibe: 'exotic', reason: 'зимой хочется туда, где лето' })
+  if (month >= 5 && month <= 7) favourites.push({ vibe: 'sea', reason: 'лето создано для моря' })
+  if (brief.party === 'couple') favourites.push({ vibe: 'romantic', reason: 'вдвоём лучше всего там, где красиво' })
+  if (brief.mood === 'active') favourites.push({ vibe: 'metropolis', reason: 'для движа нужен большой город' })
+  favourites.push({ vibe: 'europe', reason: 'межсезонье — лучшее время гулять по старым городам' })
+  const others = (['sea', 'europe', 'romantic', 'exotic', 'metropolis'] as const).map((vibe) => ({
+    vibe,
+    reason: 'в эти даты есть подходящие города',
+  }))
+  return [...favourites, ...others].find(({ vibe }) => candidatesFor(vibe, month, destinations).length > 0) ?? null
 }
 
 const ATMOSPHERES: Record<VibeId, Record<Mood | 'default', [emoji: string, title: string, text: string]>> = {
@@ -369,10 +382,15 @@ export const presetChips = (destinations: readonly Destination[], today: IsoDate
 function planScope(brief: Brief, today: IsoDate, destinations: readonly Destination[]) {
   const month = tripMonth(brief, today)
   const named = destinations.find((d) => d.id === brief.destinationId)
-  const own = brief.vibe && brief.vibe !== 'any' ? { vibe: brief.vibe, reason: '' } : null
-  const fallbackVibe = named?.scenarios[0] ?? 'europe'
-  const { vibe, reason } = own ?? (named ? { vibe: fallbackVibe, reason: '' } : chooseVibe(brief, month))
-  return { vibe, reason, named, pool: named ? [named] : candidatesFor(vibe, month, destinations) }
+  const own = brief.vibe && brief.vibe !== 'any' ? brief.vibe : null
+  if (own || named) {
+    const vibe = own ?? named?.scenarios[0] ?? 'europe'
+    return { vibe, reason: '', named, pool: named ? [named] : candidatesFor(vibe, month, destinations) }
+  }
+  const picked = chooseVibe(brief, month, destinations)
+  if (picked) return { ...picked, named, pool: candidatesFor(picked.vibe, month, destinations) }
+  // No theme has a city shown for the season: the shown cities, under the theme of the first of them.
+  return { vibe: destinations[0]?.scenarios[0] ?? 'europe', reason: '', named, pool: [...destinations] }
 }
 
 /** The cities the plan of a complete `brief` picks from: the semantic search looks for hotels there. */
