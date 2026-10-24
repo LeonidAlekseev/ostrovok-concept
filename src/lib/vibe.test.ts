@@ -6,7 +6,7 @@ import { hotels, getHotel } from './catalogGenerator'
 import {
   axisShares,
   BALANCE,
-  onePerCity,
+  fillVibe,
   poleImage,
   readVibe,
   VIBE_AXES,
@@ -176,11 +176,35 @@ describe('vibeWish', () => {
   })
 })
 
-describe('onePerCity', () => {
-  it('keeps the first hotel of each city, up to VIBE_HOTELS', () => {
-    const picked = onePerCity(catalogue)
+describe('fillVibe', () => {
+  it('keeps the best hotel of each city first, then fills up to VIBE_HOTELS from the cities taken', () => {
+    const picked = fillVibe(catalogue)
     expect(picked).toHaveLength(VIBE_HOTELS)
     expect(new Set(picked.map((h) => h.destinationId)).size).toBe(VIBE_HOTELS)
     expect(picked[0]).toBe(catalogue[0])
+  })
+
+  it('takes six hotels of one city when it is the only one', () => {
+    const city = catalogue[0].destinationId
+    const oneCity = catalogue.filter((h) => h.destinationId === city)
+    const picked = fillVibe(oneCity)
+    expect(picked).toHaveLength(VIBE_HOTELS)
+    expect(picked.every((h) => h.destinationId === city)).toBe(true)
+    expect(picked).toEqual(oneCity.slice(0, VIBE_HOTELS))
+  })
+
+  it('takes one hotel per city when there are six or more cities', () => {
+    const cities = [...new Set(catalogue.map((h) => h.destinationId))]
+    const picked = fillVibe(catalogue)
+    expect(picked.map((h) => h.destinationId)).toEqual(cities.slice(0, VIBE_HOTELS))
+  })
+
+  it('fills from the cities taken, in the order of the ranking', () => {
+    const [x, y] = [...new Set(catalogue.map((h) => h.destinationId))]
+    const of = (city: string) => catalogue.filter((h) => h.destinationId === city)
+    const [x1, x2, x3] = of(x)
+    const [y1, y2, y3] = of(y)
+    const ranked = [x1, y1, x2, y2, x3, y3]
+    expect(fillVibe(ranked).map((h) => h.id)).toEqual(ranked.map((h) => h.id))
   })
 })
