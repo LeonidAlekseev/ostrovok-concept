@@ -1,7 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { glassPanel } from './glass'
+import { searchGlassPanel } from './glass'
 
 /** The two ways to search; the figures are drawn to face the middle of the panel. */
 const entries = [
@@ -20,7 +20,7 @@ export function SearchPanel() {
     <div
       data-search-panel
       className={cn(
-        glassPanel,
+        searchGlassPanel,
         'grid grid-cols-2 divide-x divide-[color-mix(in_srgb,var(--brand-blue)_18%,transparent)] rounded-[clamp(24px,6vw,36px)]',
       )}
     >

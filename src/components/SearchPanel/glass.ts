@@ -10,5 +10,14 @@ const glassSheen =
 const glassOpaque =
   '[@media(prefers-reduced-transparency:reduce)]:[background:var(--decor-assistant-fallback)] [@media(prefers-reduced-transparency:reduce)]:[backdrop-filter:none]'
 
-/** The glass of the search panel on the home page and of Eval's window on `/assistant`; the element is `relative isolate`. */
-export const glassPanel = `relative isolate ${glassFill} ${glassBlur} ${glassRim} ${glassSheen} ${glassOpaque}`
+// The home search panel: more transparent and blurred less, so the globe lies under it; rim, sheen and fallback are shared.
+const searchGlassFill =
+  '[background:linear-gradient(150deg,color-mix(in_srgb,var(--decor-assistant-sky)_35%,transparent),color-mix(in_srgb,color-mix(in_srgb,var(--decor-assistant-sky),var(--decor-assistant-mint))_25%,transparent)_15%,color-mix(in_srgb,var(--decor-assistant-mint)_35%,transparent))]'
+const searchGlassBlur = '[backdrop-filter:blur(2px)_saturate(150%)]'
+const glassChrome = `${glassRim} ${glassSheen} ${glassOpaque}`
+
+/** The glass of Eval's window on `/assistant`; the element is `relative isolate`. */
+export const glassPanel = `relative isolate ${glassFill} ${glassBlur} ${glassChrome}`
+
+/** The glass of the search panel on the home page; the element is `relative isolate`. */
+export const searchGlassPanel = `relative isolate ${searchGlassFill} ${searchGlassBlur} ${glassChrome}`
