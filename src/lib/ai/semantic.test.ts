@@ -124,6 +124,8 @@ describe('semanticSearch', () => {
   it('gives null without the key, on a model error, without vectors or without text', async () => {
     vi.mocked(getSecret).mockResolvedValueOnce(undefined)
     expect(await semanticSearch(words(), {})).toBeNull()
+    expect(getSecret).toHaveBeenCalledWith('NVIDIA_API_KEY')
+    expect(embed).not.toHaveBeenCalled()
     vi.mocked(embed).mockRejectedValueOnce(new Error('timeout'))
     expect(await semanticSearch(words(), {})).toBeNull()
     rpc.mockResolvedValueOnce({ data: [], error: null })

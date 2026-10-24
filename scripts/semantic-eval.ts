@@ -1,11 +1,11 @@
 // The semantic search's quality on the live database, outside CI: Russian queries with a rule for the hotels
 // that answer them; for each, the relevant hotels in the top 5 by the vectors alone and after the reranker.
 //   npm run db:embed && node --env-file=.env.local scripts/semantic-eval.ts [--plain-query]
-// `--plain-query` embeds the queries without `input_type: query`, to see what the asymmetric mode gives.
-// Needs NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY and OPENROUTER_API_KEY; prints no keys.
+// `--plain-query` embeds the queries as documents (`input_type: passage`), to see what the asymmetric mode gives.
+// Needs NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY and NVIDIA_API_KEY; at most 40 requests a minute,
+// a 429 waits and tries again; prints no keys.
 import { registerHooks } from 'node:module'
 import { parseArgs } from 'node:util'
-import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { createClient } from '@supabase/supabase-js'
 import { embed, rerank } from 'ai'
 
@@ -20,8 +20,9 @@ registerHooks({
   },
 })
 
-const { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, embeddingModel, toVector } = await import('../src/lib/ai/embedding.ts')
-const { openRouterReranker } = await import('../src/lib/ai/rerank.ts')
+const { embeddingModel, toVector } = await import('../src/lib/ai/embedding.ts')
+const { NVIDIA_KEY, pacer, withRetry } = await import('../src/lib/ai/nvidia.ts')
+const { nvidiaReranker } = await import('../src/lib/ai/rerank.ts')
 
 type Destination = import('../src/data/destinations.ts').Destination
 type Hotel = import('../src/lib/catalog.ts').Hotel
@@ -37,15 +38,22 @@ function required(name: string): string {
   return value
 }
 
-const apiKey = required('OPENROUTER_API_KEY')
+const apiKey = required(NVIDIA_KEY)
 const supabase = createClient(required('NEXT_PUBLIC_SUPABASE_URL'), required('NEXT_PUBLIC_SUPABASE_ANON_KEY'), {
   auth: { persistSession: false },
 })
-const queryModel = options['plain-query']
-  ? createOpenRouter({ apiKey }).textEmbeddingModel(EMBEDDING_MODEL, {
-      extraBody: { dimensions: EMBEDDING_DIMENSIONS },
-    })
-  : embeddingModel(apiKey, 'query')
+const queryModel = embeddingModel(apiKey, options['plain-query'] ? 'passage' : 'query')
+const turn = pacer()
+/** One request to the API and its own time: waits its turn under the limit, a 429 or a 5xx is tried again. */
+const request = <T>(call: () => Promise<T>) =>
+  withRetry(
+    async () => {
+      await turn()
+      const start = performance.now()
+      return { ...(await call()), ms: performance.now() - start }
+    },
+    { onRetry: (message) => console.warn(message) },
+  )
 
 const read = async <T>(table: string) => {
   const { data, error } = await supabase.from(table).select('data').range(0, 9999)
@@ -91,8 +99,7 @@ const rows: string[] = []
 const totals = { before: 0, after: 0, ideal: 0, top1Before: 0, top1After: 0 }
 const timings = { embed: 0, vectors: 0, rerank: 0 }
 for (const [query, relevant] of QUERIES) {
-  const t0 = performance.now()
-  const { embedding } = await embed({ model: queryModel, value: query, maxRetries: 2 })
+  const { embedding, ms: embedMs } = await request(() => embed({ model: queryModel, value: query, maxRetries: 0 }))
   const t1 = performance.now()
   const { data, error } = await supabase.rpc('match_embeddings', {
     query_embedding: toVector(embedding),
@@ -102,17 +109,18 @@ for (const [query, relevant] of QUERIES) {
   if (error) throw new Error(`match_embeddings: ${error.message}`)
   const matches = data as Match[]
   const t2 = performance.now()
-  const { ranking } = await rerank({
-    model: openRouterReranker(apiKey),
-    query,
-    documents: matches.map((m) => m.content),
-    topN: TOP,
-    maxRetries: 2,
-  })
-  const t3 = performance.now()
-  timings.embed += t1 - t0
+  const { ranking, ms: rerankMs } = await request(() =>
+    rerank({
+      model: nvidiaReranker(apiKey),
+      query,
+      documents: matches.map((m) => m.content),
+      topN: TOP,
+      maxRetries: 0,
+    }),
+  )
+  timings.embed += embedMs
   timings.vectors += t2 - t1
-  timings.rerank += t3 - t2
+  timings.rerank += rerankMs
 
   const ok = (id: string) => relevant(hotels.get(id)!)
   const before = matches.slice(0, TOP).map((m) => m.ref_id)

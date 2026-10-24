@@ -6,7 +6,8 @@ import type { Database } from '@/lib/db/database.types'
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/config'
 import { getSecret } from '../secrets'
 import { embeddingModel, toVector } from './embedding'
-import { openRouterReranker } from './rerank'
+import { NVIDIA_KEY } from './nvidia'
+import { nvidiaReranker } from './rerank'
 
 /**
  * Search by meaning over the vectors of `npm run db:embed`: the query's vector, the nearest objects in
@@ -100,7 +101,7 @@ export async function semanticSearch(
 ): Promise<SemanticHit[] | null> {
   const query = text.trim().slice(0, MAX_SEMANTIC_QUERY)
   if (!query || !isSupabaseConfigured || destinationIds?.length === 0) return null
-  const apiKey = await getSecret('OPENROUTER_API_KEY')
+  const apiKey = await getSecret(NVIDIA_KEY)
   if (!apiKey) return null
   const timeout = AbortSignal.timeout(timeoutMs)
   const abortSignal = signal ? AbortSignal.any([signal, timeout]) : timeout
@@ -132,7 +133,7 @@ export async function semanticSearch(
   })
   try {
     const { ranking } = await rerank({
-      model: openRouterReranker(apiKey),
+      model: nvidiaReranker(apiKey),
       query,
       documents: matches.map((m) => m.content),
       topN: Math.min(k, matches.length),

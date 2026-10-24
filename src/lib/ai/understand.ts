@@ -95,9 +95,8 @@ export async function understandWish(
     instructions: instructions(brief, today, destinations),
     messages: messages.map(({ role, text }) => ({ role, content: text })),
     output: Output.object({ schema: wishSchema }),
-    // A one-shot extraction: thinking only spends the 8 seconds. OpenRouter takes it as a provider option,
-    // the SDK's own `reasoning` does not reach the request.
-    providerOptions: { openrouter: { reasoning: { effort: 'none' } } },
+    // A one-shot extraction: thinking only spends the 8 seconds (`reasoning_effort: none` in the request).
+    reasoning: 'none',
     maxRetries: 0,
     abortSignal: signal ? AbortSignal.any([signal, timeout]) : timeout,
   })
