@@ -14,8 +14,12 @@ interface Side {
   image: string
   Icon: typeof Moon
   tags: readonly string[]
-  /** The mirrored tilt towards the centre, the glow of the frame and the crop that keeps the face in view. */
+  /** The mirrored tilt towards the centre and the glow of the frame. */
   className: string
+  /** The shade the photo fades into under the title and the tags. */
+  tint: string
+  /** The crop that keeps the face in view below the tags. */
+  objectPosition: string
   plate: string
 }
 
@@ -27,6 +31,8 @@ const sides: readonly Side[] = [
     tags: ['уют', 'спокойствие', 'красивые места'],
     className:
       'origin-right [transform:perspective(1400px)_rotateY(5deg)] shadow-(--decor-vibe-calm-glow) ring-(--decor-vibe-calm-from)/70',
+    tint: 'bg-[color-mix(in_srgb,var(--decor-vibe-calm-from)_40%,var(--decor-night))]',
+    objectPosition: '30% bottom',
     plate: 'bg-[image:linear-gradient(135deg,var(--decor-vibe-calm-from),var(--decor-vibe-calm-to))]',
   },
   {
@@ -36,6 +42,8 @@ const sides: readonly Side[] = [
     tags: ['движ', 'новые знакомства', 'топовые места'],
     className:
       'origin-left [transform:perspective(1400px)_rotateY(-5deg)] shadow-(--decor-vibe-loud-glow) ring-(--decor-vibe-loud-from)/70',
+    tint: 'bg-[color-mix(in_srgb,var(--decor-vibe-loud-from)_40%,var(--decor-night))]',
+    objectPosition: '60% bottom',
     plate: 'bg-[image:linear-gradient(135deg,var(--decor-vibe-loud-from),var(--decor-vibe-loud-to))]',
   },
 ]
@@ -72,12 +80,21 @@ export function VibeSearch() {
       </div>
 
       <div className="relative grid w-full grid-cols-2 gap-[clamp(10px,3vw,28px)] pb-[clamp(20px,5vw,34px)]">
-        {sides.map(({ title, image, Icon, tags, className, plate }) => (
+        {sides.map(({ title, image, Icon, tags, className, tint, objectPosition, plate }) => (
           <div
             key={title}
-            className={`relative aspect-[11/18] overflow-hidden rounded-[clamp(18px,5vw,34px)] ring-2 ${className}`}
+            className={`relative aspect-[11/18] overflow-hidden rounded-[clamp(18px,5vw,34px)] ring-2 ${tint} ${className}`}
           >
-            <Image src={image} alt="" fill sizes="(min-width: 920px) 430px, 48vw" className="object-cover" />
+            <div className="absolute inset-x-0 bottom-0 h-[76%] [mask-image:linear-gradient(to_bottom,transparent,black_30%)]">
+              <Image
+                src={image}
+                alt=""
+                fill
+                sizes="(min-width: 920px) 430px, 48vw"
+                className="object-cover"
+                style={{ objectPosition }}
+              />
+            </div>
             <div className="absolute inset-0 bg-(image:--decor-vibe-shade-top)" aria-hidden />
             <div className="relative flex flex-col gap-[clamp(6px,1.6vw,14px)] p-[clamp(8px,2.6vw,24px)] text-white">
               <div className="flex items-center gap-[clamp(6px,1.8vw,14px)]">
@@ -101,7 +118,7 @@ export function VibeSearch() {
             </div>
           </div>
         ))}
-        <span className="pointer-events-none absolute top-[62%] left-1/2 h-[68%] -translate-1/2">
+        <span className="pointer-events-none absolute top-[71%] left-1/2 h-[56%] -translate-1/2 min-[900px]:top-[62%] min-[900px]:h-[68%]">
           <Image
             src="/images/vibe/vs-lightning.webp"
             alt=""
@@ -111,14 +128,14 @@ export function VibeSearch() {
             className="h-full w-auto max-w-none"
           />
         </span>
-        <span className="pointer-events-none absolute top-[calc(50%-clamp(10px,2.5vw,17px))] left-1/2 -translate-1/2">
+        <span className="pointer-events-none absolute top-[71%] left-1/2 -translate-1/2 min-[900px]:top-[calc(50%-clamp(10px,2.5vw,17px))]">
           <Image
             src="/images/vibe/vs-letters.webp"
             alt=""
             width={480}
             height={465}
             sizes="(min-width: 920px) 240px, 28vw"
-            className="w-[clamp(90px,28vw,240px)] max-w-none animate-vibe-beat motion-reduce:animate-none"
+            className="w-[clamp(76px,24vw,240px)] max-w-none animate-vibe-beat motion-reduce:animate-none"
           />
           <span className="sr-only">против</span>
         </span>
