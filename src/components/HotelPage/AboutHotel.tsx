@@ -8,7 +8,6 @@ import {
   BedDouble,
   Briefcase,
   Building2,
-  Bus,
   Car,
   ConciergeBell,
   Dumbbell,
@@ -30,12 +29,13 @@ import {
   AMENITIES,
   AMENITY_SECTIONS,
   POPULAR_AMENITIES,
-  travelTimes,
+  travelDistances,
   workLabels,
   type Amenity,
   type AmenitySection,
   type Hotel,
 } from '@/lib/catalog'
+import { formatDecimal } from '@/lib/format'
 import { DialogButton } from './DialogButton'
 
 type Icon = ComponentType<{ className?: string; strokeWidth?: number; 'aria-hidden'?: boolean }>
@@ -76,19 +76,18 @@ const AMENITY_ICON: Partial<Record<Amenity, Icon>> = {
 }
 const iconOf = (amenity: Amenity) => AMENITY_ICON[amenity] ?? SECTION_ICON[AMENITIES[amenity].section]
 
-/** By car to the centre, to the city transport and, in a city with one, on foot to the metro. */
+/** Kilometres to the centre and, in a city with a metro, to the metro. */
 function TravelTiles({ hotel }: { hotel: Hotel }) {
-  const times = travelTimes(hotel)
+  const distances = travelDistances(hotel)
   const tiles = [
-    { label: 'До центра', minutes: times.centre, note: 'на машине', icon: Car },
-    { label: 'До транспорта', minutes: times.transport, note: 'пешком', icon: Bus },
-    ...(times.metro === null
+    { label: 'До центра', note: 'города', km: distances.centre, icon: Car },
+    ...(distances.metro === null
       ? []
-      : [{ label: 'До метро', minutes: times.metro, note: hotel.metro!.station, icon: TramFront }]),
+      : [{ label: 'До метро', note: hotel.metro!.station, km: distances.metro, icon: TramFront }]),
   ]
   return (
-    <ul className="grid max-w-xl auto-cols-fr grid-flow-col divide-x divide-border" aria-label="Время в пути">
-      {tiles.map(({ label, minutes, note, icon: TileIcon }) => (
+    <ul className="grid max-w-xl auto-cols-fr grid-flow-col divide-x divide-border" aria-label="Расстояния">
+      {tiles.map(({ label, note, km, icon: TileIcon }) => (
         <li
           key={label}
           className="flex min-w-0 flex-col gap-1 px-[clamp(10px,3vw,20px)] first:pl-0 last:pr-0 sm:flex-row sm:items-center sm:gap-2.5"
@@ -96,8 +95,8 @@ function TravelTiles({ hotel }: { hotel: Hotel }) {
           <TileIcon className="size-6 shrink-0 text-primary" strokeWidth={1.8} aria-hidden />
           <span className="flex min-w-0 flex-col">
             <span className="text-xs text-muted-foreground sm:text-sm">{label}</span>
-            <b className="text-lg/tight">{minutes} мин</b>
             <span className="truncate text-xs text-muted-foreground sm:text-sm">{note}</span>
+            <b className="text-lg/tight">{formatDecimal(km)} км</b>
           </span>
         </li>
       ))}
@@ -165,7 +164,7 @@ function AmenitiesDialog({ hotel }: { hotel: Hotel }) {
   )
 }
 
-/** "Об отеле": the description, the travel times, the first popular amenities and all of them in a dialog. */
+/** "Об отеле": the description, the distances, the first popular amenities and all of them in a dialog. */
 export function AboutHotel({ hotel }: { hotel: Hotel }) {
   const [wifi, ...workspace] = workLabels(hotel)
   const work = [
