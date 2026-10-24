@@ -79,6 +79,9 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 <SUPABASE_SERVICE_ROLE_KEY>`), иначе сайт обновится сам в течение часа. Сборка читает базу: без ключей она
 останавливается с «нет NEXT_PUBLIC_SUPABASE_URL…: npm run secrets:reveal».
 
+- `npm run db:types` — `scripts/db-types.mjs`: `supabase gen types typescript` по базе (`SUPABASE_DB_URL` из `.env.local`, схема
+  только читается) в `src/lib/db/database.types.ts`, затем Prettier. Клиенты Supabase типизированы `Database`. **Перегенерируйте
+  после каждой миграции** (`db:push`) и коммитьте файл вместе с ней.
 - `npm run db:push` — применяет миграции (`supabase db push --db-url "$SUPABASE_DB_URL"`, строка из `.env.local`).
   Прямой адрес `db.<ref>.supabase.co` доступен только по IPv6; без IPv6 подставьте строку пулера
   (Dashboard → Connect → Transaction pooler, порт 6543) в `SUPABASE_DB_URL` окружения.

@@ -1,13 +1,14 @@
 import 'server-only'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import type { Database } from '@/lib/db/database.types'
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from './config'
 
 /** The client of a request, route handler or server action, with the session in its cookies; `null` without settings. */
 export async function createClient() {
   if (!isSupabaseConfigured) return null
   const cookieStore = await cookies()
-  return createServerClient(supabaseUrl, supabaseAnonKey, {
+  return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll: () => cookieStore.getAll(),
       setAll(cookiesToSet) {
