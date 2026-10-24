@@ -1,5 +1,8 @@
 import { scenarios, type Destination, type Scenario, type ScenarioId } from '../data/destinations'
+import { isVisibleHotel } from './catalog'
 import { addDays, fromIso, nightsBetween, toIso, type IsoDate } from './dates'
+import { zodiac } from './horoscope'
+import { archetypeName } from './vibe'
 
 export const GUEST_LIMITS = {
   adults: { min: 1, max: 10 },
@@ -189,4 +192,68 @@ export function fromSearchParams(
     checkOut: stay?.checkOut ?? '',
     guests: stay?.guests ?? DEFAULT_GUESTS,
   }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Selections: the hotels a vibe, the stars or a drawing picked, on /search
+
+/** Where a selection comes from: «Это твой вайб», «Звёзды подскажут», «Нарисуй свой отдых». */
+export type SelectionSource = 'vibe' | 'stars' | 'draw'
+
+/** The hotels of a selection; `from` and `pick` name its source and what it picked (an archetype, a sign). */
+export interface SelectionLink {
+  hotels: readonly string[]
+  from: SelectionSource
+  /** The archetype of a vibe or a drawing, the sign of the stars. */
+  pick: string
+}
+
+/** The selection of an address, as /search shows it: the hotels to load and the title. */
+export interface Selection {
+  kind: 'selection'
+  hotels: string[]
+  title: string
+}
+
+/** As many hotels as `GET /api/hotels?ids=` loads at once. */
+const MAX_SELECTION = 60
+const HOTEL_ID = /^[a-z0-9-]{1,80}$/
+
+const SELECTION_TITLES: Record<SelectionSource, (pick: string) => string | undefined> = {
+  vibe: (pick) => {
+    const name = archetypeName(pick)
+    return name && `Подборка по вашему вайбу: ${name}`
+  },
+  stars: (pick) => {
+    const sign = zodiac.find((z) => z.id === pick)
+    return sign && `Подборка звёзд для ${sign.genitive}`
+  },
+  draw: (pick) => {
+    const name = archetypeName(pick)
+    return name && `Подборка по вашему рисунку: ${name}`
+  },
+}
+
+/** The /search address of a selection; without `stay` the page starts from tomorrow, as a link without dates. */
+export function selectionHref({ hotels, from, pick }: SelectionLink, stay: Stay | null): string {
+  // The ids are of `HOTEL_ID`: the commas stay as they are, not %2C.
+  const params = new URLSearchParams({ from, pick })
+  if (stay) setStayParams(params, stay)
+  return `/search?hotels=${hotels.join(',')}&${params}`
+}
+
+/**
+ * The selection written by `selectionHref`, `null` without `hotels`. Malformed, repeated and hidden
+ * (`isVisibleHotel`) ids are skipped; an unknown `from` or `pick` gives the title «Подобранные отели».
+ */
+export function parseSelection(params: Pick<URLSearchParams, 'get'>): Selection | null {
+  const list = params.get('hotels')
+  if (list === null) return null
+  const hotels = [...new Set(list.split(','))]
+    .filter((id) => HOTEL_ID.test(id) && isVisibleHotel({ id }))
+    .slice(0, MAX_SELECTION)
+  const from = params.get('from')
+  const pick = params.get('pick') ?? ''
+  const title = from && Object.hasOwn(SELECTION_TITLES, from) ? SELECTION_TITLES[from as SelectionSource](pick) : null
+  return { kind: 'selection', hotels, title: title ?? 'Подобранные отели' }
 }

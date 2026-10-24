@@ -20,7 +20,6 @@ import { starSerif } from './starFont'
 import { MagicOrb } from './MagicOrb'
 import { StarForm, type StarAnswers } from './StarForm'
 import { StarResult } from './StarResult'
-import { useDestination } from '../Catalog/useDestinations'
 
 /** Length of the reading's animation; the orb's reveal in globals.css lasts as long. */
 export const READING_MS = 2500
@@ -110,13 +109,9 @@ export function StarSearchDialog({ open, onOpenChange }: Props) {
   }
 
   const result = step.kind === 'reading' && step.reading && step.swirled ? step.reading : null
-  // The stars' answer is one hotel: the best of their city, or of the next city when theirs has none.
-  const hotel = result?.hotels[0]
-  const hotelCity = useDestination(hotel?.destinationId ?? '')
+  // The stars' answer is their city; its hotels open as a selection on /search.
   const status = result
-    ? hotel
-      ? `Звёзды выбрали: ${hotel.name}, ${hotelCity?.name ?? result.city.name}`
-      : `Звёзды выбрали: ${result.city.name}`
+    ? `Звёзды выбрали: ${result.city.name}`
     : step.kind === 'reading'
       ? step.failed
         ? READING_ERROR

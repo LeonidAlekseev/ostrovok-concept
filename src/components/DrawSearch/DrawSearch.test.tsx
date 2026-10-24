@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as actions from '@/components/VibeSearch/actions'
+import { addDays, todayIso } from '../../lib/dates'
+import { allHotels } from '../../test/catalog'
 import { DrawSearch } from './DrawSearch'
 import { DrawSearchDialog } from './DrawSearchDialog'
 
@@ -174,7 +176,7 @@ describe('DrawSearch canvas', () => {
 // draw-search, Requirement: Пошаговое окно; Requirement: Подбор отеля на шаге настроения;
 // Requirement: Готовый отель на последнем шаге
 describe('DrawSearch steps', () => {
-  it('reads the mood while the hotels are picked, then shows the hotel on its own', async () => {
+  it('reads the mood while the hotels are picked, then links to their selection on its own', async () => {
     const user = userEvent.setup()
     // The hotels come when the test lets them.
     const pick = actions.vibeHotelsAction
@@ -193,6 +195,8 @@ describe('DrawSearch steps', () => {
     expect(screen.getByText('Эстет-минималист')).toBeTruthy()
     const colors = screen.getByRole('region', { name: 'Цвета рисунка' })
     expect(within(colors).getByText(/Природа и тишина/).textContent).toBe('Природа и тишина 100%')
+    // No hotels on the step: only the search for them.
+    expect(screen.queryAllByRole('article')).toHaveLength(0)
     const progress = screen.getByRole('progressbar', { name: 'Подбираем отель…' })
     expect(progress.getAttribute('aria-busy')).toBe('true')
     release()
@@ -204,8 +208,9 @@ describe('DrawSearch steps', () => {
     expect(status().textContent).toBe('Шаг 3 из 3: Ваш отель готов!')
     await waitFor(() => expect(document.activeElement).toBe(ready))
     expect(screen.getByRole('img', { name: 'Острова в океане' })).toBeTruthy()
-    const hotels = within(screen.getByRole('region', { name: 'Отели под настроение' })).getAllByRole('article')
-    expect(hotels).toHaveLength(6)
+    // No hotel cards: the selection opens on /search.
+    expect(screen.queryAllByRole('article')).toHaveLength(0)
+    expect(screen.queryByRole('link', { name: 'Посмотреть отель' })).toBeNull()
     // Only what the product has: no flights, no transfers, no routes.
     expect(screen.queryByText(/Перел[её]т/)).toBeNull()
     expect(screen.queryByText(/Трансфер/)).toBeNull()
@@ -213,11 +218,22 @@ describe('DrawSearch steps', () => {
     expect(screen.getByText('Отели под настроение', { selector: 'li' })).toBeTruthy()
     expect(screen.getByText('Фото и отзывы гостей', { selector: 'li' })).toBeTruthy()
 
-    // draw-search, Scenario: Посмотреть отель — the first hotel of the mood.
-    const first = within(hotels[0]).getByRole('link').getAttribute('href')!
-    const hotel = screen.getByRole('link', { name: 'Посмотреть отель' })
-    expect(hotel.getAttribute('href')).toBe(first)
-    expect(first).toMatch(/^\/hotels\/[a-z0-9-]+\?/)
+    // draw-search, Scenario: Посмотреть отель — the six hotels of the mood, from tomorrow.
+    const url = new URL(screen.getByRole('link', { name: 'Посмотреть подборку' }).getAttribute('href')!, 'https://x')
+    expect(url.pathname).toBe('/search')
+    const ids = url.searchParams.get('hotels')!.split(',')
+    expect(ids).toHaveLength(6)
+    for (const id of ids) expect(allHotels().some((h) => h.id === id)).toBe(true)
+    const tomorrow = addDays(todayIso(), 1)
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      hotels: ids.join(','),
+      from: 'draw',
+      pick: 'minimalist',
+      checkin: tomorrow,
+      checkout: addDays(tomorrow, 1),
+      adults: '2',
+      rooms: '1',
+    })
 
     // draw-search, Scenario: Изменить рисунок
     await user.click(screen.getByRole('button', { name: 'Изменить рисунок' }))

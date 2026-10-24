@@ -17,9 +17,8 @@ import {
   type Stroke,
 } from '../../lib/drawMood'
 import { vibeArchetype, type Answer } from '../../lib/vibe'
-import { hotelHref } from '../../lib/search'
+import { selectionHref } from '../../lib/search'
 import { useVibeReading } from '../VibeSearch/useVibeReading'
-import { VibeHotels } from '../VibeSearch/VibeHotels'
 import { DrawCanvas } from './DrawCanvas'
 import { RainbowButton, rainbowClass } from './RainbowButton'
 
@@ -57,7 +56,8 @@ function Sparkles() {
 
 /**
  * The drawing window: a wizard of three steps. 1 — the canvas and the palette; 2 — the mood of the drawing while the
- * hotels are picked, then on by itself; 3 — the hotel of the mood. On phones it is a sheet from the bottom.
+ * hotels are picked, then on by itself; 3 — the link to the selection of the mood on /search. On phones it is a
+ * sheet from the bottom.
  */
 export function DrawSearchDialog({ open, onOpenChange, colorId, onColorIdChange }: Props) {
   const [strokes, setStrokes] = useState<Stroke[]>([])
@@ -319,8 +319,6 @@ export function DrawSearchDialog({ open, onOpenChange, colorId, onColorIdChange 
               </Feature>
             </ul>
 
-            <VibeHotels hotels={vibe.hotels} stay={stay} />
-
             <div className="sticky -bottom-[clamp(16px,4vw,32px)] z-10 -mx-[clamp(16px,4vw,32px)] grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] *:whitespace-normal gap-[clamp(10px,2.4vw,16px)] bg-background/95 px-[clamp(16px,4vw,32px)] py-3 backdrop-blur-sm">
               <Button
                 variant="ghost"
@@ -331,19 +329,20 @@ export function DrawSearchDialog({ open, onOpenChange, colorId, onColorIdChange 
                 <RefreshCw aria-hidden />
                 Изменить рисунок
               </Button>
-              {vibe.hotels[0] && (
-                <Link
-                  href={hotelHref(vibe.hotels[0].id, stay)}
-                  className={cn(
-                    buttonVariants({ size: 'lg' }),
-                    rainbowClass,
-                    'h-[clamp(52px,12vw,64px)] gap-2 rounded-2xl px-3 text-[clamp(14px,3.8vw,19px)]',
-                  )}
-                >
-                  Посмотреть отель
-                  <ArrowRight aria-hidden />
-                </Link>
-              )}
+              <Link
+                href={selectionHref(
+                  { hotels: vibe.hotels.map((h) => h.id), from: 'draw', pick: vibe.archetype.id },
+                  stay,
+                )}
+                className={cn(
+                  buttonVariants({ size: 'lg' }),
+                  rainbowClass,
+                  'h-[clamp(52px,12vw,64px)] gap-2 rounded-2xl px-3 text-[clamp(14px,3.8vw,19px)]',
+                )}
+              >
+                Посмотреть подборку
+                <ArrowRight aria-hidden />
+              </Link>
             </div>
           </div>
         )}

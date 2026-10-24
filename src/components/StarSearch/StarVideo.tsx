@@ -3,7 +3,7 @@ import { Clapperboard, Download, Link2, Share2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Reading } from '../../lib/horoscope'
 import { BRAND_NAME, canShareFile, downloadFile, shareFile, shareText, videoType } from '../../lib/shareMedia'
-import { renderReadingVideo, type StarPick } from './starVideo'
+import { renderReadingVideo } from './starVideo'
 
 type State =
   | { kind: 'idle' }
@@ -20,7 +20,7 @@ const secondaryClass =
   'h-12 border-(--decor-star-line)/70 bg-(--decor-star-glass) px-3 text-base text-(--decor-star-text) hover:bg-(--decor-star-glass) hover:text-(--decor-gold)'
 
 /** The video of the reading: rendered on request, then sent through the share sheet or downloaded. */
-export function StarVideo({ reading, name, pick }: { reading: Reading; name: string; pick: StarPick }) {
+export function StarVideo({ reading, name }: { reading: Reading; name: string }) {
   const [type] = useState(videoType)
   const [state, setState] = useState<State>({ kind: 'idle' })
   const [note, setNote] = useState('')
@@ -29,7 +29,7 @@ export function StarVideo({ reading, name, pick }: { reading: Reading; name: str
   const abortRef = useRef<AbortController | null>(null)
 
   const title = `${BRAND_NAME} Звёзды подскажут`
-  const text = `${name} ${reading.sign.symbol} — звёзды выбрали мне «${pick.title}» (${pick.place}). А что выпадет тебе?`
+  const text = `${name} ${reading.sign.symbol} — звёзды выбрали мне ${reading.city.name}, ${reading.city.country}. А что выпадет тебе?`
   const site = () => window.location.origin
 
   // Closing the window stops the recording; the preview's object URL goes with the video.
@@ -53,7 +53,7 @@ export function StarVideo({ reading, name, pick }: { reading: Reading; name: str
     setRestarted(false)
     setState({ kind: 'rendering', progress: 0 })
     try {
-      const file = await renderReadingVideo(reading, name, pick, type, {
+      const file = await renderReadingVideo(reading, name, type, {
         signal: controller.signal,
         // The bar moves in 1 % steps: a state update per frame would re-render the dialog 60 times a second.
         onProgress: (share) =>

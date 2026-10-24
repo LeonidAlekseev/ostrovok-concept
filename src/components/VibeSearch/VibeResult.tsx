@@ -1,15 +1,16 @@
+import Link from 'next/link'
 import { useEffect, useRef, type CSSProperties } from 'react'
-import { RotateCcw } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import type { Stay } from '../../lib/search'
+import { ArrowRight, RotateCcw } from 'lucide-react'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { cn } from 'cn'
+import { selectionHref, type Stay } from '../../lib/search'
 import type { Vibe } from '../../lib/vibe'
 import { SmartImage } from '../ui/SmartImage'
-import { VibeHotels } from './VibeHotels'
 import { VibeImage } from './VibeImage'
 
 interface Props {
   vibe: Vibe
-  /** `null` until today's date is known: the links go without dates and the hotel page asks for them. */
+  /** `null` until today's date is known: the selection then goes without dates and /search starts from tomorrow. */
   stay: Stay | null
   onRestart: () => void
 }
@@ -59,7 +60,14 @@ export function VibeResult({ vibe, stay, onRestart }: Props) {
 
       <VibeImage vibe={vibe} />
 
-      <VibeHotels hotels={vibe.hotels} stay={stay} />
+      {/* The hotels of the vibe are shown on /search, with its filters and map. */}
+      <Link
+        href={selectionHref({ hotels: vibe.hotels.map((h) => h.id), from: 'vibe', pick: vibe.archetype.id }, stay)}
+        className={cn(buttonVariants({ size: 'lg' }), 'h-12 text-base')}
+      >
+        Посмотреть подборку
+        <ArrowRight aria-hidden />
+      </Link>
 
       <Button variant="secondary" size="lg" className="h-12 text-base" onClick={onRestart}>
         <RotateCcw aria-hidden />
