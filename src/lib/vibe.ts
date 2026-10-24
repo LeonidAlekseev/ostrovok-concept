@@ -57,7 +57,7 @@ const has = (hotel: Hotel, amenity: Hotel['amenities'][number]) => hotel.ameniti
 export const VIBE_AXES: readonly VibeAxis[] = [
   {
     id: 'evening',
-    left: 'Тихий вечер',
+    left: 'Уютный вечер',
     right: 'Шумная вечеринка',
     fit: (h, scale) => (has(h, 'bar') ? 0.5 : -0.5) + (has(h, 'restaurant') ? 0.25 : -0.25) + centrality(h, scale) / 4,
   },
@@ -111,7 +111,7 @@ export const VIBE_AXES: readonly VibeAxis[] = [
 
 export const VIBE_STEPS = VIBE_AXES.length
 
-/** The photo of a side of an axis: `public/images/vibe/evening-left.webp` is «Тихий вечер». */
+/** The photo of a side of an axis: `public/images/vibe/evening-left.webp` is «Уютный вечер». */
 export const poleImage = (axisId: string, side: -1 | 1) => `/images/vibe/${axisId}-${side < 0 ? 'left' : 'right'}.webp`
 
 export interface Archetype {
@@ -123,7 +123,7 @@ export interface Archetype {
   image: string
 }
 
-/** A side of an axis: `evening:-1` is «Тихий вечер». */
+/** A side of an axis: `evening:-1` is «Уютный вечер». */
 type Pole = `${string}:${-1 | 1}`
 
 /** The sides the answers chose; «Не могу выбрать» chooses none. */
@@ -274,7 +274,7 @@ export function fillVibe(hotels: readonly Hotel[]): Hotel[] {
 
 /**
  * The answers as words for the semantic search: the archetype and the chosen sides, as the hotels' texts
- * name them («Настроение: Тихий вечер, Море…»). Empty when every answer is «Не могу выбрать».
+ * name them («Настроение: Уютный вечер, Море…»). Empty when every answer is «Не могу выбрать».
  */
 export function vibeWish(answers: readonly Answer[]): string {
   const sides = VIBE_AXES.flatMap((axis, i) => (answers[i] ? [answers[i] < 0 ? axis.left : axis.right] : []))
