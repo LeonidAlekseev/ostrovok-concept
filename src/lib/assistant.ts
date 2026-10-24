@@ -8,7 +8,7 @@ import {
   type HotelFeatures,
   type ViewKind,
 } from './features'
-import { addDays, fromIso, toIso, type IsoDate } from './dates'
+import { addDays, formatShortRange, fromIso, nightsBetween, toIso, type IsoDate } from './dates'
 import { countRu, formatPrice } from './format'
 import { stayTotal } from './offer'
 import { MAX_NIGHTS, type Guests, type SearchQuery } from './search'
@@ -25,10 +25,20 @@ export type Party = 'solo' | 'couple' | 'family' | 'friends'
 /** Zero-based month, or "as soon as possible". `any` means the traveller left it to the assistant. */
 type When = number | 'soon' | 'any'
 
+/** The named days of a stay («с 10 по 15 ноября»): check-in and check-out. */
+export interface StayDates {
+  checkIn: IsoDate
+  checkOut: IsoDate
+}
+
 export interface Brief {
   vibe?: VibeId | 'any'
   destinationId?: string
   when?: When
+  /** The named days of the stay: the plan's dates; `when` is their month and `nights` their length. */
+  dates?: StayDates
+  /** Named days that are past, impossible or too long: they are not taken, and Эвал asks for them. */
+  datesRejected?: true
   nights?: number
   party?: Party | 'any'
   mood?: Mood
@@ -42,7 +52,7 @@ export interface Brief {
   view?: ViewKind | 'any'
 }
 
-export type QuestionId = 'vibe' | 'when' | 'party'
+export type QuestionId = 'vibe' | 'when' | 'party' | 'dates'
 
 export interface Question {
   id: QuestionId
@@ -212,14 +222,20 @@ export function mergeBrief(
 /** `mergeBrief` for a reply already read (by the rules or by the language model). */
 export function foldBrief(brief: Brief, parsed: Brief, input: string, asked: QuestionId | null): Brief {
   const next: Brief = { ...brief }
+  // Rejected days are asked again only while the newest message still lacks them.
+  delete next.datesRejected
   for (const key of Object.keys(parsed) as (keyof Brief)[]) {
     if (parsed[key] !== undefined) Object.assign(next, { [key]: parsed[key] })
   }
+  // A month of its own ("в декабре") replaces the named days.
+  if (parsed.when !== undefined && !parsed.dates) delete next.dates
   // The trip's theme is set by the first message; a later "на выходные" only sets the dates.
   if (brief.vibe && brief.vibe !== 'any' && parsed.vibe === 'weekend') next.vibe = brief.vibe
+  // "не важно" for the dates asked drops the named days, so the plan goes by the month.
+  if (asked === 'dates' && !parsed.dates && ANY.test(normalize(input))) delete next.dates
   // Without a pending question, "удиви меня" hands over the theme.
   const open = asked ?? (next.vibe || next.destinationId ? null : 'vibe')
-  if (open && next[open] === brief[open] && ANY.test(normalize(input))) next[open] = 'any'
+  if (open && open !== 'dates' && next[open] === brief[open] && ANY.test(normalize(input))) next[open] = 'any'
   return next
 }
 
@@ -237,6 +253,13 @@ const VIBE_REPLIES: [label: string, vibe: VibeId | null][] = [
  * not offered as quick replies.
  */
 export function nextQuestion(brief: Brief, today: IsoDate, destinations?: readonly Destination[]): Question | null {
+  // Named days that are not taken, or that have passed since they were named: the plan waits for them.
+  if (brief.datesRejected || (brief.dates && brief.dates.checkIn < today))
+    return {
+      id: 'dates',
+      text: 'Не могу взять эти даты: они уже прошли или не сходятся. Назовите даты заезда и выезда, например «с 10 по 15 ноября».',
+      replies: [],
+    }
   if (!brief.vibe && !brief.destinationId)
     return {
       id: 'vibe',
@@ -355,6 +378,7 @@ function nextWeekday(from: IsoDate, weekday: number): IsoDate {
 }
 
 function travelDates(brief: Brief, nights: number, today: IsoDate): IsoDate {
+  if (brief.dates) return brief.dates.checkIn
   const tomorrow = addDays(today, 1)
   const weekday = nights <= 3 ? 5 : 6
   const { when } = brief
@@ -416,7 +440,9 @@ export function makePlan(
   const { vibe, reason, named, pool } = planScope(brief, today, destinations)
   const [emoji, atmosphere, text] = ATMOSPHERES[vibe][brief.mood ?? 'default']
 
-  const nights = Math.min(brief.nights ?? (vibe === 'weekend' ? 2 : brief.party === 'family' ? 7 : 5), MAX_NIGHTS)
+  const nights = brief.dates
+    ? nightsBetween(brief.dates.checkIn, brief.dates.checkOut)
+    : Math.min(brief.nights ?? (vibe === 'weekend' ? 2 : brief.party === 'family' ? 7 : 5), MAX_NIGHTS)
   const guests = PARTY_GUESTS[brief.party && brief.party !== 'any' ? brief.party : 'couple']
   const checkIn = travelDates(brief, nights, today)
 
@@ -503,7 +529,13 @@ export function describeBrief(brief: Brief, destinations: readonly Destination[]
   return [
     named?.name ?? (brief.vibe && brief.vibe !== 'any' ? VIBE_LABEL[brief.vibe] : null),
     brief.mood === 'calm' ? 'спокойно' : brief.mood === 'active' ? 'активно' : null,
-    typeof brief.when === 'number' ? `в ${MONTH_IN[brief.when]}` : brief.when === 'soon' ? 'в ближайшее время' : null,
+    brief.dates
+      ? formatShortRange(brief.dates.checkIn, brief.dates.checkOut)
+      : typeof brief.when === 'number'
+        ? `в ${MONTH_IN[brief.when]}`
+        : brief.when === 'soon'
+          ? 'в ближайшее время'
+          : null,
     brief.nights ? countRu(brief.nights, ['ночь', 'ночи', 'ночей']) : null,
     brief.party && brief.party !== 'any' ? PARTY_LABEL[brief.party] : null,
     brief.budget ? `до ${formatPrice(brief.budget)}` : null,
@@ -519,21 +551,48 @@ const MOODS: readonly Mood[] = ['calm', 'active']
 const intIn = (value: unknown, min: number, max: number) =>
   typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max ? value : undefined
 
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * Two named days of a stay: real calendar days (not 31 февраля), check-out after check-in, at most `MAX_NIGHTS`
+ * nights apart. Whether the check-in is still ahead is for the caller, who knows today.
+ */
+export function stayDates(checkIn: unknown, checkOut: unknown): StayDates | undefined {
+  if (typeof checkIn !== 'string' || typeof checkOut !== 'string') return undefined
+  if (![checkIn, checkOut].every((day) => ISO_DAY.test(day) && toIso(fromIso(day)) === day)) return undefined
+  const nights = nightsBetween(checkIn, checkOut)
+  return nights >= 1 && nights <= MAX_NIGHTS ? { checkIn, checkOut } : undefined
+}
+
+/** The brief's month and nights of named days: `when` is the month of the check-in, `nights` the stay's length. */
+export function briefWithStay(dates: StayDates): Pick<Brief, 'dates' | 'when' | 'nights'> {
+  return {
+    dates,
+    when: fromIso(dates.checkIn).getMonth(),
+    nights: nightsBetween(dates.checkIn, dates.checkOut),
+  }
+}
+
 /**
  * Keeps only what the assistant understands: a catalog city, known themes and answers, a month 0–11,
- * 1–30 nights and a whole budget in ₽. Reads untrusted input — the client's brief or the model's answer.
+ * 1–30 nights, named days of a stay and a whole budget in ₽. Reads untrusted input — the client's brief or the
+ * model's answer.
  */
 export function normalizeBrief(
   raw: Partial<Record<keyof Brief, unknown>>,
   destinations: readonly Destination[],
 ): Brief {
   const brief: Brief = {}
-  const { vibe, destinationId, when, nights, party, mood, budget, quiet, height, view } = raw
+  const { vibe, destinationId, when, nights, party, mood, budget, quiet, height, view, dates, datesRejected } = raw
   if (vibe === 'any' || (typeof vibe === 'string' && Object.hasOwn(VIBE_LABEL, vibe))) brief.vibe = vibe as VibeId
   if (destinations.some((d) => d.id === destinationId)) brief.destinationId = destinationId as string
   if (when === 'soon' || when === 'any') brief.when = when
   else if (intIn(when, 0, 11) !== undefined) brief.when = when as number
   if (typeof nights === 'number' && nights >= 1) brief.nights = Math.min(Math.round(nights), MAX_NIGHTS)
+  const { checkIn, checkOut } = (dates ?? {}) as Partial<StayDates>
+  const stay = stayDates(checkIn, checkOut)
+  if (stay) Object.assign(brief, briefWithStay(stay))
+  if (datesRejected === true) brief.datesRejected = true
   if (party === 'any' || (typeof party === 'string' && Object.hasOwn(PARTY_LABEL, party))) brief.party = party as Party
   if (MOODS.includes(mood as Mood)) brief.mood = mood as Mood
   if (typeof budget === 'number' && budget >= 1) brief.budget = Math.round(budget)
