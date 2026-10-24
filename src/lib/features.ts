@@ -109,30 +109,25 @@ const has = (features: HotelFeatures | undefined, criterion: Criterion, wish: Fe
   return matchingViews(features, wish.view).length > 0
 }
 
-/** Room names shown in a reason. */
-const ROOMS_SHOWN = 2
-
 /**
- * Why the hotel fits the wish, one line a criterion: «тихо ночью: ниже 40 дБ», «здание 12 этажей», «номера с видом
- * на море: Люкс (по описанию)»; «нет данных о шуме» when the hotel has no data for it.
+ * Why the hotel fits the wish, one line a criterion: «тихо ночью: ниже 40 дБ», «здание 12 этажей», «в описаниях номеров
+ * отеля есть вид на море»; «нет данных о шуме» when the hotel has no data for it.
  */
 export function featureReasons(features: HotelFeatures | undefined, wish: FeatureWish): string[] {
   return criteriaOf(wish).map((criterion) => {
     if (!has(features, criterion, wish))
       // A hotel with data had its room names read: none of them tells of the view.
       return criterion === 'view' && features
-        ? `в описании номеров нет вида ${wish.view === 'any' ? 'из окна' : VIEW_LABEL[wish.view!]}`
+        ? `в описаниях номеров отеля нет вида ${wish.view === 'any' ? 'из окна' : VIEW_LABEL[wish.view!]}`
         : `нет данных о ${CRITERION_LABEL[criterion]}`
     const f = features!
     if (criterion === 'quiet') return `ночью ${bandLabel(f.lnight!)}${f.lden ? `, за сутки ${bandLabel(f.lden)}` : ''}`
     if (criterion === 'height')
       return `здание ${countRu(f.floors!, ['этаж', 'этажа', 'этажей'])}${f.heightM ? `, ${Math.round(f.heightM)} м` : ''}`
     const rooms = matchingViews(f, wish.view)
-    const names = [...new Set(rooms.map((r) => r.roomName))]
     const label = wish.view === 'any' ? VIEW_LABEL[rooms[0].view] : VIEW_LABEL[wish.view!]
-    const shown = names.slice(0, ROOMS_SHOWN).join('; ')
-    const more = names.length > ROOMS_SHOWN ? ` и ещё ${names.length - ROOMS_SHOWN}` : ''
-    return `с видом ${label}: ${shown}${more} (по описанию)`
+    // The room types are a directory of names from the suppliers, not the rooms on sale: no room is promised.
+    return `в описаниях номеров отеля есть вид ${label}`
   })
 }
 
@@ -195,10 +190,7 @@ export function featureLines(features: HotelFeatures | undefined): string[] {
         .join(', ')}${features.lnight && loudness(features.lnight) <= 45 ? ' — тихо ночью' : ''}.`,
     )
   const views = [...new Set(features.views.map((v) => v.view))]
-  if (views.length)
-    lines.push(
-      `Номера с видом (по описанию): ${views.map((v) => (v === 'nice' ? 'красивый вид из окна' : VIEW_LABEL[v])).join(', ')}.`,
-    )
+  if (views.length) lines.push(`В описаниях номеров отеля есть вид ${views.map((v) => VIEW_LABEL[v]).join(', ')}.`)
   return lines
 }
 

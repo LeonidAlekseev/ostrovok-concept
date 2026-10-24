@@ -73,18 +73,27 @@ export function featureRow(hotelId: string, geo: HotelGeo): FeatureRow | null {
 /** The room groups of an Ostrovok hotel (`static_vm.room_groups`), the parts read here. */
 export interface RoomGroup {
   rg_hash?: unknown
+  /** The class of the room type: the same for the variants of one room (views, beds) among the suppliers. */
+  room_group_id?: unknown
   name_struct?: { main_name?: unknown } | null
 }
 
-/** A row a view a room group's name tells of; a group named twice counts once. */
+/**
+ * A row a view a room group's name tells of, one per `room_group_id`: the directory holds many names of one room
+ * (182 records, 99 ids at a hotel), and the first record of the id carries the row's `rg_hash`. A group without an id
+ * counts by its `rg_hash`.
+ */
 export function viewRows(masterId: number, groups: readonly RoomGroup[]): ViewRow[] {
   const rows = new Map<string, ViewRow>()
   for (const group of groups) {
     const hash = text(group.rg_hash)
     const name = text(group.name_struct?.main_name)
     if (!hash || !name) continue
-    for (const view of viewsOfRoomName(name))
-      rows.set(`${hash}:${view}`, { hotel_id: `ota-${masterId}`, master_id: masterId, rg_hash: hash, view })
+    const id = typeof group.room_group_id === 'number' ? `id${group.room_group_id}` : `hash${hash}`
+    for (const view of viewsOfRoomName(name)) {
+      const key = `${id}:${view}`
+      if (!rows.has(key)) rows.set(key, { hotel_id: `ota-${masterId}`, master_id: masterId, rg_hash: hash, view })
+    }
   }
   return [...rows.values()]
 }

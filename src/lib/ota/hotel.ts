@@ -18,7 +18,7 @@ import type { OtaHotel, OtaMapHotel, OtaRate, OtaSearch } from './search'
 
 /**
  * A hotel of an Ostrovok search as a catalogue `Hotel`: the name, the address, the place, the stars, the
- * rating, the price, the photos, the amenities, the rooms with their rates and the review count are real; what the
+ * rating, the price, the photos, the amenities, the room with its rate and the review count are real; what the
  * search does not have (the description, the Wi‑Fi) the catalogue generator fills in. The reviews, the section
  * scores and the guests' photos are never generated: a real hotel shows only what Ostrovok has.
  */
@@ -94,22 +94,7 @@ function cancellationOf(rate: OtaRate, stay: OtaStay): Cancellation {
 
 const roomPhotos = (name: string): Photo[] => [{ id: 'room-1', caption: name, tone: 0 }]
 
-/** The room types of the hotel without a rate for the stay: no price, nothing to book; the guests are unknown. */
-function unpricedRooms(raw: OtaHotel, skip: ReadonlySet<string>): Room[] {
-  return raw.static_vm.room_groups
-    .filter((group) => !skip.has(`room-${group.rg_hash}`))
-    .map((group) => ({
-      id: `room-${group.rg_hash}`,
-      name: group.name_struct.main_name,
-      area: null,
-      beds: group.name_struct.bedding_type ?? '',
-      capacity: 0,
-      photos: roomPhotos(group.name_struct.main_name),
-      rates: [],
-    }))
-}
-
-/** The rooms of the rates, each with its rates cheapest first, the cheapest room first, then the rooms without a rate. */
+/** The rooms of the rates, each with its rates cheapest first, the cheapest room first. */
 function roomsOf(raw: OtaHotel, stay: OtaStay): Room[] {
   const rooms = new Map<string, Room>()
   raw.rates.forEach((rate, index) => {
@@ -135,18 +120,17 @@ function roomsOf(raw: OtaHotel, stay: OtaStay): Room[] {
     } satisfies Rate)
     rooms.set(id, entry)
   })
-  const priced = [...rooms.values()]
+  return [...rooms.values()]
     .map((room) => ({ ...room, rates: room.rates.sort((a, b) => a.pricePerNight - b.pricePerNight) }))
     .sort((a, b) => a.rates[0].pricePerNight - b.rates[0].pricePerNight)
-  return [...priced, ...unpricedRooms(raw, new Set(rooms.keys()))]
 }
 
-/** A hotel the search found no rate for: its first room at the price of the map pin, without a refund, then the other room types. */
-function pinRooms(raw: OtaHotel, priceFrom: number): Room[] {
+/** A hotel the search found no rate for: its first room at the price of the map pin, without a refund. */
+function pinRoom(raw: OtaHotel, priceFrom: number): Room {
   const group = raw.static_vm.room_groups[0]
   const name = group?.name_struct.main_name ?? 'Номер'
-  const first: Room = {
-    id: group ? `room-${group.rg_hash}` : 'room-1',
+  return {
+    id: 'room-1',
     name,
     area: null,
     beds: group?.name_struct.bedding_type ?? '',
@@ -162,7 +146,6 @@ function pinRooms(raw: OtaHotel, priceFrom: number): Room[] {
       },
     ],
   }
-  return [first, ...unpricedRooms(raw, new Set([first.id]))]
 }
 
 /** The hotel of the search in the destination; `pin` is its map pin, the price of a hotel without rates. */
@@ -206,7 +189,7 @@ export function otaHotel(raw: OtaHotel, destinationId: string, stay: OtaStay, pi
         url: image.tmpl,
       })),
     }),
-    rooms: rooms ?? pinRooms(raw, priceFrom),
+    rooms: rooms ?? [pinRoom(raw, priceFrom)],
   })
   // Ostrovok's rating and review count are real; the reviews, the scores of the sections and the guests' photos
   // are not in the search, and the generator's would be made up.

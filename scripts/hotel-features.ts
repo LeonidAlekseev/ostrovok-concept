@@ -1,5 +1,5 @@
 // Derives the hotels' features for Эвал: the building and the noise at each real hotel (`public.hotel_geo`) into
-// `hotel_features`, the views of its room types (the names of `ota_hotels.static_vm.room_groups`) into
+// `hotel_features`, the views of its room groups, one per `room_group_id` (the names of `ota_hotels.static_vm.room_groups`) into
 // `hotel_room_views`. Copies no raw data: only the derived values and the reference to the source.
 //   npm run db:features [-- --dry-run]   (Node runs the TypeScript itself; the keys come from .env.local)
 // `--dry-run` reads and counts, and writes nothing.
@@ -133,5 +133,5 @@ await write<ViewRow>(
 const count = (rows: FeatureRow[], pick: (row: FeatureRow) => unknown) => rows.filter((r) => pick(r) !== null).length
 console.log(
   `hotels: ${hotels.length} real; with floors ${count(features, (r) => r.floors)}, with night noise ${count(features, (r) => r.lnight_max ?? r.lnight_min)}; ` +
-    `with a view ${new Set(views.map((v) => v.hotel_id)).size} (${new Set(views.map((v) => `${v.hotel_id}:${v.rg_hash}`)).size} room types)`,
+    `with a view ${new Set(views.map((v) => v.hotel_id)).size} (${new Set(views.map((v) => `${v.hotel_id}:${v.rg_hash}`)).size} room groups)`,
 )

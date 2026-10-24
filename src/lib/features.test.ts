@@ -90,10 +90,8 @@ describe('featureReasons', () => {
     ])
   })
 
-  it('names the room types with the view, from their description (Scenario: Вид не у всех номеров)', () => {
-    expect(featureReasons(seaView, { view: 'sea' })).toEqual([
-      'с видом на море: Двухместный номер Standard с видом на море (по описанию)',
-    ])
+  it('says the descriptions tell of the view, promising no room (Scenario: Вид не у всех номеров)', () => {
+    expect(featureReasons(seaView, { view: 'sea' })).toEqual(['в описаниях номеров отеля есть вид на море'])
   })
 
   it('says there is no data instead of guessing', () => {
@@ -101,7 +99,7 @@ describe('featureReasons', () => {
       'нет данных о шуме',
       'нет данных о виде из окна',
     ])
-    expect(featureReasons(quietLow, { view: 'sea' })).toEqual(['в описании номеров нет вида на море'])
+    expect(featureReasons(quietLow, { view: 'sea' })).toEqual(['в описаниях номеров отеля нет вида на море'])
   })
 })
 
@@ -110,7 +108,7 @@ describe('featureLines', () => {
     expect(featureLines(seaView)).toEqual([
       'Здание: 7 этажей.',
       'Шум по карте шума: ночью 50–54 дБ.',
-      'Номера с видом (по описанию): на море, на город.',
+      'В описаниях номеров отеля есть вид на море, на город.',
     ])
     expect(featureLines(quietLow)[1]).toBe('Шум по карте шума: ночью ниже 40 дБ, за сутки 45–49 дБ — тихо ночью.')
     expect(featureLines(undefined)).toEqual([])
