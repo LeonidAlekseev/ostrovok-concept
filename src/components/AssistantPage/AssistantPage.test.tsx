@@ -26,7 +26,7 @@ describe('AssistantPage', () => {
     const user = userEvent.setup()
     const view = render(<AssistantPage newHotels={newHotels} />)
     await user.type(screen.getByLabelText('Опишите поездку'), 'Хочу на море{Enter}')
-    const log = () => screen.getByRole('list', { name: 'Диалог с Эвалом' })
+    const log = () => screen.getByRole('log', { name: 'Диалог с Эвалом' })
     await within(log()).findByText('Хочу на море')
 
     view.unmount()

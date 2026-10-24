@@ -219,8 +219,6 @@
 
   /* Animations of the components, started by animate-<name> classes. Per-element delays are inline
      animation-delay styles. */
-  /* The assistant's typing indicator: three dots bouncing in turn. */
-  --animate-typing-dot: typing-dot 1s ease-in-out infinite;
   /* The magic orb: the glow breathes, sparkles twinkle around it, and while the
      stars are read the sign's symbol surfaces from the nebula (2.5 s, the length of the reading). */
   --animate-orb-glow: orb-glow 3s ease-in-out infinite;
@@ -256,19 +254,6 @@
     }
     to {
       height: 0;
-    }
-  }
-
-  @keyframes typing-dot {
-    0%,
-    80%,
-    100% {
-      opacity: 0.35;
-      transform: translateY(0);
-    }
-    40% {
-      opacity: 1;
-      transform: translateY(-3px);
     }
   }
 

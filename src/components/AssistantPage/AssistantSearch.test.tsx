@@ -52,13 +52,21 @@ function renderAssistant() {
   return { ...result, user: userEvent.setup() }
 }
 
-const log = () => screen.getByRole('list', { name: 'Диалог с Эвалом' })
+const log = () => screen.getByRole('log', { name: 'Диалог с Эвалом' })
+/** The scrolling feed around the log, and its button to the newest message (inert while there is none below). */
+const feedViewport = () => screen.getByRole('region', { name: 'Лента чата' })
+const toNew = () => screen.getByRole('button', { name: 'К новому сообщению' })
 const inLog = (text: string | RegExp) => within(log()).findByText(text, {})
 const chatList = () => screen.getByRole('navigation', { name: 'Чаты' })
 const input = () => screen.getByLabelText('Опишите поездку')
 const bodyOf = (call: number) => JSON.parse(fetchMock.mock.calls[call][1]?.body as string)
 /** «Новый чат» over the chat: the list of chats has its own one too. */
 const newChatButton = () => screen.getAllByRole('button', { name: 'Новый чат' })[0]
+/** The links of the feed lead to hotel pages only: no ready-made route. */
+const hotelLinksOnly = () =>
+  within(log())
+    .queryAllByRole('link')
+    .every((link) => /^\/hotels\/[^/?]+\?/.test(link.getAttribute('href') ?? ''))
 const answer = (body: object) => Response.json({ source: 'model', ...body })
 
 /** A reply the test sends when it wants to. */
@@ -196,21 +204,28 @@ describe('AssistantSearch composer and feed', () => {
     await inLog(/Когда планируете поехать/)
     await user.type(input(), 'в октябре{Enter}')
 
-    // The traveller scrolls up a long feed while Eval answers.
-    const feed = log()
+    // The traveller scrolls up a long feed while Eval answers: jsdom has no layout, so the feed tells its sizes.
+    const feed = feedViewport()
     const scrollTo = vi.fn()
     feed.scrollTo = scrollTo
     Object.defineProperty(feed, 'scrollHeight', { configurable: true, value: 2000 })
     Object.defineProperty(feed, 'clientHeight', { configurable: true, value: 400 })
+    const rect = HTMLElement.prototype.getBoundingClientRect
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      // The messages end 1800 px below the top of the feed, scrolled 200 px down.
+      return this.dataset.messageId ? DOMRect.fromRect({ y: 1700, height: 100 }) : rect.call(this)
+    })
     feed.scrollTop = 200
+    fireEvent.wheel(feed)
     fireEvent.scroll(feed)
     reply.resolve(answer({ brief: { vibe: 'sea', when: 9 } }))
+    await inLog(/Записал/)
 
-    const toNew = await screen.findByRole('button', { name: 'К новому сообщению' })
+    await waitFor(() => expect(toNew().dataset.active).toBe('true'))
     expect(scrollTo).not.toHaveBeenCalled()
-    await user.click(toNew)
-    expect(scrollTo).toHaveBeenCalledWith({ top: 2000, behavior: 'smooth' })
-    expect(screen.queryByRole('button', { name: 'К новому сообщению' })).toBeNull()
+    await user.click(toNew())
+    expect(scrollTo).toHaveBeenCalledWith({ top: 1600, behavior: 'smooth' })
+    await waitFor(() => expect(toNew().dataset.active).toBe('false'))
   })
 
   it('follows the new answer while the traveller is at the end', async () => {
@@ -218,7 +233,7 @@ describe('AssistantSearch composer and feed', () => {
     const { user } = renderAssistant()
     await user.type(input(), 'к морю{Enter}')
     await inLog(/Когда планируете поехать/)
-    expect(screen.queryByRole('button', { name: 'К новому сообщению' })).toBeNull()
+    expect(toNew().dataset.active).toBe('false')
   })
 })
 
@@ -234,7 +249,7 @@ describe('AssistantSearch steps of the agents', () => {
     expect(
       within(log())
         .getByText(/Подбираю отели по вашему описанию/)
-        .closest('li')?.dataset.step,
+        .closest<HTMLElement>('[data-message-id]')?.dataset.step,
     ).toBe('pending')
 
     reply.resolve(
@@ -247,8 +262,8 @@ describe('AssistantSearch steps of the agents', () => {
     )
 
     const step = await inLog('Подбираю отели по вашему описанию — нашёл 3 отеля')
-    expect(step.closest('li')?.dataset.step).toBe('done')
-    const items = within(log()).getAllByRole('listitem')
+    expect(step.closest<HTMLElement>('[data-message-id]')?.dataset.step).toBe('done')
+    const items = [...log().querySelectorAll<HTMLElement>('[data-message-id]')]
     const stepAt = items.findIndex((li) => li.contains(step))
     const planAt = items.findIndex((li) => within(li).queryByText('Атмосфера поездки'))
     expect(stepAt).toBeGreaterThan(-1)
@@ -295,7 +310,7 @@ describe('AssistantSearch plan', () => {
     expect(await within(log()).findByText('Атмосфера поездки', {})).toBeTruthy()
     expect(within(log()).getAllByRole('button', { name: /Лиссабон/ }).length).toBeGreaterThan(0)
     expect(log().textContent).not.toMatch(/маршрут/i)
-    expect(within(log()).queryByRole('link')).toBeNull()
+    expect(hotelLinksOnly()).toBe(true)
   })
 })
 
@@ -309,7 +324,7 @@ describe('AssistantSearch chats', () => {
 
     await user.click(newChatButton())
 
-    expect(screen.queryByRole('list', { name: 'Диалог с Эвалом' })).toBeNull()
+    expect(screen.queryByRole('log', { name: 'Диалог с Эвалом' })).toBeNull()
     expect(screen.getByRole('heading', { name: /О каком путешествии вы мечтаете/ })).toBeTruthy()
     const previous = within(chatList()).getByRole('button', { name: /к морю/ })
     await user.click(previous)
@@ -331,7 +346,7 @@ describe('AssistantSearch chats', () => {
     await waitFor(() => expect(waiting.textContent).toContain('новое'))
     expect(waiting.textContent).not.toContain('ждёт ответа')
     // The open chat stays empty.
-    expect(screen.queryByRole('list', { name: 'Диалог с Эвалом' })).toBeNull()
+    expect(screen.queryByRole('log', { name: 'Диалог с Эвалом' })).toBeNull()
 
     await user.click(waiting)
     expect(await inLog('Записал: море. Когда планируете поехать?')).toBeTruthy()
@@ -421,7 +436,7 @@ describe('AssistantSearch after a reload', () => {
     expect(await within(log()).findByText('Атмосфера поездки', {})).toBeTruthy()
     expect(within(log()).getAllByRole('button', { name: /Лиссабон/ }).length).toBeGreaterThan(0)
     expect(screen.queryByText('Воркейшн в Лиссабоне')).toBeNull()
-    expect(within(log()).queryByRole('link')).toBeNull()
+    expect(hotelLinksOnly()).toBe(true)
     expect(window.sessionStorage.getItem(DIALOG_KEY)).toBeNull()
   })
 
@@ -437,7 +452,7 @@ describe('AssistantSearch after a reload', () => {
   ])('ignores damaged data %#: %s (Scenario: Битые данные)', (key, raw, storage) => {
     storage.setItem(key, raw)
     renderAssistant()
-    expect(screen.queryByRole('list', { name: 'Диалог с Эвалом' })).toBeNull()
+    expect(screen.queryByRole('log', { name: 'Диалог с Эвалом' })).toBeNull()
     expect(screen.getByText('О каком путешествии вы мечтаете?')).toBeTruthy()
   })
 })
