@@ -64,7 +64,7 @@ const hero = [
   // Offsets include the transparent header laid over the top of the hero.
   '[--globe-size:clamp(540px,144vw,640px)] [--globe-top:calc(var(--header-height)+clamp(24px,8vw,40px))] [--globe-x:88%]',
   'md:[--globe-size:clamp(760px,76vw,980px)] md:[--globe-top:calc(var(--header-height)+32px)] md:[--globe-x:64%]',
-  'relative isolate h-[calc(var(--globe-top)+var(--globe-size)*0.76)] overflow-hidden text-brand-foreground md:h-[calc(var(--globe-top)+var(--globe-size)*0.62)]',
+  'relative isolate h-[calc(var(--globe-top)+var(--globe-size)*1.0133)] overflow-hidden text-brand-foreground md:h-[calc(var(--globe-top)+var(--globe-size)*0.8267)]',
   'bg-brand bg-[radial-gradient(ellipse_60%_45%_at_85%_30%,color-mix(in_srgb,var(--decor-glow)_75%,transparent),transparent_70%)]',
   // A long press on the globe must not start selecting the title (iOS) or open the callout.
   'select-none [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none]',
