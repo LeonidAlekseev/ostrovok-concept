@@ -85,7 +85,7 @@ describe('Header', () => {
     expect(panel.contains(document.activeElement)).toBe(true)
     await user.tab()
     expect(panel.contains(document.activeElement)).toBe(true)
-    expect(document.activeElement?.getAttribute('href')).toBe('/trips')
+    expect(document.activeElement?.getAttribute('href')).toBe('/search')
   })
 
   it('closes a panel on a press outside the actions', async () => {
@@ -102,13 +102,15 @@ describe('Header', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
+  // site-header, Requirement: Ссылки на поиск в меню, Scenario: Меню
   it('lists the sections in the menu and closes it on a choice', async () => {
     const user = setup()
     await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
     const nav = screen.getByRole('navigation', { name: 'Основное меню' })
     const items = [...nav.querySelectorAll('a, button')].map((el) => [el.textContent, el.getAttribute('href')])
     expect(items).toEqual([
-      ['Поиск отелей', '/#search'],
+      ['Спросить Эвал', '/assistant'],
+      ['Искать вручную', '/search'],
       ['Мои поездки', '/trips'],
       ['Избранное', '/favorites'],
       ['Уведомления', null],

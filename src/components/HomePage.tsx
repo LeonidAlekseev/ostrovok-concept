@@ -2,7 +2,6 @@
 
 import { useMemo } from 'react'
 import { FEATURED_DESTINATION_ID } from '@/data/destinations'
-import { useHotelSearch } from '../hooks/useHotelSearch'
 import type { HotelSummary } from '../lib/catalog'
 import { useDestinations } from './Catalog/useDestinations'
 import { DrawSearch } from './DrawSearch/DrawSearch'
@@ -14,7 +13,7 @@ import { TravelBanner } from './TravelBanner/TravelBanner'
 import { VibeSearch } from './VibeSearch/VibeSearch'
 
 interface Props {
-  /** The "recently added" hotels: the globe's cards and the assistant's suggestions. */
+  /** The "recently added" hotels: the globe's cards. */
   newHotels: readonly HotelSummary[]
   /** The hotels of each persona's tab. */
   selections: readonly PersonaSelection[]
@@ -31,8 +30,6 @@ export function HomePage({ newHotels, selections }: Props) {
       destinations.find((d) => d.id === FEATURED_DESTINATION_ID)!
     return { cities, featured }
   }, [destinations, newHotels])
-  // The assistant's choice opens the results page, whose manual form shows it.
-  const { searchFor } = useHotelSearch()
 
   // The hero starts under the transparent header of the layout, hence the negative top margin.
   return (
@@ -45,7 +42,7 @@ export function HomePage({ newHotels, selections }: Props) {
           className="relative z-10 -mt-[clamp(120px,31vw,150px)] scroll-mt-4 md:-mt-24 lg:-mt-21"
           aria-label="Поиск отелей"
         >
-          <SearchPanel onChoose={searchFor} newHotels={newHotels} />
+          <SearchPanel />
         </section>
 
         <PersonaCarousel selections={selections} />

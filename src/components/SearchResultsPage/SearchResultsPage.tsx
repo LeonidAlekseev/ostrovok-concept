@@ -112,9 +112,11 @@ export function SearchResultsPage() {
   )
 
   if (!today) return <SearchResultsFallback />
+  // Opened from the menu or the home page: a blank form, its errors only after a submit.
+  if (!request) return <QueryForm query={query} />
   const errors = validateSearch(query, today, destinations)
   const target = resolveTarget(query.destination, destinations)
-  if (Object.keys(errors).length > 0 || !target) return <InvalidQuery key={request} query={query} errors={errors} />
+  if (Object.keys(errors).length > 0 || !target) return <QueryForm key={request} query={query} errors={errors} />
   return (
     <Results
       key={request}
@@ -137,11 +139,12 @@ function EditSearch({ query, errors }: { query: SearchQuery; errors?: SearchErro
   )
 }
 
-function InvalidQuery({ query, errors }: { query: SearchQuery; errors: SearchErrors }) {
+/** The form alone: a blank search, or an invalid query of the URL with its errors. */
+function QueryForm({ query, errors }: { query: SearchQuery; errors?: SearchErrors }) {
   return (
     <main className={pageClass}>
       <h1 className="text-title font-bold tracking-[-0.02em]">Поиск отелей</h1>
-      <p className="text-muted-foreground">Проверьте параметры поиска.</p>
+      {errors && <p className="text-muted-foreground">Проверьте параметры поиска.</p>}
       <EditSearch query={query} errors={errors} />
     </main>
   )

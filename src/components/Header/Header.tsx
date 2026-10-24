@@ -31,7 +31,8 @@ const menuItemClass =
   'block w-full rounded-md p-3 text-left font-[550] text-foreground no-underline hover:bg-muted hover:text-primary'
 
 const links = [
-  { href: '/#search', label: 'Поиск отелей' },
+  { href: '/assistant', label: 'Спросить Эвал' },
+  { href: '/search', label: 'Искать вручную' },
   { href: '/trips', label: 'Мои поездки' },
   { href: '/favorites', label: 'Избранное' },
 ]
