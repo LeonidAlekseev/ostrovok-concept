@@ -2,11 +2,26 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MEAL_LABEL } from '../../lib/catalog'
+import { destinations } from '../../data/destinations'
 import { fullHotelsIn } from '../../lib/catalogGenerator'
 import { countRu, formatPrice } from '../../lib/format'
 import { applyFilters, NO_FILTERS, priceBounds } from '../../lib/results'
 import { resetSearchView } from './searchView'
 import { SearchResultsPage } from './SearchResultsPage'
+
+// The count tests need an exact number of hotels: a set of them replaces the catalogue when it is given.
+const fetched = vi.hoisted(() => ({ hotels: null as unknown[] | null }))
+vi.mock('../../hooks/useHotels', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../hooks/useHotels')>()
+  return {
+    ...actual,
+    fetchHotels: vi.fn((query: Parameters<typeof actual.fetchHotels>[0]) =>
+      fetched.hotels
+        ? Promise.resolve(fetched.hotels as Awaited<ReturnType<typeof actual.fetchHotels>>)
+        : actual.fetchHotels(query),
+    ),
+  }
+})
 
 // The page reads the URL through Next's hooks; here they read jsdom's location and, like Next,
 // follow `pushState`, `replaceState` and "Назад".
@@ -270,6 +285,38 @@ describe('SearchResultsPage query', () => {
 })
 
 // search-results-page, Requirement: Карточка отеля в результатах
+// search-results-page, Requirement: Счётчик результатов
+describe('SearchResultsPage count', () => {
+  // Prague alone has fewer hotels than the largest count, so the pool takes every destination.
+  const pool = destinations.flatMap(({ id }) => fullHotelsIn(id))
+  const hotelsOf = (n: number) => pool.slice(0, n)
+  afterEach(() => {
+    fetched.hotels = null
+  })
+
+  it.each([
+    [1, 'вариант'],
+    [2, 'варианта'],
+    [5, 'вариантов'],
+    [21, 'вариант'],
+  ])('counts %i hotels as "%s" in the form of the number', async (n, noun) => {
+    fetched.hotels = hotelsOf(n)
+    open(PRAGUE)
+    const heading = await screen.findByRole('heading', { name: /^Найдено/ })
+
+    expect(heading.textContent).toBe(`Найдено ${n} ${noun}`)
+  })
+
+  it('shows "Ничего не нашлось" instead of the count without results', async () => {
+    fetched.hotels = []
+    open(PRAGUE)
+    await results()
+
+    expect(screen.getByText('Ничего не нашлось')).toBeDefined()
+    expect(screen.queryByText(/^Найдено/)).toBeNull()
+  })
+})
+
 describe('SearchResultsPage hotel card', () => {
   it('links the hotel name to the hotel page with the same dates and guests', async () => {
     open(`destination=prague&checkin=2026-10-20&checkout=2026-10-23&adults=3&children=1&rooms=2`)
