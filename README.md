@@ -138,16 +138,33 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 ### Поиск по смыслу
 
 `src/lib/ai/semantic.ts` (только сервер): `semanticSearch(текст, { kind, destinationIds, k })` — вектор запроса
-`nvidia/nemotron-3.5-embed-8b:free` (`input_type: query`), ближайшие объекты в Supabase pgvector
-(`match_embeddings`, косинус, индекс HNSW), затем реранжирование `nvidia/nemotron-3.5-rerank-8b:free` (адаптер
-`RerankingModelV4` в `src/lib/ai/rerank.ts`: у провайдера OpenRouter реранкеров нет). Модель отдаёт 4096 чисел, а
-HNSW индексирует не больше 4000, поэтому она просит первые 2048 (`dimensions`, модель обучена по Matryoshka) и они
-хранятся как `halfvec(2048)`. Без ключа, без векторов, при ошибке или через 8 с — `null`, и вызывающий код берёт
+`nvidia/nemotron-3.5-embed-8b` (`input_type: query`), ближайшие объекты в Supabase pgvector
+(`match_embeddings`, косинус, индекс HNSW), затем реранжирование `nvidia/nemotron-3.5-rerank-8b` (адаптер
+`RerankingModelV4` в `src/lib/ai/rerank.ts`). Модель отдаёт 4096 чисел, а HNSW индексирует не больше 4000, поэтому
+берутся первые 2048 и нормируются заново (модель обучена по Matryoshka, параметра `dimensions` в API NVIDIA нет);
+они хранятся как `halfvec(2048)`. Без ключа, без векторов, при ошибке или через 8 с — `null`, и вызывающий код берёт
 прежние правила; упал только реранкер — порядок векторов. Векторы недавних запросов кешируются в памяти процесса.
 Таблица `embeddings` закрыта: читают её только функции `security definer`, пишет сервисный ключ.
-Бесплатные модели OpenRouter медленные (эмбеддинг 2–14 с) и ограничены числом запросов в день
-(`free-models-per-day`): тогда работает запасной путь. Качество — `node --env-file=.env.local scripts/semantic-eval.ts`
-(15 запросов, попадания в top-5 до и после реранжирования; вне CI).
+Качество — `node --env-file=.env.local scripts/semantic-eval.ts` (15 запросов, попадания в top-5 до и после
+реранжирования; вне CI).
+
+### Модели
+
+Все модели — через API NVIDIA (build.nvidia.com) с одним ключом `NVIDIA_API_KEY` (см. «Ключи API»); лимит ключа —
+40 запросов в минуту, дневного лимита нет. Общий запрос и ошибки — `src/lib/ai/nvidia.ts`.
+
+- **Лёгкие текстовые задачи** (помощник, `src/lib/ai/model.ts`, `understand.ts`) — `nvidia/nemotron-3.5-lightning-30b-a3b`
+  через OpenAI-совместимый `https://integrate.api.nvidia.com/v1` (`@ai-sdk/openai-compatible`). Рассуждения
+  выключены (`reasoning: 'none'` → `reasoning_effort: none`): иначе модель тратит на них время и токены ответа.
+- **Эмбеддинги** — `nvidia/nemotron-3.5-embed-8b` (`/v1/embeddings`, `input_type` query/passage, `truncate: END`).
+  Свой адаптер в `src/lib/ai/embedding.ts`: провайдер AI SDK не передаёт `input_type`.
+- **Реранк** — `nvidia/nemotron-3.5-rerank-8b`
+  (`https://ai.api.nvidia.com/v1/retrieval/nvidia/nemotron-3.5-rerank-8b/reranking`), оценка — логит модели.
+- Сложные мультимодальные задачи — `nvidia/nemotron-3.5-super-vl-120b-a12b`; подключается вместе с первой такой
+  задачей.
+
+Скрипты (`db:embed`, `semantic-eval`) выдерживают 40 запросов в минуту и при 429 ждут (`Retry-After` или 2, 4,
+8… с) и повторяют; приложение при ошибке, лимите или таймауте уходит в запасной путь по правилам.
 
 ## Стили
 

@@ -23,8 +23,8 @@ export interface SemanticHit {
 }
 
 /**
- * The whole search, the query's vector, pgvector and the reranker together. The free embedding model answers
- * in 2–14 s (October 2026), the reranker in about 1.5 s.
+ * The whole search, the query's vector, pgvector and the reranker together. On the NVIDIA API the embedding
+ * answers in about 0.4 s and the reranker in about 0.8 s (October 2026), but a cold model may take far longer.
  */
 export const SEMANTIC_TIMEOUT_MS = 8000
 /** The query's text is cut to this many characters. */
@@ -33,7 +33,7 @@ export const MAX_SEMANTIC_QUERY = 1000
 const MAX_CANDIDATES = 50
 
 /**
- * Vectors of recent queries: the vibe's answers repeat, and the free model is slow and counts requests a day.
+ * Vectors of recent queries: the vibe's answers repeat, and the key allows 40 requests a minute.
  * The pending vector is kept too, so concurrent searches for the same words share one request.
  */
 const queryVectors = new Map<string, Promise<number[]>>()
