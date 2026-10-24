@@ -63,6 +63,11 @@ describe('HotelRating', () => {
     expect(screen.getByText('На вашем языке доступно 846 отзывов.')).toBeDefined()
   })
 
+  it('wraps the own-language count without a lone last word', () => {
+    render(<HotelRating hotel={{ ...hotel, reviewCount: 846 }} />)
+    expect(screen.getByText('На вашем языке доступно 846 отзывов.').className).toMatch(/\btext-pretty\b/)
+  })
+
   it('colours the badge and the bars on one scale: Wi‑Fi at 6,1 yellow-orange, cleanliness at 9,2 green', () => {
     const sectionScores = hotel.sectionScores.map((s) => ({
       ...s,

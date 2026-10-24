@@ -22,7 +22,7 @@ export function HotelRating({ hotel }: { hotel: Hotel }) {
         <div className="flex min-w-0 flex-col">
           <span className="text-lg/tight font-bold">{ratingLabel(rating)}</span>
           <span className="text-sm text-muted-foreground">{basedOnLabel(reviewCount)}</span>
-          <span className="text-sm text-muted-foreground">{ownLanguageLabel(reviewCount)}</span>
+          <span className="text-sm text-pretty text-muted-foreground">{ownLanguageLabel(reviewCount)}</span>
         </div>
       </div>
       <ul
