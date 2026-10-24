@@ -8,6 +8,7 @@ import { formatDecimal, formatPrice } from '../../lib/format'
 import { guruPrice } from '../../lib/offer'
 import { useDestination } from '../Catalog/useDestinations'
 import { GuruLogo } from '../GuruLogo/GuruLogo'
+import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import { PhotoCarousel } from '../PhotoCarousel/PhotoCarousel'
 import { PhotoBadges } from './PhotoBadges'
 
@@ -20,14 +21,15 @@ interface Props extends Omit<ComponentProps<'article'>, 'children'> {
   freeCancellation?: boolean
   /** Heading level of the name, below the heading of the list. */
   heading?: 'h2' | 'h3' | 'h4'
-  /** Photos turn by the arrows only, so a swipe on them goes to a scrolling row around the card. */
-  swipePhotos?: boolean
+  /** The simple card of the persona selections: one photo, without badges, arrows and the kind of stay. */
+  plain?: boolean
 }
 
 /**
  * The hotel card of the vibe, the stars, favourites and search results: the photo carousel with the free
  * cancellation, the guest rating, the favourite toggle and the stars on it, then the name, the
  * kind of stay if it is not a hotel with the distance to the city centre and the regular and GURU prices.
+ * The plain card has the first photo alone and no badges, and no kind of stay.
  */
 export function HotelTile({
   hotel,
@@ -35,7 +37,7 @@ export function HotelTile({
   price = hotel.priceFrom,
   freeCancellation = hasFreeCancellation(hotel),
   heading: Heading = 'h3',
-  swipePhotos = true,
+  plain = false,
   className,
   ...props
 }: Props) {
@@ -50,14 +52,24 @@ export function HotelTile({
     >
       {/* Above the card link: the photos swipe and lead to the hotel themselves. The first five
           only: the rest are for the hotel page. */}
-      <PhotoCarousel
-        photos={hotel.photos.slice(0, TILE_PHOTOS)}
-        href={href}
-        swipe={swipePhotos}
-        className="@container z-10 aspect-[4/3] w-full rounded-xl"
-      >
-        <PhotoBadges hotel={hotel} freeCancellation={freeCancellation} />
-      </PhotoCarousel>
+      {plain ? (
+        <Link
+          href={href}
+          tabIndex={-1}
+          aria-hidden
+          className="z-10 block aspect-[4/3] w-full overflow-hidden rounded-xl"
+        >
+          <PhotoPlaceholder photo={hotel.photos[0]} className="size-full" />
+        </Link>
+      ) : (
+        <PhotoCarousel
+          photos={hotel.photos.slice(0, TILE_PHOTOS)}
+          href={href}
+          className="@container z-10 aspect-[4/3] w-full rounded-xl"
+        >
+          <PhotoBadges hotel={hotel} freeCancellation={freeCancellation} />
+        </PhotoCarousel>
+      )}
 
       <div className="flex flex-1 flex-col gap-1 px-2 pt-3 pb-1">
         <Heading className="text-[17px]/[1.25] font-bold">
@@ -71,7 +83,7 @@ export function HotelTile({
         </Heading>
         <p className="flex items-center gap-1 text-sm/[normal] text-muted-foreground">
           <MapPin className="size-4 shrink-0" aria-hidden />
-          {hotel.stayType !== 'hotel' && (
+          {!plain && hotel.stayType !== 'hotel' && (
             <span className="font-semibold text-foreground">{STAY_TYPES[hotel.stayType]} ·</span>
           )}
           {formatDecimal(hotel.distanceKm)} км от центра {destination?.genitive}

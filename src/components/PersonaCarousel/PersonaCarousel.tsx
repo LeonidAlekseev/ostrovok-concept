@@ -49,8 +49,7 @@ export function PersonaCarousel({ selections }: { selections: readonly PersonaSe
             >
               {hotels.map((hotel) => (
                 <li key={hotel.id} className="w-[min(78vw,20rem)] flex-none snap-start md:w-auto">
-                  {/* Arrows only on the photos: a swipe scrolls the row. */}
-                  <HotelTile hotel={hotel} href={hotelHref(hotel.id)} swipePhotos={false} />
+                  <HotelTile hotel={hotel} href={hotelHref(hotel.id)} plain />
                 </li>
               ))}
             </ul>
