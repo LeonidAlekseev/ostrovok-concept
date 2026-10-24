@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ComponentType, type ReactElement, type ReactNode } from 'react'
+import { useState, type ComponentType, type CSSProperties, type ReactElement, type ReactNode } from 'react'
 import {
   Accessibility,
   Baby,
@@ -85,7 +85,8 @@ const AMENITY_ICON: Partial<Record<Amenity, Icon>> = {
 }
 /** Shorter words of the long amenities for the overview tiles; the dialog keeps the full ones. */
 const TILE_LABEL: Partial<Record<Amenity, string>> = {
-  'front-desk': 'Стойка регистрации 24/7',
+  wifi: 'Wi‑Fi',
+  'front-desk': 'Ресепшен 24/7',
   family: 'Для семей с детьми',
 }
 
@@ -199,26 +200,34 @@ function AmenitiesDialog({ hotel, trigger }: { hotel: Hotel; trigger?: ReactElem
 const FOLD_FROM = 240
 
 /**
- * The overview: up to 7 tiles of the hotel's popular amenities with "Все удобства (N)" after them (on a narrow
- * column 3 and the last), "Об отеле" with the description (folded on a phone under "Читать полностью") and the
+ * The overview: up to 7 tiles of the hotel's popular amenities with "Все удобства (N)" after them, of one width
+ * across the row (below `lg` 3 and the last), "Об отеле" with the description (folded on a phone under "Читать полностью") and the
  * distances.
  */
 export function AboutHotel({ hotel, children }: { hotel: Hotel; children?: ReactNode }) {
   const [unfolded, setUnfolded] = useState(false)
   const folds = hotel.description.length > FOLD_FROM && !unfolded
   const tiles = POPULAR_AMENITIES.filter((key) => hotel.amenities.includes(key)).slice(0, TILES)
+  // Every tile and "Все удобства" share the row: up to 8 columns from `lg`, up to 4 below it.
+  const columns = { '--wide': tiles.length + 1, '--narrow': Math.min(tiles.length, 3) + 1 } as CSSProperties
   const tile =
-    'flex min-h-22 min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl bg-card p-2 text-center text-xs/tight shadow-(--shadow-card) @lg:text-sm/tight'
+    'flex min-h-22 min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl bg-card px-1 py-2 text-center text-[11px]/tight shadow-(--shadow-card) sm:text-xs/tight xl:text-[13px]/tight'
   return (
     <section id="overview" tabIndex={-1} aria-label="Обзор" className="flex flex-col gap-6 outline-none">
-      <div className="@container">
-        <ul className="grid grid-cols-4 gap-2 @3xl:grid-cols-8" aria-label="Популярные удобства">
+      <div>
+        <ul
+          style={columns}
+          className="grid grid-cols-[repeat(var(--narrow),minmax(0,1fr))] gap-1.5 sm:gap-2 lg:grid-cols-[repeat(var(--wide),minmax(0,1fr))]"
+          aria-label="Популярные удобства"
+        >
           {tiles.map((key, i) => {
             const AmenityIcon = iconOf(key)
             return (
-              <li key={key} className={cn(tile, i >= 3 && 'hidden @3xl:flex')}>
+              <li key={key} className={cn(tile, i >= 3 && 'hidden lg:flex')}>
                 <AmenityIcon className="size-6 shrink-0 text-primary" strokeWidth={1.8} aria-hidden />
-                <span className="line-clamp-3 break-words">{TILE_LABEL[key] ?? AMENITIES[key].label}</span>
+                <span className="line-clamp-3 [hyphens:manual] [word-break:keep-all]">
+                  {TILE_LABEL[key] ?? AMENITIES[key].label}
+                </span>
               </li>
             )
           })}

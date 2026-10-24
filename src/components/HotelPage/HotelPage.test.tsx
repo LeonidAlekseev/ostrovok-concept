@@ -141,9 +141,18 @@ describe('AboutHotel', () => {
     render(<AboutHotel hotel={{ ...hotel, amenities }} />)
     const tiles = within(screen.getByRole('list', { name: 'Популярные удобства' })).getAllByRole('listitem')
     expect(tiles).toHaveLength(8)
-    expect(tiles[0].textContent).toBe(AMENITIES.wifi.label)
+    expect(tiles[0].textContent).toBe('Wi‑Fi')
     expect(tiles[6].textContent).toBe(AMENITIES[POPULAR_AMENITIES[6]].label)
     expect(tiles[7].textContent).toBe(`Все удобства (${workLabels(hotel).length + amenities.length})`)
+  })
+
+  it('shares the row in equal columns: all the tiles from lg, 3 and "Все удобства" below, words unbroken', () => {
+    render(<AboutHotel hotel={{ ...hotel, amenities: ['wifi', 'restaurant'] }} />)
+    const list = screen.getByRole('list', { name: 'Популярные удобства' })
+    expect(list.style.getPropertyValue('--wide')).toBe('3')
+    expect(list.style.getPropertyValue('--narrow')).toBe('3')
+    expect(list.className).toContain('lg:grid-cols-[repeat(var(--wide),minmax(0,1fr))]')
+    expect(list.innerHTML).not.toMatch(/hyphens-auto|overflow-wrap:anywhere/)
   })
 
   it('folds a long description on a phone until "Читать полностью"', async () => {

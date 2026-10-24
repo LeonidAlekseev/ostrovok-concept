@@ -49,7 +49,7 @@ export function HotelPage({ hotel, titleId, stay }: Props) {
       >
         <div
           className={cn(
-            !inDialog && 'lg:grid lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-8 xl:grid-cols-[minmax(0,1fr)_23rem]',
+            !inDialog && 'lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-8 xl:grid-cols-[minmax(0,1fr)_23rem]',
           )}
         >
           <div className="flex min-w-0 flex-col gap-6">

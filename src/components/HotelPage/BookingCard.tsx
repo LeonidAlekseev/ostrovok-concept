@@ -14,25 +14,26 @@ import { useHotelStay } from './stayContext'
 import { useStayPrice } from './useStayPrice'
 
 const field =
-  'flex w-full min-w-0 items-center gap-2.5 rounded-lg bg-secondary px-3 py-2 text-left transition-colors hover:bg-muted'
+  'flex min-h-13 w-full min-w-0 items-center gap-2 rounded-lg bg-secondary px-2.5 py-2 sm:px-3 transition-colors hover:bg-muted'
 
-/** A field of the card: an icon, a grey title over the value and the chevron (the days leave it out for room). */
+/** A field of the card on its light plate: the icon, the small grey title over the bold value, the chevron. */
 function Field({
   icon: Icon,
   title,
   value,
   className,
-  chevron = true,
   ...props
-}: ComponentProps<'button'> & { icon: typeof User; title?: string; value: string; chevron?: boolean }) {
+}: ComponentProps<'button'> & { icon: typeof User; title?: string; value: string }) {
   return (
     <button type="button" {...props} className={cn(field, className)}>
       <Icon className="size-5 shrink-0 text-primary" strokeWidth={1.8} aria-hidden />
-      <span className="flex min-w-0 flex-1 flex-col">
-        {title && <span className="text-xs text-muted-foreground">{title}</span>}
-        <span className="truncate font-semibold">{value}</span>
+      <span className="flex min-w-0 flex-1 flex-col text-left">
+        {title && <span className="text-xs/tight text-muted-foreground">{title}</span>}
+        <span className="truncate text-[clamp(14px,3.9vw,16px)]/snug font-semibold lg:text-sm/snug xl:text-base/snug">
+          {value}
+        </span>
       </span>
-      {chevron && <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />}
+      <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
     </button>
   )
 }
@@ -82,7 +83,7 @@ export function BookingCard({ hotel, onBook, className }: { hotel: Hotel; onBook
           trigger={
             <Field
               icon={CalendarDays}
-              chevron={false}
+
               title="Заезд"
               value={day(stay?.checkIn)}
               aria-label={`Заезд: ${day(stay?.checkIn)}`}
@@ -93,7 +94,7 @@ export function BookingCard({ hotel, onBook, className }: { hotel: Hotel; onBook
           trigger={
             <Field
               icon={CalendarDays}
-              chevron={false}
+
               title="Выезд"
               value={day(stay?.checkOut)}
               aria-label={`Выезд: ${day(stay?.checkOut)}`}
