@@ -1,14 +1,6 @@
 import Image from 'next/image'
-import {
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type FormEvent,
-  type KeyboardEvent,
-  type RefObject,
-} from 'react'
+import Link from 'next/link'
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import {
   ArrowDown,
   Check,
@@ -23,12 +15,24 @@ import {
   X,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '@/components/ui/input-group'
+import { Message, MessageAvatar, MessageContent, MessageFooter, MessageHeader } from '@/components/ui/message'
+import {
+  MessageScroller,
+  MessageScrollerButton,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerProvider,
+  MessageScrollerViewport,
+} from '@/components/ui/message-scroller'
+import { Trace, TraceIcon, TraceLine, TraceTitle } from '@/components/ui/trace'
 import type { HotelSearch } from '@/hooks/useHotelSearch'
 import { useToday } from '@/hooks/useToday'
 import { isRated, type HotelSummary } from '@/lib/catalog'
-import { MAX_MESSAGE_LENGTH, presetChips, type Plan } from '../../lib/assistant'
+import { hotelHref } from '@/lib/search'
+import { MAX_MESSAGE_LENGTH, presetChips, type AssistantOption, type Plan } from '../../lib/assistant'
 import { isPending, type Chat, type ChatMessage } from '../../lib/assistantChats'
 import { formatDateRange } from '../../lib/dates'
 import { countRu, formatPrice, guestsLabel } from '../../lib/format'
@@ -41,12 +45,13 @@ interface Props {
   onChoose: HotelSearch['searchFor']
 }
 
-const messageClass =
-  'flex items-end gap-2 animate-in fade-in slide-in-from-bottom-[6px] animation-duration-250 ease-out'
-const agentBubble = 'min-w-0 max-w-[min(100%,560px)] rounded-[18px_18px_18px_6px] bg-muted px-3.5 py-2.5'
-const userBubble = 'min-w-0 max-w-[85%] rounded-[18px_18px_6px] bg-primary px-3.5 py-2.5 text-primary-foreground'
+/** The agent's bubble; with a plan it takes the full width, on a lighter surface. */
+const agentBubble =
+  'max-w-[min(100%,560px)] *:data-[slot=bubble-content]:rounded-[18px_18px_18px_6px] *:data-[slot=bubble-content]:px-3.5 *:data-[slot=bubble-content]:py-2.5 *:data-[slot=bubble-content]:text-base has-data-[slot=plan]:w-full has-data-[slot=plan]:max-w-full has-data-[slot=plan]:*:data-[slot=bubble-content]:w-full has-data-[slot=plan]:*:data-[slot=bubble-content]:bg-(--decor-surface-soft)'
+const userBubble =
+  'max-w-[85%] *:data-[slot=bubble-content]:rounded-[18px_18px_6px] *:data-[slot=bubble-content]:px-3.5 *:data-[slot=bubble-content]:py-2.5 *:data-[slot=bubble-content]:text-base'
 /** Phones hide the agent's avatar: the bubbles need the width. */
-const messageAvatarClass = 'size-8 flex-none max-sm:hidden'
+const messageAvatarClass = 'size-8 flex-none bg-transparent max-sm:hidden'
 const messageTextClass = 'leading-[1.45] whitespace-pre-wrap'
 const avatarSrc = '/assistant/eval.webp'
 const hintClass = 'block text-xs/[normal] font-normal text-muted-foreground'
@@ -59,9 +64,6 @@ const bubbleClass = [
   'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--decor-light)_85%,transparent),0_8px_24px_color-mix(in_srgb,var(--decor-assistant-glow)_18%,transparent)]',
   "before:absolute before:right-[calc(100%_-_1px)] before:bottom-[24%] before:h-[clamp(12px,3vw,22px)] before:w-[clamp(8px,2.2vw,16px)] before:bg-(--glass-plaque) before:[clip-path:polygon(100%_0,100%_100%,0_100%)] before:content-['']",
 ].join(' ')
-
-/** The log counts as read to the end this close to its bottom, px. */
-const BOTTOM_SLACK = 48
 
 /**
  * Eval's chats on `/assistant`: the list of chats beside the open one (behind «Чаты» on phones), the feed of the open
@@ -255,47 +257,52 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
           )
         )}
 
-        <form
-          className={`relative flex flex-none items-end gap-[clamp(10px,2.6vw,18px)] rounded-[clamp(18px,4.8vw,30px)] p-[clamp(8px,2.2vw,14px)] pl-[clamp(14px,3.6vw,26px)] ${glassField} transition-shadow duration-200 focus-within:shadow-[inset_0_0_0_2px_var(--ring),0_0_0_4px_color-mix(in_srgb,var(--ring)_25%,transparent)]`}
-          onSubmit={onSubmit}
-        >
-          <Sparkles
-            className="size-[clamp(22px,6vw,30px)] flex-none self-center fill-current text-(--decor-assistant-spark) drop-shadow-[0_0_6px_color-mix(in_srgb,var(--decor-assistant-spark)_55%,transparent)]"
-            aria-hidden
-          />
-          <span
-            className="w-px self-stretch bg-[color-mix(in_srgb,var(--decor-assistant-text-2)_25%,transparent)]"
-            aria-hidden
-          />
-          <label htmlFor={inputId} className="sr-only">
-            Опишите поездку
-          </label>
-          {/* The composer draws the box and the focus state; the textarea is bare inside it and grows with the text. */}
-          <Textarea
-            ref={inputRef}
-            id={inputId}
-            className="max-h-[min(9.5rem,30dvh)] min-h-[2.8em] flex-1 resize-none self-center overflow-y-auto rounded-none border-0 bg-transparent p-0 text-base leading-[1.4] field-sizing-content placeholder:text-(--decor-assistant-text-2) focus-visible:border-0 focus-visible:ring-0 sm:text-lg md:text-lg"
-            rows={2}
-            value={text}
-            enterKeyHint="send"
-            maxLength={MAX_MESSAGE_LENGTH}
-            placeholder={
-              started
-                ? 'Ответьте или уточните пожелания…'
-                : 'Например: «Хочу на море в октябре, спокойный отдых, с ребёнком»'
-            }
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={onKeyDown}
-          />
-          <Button
-            type="submit"
-            size="icon"
-            className="size-[clamp(48px,13vw,68px)] flex-none bg-(image:--decor-assistant-send) shadow-(--decor-assistant-send-glow) disabled:opacity-60"
-            aria-label="Отправить"
-            disabled={!text.trim() || thinking || !ready}
+        <form className="flex-none" onSubmit={onSubmit}>
+          <InputGroup
+            className={`h-auto items-end gap-[clamp(10px,2.6vw,18px)] rounded-[clamp(18px,4.8vw,30px)] border-0 p-[clamp(8px,2.2vw,14px)] pl-[clamp(14px,3.6vw,26px)] ${glassField} transition-shadow duration-200 has-[[data-slot=input-group-control]:focus-visible]:ring-0 has-[[data-slot=input-group-control]:focus-visible]:shadow-[inset_0_0_0_2px_var(--ring),0_0_0_4px_color-mix(in_srgb,var(--ring)_25%,transparent)]`}
           >
-            <SendHorizontal className="size-[42%]" aria-hidden />
-          </Button>
+            <InputGroupAddon align="inline-start" className="order-first gap-[clamp(10px,2.6vw,18px)] self-stretch p-0">
+              <Sparkles
+                className="size-[clamp(22px,6vw,30px)] flex-none fill-current text-(--decor-assistant-spark) drop-shadow-[0_0_6px_color-mix(in_srgb,var(--decor-assistant-spark)_55%,transparent)]"
+                aria-hidden
+              />
+              <span
+                className="w-px self-stretch bg-[color-mix(in_srgb,var(--decor-assistant-text-2)_25%,transparent)]"
+                aria-hidden
+              />
+            </InputGroupAddon>
+            <label htmlFor={inputId} className="sr-only">
+              Опишите поездку
+            </label>
+            {/* The group draws the box and the focus state; the textarea is bare inside it and grows with the text. */}
+            <InputGroupTextarea
+              ref={inputRef}
+              id={inputId}
+              className="max-h-[min(9.5rem,30dvh)] min-h-[2.8em] self-center overflow-y-auto p-0 text-base leading-[1.4] field-sizing-content placeholder:text-(--decor-assistant-text-2) sm:text-lg md:text-lg"
+              rows={2}
+              value={text}
+              enterKeyHint="send"
+              maxLength={MAX_MESSAGE_LENGTH}
+              placeholder={
+                started
+                  ? 'Ответьте или уточните пожелания…'
+                  : 'Например: «Хочу на море в октябре, спокойный отдых, с ребёнком»'
+              }
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={onKeyDown}
+            />
+            <InputGroupAddon align="inline-end" className="p-0">
+              <InputGroupButton
+                type="submit"
+                variant="default"
+                className="size-[clamp(48px,13vw,68px)] flex-none rounded-full bg-(image:--decor-assistant-send) p-0 shadow-(--decor-assistant-send-glow) disabled:opacity-60"
+                aria-label="Отправить"
+                disabled={!text.trim() || thinking || !ready}
+              >
+                <SendHorizontal className="size-[42%]" aria-hidden />
+              </InputGroupButton>
+            </InputGroupAddon>
+          </InputGroup>
         </form>
       </section>
     </div>
@@ -404,78 +411,39 @@ interface FeedProps {
 }
 
 /**
- * The open chat's messages. It follows a new message only while the traveller is at the end of the feed (or when
- * they sent it); reading the older messages, they get a button to the new one instead of a jump.
+ * The open chat's messages in the Message Scroller of shadcn/ui. A chat opens at its end; the feed follows a new
+ * message only while the traveller is at the end, and the traveller's own message settles at the top. Reading the
+ * older messages, they get a button to the new one instead of a jump.
  */
 function Feed({ chat, onChoose, onRetry }: FeedProps) {
-  const logRef = useRef<HTMLOListElement>(null)
-  const atBottom = useRef(true)
-  const [behind, setBehind] = useState(false)
-  const last = chat.messages.at(-1)
-
-  const shown = useRef(chat.id)
-  useLayoutEffect(() => {
-    // A chat opens at its end; the traveller's own message brings them to it too.
-    const switched = shown.current !== chat.id
-    shown.current = chat.id
-    const ownMessage = chat.messages.at(-2)?.role === 'user' && last?.status === 'pending'
-    if (switched || atBottom.current || ownMessage) {
-      scrollToEnd(logRef, 'instant')
-      atBottom.current = true
-      // oxlint-disable-next-line react/set-state-in-effect -- follows the log's scroll position, outside React
-      setBehind(false)
-    } else setBehind(true)
-    // A message changes in place (pending → done) as well as when one is added: a new array either way.
-  }, [chat.id, chat.messages, last?.status])
-
-  const onScroll = () => {
-    const log = logRef.current
-    if (!log) return
-    atBottom.current = log.scrollHeight - log.scrollTop - log.clientHeight <= BOTTOM_SLACK
-    if (atBottom.current) setBehind(false)
-  }
-
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
-      <ol
-        ref={logRef}
-        className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overscroll-contain px-0.5 pt-0.5 pb-1"
-        aria-live="polite"
-        aria-label="Диалог с Эвалом"
-        onScroll={onScroll}
-      >
-        {chat.messages.map((message) => (
-          <MessageItem
-            key={message.id}
-            message={message}
-            onChoose={onChoose}
-            onRetry={() => onRetry(chat.id, message.id)}
-          />
-        ))}
-      </ol>
-      {behind && (
-        <Button
-          variant="secondary"
-          size="sm"
-          shape="pill"
-          className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-(--decor-light) shadow-(--shadow-card)"
-          onClick={() => {
-            scrollToEnd(logRef, 'smooth')
-            atBottom.current = true
-            setBehind(false)
-          }}
+    // A new provider per chat: each opens at its own end.
+    <MessageScrollerProvider key={chat.id} autoScroll defaultScrollPosition="end">
+      <MessageScroller className="flex-1">
+        <MessageScrollerViewport aria-label="Лента чата" className="px-0.5 pt-0.5 pb-1">
+          <MessageScrollerContent aria-label="Диалог с Эвалом" className="gap-2.5">
+            {chat.messages.map((message) => (
+              <MessageScrollerItem
+                key={message.id}
+                messageId={message.id}
+                scrollAnchor={message.role === 'user'}
+                data-step={message.role === 'agent' && message.data.step ? message.status : undefined}
+                className="animate-in duration-250 ease-out fade-in slide-in-from-bottom-[6px]"
+              >
+                <MessageItem message={message} onChoose={onChoose} onRetry={() => onRetry(chat.id, message.id)} />
+              </MessageScrollerItem>
+            ))}
+          </MessageScrollerContent>
+        </MessageScrollerViewport>
+        <MessageScrollerButton
+          render={<Button variant="secondary" size="sm" shape="pill" />}
+          className="bottom-2 w-auto bg-(--decor-light) shadow-(--shadow-card) data-[direction=end]:bottom-2"
         >
           <ArrowDown className="size-4" aria-hidden />К новому сообщению
-        </Button>
-      )}
-    </div>
+        </MessageScrollerButton>
+      </MessageScroller>
+    </MessageScrollerProvider>
   )
-}
-
-function scrollToEnd(ref: RefObject<HTMLOListElement | null>, behavior: ScrollBehavior) {
-  const log = ref.current
-  // Inside the log only: scrolling the page would yank it.
-  if (log) log.scrollTo?.({ top: log.scrollHeight, behavior })
 }
 
 interface MessageProps {
@@ -488,65 +456,78 @@ function MessageItem({ message, onChoose, onRetry }: MessageProps) {
   const { role, status, text, data } = message
   if (role === 'user')
     return (
-      <li className={`${messageClass} justify-end`}>
-        <div className={userBubble}>
-          <p className={messageTextClass}>{text}</p>
-        </div>
-      </li>
+      <Message align="end">
+        <MessageContent>
+          <Bubble align="end" className={userBubble}>
+            <BubbleContent>
+              <p className={messageTextClass}>{text}</p>
+            </BubbleContent>
+          </Bubble>
+        </MessageContent>
+      </Message>
     )
   if (role === 'agent' && data.step) return <StepItem status={status} step={data.step} />
   if (status === 'pending')
     return (
-      <li className={messageClass}>
+      <Message>
         <EvalAvatar />
-        <div className="flex gap-1 rounded-[18px_18px_18px_6px] bg-muted px-4 py-3.5" aria-label="Эвал думает">
-          {[0, 0.15, 0.3].map((delay) => (
-            <span
-              key={delay}
-              className="size-[7px] animate-typing-dot rounded-full bg-muted-foreground"
-              style={{ animationDelay: `${delay}s` }}
-            />
-          ))}
-        </div>
-      </li>
+        <MessageContent>
+          <Bubble variant="muted" className={agentBubble}>
+            <BubbleContent aria-label="Эвал думает">
+              <span className="shimmer motion-reduce:shimmer-none" aria-hidden>
+                Эвал думает…
+              </span>
+            </BubbleContent>
+          </Bubble>
+        </MessageContent>
+      </Message>
     )
   return (
-    <li className={messageClass}>
+    <Message>
       {role === 'owner' ? <span className={messageAvatarClass} aria-hidden /> : <EvalAvatar />}
-      {/* The agent's bubble with a plan takes the full width, on a lighter surface. */}
-      <div className={`${agentBubble} has-data-[slot=plan]:flex-1 has-data-[slot=plan]:bg-(--decor-surface-soft)`}>
-        {role === 'owner' && <p className={hintClass}>Владелец отеля</p>}
-        {text && <p className={messageTextClass}>{text}</p>}
-        {data.plan && <PlanView plan={data.plan} onChoose={onChoose} />}
+      <MessageContent className="gap-1">
+        {role === 'owner' && <MessageHeader className="px-0">Владелец отеля</MessageHeader>}
+        <Bubble variant="muted" className={agentBubble}>
+          <BubbleContent>
+            {text && <p className={messageTextClass}>{text}</p>}
+            {data.plan && <PlanView plan={data.plan} onChoose={onChoose} />}
+          </BubbleContent>
+        </Bubble>
         {status === 'failed' && (
-          <Button variant="outline" size="sm" shape="pill" className="mt-2" onClick={onRetry}>
-            <RotateCcw className="size-4" aria-hidden />
-            Повторить
-          </Button>
+          <MessageFooter className="px-0">
+            <Button variant="outline" size="sm" shape="pill" onClick={onRetry}>
+              <RotateCcw className="size-4" aria-hidden />
+              Повторить
+            </Button>
+          </MessageFooter>
         )}
-      </div>
-    </li>
+      </MessageContent>
+    </Message>
   )
 }
 
 const STEP_STATUS = {
-  pending: { icon: LoaderCircle, label: 'выполняется', className: 'motion-safe:animate-spin text-muted-foreground' },
-  done: { icon: Check, label: 'готово', className: 'text-brand-foreground' },
-  failed: { icon: X, label: 'не удалось', className: 'text-destructive' },
+  pending: { icon: LoaderCircle, label: 'выполняется', line: 'running', className: 'motion-safe:animate-spin' },
+  done: { icon: Check, label: 'готово', line: undefined, className: 'text-brand-foreground' },
+  failed: { icon: X, label: 'не удалось', line: 'error', className: '' },
 } as const
 
-/** A step of one of Eval's agents: a line of its own with the status, under Eval's avatar column. */
+/** A step of one of Eval's agents: a trace line of its own with the status, under Eval's avatar column. */
 function StepItem({ status, step }: { status: ChatMessage['status']; step: NonNullable<ChatMessage['data']['step']> }) {
-  const { icon: Icon, label, className } = STEP_STATUS[status]
+  const { icon: Icon, label, line, className } = STEP_STATUS[status]
   return (
-    <li className="flex items-center gap-2 pl-10 text-sm/[1.35] text-muted-foreground max-sm:pl-1" data-step={status}>
-      <Icon className={`size-4 flex-none ${className}`} aria-hidden />
-      <span className="min-w-0">
+    <Trace className="pl-10 max-sm:pl-1">
+      <TraceLine status={line} className="text-sm/[1.35]">
+        <TraceIcon>
+          <Icon className={className} />
+        </TraceIcon>
         <span className="sr-only">Шаг {label}: </span>
-        {step.title}
-        {status === 'pending' ? '…' : step.result ? ` — ${step.result}` : ''}
-      </span>
-    </li>
+        <TraceTitle className="whitespace-normal">
+          {step.title}
+          {status === 'pending' ? '…' : step.result ? ` — ${step.result}` : ''}
+        </TraceTitle>
+      </TraceLine>
+    </Trace>
   )
 }
 
@@ -581,50 +562,9 @@ function PlanView({ plan, onChoose }: PlanProps) {
         {formatDateRange(plan.query.checkIn, plan.query.checkOut)} · {nights} · {guestsLabel(plan.query.guests)}
       </p>
       <ul className="grid grid-cols-1 gap-1.5">
-        {plan.options.map(({ destination, hotel, total, fitsBudget, reasons }) => (
-          <li key={hotel?.id ?? destination.id}>
-            <button
-              type="button"
-              className="flex w-full items-center gap-2.5 rounded-lg border border-border bg-card py-2.5 pr-2 pl-3 text-left transition-[border-color,box-shadow] duration-200 hover:border-primary hover:shadow-[0_4px_14px_color-mix(in_srgb,var(--primary)_12%,transparent)] focus-visible:border-primary focus-visible:shadow-[0_4px_14px_color-mix(in_srgb,var(--primary)_12%,transparent)]"
-              onClick={() => onChoose({ ...plan.query, destination: destination.name })}
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-[650]">
-                  {destination.name}
-                  <span className="ml-1.5 text-sm/[normal] font-normal text-muted-foreground">
-                    {destination.country}
-                  </span>
-                </span>
-                {hotel && (
-                  <span className="block truncate text-sm/[normal] text-muted-foreground">
-                    {hotel.name}
-                    {isRated(hotel) && (
-                      <Badge className="ml-1.5 gap-0.5">
-                        <Star fill="currentColor" strokeWidth={0} aria-hidden />
-                        {hotel.rating.toFixed(1)}
-                      </Badge>
-                    )}
-                  </span>
-                )}
-                {/* Why the hotel fits the traveller's conditions, or that there is no data to tell. */}
-                {reasons?.map((reason) => (
-                  <span key={reason} className="block text-xs/[1.35] text-foreground">
-                    {reason}
-                  </span>
-                ))}
-              </span>
-              <span className="flex-none text-right font-[650] whitespace-nowrap">
-                {formatPrice(total)}
-                {fitsBudget ? (
-                  <span className={hintClass}>за {nights}</span>
-                ) : (
-                  <Badge variant="destructive" className="mt-0.5 ml-auto flex">
-                    выше бюджета
-                  </Badge>
-                )}
-              </span>
-              <ChevronRight className="size-5 flex-none text-brand-foreground" aria-hidden />
-            </button>
+        {plan.options.map((option) => (
+          <li key={option.hotel?.id ?? option.destination.id}>
+            <HotelOptionCard option={option} plan={plan} nights={nights} onChoose={onChoose} />
           </li>
         ))}
       </ul>
@@ -634,6 +574,75 @@ function PlanView({ plan, onChoose }: PlanProps) {
         </p>
       )}
     </div>
+  )
+}
+
+interface HotelOptionCardProps {
+  option: AssistantOption
+  plan: Plan
+  /** «5 ночей». */
+  nights: string
+  onChoose: Props['onChoose']
+}
+
+/**
+ * The card of an option inside Eval's message: the city with its search on the plan's dates, the hotel with why it
+ * fits and the total, and a link to the hotel's page on the same dates.
+ */
+function HotelOptionCard({ option, plan, nights, onChoose }: HotelOptionCardProps) {
+  const { destination, hotel, total, fitsBudget, reasons } = option
+  return (
+    <article className="overflow-hidden rounded-lg border border-border bg-card transition-[border-color,box-shadow] duration-200 has-[button:hover]:border-primary has-[button:hover]:shadow-[0_4px_14px_color-mix(in_srgb,var(--primary)_12%,transparent)] has-focus-visible:border-primary">
+      <button
+        type="button"
+        className="flex w-full items-center gap-2.5 py-2.5 pr-2 pl-3 text-left"
+        onClick={() => onChoose({ ...plan.query, destination: destination.name })}
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-[650]">
+            {destination.name}
+            <span className="ml-1.5 text-sm/[normal] font-normal text-muted-foreground">{destination.country}</span>
+          </span>
+          {hotel && (
+            <span className="block truncate text-sm/[normal] text-muted-foreground">
+              {hotel.name}
+              {isRated(hotel) && (
+                <Badge className="ml-1.5 gap-0.5">
+                  <Star fill="currentColor" strokeWidth={0} aria-hidden />
+                  {hotel.rating.toFixed(1)}
+                </Badge>
+              )}
+            </span>
+          )}
+          {/* Why the hotel fits the traveller's conditions, or that there is no data to tell. */}
+          {reasons?.map((reason) => (
+            <span key={reason} className="block text-xs/[1.35] text-foreground">
+              {reason}
+            </span>
+          ))}
+        </span>
+        <span className="flex-none text-right font-[650] whitespace-nowrap">
+          {formatPrice(total)}
+          {fitsBudget ? (
+            <span className={hintClass}>за {nights}</span>
+          ) : (
+            <Badge variant="destructive" className="mt-0.5 ml-auto flex">
+              выше бюджета
+            </Badge>
+          )}
+        </span>
+        <ChevronRight className="size-5 flex-none text-brand-foreground" aria-hidden />
+      </button>
+      {hotel && (
+        <Link
+          href={hotelHref(hotel.id, plan.query)}
+          className="flex items-center gap-1 border-t border-border px-3 py-2 text-sm/[normal] font-semibold text-primary hover:text-primary-hover"
+        >
+          Об отеле «{hotel.name}»
+          <ChevronRight className="size-4" aria-hidden />
+        </Link>
+      )}
+    </article>
   )
 }
 
@@ -661,5 +670,9 @@ function EvalPortrait({ started }: { started: boolean }) {
 }
 
 function EvalAvatar() {
-  return <Image src={avatarSrc} alt="" width={64} height={64} className={messageAvatarClass} />
+  return (
+    <MessageAvatar className={messageAvatarClass}>
+      <Image src={avatarSrc} alt="" width={64} height={64} className="size-full" />
+    </MessageAvatar>
+  )
 }
