@@ -1,5 +1,5 @@
 import { scenarios, type Destination } from '../../data/destinations'
-import { AMENITIES, STAY_TYPES, hasStars, isRated, type Hotel } from '../catalog'
+import { AMENITIES, STAY_TYPES, hasStars, isRated, isSyntheticHotel, type Hotel } from '../catalog'
 import { featureLines, type HotelFeatures } from '../features'
 import { VIBE_AXES, type VibeScale } from '../vibe'
 
@@ -42,7 +42,8 @@ export function hotelDocument(
     sentence(hotel.description),
     `Удобства: ${hotel.amenities.map((a) => AMENITIES[a].label).join(', ')}.`,
     `Настроение: ${vibePoles(hotel, scale).join(', ') || 'всего понемногу'}.`,
-    ...hotel.reviews
+    // A real hotel shows only Ostrovok's data: any review in its row would be a made-up one.
+    ...(isSyntheticHotel(hotel) ? hotel.reviews : [])
       .slice(0, REVIEWS)
       .map((r) => `Отзыв: ${sentence(r.pros.slice(0, REVIEW_LENGTH))}${r.cons ? ` Минус: ${sentence(r.cons)}` : ''}`),
   ]

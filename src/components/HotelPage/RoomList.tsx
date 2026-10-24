@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
-import { roomFacts, type Hotel, type Room } from '@/lib/catalog'
+import { NO_PRICE_LABEL, roomFacts, type Hotel, type Room } from '@/lib/catalog'
 import { nightsBetween } from '../../lib/dates'
 import { countRu, formatPrice } from '../../lib/format'
 import { ratePrice, unavailableReason } from '../../lib/rates'
@@ -20,7 +20,8 @@ interface Props {
 const nightForms: [string, string, string] = ['ночь', 'ночи', 'ночей']
 
 function RoomRow({ hotel, room, stay, guests, onPickDates }: Props & { room: Room }) {
-  const price = ratePrice(room.rates[0], stay)
+  const rate = room.rates[0]
+  const price = rate && ratePrice(rate, stay)
   const reason = unavailableReason(room, guests)
   const nights = stay ? nightsBetween(stay.checkIn, stay.checkOut) : 0
   const href = stay && `/hotels/${hotel.id}/rooms?${setStayParams(new URLSearchParams(), stay)}#${room.id}`
@@ -34,15 +35,19 @@ function RoomRow({ hotel, room, stay, guests, onPickDates }: Props & { room: Roo
         {reason && <p className="text-sm text-destructive">{reason}</p>}
       </div>
       <div className="flex flex-col items-start gap-2 sm:items-end sm:text-right">
-        <p>
-          <b className="text-lg">{formatPrice(price.total ?? price.perNight)}</b>
-          <span className="block text-sm text-muted-foreground">
-            {price.total === null
-              ? 'за ночь'
-              : `за ${countRu(nights, nightForms)} · ${formatPrice(price.perNight)} за ночь`}
-          </span>
-        </p>
-        {reason ? null : href ? (
+        {price ? (
+          <p>
+            <b className="text-lg">{formatPrice(price.total ?? price.perNight)}</b>
+            <span className="block text-sm text-muted-foreground">
+              {price.total === null
+                ? 'за ночь'
+                : `за ${countRu(nights, nightForms)} · ${formatPrice(price.perNight)} за ночь`}
+            </span>
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">{NO_PRICE_LABEL}</p>
+        )}
+        {reason || !price ? null : href ? (
           <Link className={buttonVariants()} href={href} aria-label={`Выбрать: ${room.name}`}>
             Выбрать
           </Link>

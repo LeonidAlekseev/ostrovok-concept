@@ -19,6 +19,13 @@ describe('hotelDocument', () => {
     expect(text.match(/^Отзыв: /gm)?.length).toBe(Math.min(3, hostel.reviews.length))
   })
 
+  it('leaves the reviews of a real hotel out of the text, whatever its row holds', () => {
+    const hostel = hotels.find((h) => h.id === 'prague-skyline-hostel')!
+    expect(hostel.reviews.length).toBeGreaterThan(0)
+    const text = hotelDocument({ ...hostel, id: 'ota-1' }, city('prague'), scale)
+    expect(text).not.toMatch(/^Отзыв: /m)
+  })
+
   it('gives apartments and villas no stars', () => {
     const villa = hotels.find((h) => h.destinationId === 'prague' && h.stayType === 'villa')!
     expect(hotelDocument(villa, city('prague'), scale)).toMatch(/^Вилла «[^»]+» — Прага/)

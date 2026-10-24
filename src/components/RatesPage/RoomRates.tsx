@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import { cancellationLabel, effectiveCancellation } from '@/lib/booking'
-import { MEAL_LABEL, PAYMENT_LABEL, roomFacts, type Hotel, type Rate, type Room } from '@/lib/catalog'
+import { MEAL_LABEL, NO_PRICE_LABEL, PAYMENT_LABEL, roomFacts, type Hotel, type Rate, type Room } from '@/lib/catalog'
 import { nightsBetween, todayIso } from '../../lib/dates'
 import { countRu, formatPrice } from '../../lib/format'
 import { toOfferParams } from '../../lib/offer'
@@ -41,6 +41,7 @@ export function RoomRates({ hotel, room, stay, guests, onPickDates }: Props) {
           {reason && <p className="text-sm font-semibold text-destructive">Недоступен: {reason}</p>}
         </div>
       </div>
+      {room.rates.length === 0 && <p className="text-sm text-muted-foreground">{NO_PRICE_LABEL}</p>}
       <ul
         className={reason ? 'flex flex-col gap-2 opacity-60' : 'flex flex-col gap-2'}
         aria-label={`Тарифы: ${room.name}`}
