@@ -36,13 +36,14 @@ const MAX_CANDIDATES = 50
 const queryVectors = new Map<string, Promise<number[]>>()
 const QUERY_CACHE = 500
 
-function queryVector(apiKey: string, query: string, abortSignal: AbortSignal): Promise<number[]> {
+/** The shared request has its own limit: a search that gives up does not cancel the vector for the others. */
+function queryVector(apiKey: string, query: string): Promise<number[]> {
   const cached = queryVectors.get(query)
   if (cached) return cached
   const vector = embed({
     model: embeddingModel(apiKey, 'query'),
     value: query,
-    abortSignal,
+    abortSignal: AbortSignal.timeout(SEMANTIC_TIMEOUT_MS),
     maxRetries: 0,
   }).then(({ embedding }) => embedding)
   // A failed request is not kept: the next search asks again.
@@ -51,6 +52,16 @@ function queryVector(apiKey: string, query: string, abortSignal: AbortSignal): P
   if (queryVectors.size >= QUERY_CACHE) queryVectors.delete(queryVectors.keys().next().value!)
   queryVectors.set(query, vector)
   return vector
+}
+
+/** Waits for `promise`, but rejects as soon as `signal` aborts; the promise itself is left running. */
+function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(signal.reason)
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(signal.reason)
+    signal.addEventListener('abort', onAbort, { once: true })
+    promise.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort))
+  })
 }
 
 /** The catalog's database with the anon key: the functions are `security definer`, the table is closed. */
@@ -96,7 +107,7 @@ export async function semanticSearch(
 
   let matches: Match[]
   try {
-    const embedding = await queryVector(apiKey, query, abortSignal)
+    const embedding = await untilAborted(queryVector(apiKey, query), abortSignal)
     const { data, error } = await database()
       .rpc('match_embeddings', {
         query_embedding: toVector(embedding),
