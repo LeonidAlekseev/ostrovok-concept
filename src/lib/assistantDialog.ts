@@ -68,7 +68,8 @@ export const isPlan = (value: unknown): value is Plan =>
       (o.hotel === undefined || (isObject(o.hotel) && isString(o.hotel.id) && isNumber(o.hotel.rating))) &&
       isNumber(o.total) &&
       typeof o.fitsBudget === 'boolean' &&
-      (o.reasons === undefined || (Array.isArray(o.reasons) && o.reasons.every(isString))),
+      (o.reasons === undefined || (Array.isArray(o.reasons) && o.reasons.every(isString))) &&
+      (o.views === undefined || (Array.isArray(o.views) && o.views.every(isString))),
   )
 
 const isMessage = (value: unknown): value is DialogMessage =>

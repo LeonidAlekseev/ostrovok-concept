@@ -1,0 +1,86 @@
+import { describe, expect, it, vi } from 'vitest'
+import { newChat, type Chat, type ChatMessage } from './assistantChats'
+import {
+  SHARE_ERROR,
+  isShareId,
+  loadSharedChat,
+  parseSnapshot,
+  shareChat,
+  shareHref,
+  snapshotOf,
+} from './assistantShare'
+
+const message = (role: ChatMessage['role'], text: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({
+  id: crypto.randomUUID(),
+  role,
+  status: 'done',
+  text,
+  data: {},
+  createdAt: '2026-10-24T10:00:00.000Z',
+  ...extra,
+})
+
+const chat: Chat = {
+  ...newChat('2026-10-24T10:00:00.000Z'),
+  title: 'Тихий отель',
+  brief: { destinationId: 'valencia', quiet: true },
+  messages: [
+    message('user', 'Тихий отель в Валенсии'),
+    message('assistant', 'Записал: Валенсия.'),
+    message('user', 'а повыше?'),
+    message('assistant', '', { status: 'pending' }),
+  ],
+}
+
+/** A Supabase client of one answer for `from(...).insert().select().single()` and `rpc()`. */
+const client = (answer: { data: unknown; error: { message: string } | null }) => {
+  const single = vi.fn(async () => answer)
+  const insert = vi.fn(() => ({ select: () => ({ single }) }))
+  return {
+    from: vi.fn(() => ({ insert })),
+    rpc: vi.fn(async () => answer),
+    insert,
+  }
+}
+
+// assistant-search, Requirement: Поделиться чатом
+describe('a shared chat', () => {
+  it('is the chat without what is still on its way', () => {
+    const snapshot = snapshotOf(chat)
+    expect(snapshot.title).toBe('Тихий отель')
+    expect(snapshot.messages.map((m) => m.text)).toEqual(['Тихий отель в Валенсии', 'Записал: Валенсия.', 'а повыше?'])
+    expect(parseSnapshot(JSON.parse(JSON.stringify(snapshot)))).toEqual(snapshot)
+    expect(parseSnapshot({ title: 1 })).toBeNull()
+    expect(snapshotOf({ ...chat, title: '' }).title).toBe('Тихий отель в Валенсии')
+  })
+
+  it('saves the snapshot and gives the id of the link', async () => {
+    const id = '0b0c7a1e-6f2b-4b5e-9a37-0c6f1b2d3e4f'
+    const c = client({ data: { id }, error: null })
+    expect(await shareChat(c as never, chat)).toBe(id)
+    expect(c.from).toHaveBeenCalledWith('assistant_chat_shares')
+    expect(c.insert).toHaveBeenCalledWith({ title: 'Тихий отель', snapshot: snapshotOf(chat) })
+    expect(shareHref(id)).toBe(`/assistant/shared/${id}`)
+  })
+
+  it('fails with a plain message while the table is missing', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const c = client({ data: null, error: { message: 'relation "assistant_chat_shares" does not exist' } })
+    await expect(shareChat(c as never, chat)).rejects.toThrow(SHARE_ERROR)
+    warn.mockRestore()
+  })
+
+  it('reads a snapshot by its id; a malformed id is not asked for (Scenario: Просмотр по ссылке)', async () => {
+    const id = '0b0c7a1e-6f2b-4b5e-9a37-0c6f1b2d3e4f'
+    const row = { id, title: 'Тихий отель', snapshot: snapshotOf(chat), created_at: '2026-10-24T11:00:00.000Z' }
+    const c = client({ data: [row], error: null })
+    expect(await loadSharedChat(c as never, id)).toMatchObject({ id, title: 'Тихий отель', createdAt: row.created_at })
+    expect(c.rpc).toHaveBeenCalledWith('assistant_chat_share', { share_id: id })
+
+    const none = client({ data: [], error: null })
+    expect(await loadSharedChat(none as never, id)).toBeNull()
+    expect(await loadSharedChat(none as never, 'not-an-id')).toBeNull()
+    expect(isShareId('not-an-id')).toBe(false)
+    expect(none.rpc).toHaveBeenCalledTimes(1)
+  })
+})

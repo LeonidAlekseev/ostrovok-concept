@@ -3,6 +3,31 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      assistant_chat_shares: {
+        Row: {
+          created_at: string
+          id: string
+          snapshot: NonNullable<Json>
+          title: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          id?: string
+          snapshot: NonNullable<Json>
+          title?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          snapshot?: NonNullable<Json>
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       assistant_chats: {
         Row: {
           brief: NonNullable<Json>
@@ -463,6 +488,15 @@ export type Database = {
       }
     }
     Functions: {
+      assistant_chat_share: {
+        Args: { share_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          snapshot: NonNullable<Json>
+          title: string
+        }[]
+      }
       hotel_geo: { Args: { lat: number; lon: number }; Returns: Json }
       match_embeddings: {
         Args: { destination_ids?: string[]; match_count?: number; match_kind: string; query_embedding: unknown }

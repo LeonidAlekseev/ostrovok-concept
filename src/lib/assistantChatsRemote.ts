@@ -72,3 +72,9 @@ export async function deleteRemoteMessages(client: Client, ids: readonly string[
     .in('id', [...ids])
   fail('assistant_messages', error)
 }
+
+/** Deletes the chat with its messages (they go with it: `on delete cascade`). */
+export async function deleteRemoteChat(client: Client, chatId: string) {
+  const { error } = await client.from('assistant_chats').delete().eq('id', chatId)
+  fail('assistant_chats', error)
+}

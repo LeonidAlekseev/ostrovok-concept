@@ -11,6 +11,7 @@ afterEach(() => {
   push.mockClear()
   window.sessionStorage.clear()
   window.localStorage.clear()
+  window.history.replaceState(null, '', '/assistant')
 })
 
 // search-modes, Requirement: Страница Эвал
@@ -43,7 +44,7 @@ describe('AssistantPage plan', () => {
     render(<AssistantPage newHotels={newHotels} />)
 
     await user.type(screen.getByLabelText('Опишите поездку'), 'Хочу на море в октябре вдвоём, спокойно{Enter}')
-    const [option] = await screen.findAllByRole('button', { name: /₽/ }, { timeout: 3000 })
+    const [option] = await screen.findAllByRole('button', { name: /^Искать в городе/ }, { timeout: 3000 })
     expect(screen.queryByText(/маршрут/i)).toBeNull()
     await user.click(option)
 

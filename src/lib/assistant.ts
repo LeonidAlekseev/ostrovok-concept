@@ -69,6 +69,8 @@ export interface AssistantOption {
   fitsBudget: boolean
   /** Why the hotel fits: «ночью ниже 40 дБ», «здание 12 этажей», «нет данных о шуме». Absent in older plans. */
   reasons?: string[]
+  /** The views the hotel's room names tell of (`hotel_room_views`); absent without data and in older plans. */
+  views?: ViewKind[]
 }
 
 export interface Plan {
@@ -365,7 +367,8 @@ const ATMOSPHERES: Record<VibeId, Record<Mood | 'default', [emoji: string, title
   },
 }
 
-const PARTY_GUESTS: Record<Party, Guests> = {
+/** The guests of a party: the plan's search and the trip's parameters on `/assistant`. */
+export const PARTY_GUESTS: Record<Party, Guests> = {
   solo: { adults: 1, children: 0, rooms: 1 },
   couple: { adults: 2, children: 0, rooms: 1 },
   family: { adults: 2, children: 1, rooms: 1 },
@@ -424,6 +427,10 @@ export const planCities = (brief: Brief, today: IsoDate, destinations: readonly 
 /** Options in a plan. */
 const PLAN_OPTIONS = 3
 
+/** The different views of the hotel's room names, the street last: what a hotel card of the plan lists. */
+const roomViews = (features: HotelFeatures | undefined): ViewKind[] =>
+  [...new Set(features?.views.map((v) => v.view))].sort((a, b) => Number(a === 'street') - Number(b === 'street'))
+
 /**
  * The plan over the `destinations`, with a hotel from `hotels` (the "recently added" ones) where a city has
  * one. `matches` are the hotels the semantic search found for the traveller's words, best first: they lead
@@ -436,6 +443,8 @@ export function makePlan(
   hotels: readonly HotelSummary[],
   matches: readonly HotelSummary[] = [],
   features: Readonly<Record<string, HotelFeatures>> = {},
+  /** The hotels already shown in the chat: «Другие варианты» skips them. */
+  exclude: ReadonlySet<string> = new Set(),
 ): Plan {
   const { vibe, reason, named, pool } = planScope(brief, today, destinations)
   const [emoji, atmosphere, text] = ATMOSPHERES[vibe][brief.mood ?? 'default']
@@ -454,6 +463,7 @@ export function makePlan(
     const perNight = hotel?.priceFrom ?? destination.priceFrom
     const sum = total(perNight)
     const reasons = hotel ? featureReasons(features[hotel.id], brief) : []
+    const views = hotel ? roomViews(features[hotel.id]) : []
     return {
       destination,
       hotel,
@@ -461,6 +471,7 @@ export function makePlan(
       total: sum,
       fitsBudget: !brief.budget || sum <= brief.budget,
       ...(reasons.length > 0 && { reasons }),
+      ...(views.length > 0 && { views }),
     }
   }
 
@@ -468,6 +479,7 @@ export function makePlan(
   const cityOf = new Map(pool.map((d) => [d.id, d]))
   const found: AssistantOption[] = []
   for (const hotel of matches) {
+    if (exclude.has(hotel.id)) continue
     const destination = cityOf.get(hotel.destinationId)
     if (!destination || (!named && found.some((o) => o.destination.id === destination.id))) continue
     found.push(option(destination, hotel))
@@ -478,7 +490,7 @@ export function makePlan(
     .filter((destination) => !found.some((o) => o.destination.id === destination.id))
     .map((destination) => {
       const cityHotels = hotels
-        .filter((h) => h.destinationId === destination.id)
+        .filter((h) => h.destinationId === destination.id && !exclude.has(h.id))
         .sort((a, b) => (preferCheap ? a.priceFrom - b.priceFrom : b.rating - a.rating))
       const affordable = cityHotels.find((h) => !brief.budget || total(h.priceFrom) <= brief.budget)
       const cheapest = cityHotels.reduce<HotelSummary | undefined>(
@@ -493,7 +505,8 @@ export function makePlan(
         (b.hotel?.rating ?? 8) - (a.hotel?.rating ?? 8) ||
         a.total - b.total,
     )
-  const options = [...found, ...ruled].slice(0, PLAN_OPTIONS)
+  // «Другие варианты»: a city whose hotels were all shown has nothing new to offer.
+  const options = [...found, ...ruled].filter((o) => exclude.size === 0 || o.hotel).slice(0, PLAN_OPTIONS)
 
   const why = reason ? `Выбрал сам: ${reason}. Значит, ${text}.` : `${text[0].toLocaleUpperCase('ru')}${text.slice(1)}.`
   return {
