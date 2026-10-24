@@ -3,12 +3,15 @@ import { MockLanguageModelV4 } from 'ai/test'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getAssistantModel } from '@/lib/ai/model'
 import { semanticSearch } from '@/lib/ai/semantic'
+import { loadHotelFeatures } from '@/lib/db/features'
+import type { HotelFeatures } from '@/lib/features'
 import { nextQuestion } from '@/lib/assistant'
 import { POST } from './route'
 
 vi.mock('@/lib/ai/model', () => ({ getAssistantModel: vi.fn() }))
 vi.mock('@/lib/ai/semantic', () => ({ SEMANTIC_TIMEOUT_MS: 8000, semanticSearch: vi.fn() }))
 vi.mock('@/lib/db/catalog', () => import('@/test/catalog'))
+vi.mock('@/lib/db/features', () => ({ loadHotelFeatures: vi.fn() }))
 
 const usage = {
   inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
@@ -58,6 +61,7 @@ const ask = (text: string, brief = {}) => post({ messages: [{ role: 'user', text
 beforeEach(() => {
   vi.spyOn(console, 'warn').mockImplementation(() => {})
   vi.mocked(semanticSearch).mockResolvedValue(null)
+  vi.mocked(loadHotelFeatures).mockResolvedValue(new Map())
 })
 afterEach(() => {
   vi.restoreAllMocks()
@@ -148,6 +152,15 @@ describe('POST /api/assistant', () => {
     setModel(new MockLanguageModelV4({ doGenerate: answer({ vibe: 'sea', destinationId: 'zakynthos', party: 'any' }) }))
     const { brief } = await (await ask('хочу туда, где тепло и можно поплавать с маской')).json()
     expect(brief).toEqual({ vibe: 'sea' })
+  })
+
+  it('reads the hotel criteria with the model when the message backs them', async () => {
+    setModel(new MockLanguageModelV4({ doGenerate: answer({ height: 'high', quiet: true, view: 'any' }) }))
+    const { brief } = await (await ask('а повыше?', { destinationId: 'lisbon', quiet: true })).json()
+    // «а повыше?» says nothing of the view: the model's guess is dropped, the earlier quiet stays.
+    expect(brief).toEqual({ destinationId: 'lisbon', quiet: true, height: 'high' })
+    setModel(new MockLanguageModelV4({ doGenerate: answer({ view: 'any' }) }))
+    expect((await (await ask('чтобы был красивый вид из окна')).json()).brief).toEqual({ view: 'any' })
   })
 
   it('turns reasoning off for the 8 seconds', async () => {
@@ -278,5 +291,87 @@ describe('POST /api/assistant: the semantic search', () => {
     expect(semanticSearch).toHaveBeenCalledTimes(1)
     expect(body.matches).toBeUndefined()
     expect(body.source).toBe('rules')
+  })
+})
+
+// assistant-search, Requirements: Подбор по свойствам здания и окружения, Шаги агентов в чате
+describe('POST /api/assistant: the steps and the hotel features', () => {
+  const complete = { destinationId: 'lisbon', when: 9, party: 'solo' }
+  // The tests' catalogue has no Valencia (its hotels are real): Lisbon's made-up hotels stand in with made-up data.
+  const lisbon = async () => (await import('@/test/catalog')).loadCityHotels(['lisbon'])
+  const features = (entries: [string, Omit<HotelFeatures, 'views'> & Partial<HotelFeatures>][]) =>
+    vi.mocked(loadHotelFeatures).mockResolvedValue(new Map(entries.map(([id, f]) => [id, { views: [], ...f }])))
+
+  it('runs the turn as steps once the plan is due (Scenario: Шаг агента)', async () => {
+    setModel(undefined)
+    const body = await (await ask('подбери что-нибудь', complete)).json()
+    expect(body.steps).toEqual([
+      { agent: 'search', title: 'Подбираю отели по вашему описанию', status: 'done', result: 'подобрал по каталогу' },
+    ])
+    expect((await (await ask('море')).json()).steps).toBeUndefined()
+  })
+
+  it('offers the hotels with the quietest nights and names the noise (Scenario: Тихий отель)', async () => {
+    setModel(undefined)
+    const [a, b, c] = await lisbon()
+    features([
+      [a.id, { lnight: { min: 60, max: 64 }, floors: 5 }],
+      [b.id, { lnight: { max: 39 }, floors: 3 }],
+      [c.id, { lnight: { min: 45, max: 49 }, floors: 12 }],
+    ])
+    const body = await (await ask('тихий отель, чтобы ночью не шумело', complete)).json()
+    expect(body.brief).toMatchObject({ quiet: true })
+    expect(body.matches.map((h: { id: string }) => h.id)).toEqual([b.id, c.id, a.id])
+    expect(body.features[b.id].lnight).toEqual({ max: 39 })
+    expect(body.steps.at(-1)).toEqual({
+      agent: 'features',
+      title: 'Проверяю данные о шуме',
+      status: 'done',
+      result: `подходят 3 отеля из ${(await lisbon()).length}`,
+    })
+    expect(body).not.toHaveProperty('missing')
+  })
+
+  it('keeps the quiet ones and goes higher on «а повыше?» (Scenario: Уточнение)', async () => {
+    setModel(undefined)
+    const [a, b, c] = await lisbon()
+    features([
+      [a.id, { lnight: { max: 39 }, floors: 4 }],
+      [b.id, { lnight: { max: 39 }, floors: 15 }],
+      [c.id, { lnight: { min: 65, max: 69 }, floors: 24 }],
+    ])
+    const body = await (await ask('а повыше?', { ...complete, quiet: true })).json()
+    expect(body.brief).toMatchObject({ quiet: true, height: 'high' })
+    expect(body.matches.map((h: { id: string }) => h.id)).toEqual([b.id, a.id, c.id])
+  })
+
+  it('names the room types with the view (Scenario: Вид не у всех номеров)', async () => {
+    setModel(undefined)
+    const [a, b] = await lisbon()
+    features([
+      [a.id, { views: [{ roomName: 'Люкс с видом на море', view: 'sea' }] }],
+      [b.id, { views: [{ roomName: 'Номер с видом на город', view: 'city' }] }],
+    ])
+    const body = await (await ask('номер с видом на море', complete)).json()
+    expect(body.matches.map((h: { id: string }) => h.id)).toEqual([a.id])
+    expect(body.features[a.id].views).toEqual([{ roomName: 'Люкс с видом на море', view: 'sea' }])
+  })
+
+  it('says there is no data instead of guessing (Scenario: Нет данных)', async () => {
+    setModel(undefined)
+    const body = await (
+      await ask('а там шумно? нужен тихий отель', { destinationId: 'prague', when: 9, party: 'solo' })
+    ).json()
+    expect(body.missing).toEqual(['quiet'])
+    expect(body.matches).toBeUndefined()
+    expect(body.steps.at(-1)).toMatchObject({ agent: 'features', status: 'done', result: 'нет данных' })
+  })
+
+  it('reports a failed step and goes on', async () => {
+    setModel(undefined)
+    vi.mocked(loadHotelFeatures).mockRejectedValue(new Error('down'))
+    const body = await (await ask('тихий отель', complete)).json()
+    expect(body.steps.at(-1)).toMatchObject({ agent: 'features', status: 'failed' })
+    expect(body.brief).toMatchObject({ quiet: true })
   })
 })
