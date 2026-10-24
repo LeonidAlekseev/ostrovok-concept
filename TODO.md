@@ -37,6 +37,8 @@
       очереди; после `hide-synthetic-in-production` (согласовано 2026-10-24).
 - [ ] `empty-state-search-links` — «Мои поездки» и «Избранное» пустые: «Спросить Эвал» и «Искать вручную» — лёгкий
       — в очереди; после `hide-synthetic-in-production` (согласовано 2026-10-24).
+- [ ] `rename-cozy-evening` — «Тихий вечер» → «Уютный вечер» в блоке и окне вайба, пересчёт векторов `db:embed` —
+      лёгкий — в очереди; после `selection-to-search` (согласовано 2026-10-24).
 - [ ] `remove-dead-assets` — `scenarios.image/alt`, три WebP, `--brand-green-gray` — лёгкий — в очереди; после
       `hide-synthetic-in-production` (общий `destinations.ts`).
 
