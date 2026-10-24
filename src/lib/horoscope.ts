@@ -14,6 +14,8 @@ export type Modality = 'cardinal' | 'fixed' | 'mutable'
 export interface ZodiacSign {
   id: string
   name: string
+  /** «для Овна»: the title of the stars' selection on /search. */
+  genitive: string
   symbol: string
   element: Element
   modality: Modality
@@ -30,6 +32,7 @@ export const zodiac: ZodiacSign[] = [
   {
     id: 'aries',
     name: 'Овен',
+    genitive: 'Овна',
     symbol: '♈',
     element: 'fire',
     modality: 'cardinal',
@@ -40,6 +43,7 @@ export const zodiac: ZodiacSign[] = [
   {
     id: 'taurus',
     name: 'Телец',
+    genitive: 'Тельца',
     symbol: '♉',
     element: 'earth',
     modality: 'fixed',
@@ -50,6 +54,7 @@ export const zodiac: ZodiacSign[] = [
   {
     id: 'gemini',
     name: 'Близнецы',
+    genitive: 'Близнецов',
     symbol: '♊',
     element: 'air',
     modality: 'mutable',
@@ -60,6 +65,7 @@ export const zodiac: ZodiacSign[] = [
   {
     id: 'cancer',
     name: 'Рак',
+    genitive: 'Рака',
     symbol: '♋',
     element: 'water',
     modality: 'cardinal',
@@ -70,6 +76,7 @@ export const zodiac: ZodiacSign[] = [
   {
     id: 'leo',
     name: 'Лев',
+    genitive: 'Льва',
     symbol: '♌',
     element: 'fire',
     modality: 'fixed',
@@ -80,6 +87,7 @@ export const zodiac: ZodiacSign[] = [
   {
     id: 'virgo',
     name: 'Дева',
+    genitive: 'Девы',
     symbol: '♍',
     element: 'earth',
     modality: 'mutable',
@@ -90,6 +98,7 @@ export const zodiac: ZodiacSign[] = [
   {
     id: 'libra',
     name: 'Весы',
+    genitive: 'Весов',
     symbol: '♎',
     element: 'air',
     modality: 'cardinal',
@@ -100,6 +109,7 @@ export const zodiac: ZodiacSign[] = [
   {
     id: 'scorpio',
     name: 'Скорпион',
+    genitive: 'Скорпиона',
     symbol: '♏',
     element: 'water',
     modality: 'fixed',
@@ -110,6 +120,7 @@ export const zodiac: ZodiacSign[] = [
   {
     id: 'sagittarius',
     name: 'Стрелец',
+    genitive: 'Стрельца',
     symbol: '♐',
     element: 'fire',
     modality: 'mutable',
@@ -120,6 +131,7 @@ export const zodiac: ZodiacSign[] = [
   {
     id: 'capricorn',
     name: 'Козерог',
+    genitive: 'Козерога',
     symbol: '♑',
     element: 'earth',
     modality: 'cardinal',
@@ -130,6 +142,7 @@ export const zodiac: ZodiacSign[] = [
   {
     id: 'aquarius',
     name: 'Водолей',
+    genitive: 'Водолея',
     symbol: '♒',
     element: 'air',
     modality: 'fixed',
@@ -140,6 +153,7 @@ export const zodiac: ZodiacSign[] = [
   {
     id: 'pisces',
     name: 'Рыбы',
+    genitive: 'Рыб',
     symbol: '♓',
     element: 'water',
     modality: 'mutable',
@@ -383,8 +397,8 @@ export interface Reading {
   /** The aspect between the natal Sun and the city's sign. */
   aspect: AspectKind | null
   /**
-   * The best hotel of the best city, then the best of the 2nd and the 3rd cities; the result shows the first,
-   * which is of the next city when the best one has no hotels.
+   * The best hotel of the best city, then the best of the 2nd and the 3rd cities: the result opens them as a
+   * selection on /search.
    */
   hotels: Hotel[]
   forecast: string

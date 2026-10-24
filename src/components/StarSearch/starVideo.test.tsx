@@ -16,8 +16,6 @@ const reading = readStars(
   allHotels(),
 )
 
-const pick = { title: 'Рим для двоих', place: 'Рим, Италия', estimate: '≈ 84 000 ₽ за 5 ночей' }
-
 afterEach(() => vi.unstubAllGlobals())
 
 function stubImage(decode: () => Promise<void>) {
@@ -35,24 +33,26 @@ const palette = Object.fromEntries(
     k,
     '#123456',
   ]),
-) as Parameters<typeof drawReadingFrame>[5]['p']
+) as Parameters<typeof drawReadingFrame>[4]['p']
 
 /** A canvas context that remembers what was drawn. */
 function fakeContext() {
   const gradient = { addColorStop: vi.fn() }
   const calls: string[] = []
+  const texts: string[] = []
   const ctx = new Proxy({ globalCompositeOperation: 'source-over' } as Record<string, unknown>, {
     get: (target, key: string) =>
       key in target
         ? target[key]
         : (...args: unknown[]) => {
             calls.push(key)
+            if (key === 'fillText') texts.push(String(args[0]))
             if (key.startsWith('create')) return gradient
             if (key === 'measureText') return { width: 10 * String(args[0]).length }
           },
     set: (target, key: string, value) => ((target[key] = value), true),
   }) as unknown as CanvasRenderingContext2D
-  return { ctx, calls }
+  return { ctx, calls, texts }
 }
 
 describe('orb picture of the video', () => {
@@ -72,7 +72,7 @@ describe('orb picture of the video', () => {
   it('is drawn as a picture', () => {
     const { ctx, calls } = fakeContext()
     const orb = {} as HTMLImageElement
-    drawReadingFrame(ctx, reading, 'Анна', pick, 1000, {
+    drawReadingFrame(ctx, reading, 'Анна', 1000, {
       p: palette,
       font: 'sans-serif',
       serif: 'serif',
@@ -86,7 +86,7 @@ describe('orb picture of the video', () => {
 
   it('falls back to the drawn orb without the picture', () => {
     const { ctx, calls } = fakeContext()
-    drawReadingFrame(ctx, reading, 'Анна', pick, 1000, {
+    drawReadingFrame(ctx, reading, 'Анна', 1000, {
       p: palette,
       font: 'sans-serif',
       serif: 'serif',
@@ -102,11 +102,33 @@ describe('orb picture of the video', () => {
     const style = { p: palette, font: 'sans-serif', serif: 'serif', site: 'x.test', orb: null }
     const sky = { width: 1006, height: 1564 } as HTMLImageElement
     const withSky = fakeContext()
-    drawReadingFrame(withSky.ctx, reading, 'Анна', pick, 1000, { ...style, sky })
+    drawReadingFrame(withSky.ctx, reading, 'Анна', 1000, { ...style, sky })
     expect(withSky.calls).toContain('drawImage')
     const without = fakeContext()
-    drawReadingFrame(without.ctx, reading, 'Анна', pick, 1000, { ...style, sky: null })
+    drawReadingFrame(without.ctx, reading, 'Анна', 1000, { ...style, sky: null })
     expect(without.calls).toContain('createLinearGradient')
     expect(without.calls).not.toContain('drawImage')
+  })
+})
+
+// star-search, Requirement: Запись видео результата; Scenario: Отель в видео
+describe('frames of the video', () => {
+  const style = { p: palette, font: 'sans-serif', serif: 'serif', site: 'x.test', orb: null, sky: null }
+
+  it("have no hotel name or price, and the last one shows the stars' city", () => {
+    const hotelNames = reading.hotels.map((h) => h.name)
+    expect(hotelNames.length).toBeGreaterThan(0)
+    for (const t of [0, 1000, 3000, 5000, 6000, 7999]) {
+      const { ctx, texts } = fakeContext()
+      drawReadingFrame(ctx, reading, 'Анна', t, style)
+      for (const text of texts) {
+        expect(hotelNames.some((name) => text.includes(name))).toBe(false)
+        expect(text).not.toMatch(/₽/)
+      }
+    }
+    const last = fakeContext()
+    drawReadingFrame(last.ctx, reading, 'Анна', 7999, style)
+    expect(last.texts).toContain(reading.city.name)
+    expect(last.texts).toContain(reading.city.country)
   })
 })

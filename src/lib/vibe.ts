@@ -115,6 +115,8 @@ export const VIBE_STEPS = VIBE_AXES.length
 export const poleImage = (axisId: string, side: -1 | 1) => `/images/vibe/${axisId}-${side < 0 ? 'left' : 'right'}.webp`
 
 export interface Archetype {
+  /** The archetype in an address: `pick` of the selection on /search. */
+  id: string
   name: string
   description: string
   /** The photo of the main pole; «Баланс во всём» has its own. */
@@ -131,36 +133,65 @@ const chosenPoles = (answers: readonly Answer[]) =>
 /** The first pole of an archetype is its main axis. Every pole is in some archetype, so any answer but «Не могу выбрать» everywhere has a match. */
 const ARCHETYPES: readonly (Omit<Archetype, 'image'> & { poles: readonly [Pole, Pole] })[] = [
   {
+    id: 'quiet-harbour',
     name: 'Тихая гавань',
     description: 'Тишина, простор и вечер без спешки',
     poles: ['evening:-1', 'location:-1'],
   },
-  { name: 'Душа вечеринки', description: 'Музыка, бары и прогулки до рассвета', poles: ['evening:1', 'leisure:1'] },
   {
+    id: 'party-soul',
+    name: 'Душа вечеринки',
+    description: 'Музыка, бары и прогулки до рассвета',
+    poles: ['evening:1', 'leisure:1'],
+  },
+  {
+    id: 'city-explorer',
     name: 'Городской исследователь',
     description: 'Новые улицы и новые места каждый вечер',
     poles: ['place:1', 'food:1'],
   },
   {
+    id: 'sea-hedonist',
     name: 'Морской гедонист',
     description: 'Море, спа и бассейн — отдых без будильника',
     poles: ['place:-1', 'leisure:-1'],
   },
   {
+    id: 'minimalist',
     name: 'Эстет-минималист',
     description: 'Маленький отель с характером и ничего лишнего',
     poles: ['size:-1', 'budget:-1'],
   },
-  { name: 'Ценитель роскоши', description: 'Большой отель и всё самое лучшее', poles: ['size:1', 'budget:1'] },
-  { name: 'Сердце города', description: 'Жить в центре и быть в гуще событий', poles: ['location:1', 'place:1'] },
-  { name: 'Уютный сибарит', description: 'Завтрак в постель и долгий день в спа', poles: ['food:-1', 'leisure:-1'] },
+  {
+    id: 'luxury',
+    name: 'Ценитель роскоши',
+    description: 'Большой отель и всё самое лучшее',
+    poles: ['size:1', 'budget:1'],
+  },
+  {
+    id: 'city-heart',
+    name: 'Сердце города',
+    description: 'Жить в центре и быть в гуще событий',
+    poles: ['location:1', 'place:1'],
+  },
+  {
+    id: 'cozy-sybarite',
+    name: 'Уютный сибарит',
+    description: 'Завтрак в постель и долгий день в спа',
+    poles: ['food:-1', 'leisure:-1'],
+  },
 ]
 
 export const BALANCE: Archetype = {
+  id: 'balance',
   name: 'Баланс во всём',
   description: 'Всего понемногу — и всё по настроению',
   image: '/images/vibe/balance.webp',
 }
+
+/** The name of the archetype `id`, or `undefined` for an unknown one. */
+export const archetypeName = (id: string): string | undefined =>
+  (id === BALANCE.id ? BALANCE : ARCHETYPES.find((a) => a.id === id))?.name
 
 /**
  * The archetype of the answers: the one whose two poles match most of them; on a tie the one whose main

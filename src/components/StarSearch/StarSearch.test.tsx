@@ -166,7 +166,7 @@ describe('StarSearch reading', () => {
     expect(await screen.findByRole('heading', { name: /Анна, ваш знак — Овен/ }, { timeout: 4000 })).toBeTruthy()
   })
 
-  it('skips the animation under reduced motion and answers with one hotel', async () => {
+  it("skips the animation under reduced motion and answers with a selection of the stars' hotels", async () => {
     reduceMotion()
     const user = userEvent.setup()
     renderDialog()
@@ -175,17 +175,22 @@ describe('StarSearch reading', () => {
 
     const heading = screen.getByRole('heading', { name: /Анна, ваш знак — Овен/ })
     expect(document.activeElement).toBe(heading)
-    expect(screen.getAllByRole('status').some((s) => /^Звёзды выбрали: /.test(s.textContent!))).toBe(true)
+    expect(screen.getAllByRole('status').some((s) => /^Звёзды выбрали: [^,]+$/.test(s.textContent!))).toBe(true)
     expect(screen.getByText(/Гороскоп — для настроения, а не для планов/)).toBeTruthy()
 
-    // star-search, Requirement: Итог гадания — один отель: the hotel's page with the dates of the reading.
-    const hotel = screen.getByRole('region', { name: 'Звёзды выбрали отель' })
+    // star-search, Requirement: Итог гадания — один отель: no hotel card, the selection with the dates of the reading.
+    expect(screen.queryByRole('region', { name: 'Звёзды выбрали отель' })).toBeNull()
+    expect(screen.queryByText(/₽/)).toBeNull()
     const links = screen.getAllByRole('link')
     expect(links).toHaveLength(1)
-    expect(within(hotel).getByRole('link').getAttribute('href')).toMatch(
-      /^\/hotels\/[a-z-]+\?checkin=\d{4}-\d{2}-\d{2}&/,
-    )
-    expect(within(hotel).getByText(/^от .+ ₽ за ночь$/)).toBeTruthy()
+    expect(links[0].textContent).toBe('Посмотреть подборку')
+    const url = new URL(links[0].getAttribute('href')!, 'https://x')
+    expect(url.pathname).toBe('/search')
+    expect(url.searchParams.get('hotels')!.split(',')).toHaveLength(3)
+    expect(url.searchParams.get('from')).toBe('stars')
+    expect(url.searchParams.get('pick')).toBe('aries')
+    expect(url.searchParams.get('checkin')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(url.searchParams.get('checkout')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(screen.queryByText('Запасные варианты')).toBeNull()
     expect(screen.queryByText(/маршрут/i)).toBeNull()
   })
@@ -205,7 +210,7 @@ describe('StarSearch reading', () => {
     await user.click(north)
     await user.click(screen.getByRole('button', { name: 'Гадать' }))
     const status = screen.getAllByRole('status').find((s) => /^Звёзды выбрали: /.test(s.textContent!))!
-    expect(status.textContent).toMatch(/, (Осло|Стокгольм|Хельсинки|Рейкьявик|Калининград)$/)
+    expect(status.textContent).toMatch(/^Звёзды выбрали: (Осло|Стокгольм|Хельсинки|Рейкьявик|Калининград)$/)
   })
 
   it('reads the stars in the chosen country and city', async () => {
@@ -225,11 +230,12 @@ describe('StarSearch reading', () => {
     await user.selectOptions(city, 'Рим')
     await user.click(screen.getByRole('button', { name: 'Гадать' }))
     const status = screen.getAllByRole('status').find((s) => /^Звёзды выбрали: /.test(s.textContent!))!
-    expect(status.textContent).toMatch(/, Рим$/)
-    // star-search, Requirement: Гадание среди выбранных городов: the hotel of Rome.
-    const hotel = within(screen.getByRole('region', { name: 'Звёзды выбрали отель' })).getByRole('link')
-    expect(hotel.textContent).toContain('Рим, Италия')
-    expect(hotel.getAttribute('href')).toMatch(/^\/hotels\/rome-/)
+    expect(status.textContent).toBe('Звёзды выбрали: Рим')
+    // star-search, Requirement: Гадание среди выбранных городов: the hotels of Rome.
+    const selection = screen.getByRole('link', { name: 'Посмотреть подборку' })
+    const ids = new URL(selection.getAttribute('href')!, 'https://x').searchParams.get('hotels')!.split(',')
+    expect(ids.length).toBeGreaterThan(0)
+    for (const id of ids) expect(id).toMatch(/^rome-/)
   })
 
   it('is the same for the same answers', async () => {
@@ -257,7 +263,7 @@ describe('StarSearch video', () => {
   it('moves the progress bar in 1 % steps, not on every frame', async () => {
     vi.stubGlobal('MediaRecorder', { isTypeSupported: () => true })
     let finish!: () => void
-    vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _pick, _type, { onProgress }) => {
+    vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _type, { onProgress }) => {
       await new Promise<void>((resolve) => (finish = resolve))
       onProgress(0)
       for (let i = 1; i <= 300; i++) {
@@ -284,7 +290,7 @@ describe('StarSearch video', () => {
     vi.stubGlobal('MediaRecorder', { isTypeSupported: () => true })
     let restart!: () => void
     let finish!: () => void
-    vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _pick, _type, { onRestart }) => {
+    vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _type, { onRestart }) => {
       restart = onRestart
       await new Promise<void>((resolve) => (finish = resolve))
       return video

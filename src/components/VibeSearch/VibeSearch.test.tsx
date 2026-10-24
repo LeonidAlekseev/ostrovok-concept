@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { addDays, todayIso } from '../../lib/dates'
+import { allHotels } from '../../test/catalog'
 import { VibeSearch } from './VibeSearch'
 import { VibeSearchDialog } from './VibeSearchDialog'
 
@@ -184,7 +185,7 @@ describe('VibeSearch pairs', () => {
 
 // vibe-search, Requirement: Статистика вайба; Requirement: Отели под настроение
 describe('VibeSearch result', () => {
-  it('shows the vibe, the shares and six hotels from different cities with start dates', async () => {
+  it('shows the vibe, the shares and a selection of six hotels from different cities with start dates', async () => {
     const user = userEvent.setup()
     renderDialog()
     await answerAll(
@@ -197,21 +198,24 @@ describe('VibeSearch result', () => {
     // No ready-made route: hotels only.
     expect(screen.queryByText(/маршрут/i)).toBeNull()
 
-    const hotels = within(screen.getByRole('region', { name: 'Отели под настроение' })).getAllByRole('article')
-    expect(hotels).toHaveLength(6)
-    const cities = hotels.map((hotel) => within(hotel).getByRole('heading').nextElementSibling?.textContent)
+    // No hotel cards in the window: the selection opens on /search.
+    expect(screen.queryAllByRole('article')).toHaveLength(0)
+    const url = new URL(screen.getByRole('link', { name: 'Посмотреть подборку' }).getAttribute('href')!, 'https://x')
+    expect(url.pathname).toBe('/search')
+    const ids = url.searchParams.get('hotels')!.split(',')
+    expect(ids).toHaveLength(6)
+    const cities = ids.map((id) => allHotels().find((h) => h.id === id)!.destinationId)
     expect(new Set(cities).size).toBe(6)
     const tomorrow = addDays(todayIso(), 1)
-    for (const hotel of hotels) {
-      const url = new URL(within(hotel).getByRole('link').getAttribute('href')!, 'https://x')
-      expect(url.pathname).toMatch(/^\/hotels\/[a-z0-9-]+$/)
-      expect(Object.fromEntries(url.searchParams)).toEqual({
-        checkin: tomorrow,
-        checkout: addDays(tomorrow, 1),
-        adults: '2',
-        rooms: '1',
-      })
-    }
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      hotels: ids.join(','),
+      from: 'vibe',
+      pick: 'quiet-harbour',
+      checkin: tomorrow,
+      checkout: addDays(tomorrow, 1),
+      adults: '2',
+      rooms: '1',
+    })
   })
 
   // vibe-search, Requirement: Оформление итога

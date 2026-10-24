@@ -1,20 +1,16 @@
 import { useEffect, useRef } from 'react'
-import { RotateCcw } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { ASPECT_LABEL, ELEMENT_LABEL, lowerFirst, MODALITY_LABEL, type Reading } from '../../lib/horoscope'
-import { isRated, type Hotel } from '../../lib/catalog'
-import { hotelHref, type Stay } from '../../lib/search'
 import Link from 'next/link'
-import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
-import { formatDecimal, formatPrice } from '../../lib/format'
-import { useDestination } from '../Catalog/useDestinations'
+import { ArrowRight, RotateCcw } from 'lucide-react'
+import { cn } from 'cn'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { ASPECT_LABEL, ELEMENT_LABEL, lowerFirst, MODALITY_LABEL, type Reading } from '../../lib/horoscope'
+import { selectionHref, type Stay } from '../../lib/search'
 import { MagicOrb } from './MagicOrb'
-import type { StarPick } from './starVideo'
 import { StarVideo } from './StarVideo'
 
 interface Props {
   reading: Reading
-  /** The dates of the reading, for the hotel's link. */
+  /** The dates of the reading, for the link to the selection. */
   stay: Stay
   name: string
   onRestart: () => void
@@ -25,15 +21,6 @@ const symbolFont = "font-['Segoe_UI_Symbol','Apple_Symbols','Noto_Sans_Symbols',
 export function StarResult({ reading, stay, name, onRestart }: Props) {
   const headingRef = useRef<HTMLHeadingElement>(null)
   const { sign, moon, aspect, citySign } = reading
-  // The stars' hotel: of their city, or of the next one when theirs has none.
-  const [hotel] = reading.hotels
-  const city = useDestination(hotel?.destinationId ?? '') ?? reading.city
-  // What the video and the message tell.
-  const pick: StarPick = {
-    title: hotel?.name ?? reading.city.name,
-    place: `${city.name}, ${city.country}`,
-    estimate: hotel ? `от ${formatPrice(hotel.priceFrom)} за ночь` : '',
-  }
   const facts = [
     ['Стихия', `${ELEMENT_LABEL[sign.element]}, ${MODALITY_LABEL[sign.modality]} знак, управитель — ${sign.ruler}`],
     ['Луна', `${moon.sign.name}, ${lowerFirst(moon.phase.name)}`],
@@ -76,13 +63,23 @@ export function StarResult({ reading, stay, name, onRestart }: Props) {
         {reading.forecast}
       </p>
 
-      {hotel && <StarHotel hotel={hotel} place={pick.place} href={hotelHref(hotel.id, stay)} />}
+      {/* The stars' hotels are shown on /search, with its filters and map. */}
+      <Link
+        href={selectionHref({ hotels: reading.hotels.map((h) => h.id), from: 'stars', pick: sign.id }, stay)}
+        className={cn(
+          buttonVariants({ size: 'lg' }),
+          'h-12 bg-(image:--decor-star-choice) text-base text-(--decor-star-text) shadow-(--decor-spin-shadow) hover:bg-(image:--decor-star-choice) hover:brightness-110',
+        )}
+      >
+        Посмотреть подборку
+        <ArrowRight aria-hidden />
+      </Link>
 
       <p className="text-sm text-(--decor-star-muted)">
         Гороскоп — для настроения, а не для планов. Цены и даты проверьте при бронировании.
       </p>
 
-      <StarVideo reading={reading} name={name} pick={pick} />
+      <StarVideo reading={reading} name={name} />
 
       <Button
         variant="outline"
@@ -94,37 +91,5 @@ export function StarResult({ reading, stay, name, onRestart }: Props) {
         Гадать заново
       </Button>
     </div>
-  )
-}
-
-/** The stars' hotel: a card of the window's glass in a golden line, a link to the hotel's page. */
-function StarHotel({ hotel, place, href }: { hotel: Hotel; place: string; href: string }) {
-  return (
-    <section aria-labelledby="star-hotel" className="flex flex-col gap-2.5">
-      {/* Not a heading: the result's heading is h3, the hotel's name is h4. */}
-      <p id="star-hotel" className="font-star text-lg font-semibold text-(--decor-gold)">
-        Звёзды выбрали отель
-      </p>
-      <Link
-        href={href}
-        className="group flex flex-col overflow-hidden rounded-3xl border border-(--decor-gold)/45 bg-(--decor-star-glass) shadow-[0_16px_48px_color-mix(in_srgb,var(--decor-violet)_35%,transparent)] transition-[border-color,translate] duration-200 outline-none hover:-translate-y-0.5 hover:border-(--decor-gold) focus-visible:ring-3 focus-visible:ring-(--decor-gold)/70"
-      >
-        <PhotoPlaceholder photo={hotel.photos[0]} className="aspect-[16/9] w-full" />
-        <span className="flex flex-col gap-1.5 p-[clamp(14px,4vw,20px)]">
-          <h4 className="font-star text-[clamp(19px,5vw,22px)]/[1.25] font-semibold text-(--decor-star-text) group-hover:text-(--decor-gold)">
-            {hotel.name}
-          </h4>
-          <span className="text-sm text-(--decor-star-muted)">{place}</span>
-          {isRated(hotel) && (
-            <span className="text-sm text-(--decor-star-muted)">
-              Оценка гостей: <span className="font-medium text-(--decor-star-text)">{formatDecimal(hotel.rating)}</span>
-            </span>
-          )}
-          <span className="mt-1 bg-(image:--decor-gold-gradient) bg-clip-text text-lg font-bold text-transparent">
-            от {formatPrice(hotel.priceFrom)} за ночь
-          </span>
-        </span>
-      </Link>
-    </section>
   )
 }

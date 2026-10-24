@@ -6,9 +6,9 @@ export const VIDEO_WIDTH = 1080
 export const VIDEO_HEIGHT = 1920
 export const VIDEO_MS = 8000
 
-/** Scenes: the orb reveals the sign, then the forecast, then the hotel. */
+/** Scenes: the orb reveals the sign, then the forecast, then the stars' city. */
 const FORECAST_AT = 2800
-const HOTEL_AT = 5400
+const CITY_AT = 5400
 const FADE_MS = 400
 
 const clamp = (x: number) => Math.min(1, Math.max(0, x))
@@ -201,15 +201,6 @@ function drawSymbol(ctx: CanvasRenderingContext2D, p: Palette, symbol: string, x
   ctx.restore()
 }
 
-/** The stars' hotel the video ends on. */
-export interface StarPick {
-  title: string
-  /** City and country. */
-  place: string
-  /** «от 7 000 ₽ за ночь». */
-  estimate: string
-}
-
 interface Style {
   p: Palette
   /** The brand's font for the text, the window's antiqua for the titles. */
@@ -226,7 +217,6 @@ export function drawReadingFrame(
   ctx: CanvasRenderingContext2D,
   reading: Reading,
   name: string,
-  pick: StarPick,
   t: number,
   { p, font, serif, site, orb, sky }: Style,
 ) {
@@ -254,7 +244,7 @@ export function drawReadingFrame(
   }
 
   // 2. The forecast.
-  const forecast = sceneAlpha(t, FORECAST_AT, HOTEL_AT)
+  const forecast = sceneAlpha(t, FORECAST_AT, CITY_AT)
   if (forecast > 0) {
     ctx.globalAlpha = forecast
     drawOrb(ctx, p, orb, W / 2, 480, 130, t)
@@ -269,10 +259,10 @@ export function drawReadingFrame(
     lines.forEach((line, i) => ctx.fillText(line, W / 2, 880 + i * 74 + rise))
   }
 
-  // 3. The stars' choice: a card of the window's glass in a golden line.
-  const pickAlpha = sceneAlpha(t, HOTEL_AT, Infinity)
+  // 3. The stars' city: a card of the window's glass in a golden line, without a hotel or a price.
+  const pickAlpha = sceneAlpha(t, CITY_AT, Infinity)
   if (pickAlpha > 0) {
-    const rise = (1 - ease((t - HOTEL_AT) / 700)) * 60
+    const rise = (1 - ease((t - CITY_AT) / 700)) * 60
     ctx.globalAlpha = pickAlpha
     ctx.save()
     ctx.translate(0, rise)
@@ -307,17 +297,12 @@ export function drawReadingFrame(
     ctx.fillText('Звёзды выбрали', W / 2, 850)
 
     ctx.fillStyle = p.light
-    ctx.font = `600 58px ${serif}`
-    const titleLines = wrapText(ctx, pick.title, 820).slice(0, 3)
-    titleLines.forEach((line, i) => ctx.fillText(line, W / 2, 1000 + i * 72))
-    let y = 1000 + titleLines.length * 72 + 20
+    ctx.font = `600 84px ${serif}`
+    const cityLines = wrapText(ctx, reading.city.name, 820).slice(0, 2)
+    cityLines.forEach((line, i) => ctx.fillText(line, W / 2, 1030 + i * 96))
     ctx.fillStyle = p.lavender
     ctx.font = `500 46px ${font}`
-    ctx.fillText(pick.place, W / 2, y, 820)
-    y += 120
-    ctx.fillStyle = goldText(ctx, p, y, 64)
-    ctx.font = `800 64px ${font}`
-    ctx.fillText(pick.estimate, W / 2, y, 820)
+    ctx.fillText(reading.city.country, W / 2, 1030 + cityLines.length * 96 + 30, 820)
     ctx.restore()
   }
   ctx.globalAlpha = 1
@@ -336,7 +321,6 @@ function paintedSky(p: Palette, sky: HTMLImageElement): HTMLCanvasElement {
 export async function renderReadingVideo(
   reading: Reading,
   name: string,
-  pick: StarPick,
   type: string,
   {
     onProgress,
@@ -359,7 +343,7 @@ export async function renderReadingVideo(
   const blob = await recordCanvas(canvas, {
     type,
     durationMs: VIDEO_MS,
-    draw: (t) => drawReadingFrame(ctx, reading, name, pick, t, style),
+    draw: (t) => drawReadingFrame(ctx, reading, name, t, style),
     onProgress,
     onRestart,
     signal,

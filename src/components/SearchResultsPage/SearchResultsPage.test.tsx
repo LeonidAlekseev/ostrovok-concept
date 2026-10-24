@@ -284,6 +284,83 @@ describe('SearchResultsPage query', () => {
   })
 })
 
+// search-results-page, Requirement: Подборка отелей
+describe('SearchResultsPage selection', () => {
+  const picked = [...fullHotelsIn('prague').slice(0, 4), ...fullHotelsIn('rome').slice(0, 4)]
+  const ids = picked.map((h) => h.id).join(',')
+  const names = (hotels: { name: string }[]) => hotels.map((h) => h.name).sort()
+
+  // Scenario: Подборка вайба
+  it('shows only the hotels of the selection under the title of its source', async () => {
+    open(`hotels=${ids},no-such-hotel&from=vibe&pick=quiet-harbour&${STAY}`)
+    await results()
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Подборка по вашему вайбу: Тихая гавань' })).toBeDefined()
+    expect(screen.getByRole('heading', { name: `Найдено ${countRu(8, ['вариант', 'варианта', 'вариантов'])}` }))
+    expect(cardNames().sort()).toEqual(names(picked))
+    // «Изменить поиск» is the manual search: no destination yet, the dates of the selection.
+    const form = screen.getByRole('form', { name: 'Поиск отелей' })
+    expect((within(form).getByRole('combobox', { name: 'Направление' }) as HTMLInputElement).value).toBe('')
+    expect(within(cards()[0]).getByRole('link').getAttribute('href')).toMatch(
+      /\?checkin=2026-10-20&checkout=2026-10-23&/,
+    )
+  })
+
+  it('titles the selections of the stars and the drawing', async () => {
+    open(`hotels=${ids}&from=stars&pick=leo&${STAY}`)
+    expect(screen.getByRole('heading', { level: 1, name: 'Подборка звёзд для Льва' })).toBeDefined()
+    cleanup()
+    open(`hotels=${ids}&from=draw&pick=city-heart&${STAY}`)
+    expect(screen.getByRole('heading', { level: 1, name: 'Подборка по вашему рисунку: Сердце города' })).toBeDefined()
+  })
+
+  // Scenario: Неизвестный источник
+  it('titles a selection of an unknown pick «Подобранные отели»', async () => {
+    open(`hotels=${ids}&from=vibe&pick=unknown&${STAY}`)
+    expect(screen.getByRole('heading', { level: 1, name: 'Подобранные отели' })).toBeDefined()
+    await results()
+    expect(cards()).toHaveLength(8)
+  })
+
+  it('starts a selection without dates from tomorrow', async () => {
+    open(`hotels=${ids}&from=draw&pick=minimalist`)
+    await results()
+    expect(within(cards()[0]).getByRole('link').getAttribute('href')).toMatch(
+      /\?checkin=2026-10-20&checkout=2026-10-21&/,
+    )
+  })
+
+  // Scenario: Фильтр в подборке
+  it('filters and sorts only the hotels of the selection', async () => {
+    const user = userEvent.setup()
+    open(`hotels=${ids}&from=vibe&pick=quiet-harbour&${STAY}`, { desktop: true })
+    await results()
+
+    await user.click(screen.getByRole('button', { name: 'Бесплатная отмена' }))
+    expect(window.location.search).toContain('free_cancel=1')
+    expect(new URLSearchParams(window.location.search).get('hotels')).toBe(ids)
+    const stay = { checkIn: '2026-10-20', checkOut: '2026-10-23', guests: { adults: 2, children: 0, rooms: 1 } }
+    const expected = applyFilters(picked, { ...NO_FILTERS, freeCancel: true }, stay).map((item) => item.hotel)
+    // The filter drops some of the selection and adds none of the city.
+    expect(expected.length).toBeGreaterThan(0)
+    expect(expected.length).toBeLessThan(picked.length)
+    expect(cardNames().sort()).toEqual(names(expected))
+    for (const card of cards()) expect(within(card).getByText('Бесплатная отмена')).toBeDefined()
+
+    await user.selectOptions(screen.getByLabelText('Сортировка'), 'Сначала дешевле')
+    expect(prices()).toEqual([...prices()].sort((a, b) => a - b))
+    expect(cardNames().sort()).toEqual(names(expected))
+  })
+
+  it('pages the selection by 12', async () => {
+    const many = [...fullHotelsIn('prague'), ...fullHotelsIn('rome'), ...fullHotelsIn('paris')].slice(0, 14)
+    open(`hotels=${many.map((h) => h.id).join(',')}&from=stars&pick=leo&${STAY}`)
+    await results()
+    expect(cards()).toHaveLength(12)
+    expect(screen.getByRole('navigation', { name: /Страниц/ })).toBeDefined()
+  })
+})
+
 // search-results-page, Requirement: Карточка отеля в результатах
 // search-results-page, Requirement: Счётчик результатов
 describe('SearchResultsPage count', () => {

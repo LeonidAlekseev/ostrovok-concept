@@ -29,6 +29,7 @@ import {
 } from '../../lib/results'
 import {
   fromSearchParams,
+  parseSelection,
   resolveTarget,
   setStayParams,
   validateSearch,
@@ -36,6 +37,7 @@ import {
   type SearchErrors,
   type SearchQuery,
   type SearchTarget,
+  type Selection,
   type Stay,
 } from '../../lib/search'
 import { useDestinations } from '../Catalog/useDestinations'
@@ -95,7 +97,10 @@ const subscribeDesktop = (onChange: () => void) => {
 /** `lg` and wider: the list and the map side by side. */
 const useDesktop = () => useSyncExternalStore(subscribeDesktop, isDesktop, () => false)
 
-/** The results page `/search`: reads the query, filters and sorting from the URL. */
+/**
+ * The results page `/search`: reads the query, filters and sorting from the URL. The query is a destination or
+ * a scenario, or the hotels of a selection (`?hotels=a,b&from=vibe&pick=…`, see `selectionHref`).
+ */
 export function SearchResultsPage() {
   const params = useSearchParams()
   const today = useToday()
@@ -110,12 +115,15 @@ export function SearchResultsPage() {
     () => withStartDates(fromSearchParams(new URLSearchParams(request), destinations), today),
     [request, today, destinations],
   )
+  const selection = useMemo(() => parseSelection(new URLSearchParams(request)), [request])
 
   if (!today) return <SearchResultsFallback />
   // Opened from the menu or the home page: a blank form, its errors only after a submit.
   if (!request) return <QueryForm query={query} />
   const errors = validateSearch(query, today, destinations)
-  const target = resolveTarget(query.destination, destinations)
+  // A selection has its hotels instead of a destination.
+  if (selection) delete errors.destination
+  const target = selection ?? resolveTarget(query.destination, destinations)
   if (Object.keys(errors).length > 0 || !target) return <QueryForm key={request} query={query} errors={errors} />
   return (
     <Results
@@ -152,7 +160,7 @@ function QueryForm({ query, errors }: { query: SearchQuery; errors?: SearchError
 
 interface ResultsProps {
   query: SearchQuery
-  target: SearchTarget
+  target: SearchTarget | Selection
   initialFilters: Filters
   /** The hotel opened from the map; an unknown id is ignored. */
   hotelId: string | null
@@ -176,7 +184,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
 
   const destinations = useDestinations()
   const result = status.state === 'done' ? status.result : null
-  // The opened hotel is one of the results: the browser has only the hotels of the searched cities.
+  // The opened hotel is one of the results: the browser has only the hotels of the searched cities or the selection.
   const openedHotel = hotelId ? result?.hotels.find((h) => h.id === hotelId) : undefined
 
   // Narrow screens have no hotel dialog: a link with the hotel opens its page instead.
@@ -186,7 +194,11 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
 
   useEffect(() => {
     const controller = new AbortController()
-    const hotels = fetchHotels({ destinations: targetDestinations(target, destinations).map((d) => d.id) })
+    const hotels = fetchHotels(
+      target.kind === 'selection'
+        ? { ids: target.hotels }
+        : { destinations: targetDestinations(target, destinations).map((d) => d.id) },
+    )
     runDemoSearch(query, target, hotels, controller.signal).then(
       (result) => setStatus({ state: 'done', result }),
       (error: unknown) => {
@@ -265,7 +277,8 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
 
   return (
     <main className={pageClass}>
-      <h1 className="sr-only">{title}</h1>
+      {/* A selection names its source; a search names its place in the form. */}
+      <h1 className={target.kind === 'selection' ? 'text-title font-bold tracking-[-0.02em]' : 'sr-only'}>{title}</h1>
       {/* The manual search, filled from the address: a new search changes the address and the results. */}
       <EditSearch query={query} />
       {result && (
