@@ -197,8 +197,8 @@ export function fromSearchParams(
 // ---------------------------------------------------------------------------------------------
 // Selections: the hotels a vibe, the stars or a drawing picked, on /search
 
-/** Where a selection comes from: «Это твой вайб», «Звёзды подскажут», «Нарисуй свой отдых». */
-export type SelectionSource = 'vibe' | 'stars' | 'draw'
+/** Where a selection comes from: «Это твой вайб», «Звёзды подскажут», «Нарисуй свой отдых», Эвал's answer. */
+export type SelectionSource = 'vibe' | 'stars' | 'draw' | 'assistant'
 
 /** The hotels of a selection; `from` and `pick` name its source and what it picked (an archetype, a sign). */
 export interface SelectionLink {
@@ -232,6 +232,7 @@ const SELECTION_TITLES: Record<SelectionSource, (pick: string) => string | undef
     const name = archetypeName(pick)
     return name && `Подборка по вашему рисунку: ${name}`
   },
+  assistant: () => 'Подборка Эвала',
 }
 
 /** The /search address of a selection; without `stay` the page starts from tomorrow, as a link without dates. */

@@ -22,6 +22,8 @@ export interface AgentStep {
 export interface MessageData {
   plan?: Plan
   step?: AgentStep
+  /** The traveller's «Другие варианты»: the answer skips the hotels the chat has shown. */
+  more?: true
 }
 
 export interface ChatMessage {
@@ -75,6 +77,10 @@ export function chatTitle(text: string): string {
 
 export const isPending = (chat: Chat) => chat.messages.some((m) => m.status === 'pending')
 
+/** The hotels the chat's answers have shown. */
+export const shownHotels = (chat: Chat): Set<string> =>
+  new Set(chat.messages.flatMap((m) => m.data.plan?.options.flatMap((o) => (o.hotel ? [o.hotel.id] : [])) ?? []))
+
 /** The newest chat first. */
 export const byRecent = (a: Chat, b: Chat) => b.updatedAt.localeCompare(a.updatedAt)
 
@@ -111,6 +117,7 @@ export function parseData(value: unknown): MessageData | null {
   return {
     ...(value.plan !== undefined && { plan: value.plan as Plan }),
     ...(value.step !== undefined && { step: value.step as AgentStep }),
+    ...(value.more === true && { more: true as const }),
   }
 }
 

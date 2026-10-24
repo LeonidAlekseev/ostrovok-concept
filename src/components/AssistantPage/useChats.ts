@@ -20,10 +20,11 @@ import {
   newChat,
   newId,
   saveGuestChats,
+  shownHotels,
   type Chat,
   type ChatMessage,
 } from '@/lib/assistantChats'
-import { deleteRemoteMessages, loadRemoteChats, saveRemoteChat } from '@/lib/assistantChatsRemote'
+import { deleteRemoteChat, deleteRemoteMessages, loadRemoteChats, saveRemoteChat } from '@/lib/assistantChatsRemote'
 import type { HotelSummary } from '@/lib/catalog'
 import { todayIso } from '@/lib/dates'
 import { getBrowserClient } from '@/lib/supabase/client'
@@ -45,6 +46,8 @@ export function compose(
   response: AssistantResponse,
   destinations: readonly Destination[],
   newHotels: readonly HotelSummary[],
+  /** The hotels the chat has shown, for «Другие варианты». */
+  exclude?: ReadonlySet<string>,
 ): { brief: Brief; question: Question | null; text: string; data: ChatMessage['data'] } {
   const { brief, reply: remark, matches, features, missing = [] } = response
   const today = todayIso()
@@ -55,7 +58,7 @@ export function compose(
     const lead = understood ? `Записал: ${understood}.` : remark
     return { brief, question, text: lead ? `${lead} ${question.text}` : question.text, data: {} }
   }
-  const plan = makePlan(brief, today, destinations, newHotels, matches, features)
+  const plan = makePlan(brief, today, destinations, newHotels, matches, features, exclude)
   const note = missingNote(missing, planCities(brief, today, destinations))
   const text = [understood && `Записал: ${understood}.`, note].filter(Boolean).join(' ')
   return { brief, question, text, data: { plan } }
@@ -67,13 +70,17 @@ export interface Chats {
   /** The open chat; a new one is not in the list until its first message. */
   active: Chat
   ready: boolean
-  /** Sends the traveller's text in the open chat. */
-  send: (text: string) => void
+  /** Signed in: the chats live in Supabase and can be shared. */
+  signedIn: boolean
+  /** Sends the traveller's text in the open chat; `more` asks for the hotels the chat has not shown yet. */
+  send: (text: string, options?: { more?: boolean }) => void
   /** Asks the failed answer again. */
   retry: (chatId: string, messageId: string) => void
-  open: (chatId: string) => void
-  /** Opens an empty chat; the others stay in the list. */
-  startNew: () => void
+  rename: (chatId: string, title: string) => void
+  /** Deletes the chat with its messages, here and in the account. */
+  remove: (chatId: string) => void
+  /** The trip's parameters edited by hand: the next answer goes by them. */
+  setBrief: (chatId: string, brief: Brief) => void
 }
 
 /**
@@ -81,12 +88,16 @@ export interface Chats {
  * traveller is in another one, and a pending answer is asked again after a reload. A guest keeps the chats in the
  * browser; on sign-in they move to the account (Supabase) and the account's chats are shown.
  */
-export function useChats(destinations: readonly Destination[], newHotels: readonly HotelSummary[]): Chats {
+export function useChats(
+  destinations: readonly Destination[],
+  newHotels: readonly HotelSummary[],
+  /** The chat of the address (`/assistant/<id>`); `null` or an id not in the list is a new, empty chat. */
+  activeId: string | null,
+): Chats {
   const session = useSession()
   const [mode, setMode] = useState<Mode>({ kind: 'loading' })
   const [chats, setChats] = useState<Chat[]>([])
   const [draft, setDraft] = useState<Chat>(() => newChat())
-  const [activeId, setActiveId] = useState<string | null>(null)
 
   // The latest values for the turns that finish later.
   const chatsRef = useRef(chats)
@@ -242,8 +253,13 @@ export function useChats(destinations: readonly Destination[], newHotels: readon
   )
 
   function finish(chatId: string, pendingId: string, response: AssistantResponse) {
+    // «Другие варианты» skips the hotels the chat has shown before.
+    const chat = chatsRef.current.find((c) => c.id === chatId)
+    const pendingAt = chat?.messages.find((m) => m.id === pendingId)?.createdAt ?? ''
+    const asked = chat?.messages.findLast((m) => m.role === 'user' && m.createdAt < pendingAt)
+    const exclude = chat && asked?.data.more ? shownHotels(chat) : undefined
     // Composed before the update: a failure here fails the answer, not the render.
-    const { brief: next, question, text, data } = compose(response, destinations, newHotels)
+    const { brief: next, question, text, data } = compose(response, destinations, newHotels, exclude)
     const steps = response.steps ?? []
     const now = new Date().toISOString()
     update(chatId, (chat) => {
@@ -277,22 +293,29 @@ export function useChats(destinations: readonly Destination[], newHotels: readon
     }
   }, [chats, mode, runTurn])
 
-  const active = chats.find((c) => c.id === activeId) ?? draft
+  // An address of a chat not in the list (a new one, or one deleted elsewhere) opens an empty chat of that id.
+  const listed = chats.find((c) => c.id === activeId)
+  const active = listed ?? (activeId && draft.id !== activeId ? { ...draft, id: activeId } : draft)
 
-  // On load the newest chat opens, so a reload keeps the dialog.
-  const opened = useRef(false)
+  // The open chat is read.
   useEffect(() => {
-    if (mode.kind === 'loading' || opened.current) return
-    opened.current = true
-    // oxlint-disable-next-line react/set-state-in-effect -- the chats exist only on the client
-    if (chats[0]) setActiveId(chats[0].id)
-  }, [mode, chats])
+    if (!listed?.unread) return
+    // oxlint-disable-next-line react/set-state-in-effect -- the mark follows the chat the address opens
+    update(listed.id, (chat) => ({ ...chat, unread: false }))
+  }, [listed, update])
 
-  const send = (raw: string) => {
+  const send = (raw: string, options: { more?: boolean } = {}) => {
     const text = raw.trim()
     if (!text || active.messages.some((m) => m.status === 'pending')) return
     const now = new Date().toISOString()
-    const user: ChatMessage = { id: newId(), role: 'user', status: 'done', text, data: {}, createdAt: now }
+    const user: ChatMessage = {
+      id: newId(),
+      role: 'user',
+      status: 'done',
+      text,
+      data: options.more ? { more: true } : {},
+      createdAt: now,
+    }
     const pending: ChatMessage = {
       id: newId(),
       role: 'assistant',
@@ -309,8 +332,7 @@ export function useChats(destinations: readonly Destination[], newHotels: readon
       updatedAt: now,
     }
     setChats((list) => [chat, ...list.filter((c) => c.id !== chat.id)])
-    setActiveId(chat.id)
-    if (active === draft) setDraft(newChat())
+    if (!listed) setDraft(newChat())
     // The turn starts from the effect above, once the chat is in the list.
   }
 
@@ -320,15 +342,46 @@ export function useChats(destinations: readonly Destination[], newHotels: readon
       messages: chat.messages.map((m) => (m.id === messageId ? { ...m, status: 'pending', text: '' } : m)),
     }))
 
-  const open = (chatId: string) => {
-    setActiveId(chatId)
-    update(chatId, (chat) => (chat.unread ? { ...chat, unread: false } : chat))
+  const rename = (chatId: string, raw: string) => {
+    const title = chatTitle(raw)
+    if (title) update(chatId, (chat) => ({ ...chat, title }))
   }
 
-  const startNew = () => {
-    setActiveId(null)
-    setDraft(newChat())
+  const remove = (chatId: string) => {
+    inflight.current.get(chatId)?.abort()
+    inflight.current.delete(chatId)
+    setChats((list) => list.filter((c) => c.id !== chatId))
+    if (modeRef.current.kind !== 'remote') return
+    const client = getBrowserClient()
+    if (!client) return
+    saved.current.delete(chatId)
+    queue.current = queue.current
+      .then(() => deleteRemoteChat(client, chatId))
+      .catch((error: unknown) => {
+        console.warn(`chats: not deleted (${error instanceof Error ? error.message.slice(0, 200) : 'error'})`)
+      })
   }
 
-  return { chats, active, ready: mode.kind !== 'loading', send, retry, open, startNew }
+  const setBrief = (chatId: string, brief: Brief) => {
+    // The question asked follows the new brief: the answer of a date question is given by the dates set.
+    const edit = (chat: Chat): Chat => ({
+      ...chat,
+      brief,
+      question: chat.question && nextQuestion(brief, todayIso(), destinations),
+    })
+    if (listed?.id === chatId || chats.some((c) => c.id === chatId)) update(chatId, edit)
+    else if (active.id === chatId) setDraft(edit({ ...active }))
+  }
+
+  return {
+    chats,
+    active,
+    ready: mode.kind !== 'loading',
+    signedIn: mode.kind === 'remote',
+    send,
+    retry,
+    rename,
+    remove,
+    setBrief,
+  }
 }

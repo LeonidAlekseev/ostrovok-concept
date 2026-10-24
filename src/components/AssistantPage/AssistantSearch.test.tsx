@@ -7,6 +7,7 @@ import { CHATS_KEY } from '../../lib/assistantChats'
 import { newHotels } from '../../lib/catalogGenerator'
 import { DIALOG_KEY } from '../../lib/assistantDialog'
 import { todayIso } from '../../lib/dates'
+import { catalogFetch } from '../../test/catalog'
 import { AssistantSearch } from './AssistantSearch'
 
 const fetchMock = vi.fn<typeof fetch>()
@@ -42,12 +43,18 @@ afterEach(() => {
   fetchMock.mockReset()
   vi.unstubAllGlobals()
   failPlan.once = false
+  // The open chat lives in the address.
+  window.history.replaceState(null, '', '/assistant')
 })
 
 const view = () => <AssistantSearch newHotels={newHotels} onChoose={() => ({})} />
 
+/** The route of Eval is the test's; the hotels of the cards come from the catalogue. */
+const routedFetch: typeof fetch = (input, init) =>
+  String(input).startsWith('/api/hotels') ? catalogFetch(input) : fetchMock(input, init)
+
 function renderAssistant() {
-  vi.stubGlobal('fetch', fetchMock)
+  vi.stubGlobal('fetch', routedFetch)
   const result = render(view())
   return { ...result, user: userEvent.setup() }
 }
@@ -62,11 +69,11 @@ const input = () => screen.getByLabelText('Опишите поездку')
 const bodyOf = (call: number) => JSON.parse(fetchMock.mock.calls[call][1]?.body as string)
 /** «Новый чат» over the chat: the list of chats has its own one too. */
 const newChatButton = () => screen.getAllByRole('button', { name: 'Новый чат' })[0]
-/** The links of the feed lead to hotel pages only: no ready-made route. */
+/** The links of the feed lead to hotel pages and to the map of the answer's hotels only: no ready-made route. */
 const hotelLinksOnly = () =>
   within(log())
     .queryAllByRole('link')
-    .every((link) => /^\/hotels\/[^/?]+\?/.test(link.getAttribute('href') ?? ''))
+    .every((link) => /^\/(hotels\/[^/?]+|search)\?/.test(link.getAttribute('href') ?? ''))
 const answer = (body: object) => Response.json({ source: 'model', ...body })
 
 /** A reply the test sends when it wants to. */
@@ -295,7 +302,7 @@ describe('AssistantSearch steps of the agents', () => {
 
     await user.type(input(), 'тихо и повыше, Лиссабон в октябре, один{Enter}')
 
-    const option = await within(log()).findByRole('button', { name: new RegExp(lisbon.name) }, {})
+    const option = await within(log()).findByRole('article', { name: lisbon.name }, {})
     expect(option.textContent).toContain('ночью 45–49 дБ')
     expect(option.textContent).toContain('здание 12 этажей, 38 м')
   })
@@ -308,7 +315,7 @@ describe('AssistantSearch plan', () => {
     const { user } = renderAssistant()
     await user.type(input(), 'Лиссабон в октябре, один{Enter}')
     expect(await within(log()).findByText('Атмосфера поездки', {})).toBeTruthy()
-    expect(within(log()).getAllByRole('button', { name: /Лиссабон/ }).length).toBeGreaterThan(0)
+    expect(within(log()).getAllByRole('button', { name: /Искать в городе Лиссабон/ }).length).toBeGreaterThan(0)
     expect(log().textContent).not.toMatch(/маршрут/i)
     expect(hotelLinksOnly()).toBe(true)
   })
@@ -434,7 +441,7 @@ describe('AssistantSearch after a reload', () => {
     renderAssistant()
 
     expect(await within(log()).findByText('Атмосфера поездки', {})).toBeTruthy()
-    expect(within(log()).getAllByRole('button', { name: /Лиссабон/ }).length).toBeGreaterThan(0)
+    expect(within(log()).getAllByRole('button', { name: /Искать в городе Лиссабон/ }).length).toBeGreaterThan(0)
     expect(screen.queryByText('Воркейшн в Лиссабоне')).toBeNull()
     expect(hotelLinksOnly()).toBe(true)
     expect(window.sessionStorage.getItem(DIALOG_KEY)).toBeNull()

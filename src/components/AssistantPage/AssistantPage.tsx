@@ -2,7 +2,6 @@
 
 import { useHotelSearch } from '@/hooks/useHotelSearch'
 import type { HotelSummary } from '@/lib/catalog'
-import { glassPanel } from '../SearchPanel/glass'
 import { AssistantSearch } from './AssistantSearch'
 
 interface Props {
@@ -10,19 +9,18 @@ interface Props {
   newHotels: readonly HotelSummary[]
 }
 
-/** The page `/assistant`: Eval's chats in their glass window across the page, on the plain page background. */
+/**
+ * The page `/assistant` (and `/assistant/<id>`): Eval's chats on the plain page background. From `lg` they take the
+ * whole screen, without the site's header and footer (src/app/layout.tsx hides them by `data-assistant-app`); on
+ * phones the list keeps the header, a chat takes the screen.
+ */
 export function AssistantPage({ newHotels }: Props) {
   // The assistant's choice opens the results page, whose manual form shows it.
   const { searchFor } = useHotelSearch()
   return (
-    <main className="mx-auto flex w-full max-w-(--page-max) flex-1 flex-col px-(--page-x) py-(--page-y) [--page-y:clamp(12px,3vw,32px)]">
+    <main className="flex w-full flex-1 flex-col px-(--page-x) pt-2 pb-6 has-data-[assistant-app=chat]:p-0 lg:h-dvh lg:p-4 lg:has-data-[assistant-app=chat]:p-4">
       <h1 className="sr-only">Спросить Эвал</h1>
-      {/* Children that bleed to the window edge (scrolling chips) read --pad; a chat takes the window's height. */}
-      <div
-        className={`${glassPanel} rounded-[clamp(24px,6vw,36px)] p-(--pad) [--chat-height:calc(100dvh-var(--header-height)-2*var(--page-y)-2*var(--pad))] [--pad:clamp(14px,3.8vw,28px)]`}
-      >
-        <AssistantSearch newHotels={newHotels} onChoose={searchFor} />
-      </div>
+      <AssistantSearch newHotels={newHotels} onChoose={searchFor} />
     </main>
   )
 }

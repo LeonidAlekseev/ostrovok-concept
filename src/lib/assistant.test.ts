@@ -104,6 +104,35 @@ describe('mergeBrief', () => {
 describe('makePlan', () => {
   const today = '2026-10-19' // Monday
 
+  // assistant-search, Requirement: Действия под ответом — «Другие варианты»
+  it('skips the hotels the chat has shown for «Другие варианты»', () => {
+    const brief = { destinationId: 'lisbon', when: 9, party: 'solo' as const }
+    const city = hotels.filter((h) => h.destinationId === 'lisbon')
+    const first = makePlan(brief, today, destinations, newHotels, city)
+    const shown = new Set(first.options.flatMap((o) => (o.hotel ? [o.hotel.id] : [])))
+    const more = makePlan(brief, today, destinations, newHotels, city, {}, shown)
+    expect(more.options.length).toBeGreaterThan(0)
+    expect(more.options.every((o) => o.hotel && !shown.has(o.hotel.id))).toBe(true)
+  })
+
+  // assistant-search, Requirement: Карточки отелей в ответе
+  it('gives a hotel the views of its room names, and none without data', () => {
+    const brief = { destinationId: 'lisbon', when: 9, party: 'solo' as const }
+    const [hotel, other] = hotels.filter((h) => h.destinationId === 'lisbon')
+    const features = {
+      [hotel.id]: {
+        views: [
+          { roomName: 'Номер с видом на улицу', view: 'street' as const },
+          { roomName: 'Люкс с видом на море', view: 'sea' as const },
+          { roomName: 'Делюкс с видом на море', view: 'sea' as const },
+        ],
+      },
+    }
+    const plan = makePlan(brief, today, destinations, newHotels, [hotel, other], features)
+    expect(plan.options.find((o) => o.hotel?.id === hotel.id)?.views).toEqual(['sea', 'street'])
+    expect(plan.options.find((o) => o.hotel?.id === other.id)).not.toHaveProperty('views')
+  })
+
   it('plans a theme chosen by the traveller', () => {
     const plan = makePlan({ vibe: 'sea', when: 10, party: 'couple' }, today, destinations, newHotels)
     expect(plan).toMatchObject({
