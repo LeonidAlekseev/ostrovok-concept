@@ -2,6 +2,7 @@ import 'server-only'
 import { createClient, type PostgrestError } from '@supabase/supabase-js'
 import { unstable_cache } from 'next/cache'
 import type { Destination } from '@/data/destinations'
+import type { Database } from '@/lib/db/database.types'
 import { isVisibleHotel, type Hotel, type HotelSummary } from '@/lib/catalog'
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/config'
 
@@ -31,7 +32,9 @@ function database() {
     throw new CatalogUnavailableError(
       'нет NEXT_PUBLIC_SUPABASE_URL или NEXT_PUBLIC_SUPABASE_ANON_KEY: npm run secrets:reveal',
     )
-  return createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } })
+  return createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
 }
 
 function rowsOf<T>({ data, error }: { data: T[] | null; error: PostgrestError | null }): T[] {

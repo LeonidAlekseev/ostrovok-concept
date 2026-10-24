@@ -2,6 +2,7 @@ import 'server-only'
 import { createClient } from '@supabase/supabase-js'
 import { embed, rerank } from 'ai'
 import { isVisibleHotel } from '@/lib/catalog'
+import type { Database } from '@/lib/db/database.types'
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/config'
 import { getSecret } from '../secrets'
 import { embeddingModel, toVector } from './embedding'
@@ -67,7 +68,7 @@ function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 
 /** The catalog's database with the anon key: the functions are `security definer`, the table is closed. */
 const database = () =>
-  createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } })
+  createClient<Database>(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } })
 
 const warn = (what: string, error: unknown) =>
   // The kind and the provider's short message; never the query itself.
@@ -75,12 +76,7 @@ const warn = (what: string, error: unknown) =>
     `semantic: ${what} (${error instanceof Error ? `${error.name}: ${error.message.slice(0, 200)}` : error})`,
   )
 
-interface Match {
-  ref_id: string
-  destination_id: string
-  content: string
-  similarity: number
-}
+type Match = Database['public']['Functions']['match_embeddings']['Returns'][number]
 
 export interface SemanticOptions {
   /** Only objects in these cities; all cities when absent. */
@@ -116,13 +112,13 @@ export async function semanticSearch(
       .rpc('match_embeddings', {
         query_embedding: toVector(embedding),
         match_kind: 'hotel',
-        destination_ids: destinationIds ?? null,
+        destination_ids: destinationIds ? [...destinationIds] : undefined,
         match_count: Math.min(Math.max(candidates, k), MAX_CANDIDATES),
       })
       .abortSignal(abortSignal)
     if (error) throw new Error(error.message)
     // The vectors cover the whole catalogue; only the hotels shown in this environment are found.
-    matches = ((data ?? []) as Match[]).filter((m) => isVisibleHotel({ id: m.ref_id }))
+    matches = (data ?? []).filter((m) => isVisibleHotel({ id: m.ref_id }))
   } catch (error) {
     warn('no vectors, using the rules', error)
     return null
