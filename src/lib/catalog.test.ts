@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { destinations } from '../data/destinations'
 import { newHotelSeeds } from '../data/hotels'
 import {
@@ -6,6 +6,8 @@ import {
   AMENITY_SECTIONS,
   cheapestRate,
   hasFreeCancellation,
+  isSyntheticHotel,
+  isVisibleHotel,
   POPULAR_AMENITIES,
   SCORE_SECTIONS,
   travelDistances,
@@ -20,6 +22,11 @@ import {
   newHotels,
   slugify,
 } from './catalogGenerator'
+import { otaHotelId } from './ota/hotel'
+import { setProduction } from '@/test/env'
+
+vi.mock('@/lib/env', () => import('@/test/env'))
+afterEach(() => setProduction(false))
 
 const catalog = buildCatalog()
 
@@ -385,5 +392,27 @@ describe('texts by kind of stay', () => {
         hotel.id,
       ).toEqual([])
     }
+  })
+})
+
+// hotel-catalog, Requirement: Синтетические отели только вне production
+describe('synthetic hotels', () => {
+  const real = { id: otaHotelId(9322089) }
+
+  it('tells the generator’s hotels from the real ones of an Ostrovok search', () => {
+    expect(hotels.every(isSyntheticHotel)).toBe(true)
+    expect(isSyntheticHotel(real)).toBe(false)
+    expect(isSyntheticHotel({ id: 'valencia-ota-like' })).toBe(true)
+  })
+
+  it('shows every hotel outside production (Scenario: Preview)', () => {
+    expect(hotels.every(isVisibleHotel)).toBe(true)
+    expect(isVisibleHotel(real)).toBe(true)
+  })
+
+  it('shows only the real hotels in production (Scenario: Production)', () => {
+    setProduction(true)
+    expect(hotels.some(isVisibleHotel)).toBe(false)
+    expect(isVisibleHotel(real)).toBe(true)
   })
 })

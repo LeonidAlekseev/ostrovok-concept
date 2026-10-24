@@ -1,11 +1,13 @@
 import { embed, rerank } from 'ai'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { setProduction } from '@/test/env'
 import { getSecret } from '../secrets'
 import { semanticSearch } from './semantic'
 
 const rpc = vi.fn()
 
 vi.mock('../secrets', () => ({ getSecret: vi.fn() }))
+vi.mock('@/lib/env', () => import('@/test/env'))
 vi.mock('@/lib/supabase/config', () => ({
   isSupabaseConfigured: true,
   supabaseUrl: 'https://db.test',
@@ -37,6 +39,7 @@ beforeEach(() => {
   vi.mocked(embed).mockResolvedValue({ embedding: [0.1, 0.2] } as Awaited<ReturnType<typeof embed>>)
   rpc.mockResolvedValue({ data: matches, error: null })
 })
+afterEach(() => setProduction(false))
 
 const reranked = (ranking: { originalIndex: number; score: number }[]) =>
   ({ ranking }) as unknown as Awaited<ReturnType<typeof rerank>>
@@ -138,5 +141,23 @@ describe('semanticSearch', () => {
     await semanticSearch(text, {})
     await semanticSearch(text, {})
     expect(embed).toHaveBeenCalledTimes(1)
+  })
+})
+
+// hotel-catalog, Requirement: Синтетические отели только вне production
+describe('semanticSearch in production', () => {
+  it('finds only the real hotels', async () => {
+    setProduction(true)
+    const real = { ref_id: 'ota-1', destination_id: 'valencia', content: 'Отель у моря', similarity: 0.4 }
+    rpc.mockResolvedValue({ data: [...matches, real], error: null })
+    vi.mocked(rerank).mockResolvedValue(reranked([{ originalIndex: 0, score: 0.8 }]))
+    expect(await semanticSearch(words(), { k: 2 })).toEqual([{ id: 'ota-1', destinationId: 'valencia', score: 0.8 }])
+    expect(vi.mocked(rerank).mock.calls[0][0]).toMatchObject({ documents: ['Отель у моря'], topN: 1 })
+  })
+
+  it('falls back to the rules when every match is synthetic', async () => {
+    setProduction(true)
+    expect(await semanticSearch(words(), {})).toBeNull()
+    expect(rerank).not.toHaveBeenCalled()
   })
 })

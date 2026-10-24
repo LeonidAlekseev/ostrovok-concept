@@ -1,4 +1,5 @@
 import type { IsoDate } from './dates'
+import { isProduction } from './env'
 import { countRu } from './format'
 
 /**
@@ -245,6 +246,18 @@ export interface HotelSummary {
   /** One of the hand-picked "recently added" hotels the hero globe spotlights. */
   isNew: boolean
 }
+
+/** The id of a real hotel starts so: `ota-<master_id>`, from an Ostrovok search (`npm run db:seed:valencia`). */
+export const REAL_HOTEL_ID_PREFIX = 'ota-'
+
+/** A hotel the catalogue generator made up, not one from an Ostrovok search. */
+export const isSyntheticHotel = (hotel: Pick<HotelSummary, 'id'>) => !hotel.id.startsWith(REAL_HOTEL_ID_PREFIX)
+
+/**
+ * The catalogue shows a hotel: production only the real ones, preview and `next dev` the made-up ones too. The
+ * synthetic hotels stay in Supabase either way; src/lib/db/catalog.ts reads the catalogue through this.
+ */
+export const isVisibleHotel = (hotel: Pick<HotelSummary, 'id'>) => !isProduction || !isSyntheticHotel(hotel)
 
 export interface NearestStation {
   station: string

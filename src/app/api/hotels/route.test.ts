@@ -1,11 +1,14 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { loadHotels } from '@/lib/db/catalog'
+import { setProduction } from '@/test/env'
 import { GET } from './route'
 
 vi.mock('@/lib/db/catalog', async () => {
   const fixture = await import('@/test/catalog')
   return { ...fixture, loadHotels: vi.fn(fixture.loadHotels) }
 })
+vi.mock('@/lib/env', () => import('@/test/env'))
+afterEach(() => setProduction(false))
 
 const get = (query: string) => GET(new Request(`http://localhost/api/hotels?${query}`))
 const idsOf = async (response: Response) =>
@@ -48,5 +51,16 @@ describe('GET /api/hotels', () => {
     const response = await get('ids=prague-old-town-lantern')
     expect(response.status).toBe(503)
     expect(await response.json()).toEqual({ error: 'Каталог временно недоступен' })
+  })
+})
+
+// hotel-catalog, Requirement: Синтетические отели только вне production
+describe('GET /api/hotels in production', () => {
+  it('returns no synthetic hotel by id or by city (Scenario: API)', async () => {
+    setProduction(true)
+    const byIds = await get('ids=prague-old-town-lantern')
+    expect(byIds.status).toBe(200)
+    expect(await idsOf(byIds)).toEqual([])
+    expect(await idsOf(await get('destinations=prague'))).toEqual([])
   })
 })
