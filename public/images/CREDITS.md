@@ -4,7 +4,8 @@ Photos were downloaded from Wikimedia Commons and processed by `scripts/build-im
 (crop, resize, WebP). The globe geometry `public/data/globe.json` is built by
 `scripts/build-globe.py` from [Natural Earth](https://www.naturalearthdata.com/) 1:50m land and
 coastlines (public domain). The cloud photos in `hero/clouds/` were provided by the project owner and cut out by
-`scripts/build-clouds.py`.
+`scripts/build-clouds.py`. The images of the «Это твой вайб» block (`vibe/card-calm.webp`, `vibe/card-loud.webp`,
+`vibe/vs-letters.webp`, `vibe/vs-lightning.webp`) were provided by the project owner.
 
 | File                       | Source                                                                                                                                                                                                                                                                     | Author           | License      |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ------------ |

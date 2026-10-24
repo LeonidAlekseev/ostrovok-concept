@@ -38,16 +38,38 @@ describe('VibeSearch section', () => {
   it('shows «Тихий вечер» vs «Шумная вечеринка» and opens the window with the first pair', async () => {
     const user = userEvent.setup()
     render(<VibeSearch />)
-    const section = screen.getByRole('region', { name: 'Поиск вайба' })
+    const section = screen.getByRole('region', { name: 'Это твой вайб' })
     expect(section.getAttribute('id')).toBe('vibe')
     expect(within(section).getByText('Тихий вечер')).toBeTruthy()
     expect(within(section).getByText('Шумная вечеринка')).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: 'Найти свой вайб' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Поиск вайба' })
+    const dialog = await screen.findByRole('dialog', { name: 'Это твой вайб' })
     expect(within(dialog).getByRole('radio', { name: 'Тихий вечер' })).toBeTruthy()
     expect(within(dialog).getByRole('radio', { name: 'Шумная вечеринка' })).toBeTruthy()
     expect(within(dialog).getByText('1 из 7')).toBeTruthy()
+  })
+})
+
+describe('VibeSearch block', () => {
+  it('shows the gradient title, the subtitle and three tags on each card', () => {
+    render(<VibeSearch />)
+    const section = screen.getByRole('region', { name: 'Это твой вайб' })
+    expect(within(section).getByRole('heading', { level: 2 }).textContent).toBe('Это твой вайб')
+    expect(within(section).getByText(/готовую подборку отелей и отели под настроение/)).toBeTruthy()
+    for (const tag of ['уют', 'спокойствие', 'красивые места', 'движ', 'новые знакомства', 'топовые места'])
+      expect(within(section).getByText(tag)).toBeTruthy()
+    expect(within(section).getAllByRole('listitem')).toHaveLength(6)
+  })
+
+  it('reads the VS between the cards as «против» and hides the pictures', () => {
+    render(<VibeSearch />)
+    const section = screen.getByRole('region', { name: 'Это твой вайб' })
+    expect(within(section).getByText('против').className).toContain('sr-only')
+    expect(section.querySelectorAll('img[alt]:not([alt=""])')).toHaveLength(0)
+    const letters = section.querySelector('img[src*="vs-letters"]')
+    expect(letters?.className).toContain('animate-vibe-beat')
+    expect(letters?.className).toContain('motion-reduce:animate-none')
   })
 })
 
@@ -57,13 +79,15 @@ describe('VibeSearch photos', () => {
     [...document.querySelectorAll('img')]
       .map((img) => img.getAttribute('src'))
       .filter((src) => src?.includes('/images/vibe/'))
+      // The pictures of the block itself are on the page from the start; the window's photos are not.
+      .filter((src) => !/card-|vs-/.test(src!))
 
   it('loads no vibe photos on the home page until the window is opened', async () => {
     const user = userEvent.setup()
     render(<VibeSearch />)
     expect(vibePhotos()).toEqual([])
     await user.click(screen.getByRole('button', { name: 'Найти свой вайб' }))
-    await screen.findByRole('dialog', { name: 'Поиск вайба' })
+    await screen.findByRole('dialog', { name: 'Это твой вайб' })
     expect(vibePhotos()).toEqual(['/images/vibe/evening-left.webp', '/images/vibe/evening-right.webp'])
   })
 
@@ -238,7 +262,7 @@ describe('VibeSearch picture', () => {
     const user = await finish()
     await user.click(screen.getByRole('button', { name: 'Поделиться' }))
     expect(canShare).toHaveBeenCalledWith({ files: [image] })
-    expect(share).toHaveBeenCalledWith(expect.objectContaining({ files: [image], title: 'О!бъективно Поиск вайба' }))
+    expect(share).toHaveBeenCalledWith(expect.objectContaining({ files: [image], title: 'О!бъективно Это твой вайб' }))
     expect(await screen.findByText('Картинка отправлена')).toBeTruthy()
   })
 

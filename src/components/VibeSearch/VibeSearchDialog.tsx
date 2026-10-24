@@ -97,7 +97,7 @@ export function VibeSearchDialog({ open, onOpenChange }: Props) {
         className="max-h-[calc(100dvh-2rem)] gap-5 overflow-y-auto p-[clamp(16px,4vw,24px)] sm:max-w-2xl"
       >
         <DialogHeader>
-          <DialogTitle className="text-(length:--text-heading) font-bold">Поиск вайба</DialogTitle>
+          <DialogTitle className="text-(length:--text-heading) font-bold">Это твой вайб</DialogTitle>
           <DialogDescription className="text-[15px]">
             Выберите, что ближе, — и мы подберём отели под настроение.
           </DialogDescription>
