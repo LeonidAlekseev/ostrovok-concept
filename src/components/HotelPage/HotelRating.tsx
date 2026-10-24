@@ -7,15 +7,15 @@ import { basedOnLabel, ownLanguageLabel } from './reviewsLabel'
 import { ScoreBadge } from './ScoreBadge'
 
 /**
- * The guests' rating: the badge, its word and the counts, the scores of the eight sections with
+ * "Отзывы гостей", the guests' rating: the badge, its word and the counts, the scores of the eight sections with
  * bars in the colours of the same scale, and the reviews dialog.
  */
 export function HotelRating({ hotel }: { hotel: Hotel }) {
   const { rating, reviewCount, sectionScores, reviews } = hotel
   return (
-    <section aria-labelledby="rating-title" className="flex flex-col gap-5">
-      <h2 id="rating-title" className="sr-only">
-        Оценка гостей
+    <section id="rating" tabIndex={-1} aria-labelledby="rating-title" className="flex flex-col gap-5 outline-none">
+      <h2 id="rating-title" className="text-heading font-bold">
+        Отзывы гостей
       </h2>
       <div className="flex items-center gap-3">
         <ScoreBadge score={rating} />

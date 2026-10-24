@@ -883,7 +883,7 @@ describe('SearchResultsPage hotel dialog', () => {
   })
 
   // search-results-page, Requirement: Панель цены в окне отеля
-  it('opens the dialog right away from a link; the stay changes in it only, the price bar stays at the bottom; closes in place', async () => {
+  it('opens the dialog right away from a link; the stay changes in it only, the booking card ends it unstuck; closes in place', async () => {
     const user = userEvent.setup()
     open(`${PRAGUE}&hotel=${hotel.id}`, { desktop: true })
     await results()
@@ -892,15 +892,15 @@ describe('SearchResultsPage hotel dialog', () => {
     const dialog = await screen.findByRole('dialog', { name: hotel.name })
     const bar = within(dialog).getByRole('region', { name: 'Цена' })
 
-    expect(bar.className).toContain('sticky')
-    expect(bar.className).toContain('bottom-0')
+    expect(bar.className).not.toContain('sticky')
     expect(bar.closest('.overflow-y-auto')).not.toBeNull()
-    expect(within(bar).getByText('за 3 ночи, для 2 гостей')).toBeDefined()
-    await user.click(within(dialog).getByRole('button', { name: /^Гости: / }))
+    expect(within(dialog).queryByRole('button', { name: /^Выбрать даты$|^Забронировать ·/ })).toBeNull()
+    expect(within(bar).getByText('за 3 ночи для 2 гостей')).toBeDefined()
+    await user.click(within(bar).getByRole('button', { name: /^Гости: / }))
     await user.click(await screen.findByRole('button', { name: 'Взрослые: увеличить' }))
 
-    expect(within(bar).getByText('за 3 ночи, для 3 гостей')).toBeDefined()
-    expect(within(bar).getByRole('button', { name: 'Выбрать номер' })).toBeDefined()
+    expect(within(bar).getByText('за 3 ночи для 3 гостей')).toBeDefined()
+    expect(within(bar).getByRole('button', { name: 'Забронировать' })).toBeDefined()
     const changed = `/hotels/${hotel.id}?checkin=2026-10-20&checkout=2026-10-23&adults=3&rooms=1`
     expect(within(dialog).getByRole('link', { name: 'Открыть страницу отеля' }).getAttribute('href')).toBe(changed)
     expect(

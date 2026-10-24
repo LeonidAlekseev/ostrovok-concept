@@ -30,11 +30,11 @@ export function StayDates({ hotel }: { hotel: Hotel }) {
   const nights = stay ? nightsBetween(stay.checkIn, stay.checkOut) : 0
 
   return (
-    <section aria-labelledby="stay-title" className="flex flex-col gap-4">
+    <section aria-labelledby="stay-title" className="flex flex-col gap-4 rounded-xl bg-card p-4 shadow-(--shadow-card)">
       <div className="flex items-center justify-between gap-3">
-        <h2 id="stay-title" className="text-heading font-bold">
+        <h3 id="stay-title" className="text-lg font-bold">
           Даты проживания
-        </h2>
+        </h3>
         <DateField
           checkIn={stay?.checkIn ?? ''}
           checkOut={stay?.checkOut ?? ''}

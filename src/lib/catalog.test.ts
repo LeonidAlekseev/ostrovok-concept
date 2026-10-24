@@ -2,14 +2,18 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { destinations } from '../data/destinations'
 import { newHotelSeeds } from '../data/hotels'
 import {
+  AIRPORTS,
   AMENITIES,
   AMENITY_SECTIONS,
   cheapestRate,
+  freeCancellationDeadline,
+  guestReasons,
   hasFreeCancellation,
   isSyntheticHotel,
   isVisibleHotel,
   POPULAR_AMENITIES,
   SCORE_SECTIONS,
+  straightKm,
   travelDistances,
 } from './catalog'
 import {
@@ -365,19 +369,97 @@ describe('section scores', () => {
 
 // hotel-page, Requirement: Расположение отеля
 describe('travelDistances', () => {
+  const prague = { destinationId: 'prague', lat: 50.08, lon: 14.43 }
+
   it('gives kilometres to the centre and the metro metres in kilometres', () => {
-    expect(travelDistances({ distanceKm: 1.7, metro: { station: 'Můstek', meters: 1200 } })).toEqual({
+    expect(travelDistances({ ...prague, distanceKm: 1.7, metro: { station: 'Můstek', meters: 1200 } })).toEqual({
       centre: 1.7,
       metro: 1.2,
+      airport: null,
     })
   })
 
   it('keeps a hotel next door at its distance', () => {
-    expect(travelDistances({ distanceKm: 0.1, metro: null }).centre).toBe(0.1)
+    expect(travelDistances({ ...prague, distanceKm: 0.1, metro: null }).centre).toBe(0.1)
   })
 
   it('has no metro distance in a city without a metro', () => {
-    expect(travelDistances({ distanceKm: 3, metro: null })).toEqual({ centre: 3, metro: null })
+    expect(travelDistances({ ...prague, distanceKm: 3, metro: null })).toEqual({
+      centre: 3,
+      metro: null,
+      airport: null,
+    })
+  })
+
+  // Scenario: Аэропорт Валенсии
+  it('measures a Valencia hotel straight to VLC, about 9,3 km from the city centre', () => {
+    const centre = { destinationId: 'valencia', lat: 39.4699, lon: -0.3763, distanceKm: 0, metro: null }
+    expect(travelDistances(centre).airport).toBeCloseTo(9.3, 1)
+    expect(travelDistances({ ...centre, lat: AIRPORTS.valencia.lat, lon: AIRPORTS.valencia.lon }).airport).toBe(0)
+  })
+})
+
+describe('straightKm', () => {
+  it('is about 111,2 km per degree of latitude', () => {
+    expect(straightKm({ lat: 0, lon: 0 }, { lat: 1, lon: 0 })).toBeCloseTo(111.19, 1)
+  })
+})
+
+// hotel-page, Requirement: Почему гости выбирают нас
+describe('guestReasons', () => {
+  const hotel = getHotel('prague-old-town-lantern')!
+  const free = { ...hotel.rooms[0].rates[0], cancellation: { kind: 'free' as const, daysBefore: 2 } }
+  const strict = { ...hotel.rooms[0].rates[0], cancellation: { kind: 'non-refundable' as const } }
+  const rooms = (rate: typeof free | typeof strict) => [{ ...hotel.rooms[0], rates: [rate] }]
+
+  it('lists a high rating, a short way to the centre and free cancellation', () => {
+    expect(guestReasons({ rating: 9.1, distanceKm: 1.4, rooms: rooms(free) })).toEqual([
+      { kind: 'rating', rating: 9.1 },
+      { kind: 'centre', km: 1.4 },
+      { kind: 'free-cancellation' },
+    ])
+  })
+
+  it('takes 8 and 2 km as the edges', () => {
+    expect(guestReasons({ rating: 8, distanceKm: 2, rooms: rooms(strict) }).map((r) => r.kind)).toEqual([
+      'rating',
+      'centre',
+    ])
+  })
+
+  // Scenario: Далеко и низкая оценка
+  it('is empty for 7,2, 4 km and no free cancellation', () => {
+    expect(guestReasons({ rating: 7.2, distanceKm: 4, rooms: rooms(strict) })).toEqual([])
+  })
+
+  it('does not count an unrated hotel', () => {
+    expect(guestReasons({ rating: 0, distanceKm: 5, rooms: rooms(strict) })).toEqual([])
+  })
+})
+
+// hotel-page, Requirement: Раскладка панели цены
+describe('freeCancellationDeadline', () => {
+  const hotel = getHotel('prague-old-town-lantern')!
+  const rate = (id: string, pricePerNight: number, daysBefore: number | null) => ({
+    ...hotel.rooms[0].rates[0],
+    id,
+    pricePerNight,
+    cancellation: daysBefore === null ? { kind: 'non-refundable' as const } : { kind: 'free' as const, daysBefore },
+  })
+  const withRates = (...rates: ReturnType<typeof rate>[]) => ({ rooms: [{ ...hotel.rooms[0], rates }] })
+
+  it('takes the cheapest refundable rate, not the cheapest rate', () => {
+    const h = withRates(rate('a', 3000, null), rate('b', 5000, 3), rate('c', 4000, 1))
+    expect(freeCancellationDeadline(h, '2026-10-30', '2026-10-20')).toBe('2026-10-29')
+  })
+
+  it('skips a rate whose free period is over', () => {
+    const h = withRates(rate('a', 4000, 10), rate('b', 5000, 2))
+    expect(freeCancellationDeadline(h, '2026-10-25', '2026-10-20')).toBe('2026-10-23')
+  })
+
+  it('is null without a refundable rate', () => {
+    expect(freeCancellationDeadline(withRates(rate('a', 3000, null)), '2026-10-25', '2026-10-20')).toBeNull()
   })
 })
 

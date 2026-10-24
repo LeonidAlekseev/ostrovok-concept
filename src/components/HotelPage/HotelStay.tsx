@@ -5,6 +5,7 @@ import type { Hotel } from '@/lib/catalog'
 import type { Stay } from '@/lib/search'
 import { useLocalStay, useStay } from '../StayBar/useStay'
 import { RoomList } from './RoomList'
+import { StayDates } from './StayDates'
 import { noDates, StayContext, useHotelStay } from './stayContext'
 
 function AddressStay({ hotel, children }: { hotel: Hotel; children: ReactNode }) {
@@ -39,7 +40,7 @@ export function HotelStay({ hotel, local, children }: { hotel: Hotel; local?: Lo
   )
 }
 
-/** The rooms for the stay; "Выбрать номер" of the price bar leads here. */
+/** "Номера": the dates and guests of the stay, then its rooms; "Забронировать" of the booking card leads here. */
 export function HotelRooms({ hotel, className }: { hotel: Hotel; className?: string }) {
   const { stay, guests, setStay } = useHotelStay()
   return (
@@ -47,6 +48,7 @@ export function HotelRooms({ hotel, className }: { hotel: Hotel; className?: str
       <h2 id="rooms-title" className="text-heading font-bold">
         Номера
       </h2>
+      <StayDates hotel={hotel} />
       <RoomList hotel={hotel} stay={stay} guests={guests} onPickDates={() => setStay({})} />
     </section>
   )
