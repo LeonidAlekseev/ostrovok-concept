@@ -78,6 +78,37 @@ describe('semanticSearch', () => {
     expect(embed).toHaveBeenCalledTimes(3)
   })
 
+  it('keeps the shared vector when the first of two concurrent searches is cancelled', async () => {
+    vi.mocked(rerank).mockResolvedValue(reranked([{ originalIndex: 0, score: 0.9 }]))
+    let answer!: (result: Awaited<ReturnType<typeof embed>>) => void
+    vi.mocked(embed).mockImplementationOnce(
+      ({ abortSignal }) =>
+        new Promise((resolve, reject) => {
+          abortSignal?.addEventListener('abort', () => reject(abortSignal.reason))
+          answer = resolve
+        }),
+    )
+    const text = words()
+    const first = new AbortController()
+    const cancelled = semanticSearch(text, { signal: first.signal })
+    const second = semanticSearch(text, {})
+    await vi.waitFor(() => expect(embed).toHaveBeenCalledTimes(1))
+    first.abort()
+    expect(await cancelled).toBeNull()
+    answer({ embedding: [0.1, 0.2] } as Awaited<ReturnType<typeof embed>>)
+    expect(await second).toEqual([{ id: 'prague-central-hostel', destinationId: 'prague', score: 0.9 }])
+    expect(embed).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not keep a shared vector that failed for everyone waiting on it', async () => {
+    const text = words()
+    vi.mocked(embed).mockRejectedValueOnce(new Error('timeout'))
+    expect(await Promise.all([semanticSearch(text, {}), semanticSearch(text, {})])).toEqual([null, null])
+    vi.mocked(rerank).mockResolvedValue(reranked([{ originalIndex: 0, score: 0.9 }]))
+    expect(await semanticSearch(text, {})).not.toBeNull()
+    expect(embed).toHaveBeenCalledTimes(2)
+  })
+
   it('keeps the vectors’ order when the reranker fails', async () => {
     vi.mocked(rerank).mockRejectedValue(new Error('429'))
     const hits = await semanticSearch(words(), { k: 2 })
