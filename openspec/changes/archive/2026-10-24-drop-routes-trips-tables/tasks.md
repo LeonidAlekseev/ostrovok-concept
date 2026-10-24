@@ -6,8 +6,8 @@
 ## 2. Миграция
 - [x] 2.1 Новая миграция: удалить `trips` (и триггер), `routes`, лишнюю `touch_updated_at`, векторы `route`, сузить `kind`
 - [x] 2.2 Убрать упоминания маршрутов и планов из `scripts/`
-- [ ] 2.3 `npm run db:push`; проверить, что таблиц нет, а `match_embeddings` и `similar_hotels` работают
+- [x] 2.3 `npm run db:push`; проверить, что таблиц нет, а `match_embeddings` и `similar_hotels` работают
 
 ## 3. Проверка
 - [x] 3.1 `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check`, `npm run build`
-- [ ] 3.2 Вручную: `/search`, страница отеля, вход по ссылке, `/trips` (бронирования) без ошибок
+- [x] 3.2 Вручную: `/search`, страница отеля, вход по ссылке, `/trips` (бронирования) без ошибок
