@@ -1,7 +1,6 @@
 // Embeds the catalog for the semantic search: every hotel gets a vector from nvidia/nemotron-3.5-embed-8b in the `embeddings` table.
 //   npm run db:embed   (Node runs the TypeScript itself; the keys come from .env.local, see README «Ключи API»)
-// Only new and changed hotels go to the model (`content_hash`); vectors of removed objects (and of the routes the
-// site no longer has) are deleted.
+// Only new and changed hotels go to the model (`content_hash`); vectors of removed hotels are deleted.
 // Batches of BATCH texts; a 429 or a 5xx is retried with a growing pause. Needs NEXT_PUBLIC_SUPABASE_URL,
 // SUPABASE_SERVICE_ROLE_KEY and OPENROUTER_API_KEY; prints counts, never the keys. Exits with 1 on errors.
 import { createHash } from 'node:crypto'
@@ -131,7 +130,7 @@ for (let i = 0; i < todo.length; i += BATCH) {
   }
 }
 
-// Vectors of hotels gone from the catalog, and of the routes.
+// Vectors of hotels gone from the catalog.
 const current = new Set(documents.map(key))
 const stale = stored.filter((row) => !current.has(key(row)))
 for (const row of stale) {
