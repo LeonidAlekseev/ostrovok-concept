@@ -51,10 +51,10 @@ describe('StarSearch section', () => {
   it('opens the window with the focus in the first field', async () => {
     const user = userEvent.setup()
     render(<StarSearch />)
-    expect(screen.getByRole('heading', { name: 'Поиск по звёздам' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Звёзды подскажут' })).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: 'Найти по звёздам' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Поиск по звёздам' })
+    const dialog = await screen.findByRole('dialog', { name: 'Звёзды подскажут' })
     await waitFor(() => expect(document.activeElement).toBe(within(dialog).getByLabelText('Как вас зовут?')))
   })
 

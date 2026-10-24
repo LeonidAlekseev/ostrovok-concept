@@ -147,8 +147,8 @@ export function StarSearchDialog({ open, onOpenChange }: Props) {
         <div className="grid grid-cols-[1fr_auto] items-start">
           <DialogHeader className="gap-3 pt-[clamp(4px,1.5vw,10px)]">
             <DialogTitle className="bg-(image:--decor-gold-gradient) bg-clip-text pr-2 font-star text-[clamp(31px,8.6vw,50px)]/[1.05] font-semibold text-transparent">
-              Поиск <br />
-              по звёздам
+              Звёзды <br />
+              подскажут
             </DialogTitle>
             <DialogDescription className="max-w-[34ch] text-[clamp(14px,3.8vw,16px)] text-(--decor-star-muted)">
               Звёзды выберут город и отель по вашему знаку, Луне и дате поездки.

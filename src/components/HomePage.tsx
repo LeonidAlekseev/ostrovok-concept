@@ -50,11 +50,11 @@ export function HomePage({ newHotels, selections }: Props) {
 
         <PersonaCarousel selections={selections} />
 
+        <DrawSearch />
+
         <VibeSearch />
 
         <StarSearch />
-
-        <DrawSearch />
 
         <TravelBanner />
       </div>

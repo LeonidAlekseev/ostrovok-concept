@@ -28,7 +28,7 @@ export function StarVideo({ reading, name, pick }: { reading: Reading; name: str
   const [restarted, setRestarted] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
-  const title = `${BRAND_NAME} Поиск по звёздам`
+  const title = `${BRAND_NAME} Звёзды подскажут`
   const text = `${name} ${reading.sign.symbol} — звёзды выбрали мне «${pick.title}» (${pick.place}). А что выпадет тебе?`
   const site = () => window.location.origin
 

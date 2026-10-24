@@ -18,10 +18,10 @@ const selections = PERSONAS.map((persona) => ({
 
 // home-page, Requirement: Состав и порядок секций
 describe('HomePage', () => {
-  it('renders the sections in order: search, personas, vibe, stars, draw, banner', () => {
+  it('renders the sections in order: search, personas, draw, vibe, stars, banner', () => {
     const { container } = render(<HomePage newHotels={newHotels} selections={selections} />)
     const ids = Array.from(container.querySelectorAll('section[id]')).map((s) => s.id)
-    expect(ids).toEqual(['search', 'personas', 'vibe', 'stars', 'draw', 'explore'])
+    expect(ids).toEqual(['search', 'personas', 'draw', 'vibe', 'stars', 'explore'])
   })
 
   // Scenario: Нет витрины маршрутов
@@ -36,7 +36,7 @@ describe('HomePage', () => {
     const empty = PERSONAS.map((persona) => ({ persona, hotels: [] }))
     const { container } = render(<HomePage newHotels={newHotels} selections={empty} />)
     const ids = Array.from(container.querySelectorAll('section[id]')).map((s) => s.id)
-    expect(ids).toEqual(['search', 'vibe', 'stars', 'draw', 'explore'])
+    expect(ids).toEqual(['search', 'draw', 'vibe', 'stars', 'explore'])
   })
 
   it('has no manual form (Scenario: Нет ручной формы на главной)', () => {
