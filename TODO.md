@@ -37,8 +37,15 @@
       очереди; после `hide-synthetic-in-production` (согласовано 2026-10-24).
 - [ ] `empty-state-search-links` — «Мои поездки» и «Избранное» пустые: «Спросить Эвал» и «Искать вручную» — лёгкий
       — в очереди; после `hide-synthetic-in-production` (согласовано 2026-10-24).
+- [ ] `nvidia-direct-api` — OpenRouter → прямой API NVIDIA (40 rpm, без дневного лимита): эмбеддинги, реранк, модель
+      помощника; ключ `NVIDIA_API_KEY` в `.env.local.secret` добавляет пользователь — высокий — в очереди; после
+      `generate-db-types` (общий `semantic.ts`), до `rename-cozy-evening` (согласовано 2026-10-24).
+- [ ] `trim-heavy-tests` — сократить тяжёлые тесты (`SearchResultsPage.test.tsx` 118 с из ~200 с), `npm test` ≤ 90 с без
+      флаков; ориентир — CI GitHub Actions и сборка Vercel — средний — в очереди (согласовано 2026-10-24).
+- [ ] `globe-card-label` — «Отель · <город>» на глобусе для отелей без пометки «новый» — лёгкий — в очереди
+      (согласовано 2026-10-24).
 - [ ] `rename-cozy-evening` — «Тихий вечер» → «Уютный вечер» в блоке и окне вайба, пересчёт векторов `db:embed` —
-      лёгкий — в очереди; после `selection-to-search` (согласовано 2026-10-24).
+      лёгкий — в очереди; после `nvidia-direct-api` (`db:embed` без дневного лимита OpenRouter) (согласовано 2026-10-24).
 - [ ] `remove-dead-assets` — `scenarios.image/alt`, три WebP, `--brand-green-gray` — лёгкий — в очереди; после
       `hide-synthetic-in-production` (общий `destinations.ts`).
 

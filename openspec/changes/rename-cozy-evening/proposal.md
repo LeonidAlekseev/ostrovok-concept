@@ -9,4 +9,4 @@
 
 ## Impact
 - `src/lib/vibe.ts`, `src/components/VibeSearch/*`, `src/lib/ai/documents.ts` (комментарий), тесты (`vibe.test.ts`, `VibeSearch.test.tsx`, `actions.test.ts`, `drawMood.test.ts`), README. Specs `vibe-search`, `draw-search`.
-- После `selection-to-search` (общие файлы вайба и spec `vibe-search`).
+- После `selection-to-search` (общие файлы вайба и spec `vibe-search`) и `nvidia-direct-api` (пересчёт векторов без дневного лимита OpenRouter).
