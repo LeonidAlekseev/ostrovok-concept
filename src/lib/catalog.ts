@@ -302,21 +302,17 @@ export const workLabels = (hotel: Pick<Hotel, 'wifiMbps' | 'workspace'>): string
   ...(hotel.workspace ? ['Рабочая зона'] : []),
 ]
 
-/** Travel times from the hotel, minutes. */
-export interface TravelTimes {
-  /** By car to the city centre: 3 minutes a kilometre, at least 1. */
+/** Distances from the hotel, kilometres. */
+export interface TravelDistances {
+  /** To the city centre. */
   centre: number
-  /** On foot to the stop of the city transport. */
-  transport: number
-  /** On foot to the metro (80 m a minute), `null` in a city without a metro. */
+  /** To the metro, `null` in a city without a metro. */
   metro: number | null
 }
 
-export const travelTimes = (hotel: Pick<Hotel, 'distanceKm' | 'metro'>): TravelTimes => ({
-  // Rounded to tenths first: 1.7 × 3 is 5.1000000000000005 in floating point.
-  centre: Math.max(1, Math.ceil(Math.round(hotel.distanceKm * 30) / 10)),
-  transport: 5,
-  metro: hotel.metro && Math.ceil(hotel.metro.meters / 80),
+export const travelDistances = (hotel: Pick<Hotel, 'distanceKm' | 'metro'>): TravelDistances => ({
+  centre: hotel.distanceKm,
+  metro: hotel.metro && hotel.metro.meters / 1000,
 })
 
 /** A hotel offers free cancellation when at least one of its rates does. */

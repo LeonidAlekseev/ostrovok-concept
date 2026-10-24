@@ -85,27 +85,27 @@ describe('HotelRating', () => {
 })
 
 // hotel-page, Requirement: Расположение отеля
-describe('travel times', () => {
+describe('travel distances', () => {
   const tile = (label: string) => screen.getByText(label).closest('li')!.textContent
 
-  it('in a city with a metro shows the centre by car, the transport and the metro on foot', () => {
+  it('in a city with a metro shows the centre and the metro in kilometres, no transport tile', () => {
     render(<AboutHotel hotel={{ ...hotel, distanceKm: 1.7, metro: { station: 'Můstek', meters: 1200 } }} />)
-    expect(tile('До центра')).toContain('6 мин')
-    expect(tile('До транспорта')).toContain('5 мин')
-    expect(tile('До метро')).toContain('15 мин')
-    expect(tile('До метро')).toContain('Můstek')
+    expect(tile('До центра')).toBe('До центрагорода1,7 км')
+    expect(tile('До метро')).toBe('До метроMůstek1,2 км')
+    expect(screen.queryByText('До транспорта')).toBeNull()
+    expect(screen.getByLabelText('Расстояния')).toBeDefined()
+    expect(screen.queryByText(/мин/)).toBeNull()
   })
 
-  it('in a city without a metro has no metro tile', () => {
+  it('in a city without a metro has only the centre tile', () => {
     render(<AboutHotel hotel={fullHotelsIn('zakynthos')[0]} />)
     expect(screen.getByText('До центра')).toBeDefined()
-    expect(screen.getByText('До транспорта')).toBeDefined()
     expect(screen.queryByText('До метро')).toBeNull()
   })
 
-  it('takes a minute to the centre from next door, and has no "км до центра" tile', () => {
+  it('shows 0,1 km from next door, and has no "км до центра" tile', () => {
     render(<AboutHotel hotel={{ ...hotel, distanceKm: 0.1 }} />)
-    expect(tile('До центра')).toContain('1 мин')
+    expect(tile('До центра')).toContain('0,1 км')
     expect(screen.queryByText(/км до центра/)).toBeNull()
   })
 })

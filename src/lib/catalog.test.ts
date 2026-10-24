@@ -8,7 +8,7 @@ import {
   hasFreeCancellation,
   POPULAR_AMENITIES,
   SCORE_SECTIONS,
-  travelTimes,
+  travelDistances,
 } from './catalog'
 import {
   buildCatalog,
@@ -357,23 +357,20 @@ describe('section scores', () => {
 })
 
 // hotel-page, Requirement: Расположение отеля
-describe('travelTimes', () => {
-  it('drives 3 minutes a kilometre to the centre and walks 80 m a minute to the metro', () => {
-    expect(travelTimes({ distanceKm: 1.7, metro: { station: 'Můstek', meters: 1200 } })).toEqual({
-      centre: 6,
-      transport: 5,
-      metro: 15,
+describe('travelDistances', () => {
+  it('gives kilometres to the centre and the metro metres in kilometres', () => {
+    expect(travelDistances({ distanceKm: 1.7, metro: { station: 'Můstek', meters: 1200 } })).toEqual({
+      centre: 1.7,
+      metro: 1.2,
     })
-    expect(travelTimes({ distanceKm: 2, metro: { station: 'x', meters: 810 } })).toMatchObject({ centre: 6, metro: 11 })
   })
 
-  it('takes at least a minute to the centre', () => {
-    expect(travelTimes({ distanceKm: 0.1, metro: null }).centre).toBe(1)
-    expect(travelTimes({ distanceKm: 0, metro: null }).centre).toBe(1)
+  it('keeps a hotel next door at its distance', () => {
+    expect(travelDistances({ distanceKm: 0.1, metro: null }).centre).toBe(0.1)
   })
 
-  it('has no metro time in a city without a metro', () => {
-    expect(travelTimes({ distanceKm: 3, metro: null })).toEqual({ centre: 9, transport: 5, metro: null })
+  it('has no metro distance in a city without a metro', () => {
+    expect(travelDistances({ distanceKm: 3, metro: null })).toEqual({ centre: 3, metro: null })
   })
 })
 
