@@ -1,13 +1,22 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { newHotels } from '../../lib/catalogGenerator'
 import { DIALOG_KEY } from '../../lib/assistantDialog'
 import { AssistantSearch } from './AssistantSearch'
 
 const fetchMock = vi.fn<typeof fetch>()
 
+// The assistant "thinks" for 650 ms before it answers: the tests do not wait for it in real time.
+const THINK_MS = 650
+beforeEach(() => {
+  const realSetTimeout = globalThis.setTimeout
+  vi.spyOn(globalThis, 'setTimeout').mockImplementation(((handler: TimerHandler, ms?: number, ...args: unknown[]) =>
+    realSetTimeout(handler, ms === THINK_MS ? 0 : ms, ...args)) as typeof setTimeout)
+})
+
 afterEach(() => {
+  vi.restoreAllMocks()
   window.sessionStorage.clear()
   fetchMock.mockReset()
   vi.unstubAllGlobals()
@@ -31,9 +40,7 @@ describe('AssistantSearch with the model', () => {
 
     await user.type(screen.getByLabelText('Опишите поездку'), 'хочу туда, где тепло и можно поплавать с маской{Enter}')
 
-    expect(
-      await screen.findByText('Записал: море · до 40 000 ₽. Когда планируете поехать?', {}, { timeout: 2000 }),
-    ).toBeTruthy()
+    expect(await screen.findByText('Записал: море · до 40 000 ₽. Когда планируете поехать?', {})).toBeTruthy()
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe('/api/assistant')
     expect(JSON.parse(init?.body as string)).toEqual({
@@ -49,9 +56,9 @@ describe('AssistantSearch with the model', () => {
     const user = renderAssistant()
 
     await user.type(screen.getByLabelText('Опишите поездку'), 'к морю{Enter}')
-    await screen.findByText(/Когда планируете поехать/, {}, { timeout: 2000 })
+    await screen.findByText(/Когда планируете поехать/, {})
     await user.type(screen.getByLabelText('Опишите поездку'), 'осенью, в октябре{Enter}')
-    await screen.findByText(/С кем едете/, {}, { timeout: 2000 })
+    await screen.findByText(/С кем едете/, {})
 
     expect(JSON.parse(fetchMock.mock.calls[1][1]?.body as string)).toEqual({
       messages: [
@@ -69,7 +76,7 @@ describe('AssistantSearch with the model', () => {
 
     await user.type(screen.getByLabelText('Опишите поездку'), 'привет{Enter}')
 
-    expect(await screen.findByText(/^Привет! Какое настроение у поездки\?/, {}, { timeout: 2000 })).toBeTruthy()
+    expect(await screen.findByText(/^Привет! Какое настроение у поездки\?/, {})).toBeTruthy()
   })
 
   it('reads the wish with the rules when the route fails, without an error (Scenario: Модель недоступна)', async () => {
@@ -82,7 +89,6 @@ describe('AssistantSearch with the model', () => {
       await screen.findByText(
         'Записал: море · в октябре · до 70 000 ₽. С кем едете? Так я подберу номер и формат отдыха.',
         {},
-        { timeout: 2000 },
       ),
     ).toBeTruthy()
     expect(log().textContent).not.toMatch(/ошибк/i)
@@ -94,7 +100,7 @@ describe('AssistantSearch with the model', () => {
 
     await user.type(screen.getByLabelText('Опишите поездку'), 'в горы{Enter}')
 
-    expect(await screen.findByText('Записал: горы. Когда планируете поехать?', {}, { timeout: 2000 })).toBeTruthy()
+    expect(await screen.findByText('Записал: горы. Когда планируете поехать?', {})).toBeTruthy()
   })
 
   it('drops the pending reply on «Заново»', async () => {
@@ -105,7 +111,7 @@ describe('AssistantSearch with the model', () => {
     await user.type(screen.getByLabelText('Опишите поездку'), 'в горы{Enter}')
     await user.click(screen.getByRole('button', { name: 'Заново' }))
     answer(Response.json({ brief: { vibe: 'mountains' }, source: 'model' }))
-    await new Promise((resolve) => setTimeout(resolve, 900))
+    await new Promise((resolve) => setTimeout(resolve, 50))
 
     expect(screen.queryByRole('list', { name: 'Диалог с Эвалом' })).toBeNull()
     expect(screen.getByText('О каком путешествии вы мечтаете?')).toBeTruthy()
@@ -125,7 +131,7 @@ describe('AssistantSearch plan', () => {
     )
     const user = renderAssistant()
     await user.type(screen.getByLabelText('Опишите поездку'), 'Лиссабон в октябре, один{Enter}')
-    expect(await screen.findByText('Атмосфера поездки', {}, { timeout: 2000 })).toBeTruthy()
+    expect(await screen.findByText('Атмосфера поездки', {})).toBeTruthy()
     expect(within(log()).getAllByRole('button', { name: /Лиссабон/ }).length).toBeGreaterThan(0)
     expect(log().textContent).not.toMatch(/маршрут/i)
     expect(within(log()).queryByRole('link')).toBeNull()
@@ -147,14 +153,14 @@ describe('AssistantSearch after a reload', () => {
     const view = render(<AssistantSearch newHotels={newHotels} onChoose={() => ({})} />)
     const user = userEvent.setup()
     await user.type(screen.getByLabelText('Опишите поездку'), 'к морю{Enter}')
-    await screen.findByText('Записал: море. Когда планируете поехать?', {}, { timeout: 2000 })
+    await screen.findByText('Записал: море. Когда планируете поехать?', {})
 
     remount(view)
 
     expect(await screen.findByText('Записал: море. Когда планируете поехать?')).toBeTruthy()
     expect(screen.queryByLabelText('Эвал думает')).toBeNull()
     await user.type(screen.getByLabelText('Опишите поездку'), 'в октябре{Enter}')
-    await screen.findByText(/С кем едете/, {}, { timeout: 2000 })
+    await screen.findByText(/С кем едете/, {})
     expect(JSON.parse(fetchMock.mock.calls[1][1]?.body as string).brief).toEqual({ vibe: 'sea' })
   })
 
@@ -166,7 +172,7 @@ describe('AssistantSearch after a reload', () => {
     const view = render(<AssistantSearch newHotels={newHotels} onChoose={() => ({})} />)
     const user = userEvent.setup()
     await user.type(screen.getByLabelText('Опишите поездку'), 'Лиссабон в октябре, один{Enter}')
-    await screen.findByText('Атмосфера поездки', {}, { timeout: 2000 })
+    await screen.findByText('Атмосфера поездки', {})
     // The dialog as the version with routes saved it: the plan's message carried its ready-made route.
     const saved = JSON.parse(window.sessionStorage.getItem(DIALOG_KEY)!)
     const route = {
@@ -194,7 +200,7 @@ describe('AssistantSearch after a reload', () => {
     const view = render(<AssistantSearch newHotels={newHotels} onChoose={() => ({})} />)
     const user = userEvent.setup()
     await user.type(screen.getByLabelText('Опишите поездку'), 'к морю{Enter}')
-    await screen.findByText(/Когда планируете поехать/, {}, { timeout: 2000 })
+    await screen.findByText(/Когда планируете поехать/, {})
     await user.click(screen.getByRole('button', { name: 'Заново' }))
 
     expect(window.sessionStorage.getItem(DIALOG_KEY)).toBeNull()

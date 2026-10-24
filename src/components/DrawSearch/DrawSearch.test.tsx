@@ -18,6 +18,10 @@ beforeEach(() => {
     width: 300,
     height: 200,
   } as DOMRect)
+  // Step 3 waits MIN_SEARCH_MS (1,5 s) after the search began: not in real time. The window skips the 1 s of Testing Library's own timeout.
+  const realSetTimeout = globalThis.setTimeout
+  vi.spyOn(globalThis, 'setTimeout').mockImplementation(((handler: TimerHandler, ms?: number, ...args: unknown[]) =>
+    realSetTimeout(handler, ms !== undefined && ms > 1100 && ms <= 1500 ? 0 : ms, ...args)) as typeof setTimeout)
 })
 
 afterEach(() => vi.restoreAllMocks())
@@ -31,7 +35,6 @@ function Harness() {
 const renderDialog = () => render(<Harness />)
 const next = () => screen.getByRole('button', { name: 'Далее' }) as HTMLButtonElement
 const status = () => screen.getByRole('status')
-// Past the «Подбираем отель» of at least 1,5 s.
 const RESULT = { timeout: 3000 }
 
 /** Green from the keyboard, then «Далее». */
