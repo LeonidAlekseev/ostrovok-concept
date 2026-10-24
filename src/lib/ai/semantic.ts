@@ -6,7 +6,8 @@ import type { Database } from '@/lib/db/database.types'
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/config'
 import { getSecret } from '../secrets'
 import { embeddingModel, toVector } from './embedding'
-import { openRouterReranker } from './rerank'
+import { NVIDIA_KEY } from './nvidia'
+import { nvidiaReranker } from './rerank'
 
 /**
  * Search by meaning over the vectors of `npm run db:embed`: the query's vector, the nearest objects in
@@ -22,8 +23,8 @@ export interface SemanticHit {
 }
 
 /**
- * The whole search, the query's vector, pgvector and the reranker together. The free embedding model answers
- * in 2–14 s (October 2026), the reranker in about 1.5 s.
+ * The whole search, the query's vector, pgvector and the reranker together. On the NVIDIA API the embedding
+ * answers in about 0.4 s and the reranker in about 0.8 s (October 2026), but a cold model may take far longer.
  */
 export const SEMANTIC_TIMEOUT_MS = 8000
 /** The query's text is cut to this many characters. */
@@ -32,7 +33,7 @@ export const MAX_SEMANTIC_QUERY = 1000
 const MAX_CANDIDATES = 50
 
 /**
- * Vectors of recent queries: the vibe's answers repeat, and the free model is slow and counts requests a day.
+ * Vectors of recent queries: the vibe's answers repeat, and the key allows 40 requests a minute.
  * The pending vector is kept too, so concurrent searches for the same words share one request.
  */
 const queryVectors = new Map<string, Promise<number[]>>()
@@ -100,7 +101,7 @@ export async function semanticSearch(
 ): Promise<SemanticHit[] | null> {
   const query = text.trim().slice(0, MAX_SEMANTIC_QUERY)
   if (!query || !isSupabaseConfigured || destinationIds?.length === 0) return null
-  const apiKey = await getSecret('OPENROUTER_API_KEY')
+  const apiKey = await getSecret(NVIDIA_KEY)
   if (!apiKey) return null
   const timeout = AbortSignal.timeout(timeoutMs)
   const abortSignal = signal ? AbortSignal.any([signal, timeout]) : timeout
@@ -132,7 +133,7 @@ export async function semanticSearch(
   })
   try {
     const { ranking } = await rerank({
-      model: openRouterReranker(apiKey),
+      model: nvidiaReranker(apiKey),
       query,
       documents: matches.map((m) => m.content),
       topN: Math.min(k, matches.length),

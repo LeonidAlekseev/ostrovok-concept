@@ -1,14 +1,18 @@
 import 'server-only'
-import { createOpenRouter } from '@openrouter/ai-sdk-provider'
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import type { LanguageModel } from 'ai'
 import { getSecret } from '../secrets'
+import { NVIDIA_BASE_URL, NVIDIA_KEY } from './nvidia'
 
-export const DEFAULT_MODEL = 'nvidia/nemotron-3.5-lightning:free'
+/** The light text tasks: reading the traveller's wish. */
+export const ASSISTANT_MODEL = 'nvidia/nemotron-3.5-lightning-30b-a3b'
 
-/** The OpenRouter model of the assistant, or `undefined` without `OPENROUTER_API_KEY` (the rules take over). */
+/** The assistant's model on the NVIDIA API, or `undefined` without `NVIDIA_API_KEY` (the rules take over). */
 export async function getAssistantModel(): Promise<LanguageModel | undefined> {
-  const apiKey = await getSecret('OPENROUTER_API_KEY')
+  const apiKey = await getSecret(NVIDIA_KEY)
   if (!apiKey) return undefined
-  const modelId = (await getSecret('OPENROUTER_MODEL')) || DEFAULT_MODEL
-  return createOpenRouter({ apiKey })(modelId)
+  // The API takes `response_format: json_schema`, so the answer follows the schema of `Output.object`.
+  return createOpenAICompatible({ name: 'nvidia', baseURL: NVIDIA_BASE_URL, apiKey, supportsStructuredOutputs: true })(
+    ASSISTANT_MODEL,
+  )
 }

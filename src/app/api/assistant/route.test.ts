@@ -154,7 +154,7 @@ describe('POST /api/assistant', () => {
     const model = new MockLanguageModelV4({ doGenerate: answer({}) })
     setModel(model)
     await ask('море')
-    expect(model.doGenerateCalls[0].providerOptions).toEqual({ openrouter: { reasoning: { effort: 'none' } } })
+    expect(model.doGenerateCalls[0].reasoning).toBe('none')
   })
 
   it('adds the answer to what is understood (Scenario: Уточнение темы)', async () => {

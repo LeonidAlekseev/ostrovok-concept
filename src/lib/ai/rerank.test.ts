@@ -1,6 +1,6 @@
 import { APICallError, rerank } from 'ai'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { RERANK_MODEL, RERANK_URL, openRouterReranker } from './rerank'
+import { RERANK_MODEL, RERANK_URL, nvidiaReranker } from './rerank'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -15,51 +15,54 @@ function stubFetch(status: number, body: unknown) {
   return fetch
 }
 
-describe('openRouterReranker', () => {
-  it('sends the query and the documents to OpenRouter and orders them by its scores', async () => {
+describe('nvidiaReranker', () => {
+  it('sends the query and the passages to NVIDIA and keeps the top N by its logits', async () => {
     const fetch = stubFetch(200, {
-      id: 'gen-1',
-      model: 'nvidia/nemotron-3.5-rerank-8b',
-      results: [
-        { index: 2, relevance_score: 0.9 },
-        { index: 0, relevance_score: 0.4 },
+      rankings: [
+        { index: 2, logit: -1.6 },
+        { index: 0, logit: -3.2 },
+        { index: 1, logit: -3.4 },
       ],
     })
     const { rerankedDocuments, ranking } = await rerank({
-      model: openRouterReranker('test-key'),
+      model: nvidiaReranker('test-key'),
       query: 'тихий хостел',
       documents: ['шумный клуб', 'вилла', 'тихий хостел'],
       topN: 2,
       maxRetries: 0,
     })
     expect(rerankedDocuments).toEqual(['тихий хостел', 'шумный клуб'])
-    expect(ranking.map((r) => r.score)).toEqual([0.9, 0.4])
+    expect(ranking.map((r) => r.score)).toEqual([-1.6, -3.2])
     const [url, init] = fetch.mock.calls[0]
     expect(url).toBe(RERANK_URL)
     expect(new Headers(init?.headers).get('authorization')).toBe('Bearer test-key')
     expect(JSON.parse(String(init?.body))).toEqual({
       model: RERANK_MODEL,
-      query: 'тихий хостел',
-      documents: ['шумный клуб', 'вилла', 'тихий хостел'],
-      top_n: 2,
+      query: { text: 'тихий хостел' },
+      passages: [{ text: 'шумный клуб' }, { text: 'вилла' }, { text: 'тихий хостел' }],
+      truncate: 'END',
     })
   })
 
-  it('drops an index outside the documents', async () => {
+  it('orders the rankings itself and drops an index outside the documents', async () => {
     stubFetch(200, {
-      results: [
-        { index: 5, relevance_score: 1 },
-        { index: 0, relevance_score: 0.5 },
+      rankings: [
+        { index: 5, logit: 1 },
+        { index: 1, logit: -2 },
+        { index: 0, logit: 0.5 },
       ],
     })
-    const result = await openRouterReranker('k').doRerank({ query: 'q', documents: { type: 'text', values: ['a'] } })
-    expect(result.ranking).toEqual([{ index: 0, relevanceScore: 0.5 }])
+    const result = await nvidiaReranker('k').doRerank({ query: 'q', documents: { type: 'text', values: ['a', 'b'] } })
+    expect(result.ranking).toEqual([
+      { index: 0, relevanceScore: 0.5 },
+      { index: 1, relevanceScore: -2 },
+    ])
   })
 
   it('throws a retryable API error on a rate limit', async () => {
-    stubFetch(429, { error: { message: 'Rate limit exceeded' } })
+    stubFetch(429, { status: 429, title: 'Too Many Requests' })
     const error = await Promise.resolve(
-      openRouterReranker('k').doRerank({ query: 'q', documents: { type: 'text', values: ['a'] } }),
+      nvidiaReranker('k').doRerank({ query: 'q', documents: { type: 'text', values: ['a'] } }),
     ).catch((e: unknown) => e)
     expect(APICallError.isInstance(error)).toBe(true)
     expect((error as APICallError).statusCode).toBe(429)

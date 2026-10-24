@@ -35,7 +35,7 @@ Vercel определяет проект как Next.js без дополнит�
 
 ## Ключи API
 
-Ключи API (Supabase, OpenRouter) хранятся в репозитории зашифрованными через
+Ключи API (Supabase, NVIDIA) хранятся в репозитории зашифрованными через
 [git-secret](https://github.com/sobolevn/git-secret): в git лежит только `.env.local.secret`, открытые `.env*`
 (кроме `.env.example` с именами переменных) и закрытые ключи в `.gitignore`. Файл зашифрован для ключа GPG проекта
 `secrets@opognali.local` (без пароля) и ключей людей, добавленных через `git secret tell`.
@@ -96,7 +96,8 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 - `npm run db:embed` — `scripts/embed.ts`: векторы для поиска по смыслу (см. «Поиск по смыслу») по каталогу из базы —
   все отели. В модель уходят только новые и изменённые отели (`content_hash`),
   векторы удалённых объектов стираются; пачки по 32, при 429 и 5xx — повтор с паузой 2, 4, 8… с. Печатает: всего, посчитано,
-  без изменений, ошибок, удалено. Запускать после `db:seed`; нужен `OPENROUTER_API_KEY`.
+  без изменений, ошибок, удалено. Запускать после `db:seed`; нужен `NVIDIA_API_KEY`, не больше 40 запросов в минуту (лимит ключа), при 429 — ожидание
+  (`Retry-After` или 2, 4, 8… с) и повтор.
 
 ## Производительность глобуса
 
@@ -119,8 +120,8 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
   разбирает его, по одному задаёт недостающие вопросы (настроение, когда, с кем), сам выбирает
   атмосферу поездки и предлагает три варианта; выбранный открывает страницу результатов `/search`
   с его городом, датами и гостями (`src/lib/assistant.ts`). Сообщение читает языковая модель через `POST /api/assistant`
-  (Vercel AI SDK и OpenRouter, `src/lib/ai/`; модель `OPENROUTER_MODEL`, по умолчанию `nvidia/nemotron-3.5-lightning:free`).
-  Без `OPENROUTER_API_KEY`, при ошибке, лимите (20 запросов в минуту с IP) или через 8 с — прежние правила по ключевым
+  (Vercel AI SDK, `src/lib/ai/`; см. «Модели»).
+  Без `NVIDIA_API_KEY`, при ошибке, лимите (20 запросов в минуту с IP) или через 8 с — прежние правила по ключевым
   словам, без сообщения об ошибке. Сообщение — до 500 символов, история — до 20 сообщений. Когда все вопросы заданы,
   отели плана подбирает поиск по смыслу по всем словам путешественника в городах плана («тихий хостел с быстрым
   Wi‑Fi в Праге» — хостелы Праги); ответ с ним — до 14 с, клиент ждёт 15.
@@ -137,16 +138,33 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 ### Поиск по смыслу
 
 `src/lib/ai/semantic.ts` (только сервер): `semanticSearch(текст, { kind, destinationIds, k })` — вектор запроса
-`nvidia/nemotron-3.5-embed-8b:free` (`input_type: query`), ближайшие объекты в Supabase pgvector
-(`match_embeddings`, косинус, индекс HNSW), затем реранжирование `nvidia/nemotron-3.5-rerank-8b:free` (адаптер
-`RerankingModelV4` в `src/lib/ai/rerank.ts`: у провайдера OpenRouter реранкеров нет). Модель отдаёт 4096 чисел, а
-HNSW индексирует не больше 4000, поэтому она просит первые 2048 (`dimensions`, модель обучена по Matryoshka) и они
-хранятся как `halfvec(2048)`. Без ключа, без векторов, при ошибке или через 8 с — `null`, и вызывающий код берёт
+`nvidia/nemotron-3.5-embed-8b` (`input_type: query`), ближайшие объекты в Supabase pgvector
+(`match_embeddings`, косинус, индекс HNSW), затем реранжирование `nvidia/nemotron-3.5-rerank-8b` (адаптер
+`RerankingModelV4` в `src/lib/ai/rerank.ts`). Модель отдаёт 4096 чисел, а HNSW индексирует не больше 4000, поэтому
+берутся первые 2048 и нормируются заново (модель обучена по Matryoshka, параметра `dimensions` в API NVIDIA нет);
+они хранятся как `halfvec(2048)`. Без ключа, без векторов, при ошибке или через 8 с — `null`, и вызывающий код берёт
 прежние правила; упал только реранкер — порядок векторов. Векторы недавних запросов кешируются в памяти процесса.
 Таблица `embeddings` закрыта: читают её только функции `security definer`, пишет сервисный ключ.
-Бесплатные модели OpenRouter медленные (эмбеддинг 2–14 с) и ограничены числом запросов в день
-(`free-models-per-day`): тогда работает запасной путь. Качество — `node --env-file=.env.local scripts/semantic-eval.ts`
-(15 запросов, попадания в top-5 до и после реранжирования; вне CI).
+Качество — `node --env-file=.env.local scripts/semantic-eval.ts` (15 запросов, попадания в top-5 до и после
+реранжирования; вне CI).
+
+### Модели
+
+Все модели — через API NVIDIA (build.nvidia.com) с одним ключом `NVIDIA_API_KEY` (см. «Ключи API»); лимит ключа —
+40 запросов в минуту, дневного лимита нет. Общий запрос и ошибки — `src/lib/ai/nvidia.ts`.
+
+- **Лёгкие текстовые задачи** (помощник, `src/lib/ai/model.ts`, `understand.ts`) — `nvidia/nemotron-3.5-lightning-30b-a3b`
+  через OpenAI-совместимый `https://integrate.api.nvidia.com/v1` (`@ai-sdk/openai-compatible`). Рассуждения
+  выключены (`reasoning: 'none'` → `reasoning_effort: none`): иначе модель тратит на них время и токены ответа.
+- **Эмбеддинги** — `nvidia/nemotron-3.5-embed-8b` (`/v1/embeddings`, `input_type` query/passage, `truncate: END`).
+  Свой адаптер в `src/lib/ai/embedding.ts`: провайдер AI SDK не передаёт `input_type`.
+- **Реранк** — `nvidia/nemotron-3.5-rerank-8b`
+  (`https://ai.api.nvidia.com/v1/retrieval/nvidia/nemotron-3.5-rerank-8b/reranking`), оценка — логит модели.
+- Сложные мультимодальные задачи — `nvidia/nemotron-3.5-super-vl-120b-a12b`; подключается вместе с первой такой
+  задачей.
+
+Скрипты (`db:embed`, `semantic-eval`) выдерживают 40 запросов в минуту и при 429 ждут (`Retry-After` или 2, 4,
+8… с) и повторяют; приложение при ошибке, лимите или таймауте уходит в запасной путь по правилам.
 
 ## Стили
 
