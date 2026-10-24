@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { stayTotal } from './offer'
 import { hotels, newHotels } from './catalogGenerator'
 import { destinations } from '../data/destinations'
-import { makePlan, mergeBrief, parseWish } from './assistant'
+import { describeBrief, makePlan, mergeBrief, missingNote, nextQuestion, parseWish, presetChips } from './assistant'
 
 describe('parseWish', () => {
   it('reads theme, month and budget from a full request', () => {
@@ -223,5 +223,60 @@ describe('makePlan with the semantic matches', () => {
     const plan = makePlan(brief, today, destinations, newHotels, [dear, cheap])
     expect(plan.options.map((o) => o.hotel?.id)).toEqual([cheap.id, dear.id])
     expect(plan.options[1].fitsBudget).toBe(false)
+  })
+})
+
+// assistant-search, Requirement: Подбор по свойствам здания и окружения
+describe('the hotel criteria', () => {
+  it('reads a quiet night, the building’s height and the view', () => {
+    expect(parseWish('тихий отель в Валенсии, чтобы ночью не шумело', destinations)).toMatchObject({ quiet: true })
+    expect(parseWish('а повыше?', destinations)).toEqual({ height: 'high' })
+    expect(parseWish('а пониже, на нижних этажах', destinations)).toEqual({ height: 'low' })
+    expect(parseWish('номер с видом на море', destinations)).toMatchObject({ view: 'sea', vibe: 'sea' })
+    expect(parseWish('чтобы был красивый вид из окна', destinations)).toMatchObject({ view: 'any' })
+    expect(parseWish('хочу на море в октябре', destinations).view).toBeUndefined()
+  })
+
+  it('keeps the earlier conditions of the chat on a refinement (Scenario: Уточнение)', () => {
+    const quiet = mergeBrief({}, 'тихий отель в Лиссабоне в октябре, один', null, destinations)
+    expect(quiet).toMatchObject({ destinationId: 'lisbon', quiet: true, when: 9, party: 'solo' })
+    const higher = mergeBrief(quiet, 'а повыше?', null, destinations)
+    expect(higher).toEqual({ ...quiet, height: 'high' })
+    expect(describeBrief(higher, destinations)).toBe(
+      'Лиссабон · спокойно · в октябре · один · тихо ночью · здание повыше',
+    )
+  })
+
+  it('explains a hotel without the data honestly (Scenario: Нет данных)', () => {
+    const brief = { destinationId: 'prague', when: 9, party: 'solo' as const, quiet: true as const }
+    const plan = makePlan(brief, '2026-10-01', destinations, newHotels)
+    expect(plan.options.length).toBeGreaterThan(0)
+    for (const option of plan.options) expect(option.reasons).toEqual(['нет данных о шуме'])
+    const prague = destinations.filter((d) => d.id === 'prague')
+    expect(missingNote(['quiet'], prague)).toBe('Данных о шуме у отелей Праги нет — подобрал без этого условия.')
+    expect(missingNote([], prague)).toBe('')
+  })
+})
+
+// assistant-search, Requirement: Начальный экран
+describe('the presets of Eval', () => {
+  const valencia = destinations.filter((d) => d.id === 'valencia')
+
+  it('offers only the themes with a city shown in the season (Scenario: Пресеты без видимых городов)', () => {
+    // Production shows Valencia only: no mountains; the sea only outside winter.
+    expect(presetChips(valencia, '2026-06-01').map((c) => c.label)).toEqual(['На море', 'Города'])
+    expect(presetChips(valencia, '2026-11-20').map((c) => c.label)).toEqual(['Города'])
+    expect(presetChips(destinations, '2026-11-20').map((c) => c.label)).toEqual(['На море', 'В горы', 'Города'])
+  })
+
+  it('leaves out the quick replies without a city', () => {
+    expect(nextQuestion({}, '2026-06-01', valencia)?.replies).toEqual(['На море', 'Города Европы', 'Удиви меня'])
+    expect(nextQuestion({}, '2026-06-01')?.replies).toEqual([
+      'На море',
+      'В горы',
+      'Города Европы',
+      'Романтика',
+      'Удиви меня',
+    ])
   })
 })

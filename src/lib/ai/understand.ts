@@ -12,6 +12,7 @@ import {
   type Brief,
 } from '../assistant'
 import type { IsoDate } from '../dates'
+import { VIEW_LABEL } from '../features'
 
 /** One attempt: after this the route answers with the rules. */
 export const MODEL_TIMEOUT_MS = 8000
@@ -37,6 +38,15 @@ const wishSchema = z.object({
   party: optional(z.string()).describe('id состава из списка, только если сказано явно; иначе null'),
   mood: optional(z.string()).describe('calm — спокойно, active — активно, только если сказано явно; иначе null'),
   budget: optional(z.coerce.number()).describe('бюджет на всю поездку в рублях, целое; «недорого» без суммы — null'),
+  quiet: optional(z.boolean()).describe(
+    'true — просят тишину, чтобы ночью не шумело («тихий», «а потише?»); иначе null',
+  ),
+  height: optional(z.string()).describe(
+    'high — здание повыше или высокий этаж («а повыше?»), low — пониже, только если сказано; иначе null',
+  ),
+  view: optional(z.string()).describe(
+    'вид из окна номера: id вида из списка, any — «с видом» без уточнения; иначе null',
+  ),
   reply: optional(z.string()).describe('одна короткая дружелюбная фраза-реакция без вопросов, до 120 символов'),
 })
 
@@ -52,9 +62,11 @@ function instructions(brief: Brief, today: IsoDate, destinations: readonly Desti
     'Извлеки из ПОСЛЕДНЕГО сообщения пользователя только то, что в нём сказано или ясно следует по смыслу',
     '(«тепло и поплавать с маской» — море, «старинные улочки» — города Европы). Тему (vibe) определяй по смыслу; остальное не додумывай: если не сказано явно — null.',
     'Предыдущие сообщения — контекст для коротких ответов на вопрос помощника.',
+    'Уточнения («а повыше?», «а потише?») дополняют прежние условия: верни только то, что сказано в последнем сообщении.',
     `Сегодня ${today}.`,
     `Темы (vibe): ${list(VIBE_LABEL)}.`,
     `Состав (party): ${list(PARTY_LABEL)}.`,
+    `Вид из окна (view): ${list(VIEW_LABEL)}.`,
     `Города каталога (destinationId — только из этого списка): ${destinations.map((d) => `${d.id} — ${d.name}`).join('; ')}.`,
     known ? `Уже понято: ${known}.` : 'Пока ничего не понято.',
     // The model gets the field names from `response_format`, but not their descriptions: they go here.
@@ -68,8 +80,8 @@ export const OTHER_SCRIPT = /(?!\p{Script=Cyrillic})\p{L}/u
 /**
  * Without reasoning the model fills fields the traveller never mentioned, and then the assistant skips its
  * questions. The theme and the budget are taken as they are (that is what free phrases are for); a city only
- * when it is named; who goes, the dates, the length and the mood only when the rules see them in the same text
- * (a bare number is not enough for the length: it may be the budget).
+ * when it is named; who goes, the dates, the length, the mood and the hotel's criteria (quiet, height, view) only
+ * when the rules see them in the same text (a bare number is not enough for the length: it may be the budget).
  */
 function grounded(key: keyof Brief, parsed: Brief, input: string, destinations: readonly Destination[]): boolean {
   if (key === 'vibe' || key === 'budget') return true
@@ -107,7 +119,8 @@ export async function understandWish(
   const parsed = normalizeBrief({ ...output, when }, destinations)
   const input = messages.at(-1)?.text ?? ''
   // "не важно" for the asked question is the rules' call in `foldBrief`: the model hands questions over too eagerly.
+  // A view `any` is «с видом», not a handed-over question.
   for (const key of Object.keys(parsed) as (keyof Brief)[])
-    if (parsed[key] === 'any' || !grounded(key, parsed, input, destinations)) delete parsed[key]
+    if ((parsed[key] === 'any' && key !== 'view') || !grounded(key, parsed, input, destinations)) delete parsed[key]
   return { parsed, reply: reply && !OTHER_SCRIPT.test(reply) ? reply : undefined }
 }

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { newHotels } from '../../lib/catalogGenerator'
@@ -10,6 +10,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
 afterEach(() => {
   push.mockClear()
   window.sessionStorage.clear()
+  window.localStorage.clear()
 })
 
 // search-modes, Requirement: Страница Эвал
@@ -25,12 +26,13 @@ describe('AssistantPage', () => {
     const user = userEvent.setup()
     const view = render(<AssistantPage newHotels={newHotels} />)
     await user.type(screen.getByLabelText('Опишите поездку'), 'Хочу на море{Enter}')
-    await screen.findByText('Хочу на море')
+    const log = () => screen.getByRole('list', { name: 'Диалог с Эвалом' })
+    await within(log()).findByText('Хочу на море')
 
     view.unmount()
     render(<AssistantPage newHotels={newHotels} />)
 
-    expect(await screen.findByText('Хочу на море')).toBeTruthy()
+    expect(await within(log()).findByText('Хочу на море')).toBeTruthy()
   })
 })
 

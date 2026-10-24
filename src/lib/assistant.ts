@@ -1,5 +1,13 @@
 import type { Destination } from '../data/destinations'
 import type { HotelSummary } from './catalog'
+import {
+  CRITERION_LABEL,
+  VIEW_LABEL,
+  featureReasons,
+  type Criterion,
+  type HotelFeatures,
+  type ViewKind,
+} from './features'
 import { addDays, fromIso, toIso, type IsoDate } from './dates'
 import { countRu, formatPrice } from './format'
 import { stayTotal } from './offer'
@@ -26,6 +34,12 @@ export interface Brief {
   mood?: Mood
   /** Whole-stay budget, ₽. */
   budget?: number
+  /** A quiet place at night: the noise map's night band (`hotel_features`). */
+  quiet?: true
+  /** A taller or a lower building. */
+  height?: 'high' | 'low'
+  /** A window view of a room; `any` is «с видом» without saying of what. */
+  view?: ViewKind | 'any'
 }
 
 export type QuestionId = 'vibe' | 'when' | 'party'
@@ -43,6 +57,8 @@ export interface AssistantOption {
   perNight: number
   total: number
   fitsBudget: boolean
+  /** Why the hotel fits: «ночью ниже 40 дБ», «здание 12 этажей», «нет данных о шуме». Absent in older plans. */
+  reasons?: string[]
 }
 
 export interface Plan {
@@ -57,10 +73,10 @@ export interface Plan {
 
 /** The starter cards of the assistant: a photo from `public/assistant/chips` (scripts/build-assistant-chips.mjs). */
 export const starterChips = [
-  { emoji: '🌴', label: 'На море', photo: '/assistant/chips/sea.webp' },
-  { emoji: '⛰️', label: 'В горы', photo: '/assistant/chips/mountains.webp' },
-  { emoji: '🏛️', label: 'Города', photo: '/assistant/chips/cities.webp' },
-]
+  { emoji: '🌴', label: 'На море', photo: '/assistant/chips/sea.webp', vibe: 'sea' },
+  { emoji: '⛰️', label: 'В горы', photo: '/assistant/chips/mountains.webp', vibe: 'mountains' },
+  { emoji: '🏛️', label: 'Города', photo: '/assistant/chips/cities.webp', vibe: 'europe' },
+] as const satisfies readonly { emoji: string; label: string; photo: string; vibe: VibeId }[]
 
 const MONTHS = [
   'январ',
@@ -117,6 +133,21 @@ const PARTY_RULES: [Party, RegExp][] = [
   ['solo', word('один|одна|сам[аи]?(?![а-яё])|в одиночку|соло')],
 ]
 
+/** A quiet night: «тихий», «а потише», «чтобы ночью не шумело», «без шума». */
+const QUIET = word('тих|тиш|не\\s+шум|без\\s+шума|шумоизол|выспат')
+const HIGH = word('повыше|высок[а-яё]*\\s+(?:этаж|здан|дом)|высотк|высотн|верхн[а-яё]*\\s+этаж|многоэтаж|высоко')
+const LOW = word('пониже|невысок|низк[а-яё]*\\s+(?:этаж|здан|дом)|малоэтаж|нижн[а-яё]*\\s+этаж|невысоко')
+const VIEW_RULES: [ViewKind | 'any', RegExp][] = [
+  ['sea', /вид[а-яё]*\s+на\s+(?:мор|океан|пляж|залив)/],
+  ['water', /вид[а-яё]*\s+на\s+(?:воду|реку|озеро|канал|порт)/],
+  ['mountain', /вид[а-яё]*\s+на\s+гор(?!од)/],
+  ['park', /вид[а-яё]*\s+на\s+парк/],
+  ['garden', /вид[а-яё]*\s+на\s+сад/],
+  ['pool', /вид[а-яё]*\s+на\s+бассейн/],
+  ['city', /вид[а-яё]*\s+на\s+(?:город|площадь)/],
+  ['any', /(?<![а-яё])(?:с\s+видом|вид\s+из\s+окна|красив[а-яё]*\s+вид|панорамн|видовой)/],
+]
+
 const ANY = word('не важно|неважно|вс[её] равно|любо[ей]|не знаю|удиви|на тво[йё]|реши сам|выбери сам|без разницы')
 
 const normalize = (s: string) => s.toLocaleLowerCase('ru').replace(/ /g, ' ')
@@ -149,6 +180,11 @@ export function parseWish(input: string, destinations: readonly Destination[]): 
     brief.nights ??= 2
     brief.when ??= 'soon'
   }
+
+  if (QUIET.test(text)) brief.quiet = true
+  if (LOW.test(text)) brief.height = 'low'
+  else if (HIGH.test(text)) brief.height = 'high'
+  brief.view = VIEW_RULES.find(([, re]) => re.test(text))?.[0]
 
   // "до 70 000 ₽", "70к", "70 тыс.", "бюджет 120000" — but not "на 5 ночей".
   for (const m of text.matchAll(/(\d[\d ]*\d|\d)\s*(тыс[а-я.]*|к(?![а-яё])|₽|руб[а-я.]*|р\.)?/g)) {
@@ -187,12 +223,27 @@ export function foldBrief(brief: Brief, parsed: Brief, input: string, asked: Que
   return next
 }
 
-export function nextQuestion(brief: Brief, today: IsoDate): Question | null {
+/** The quick replies to the question of the theme, each with its theme; «Удиви меня» has none. */
+const VIBE_REPLIES: [label: string, vibe: VibeId | null][] = [
+  ['На море', 'sea'],
+  ['В горы', 'mountains'],
+  ['Города Европы', 'europe'],
+  ['Романтика', 'romantic'],
+  ['Удиви меня', null],
+]
+
+/**
+ * The question the brief still lacks. With the `destinations` shown, the themes without a city in the season are
+ * not offered as quick replies.
+ */
+export function nextQuestion(brief: Brief, today: IsoDate, destinations?: readonly Destination[]): Question | null {
   if (!brief.vibe && !brief.destinationId)
     return {
       id: 'vibe',
       text: 'Какое настроение у поездки? Море, горы, старые города — или довериться мне?',
-      replies: ['На море', 'В горы', 'Города Европы', 'Романтика', 'Удиви меня'],
+      replies: VIBE_REPLIES.filter(
+        ([, vibe]) => !vibe || !destinations || hasCandidates(vibe, brief, today, destinations),
+      ).map(([label]) => label),
     }
   if (brief.when === undefined) {
     const month = fromIso(today).getMonth()
@@ -306,6 +357,14 @@ function travelDates(brief: Brief, nights: number, today: IsoDate): IsoDate {
 const tripMonth = (brief: Brief, today: IsoDate) =>
   typeof brief.when === 'number' ? brief.when : fromIso(addDays(today, brief.when === 'soon' ? 3 : 14)).getMonth()
 
+/** The theme has a city shown for the trip's season: a preset without one leads nowhere. */
+const hasCandidates = (vibe: VibeId, brief: Brief, today: IsoDate, destinations: readonly Destination[]) =>
+  candidatesFor(vibe, tripMonth(brief, today), destinations).length > 0
+
+/** The starter cards whose theme has a city shown in the season of a trip planned today. */
+export const presetChips = (destinations: readonly Destination[], today: IsoDate) =>
+  starterChips.filter((chip) => hasCandidates(chip.vibe, {}, today, destinations))
+
 /** The theme of the plan (the traveller's, the named city's or the assistant's own pick) and its cities. */
 function planScope(brief: Brief, today: IsoDate, destinations: readonly Destination[]) {
   const month = tripMonth(brief, today)
@@ -334,6 +393,7 @@ export function makePlan(
   destinations: readonly Destination[],
   hotels: readonly HotelSummary[],
   matches: readonly HotelSummary[] = [],
+  features: Readonly<Record<string, HotelFeatures>> = {},
 ): Plan {
   const { vibe, reason, named, pool } = planScope(brief, today, destinations)
   const [emoji, atmosphere, text] = ATMOSPHERES[vibe][brief.mood ?? 'default']
@@ -349,7 +409,15 @@ export function makePlan(
   const option = (destination: Destination, hotel: HotelSummary | undefined): AssistantOption => {
     const perNight = hotel?.priceFrom ?? destination.priceFrom
     const sum = total(perNight)
-    return { destination, hotel, perNight, total: sum, fitsBudget: !brief.budget || sum <= brief.budget }
+    const reasons = hotel ? featureReasons(features[hotel.id], brief) : []
+    return {
+      destination,
+      hotel,
+      perNight,
+      total: sum,
+      fitsBudget: !brief.budget || sum <= brief.budget,
+      ...(reasons.length > 0 && { reasons }),
+    }
   }
 
   // The semantic matches in the plan's cities keep their order, within the budget first.
@@ -421,6 +489,9 @@ export function describeBrief(brief: Brief, destinations: readonly Destination[]
     brief.nights ? countRu(brief.nights, ['ночь', 'ночи', 'ночей']) : null,
     brief.party && brief.party !== 'any' ? PARTY_LABEL[brief.party] : null,
     brief.budget ? `до ${formatPrice(brief.budget)}` : null,
+    brief.quiet ? 'тихо ночью' : null,
+    brief.height === 'high' ? 'здание повыше' : brief.height === 'low' ? 'здание пониже' : null,
+    brief.view === 'any' ? 'с видом из окна' : brief.view ? `вид ${VIEW_LABEL[brief.view]}` : null,
   ]
     .filter(Boolean)
     .join(' · ')
@@ -439,7 +510,7 @@ export function normalizeBrief(
   destinations: readonly Destination[],
 ): Brief {
   const brief: Brief = {}
-  const { vibe, destinationId, when, nights, party, mood, budget } = raw
+  const { vibe, destinationId, when, nights, party, mood, budget, quiet, height, view } = raw
   if (vibe === 'any' || (typeof vibe === 'string' && Object.hasOwn(VIBE_LABEL, vibe))) brief.vibe = vibe as VibeId
   if (destinations.some((d) => d.id === destinationId)) brief.destinationId = destinationId as string
   if (when === 'soon' || when === 'any') brief.when = when
@@ -448,6 +519,9 @@ export function normalizeBrief(
   if (party === 'any' || (typeof party === 'string' && Object.hasOwn(PARTY_LABEL, party))) brief.party = party as Party
   if (MOODS.includes(mood as Mood)) brief.mood = mood as Mood
   if (typeof budget === 'number' && budget >= 1) brief.budget = Math.round(budget)
+  if (quiet === true) brief.quiet = true
+  if (height === 'high' || height === 'low') brief.height = height
+  if (view === 'any' || (typeof view === 'string' && Object.hasOwn(VIEW_LABEL, view))) brief.view = view as ViewKind
   return brief
 }
 
@@ -457,6 +531,15 @@ export interface AssistantRequest {
   brief: Brief
 }
 
+/** A step of Эвал's turn on the server: one of its agents and what came of it. */
+export interface TurnStep {
+  /** `search` picks the hotels by meaning, `features` checks their building, noise and views. */
+  agent: 'search' | 'features'
+  title: string
+  status: 'done' | 'failed'
+  result?: string
+}
+
 export interface AssistantResponse {
   brief: Brief
   /** The model's short remark; absent when the rules read the message. */
@@ -464,6 +547,12 @@ export interface AssistantResponse {
   source: 'model' | 'rules'
   /** Hotels the semantic search found for the traveller's words once the brief is complete, best first. */
   matches?: HotelSummary[]
+  /** The building, noise and room views of the `matches` that have data. */
+  features?: Record<string, HotelFeatures>
+  /** The criteria no hotel of the plan's cities has data for: Эвал says so. */
+  missing?: Criterion[]
+  /** The steps of the turn, in order, once the plan is due. */
+  steps?: TurnStep[]
 }
 
 export const MAX_MESSAGE_LENGTH = 500
@@ -473,6 +562,24 @@ export const MAX_HISTORY = 20
  * the semantic search's hotels, when the plan is due.
  */
 const ASSISTANT_TIMEOUT_MS = 15_000
+
+const isRecord = (value: unknown): value is Record<string, HotelFeatures> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+const isCriterion = (value: unknown): value is Criterion => value === 'quiet' || value === 'height' || value === 'view'
+const isStep = (value: unknown): value is TurnStep =>
+  typeof value === 'object' &&
+  value !== null &&
+  ['search', 'features'].includes((value as TurnStep).agent) &&
+  typeof (value as TurnStep).title === 'string' &&
+  ['done', 'failed'].includes((value as TurnStep).status)
+
+/** «Данных о шуме у отелей Праги нет — …»: what Эвал says instead of guessing. */
+export function missingNote(missing: readonly Criterion[], cities: readonly Destination[]): string {
+  if (missing.length === 0) return ''
+  const what = missing.map((c) => CRITERION_LABEL[c]).join(', ')
+  const where = cities.length === 1 ? ` у отелей ${cities[0].genitive}` : ' у отелей этих городов'
+  return `Данных о ${what}${where} нет — подобрал без этого условия.`
+}
 
 /**
  * Reads the newest message of `messages` into `brief` through the assistant route. Any failure — no
@@ -506,6 +613,9 @@ export async function askAssistant(
         reply: typeof data.reply === 'string' ? data.reply : undefined,
         source: data.source === 'model' ? 'model' : 'rules',
         matches: Array.isArray(data.matches) ? data.matches : undefined,
+        ...(isRecord(data.features) && { features: data.features }),
+        ...(Array.isArray(data.missing) && { missing: data.missing.filter(isCriterion) }),
+        ...(Array.isArray(data.steps) && { steps: data.steps.filter(isStep) }),
       }
     }
   } catch {

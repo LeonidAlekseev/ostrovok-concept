@@ -23,4 +23,18 @@ describe('hotelDocument', () => {
     const villa = hotels.find((h) => h.destinationId === 'prague' && h.stayType === 'villa')!
     expect(hotelDocument(villa, city('prague'), scale)).toMatch(/^Вилла «[^»]+» — Прага/)
   })
+
+  it('adds the building, the noise and the room views when the hotel has them', () => {
+    const hotel = hotels.find((h) => h.destinationId === 'lisbon')!
+    const plain = hotelDocument(hotel, city('lisbon'), scale)
+    const text = hotelDocument(hotel, city('lisbon'), scale, {
+      floors: 12,
+      lnight: { max: 39 },
+      views: [{ roomName: 'Люкс с видом на море', view: 'sea' }],
+    })
+    expect(plain).not.toMatch(/Здание|Шум|видом/)
+    expect(text).toContain('Здание: 12 этажей.')
+    expect(text).toContain('Шум по карте шума: ночью ниже 40 дБ — тихо ночью.')
+    expect(text).toContain('Номера с видом (по описанию): на море.')
+  })
 })

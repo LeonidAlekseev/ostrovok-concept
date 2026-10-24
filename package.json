@@ -19,7 +19,8 @@
     "db:push": "node --env-file-if-exists=.env.local scripts/db-push.mjs",
     "db:seed": "node --env-file-if-exists=.env.local scripts/seed.ts",
     "db:seed:valencia": "node --env-file-if-exists=.env.local scripts/seed-valencia.ts",
-    "db:embed": "node --env-file-if-exists=.env.local scripts/embed.ts"
+    "db:embed": "node --env-file-if-exists=.env.local scripts/embed.ts",
+    "db:features": "node --env-file-if-exists=.env.local scripts/hotel-features.ts"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.75",

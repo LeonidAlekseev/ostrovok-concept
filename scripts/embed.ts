@@ -23,11 +23,14 @@ registerHooks({
 
 const { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, embeddingModel, toVector } = await import('../src/lib/ai/embedding.ts')
 const { hotelDocument } = await import('../src/lib/ai/documents.ts')
+const { featuresOf } = await import('../src/lib/features.ts')
 const { NVIDIA_KEY, pacer, withRetry } = await import('../src/lib/ai/nvidia.ts')
 const { vibeScale } = await import('../src/lib/vibe.ts')
 
 type Destination = import('../src/data/destinations.ts').Destination
 type Hotel = import('../src/lib/catalog.ts').Hotel
+type FeatureRow = import('../src/lib/features.ts').FeatureRowRead
+type RoomViewRow = import('../src/lib/features.ts').RoomViewRowRead
 
 const BATCH = 32
 const PAGE = 1000
@@ -73,12 +76,26 @@ const destinations = ((await readAll<{ data: Destination }>('destinations', 'dat
 const cityOf = new Map(destinations.map((d) => [d.id, d]))
 const hotels = ((await readAll<{ data: Hotel }>('hotels', 'data')) ?? []).map((row) => row.data)
 
+// The building, the noise and the room views of `npm run db:features`; none before its migration.
+const features = featuresOf(
+  (await readAll<FeatureRow>(
+    'hotel_features',
+    'hotel_id, floors, height_m, lden_min, lden_max, lnight_min, lnight_max',
+    ['hotel_id'],
+  )) ?? [],
+  (await readAll<RoomViewRow>('hotel_room_views_named', 'hotel_id, view, room_name', [
+    'hotel_id',
+    'rg_hash',
+    'view',
+  ])) ?? [],
+)
+
 const scale = vibeScale(hotels, destinations)
 const documents: Document[] = []
 for (const hotel of hotels) {
   const city = cityOf.get(hotel.destinationId)
   if (!city) continue
-  const content = hotelDocument(hotel, city, scale)
+  const content = hotelDocument(hotel, city, scale, features.get(hotel.id))
   documents.push({ kind: 'hotel', ref_id: hotel.id, destination_id: city.id, content, content_hash: hash(content) })
 }
 

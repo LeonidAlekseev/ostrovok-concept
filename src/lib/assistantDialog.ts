@@ -1,9 +1,9 @@
 import type { Brief, Plan, Question } from './assistant'
 
 /**
- * The assistant's dialog in sessionStorage, so a reload of the tab keeps what Эвал has already written down.
- * The pending reply is not kept. A damaged or foreign value reads as no dialog; the ready-made route a plan of
- * an older version kept is dropped, its plan stays.
+ * The single dialog of the older versions in sessionStorage: src/lib/assistantChats.ts reads it once into a chat
+ * and erases it. A damaged or foreign value reads as no dialog; the ready-made route a plan of an older version
+ * kept is dropped, its plan stays. The checks of a brief, a question and a plan serve the chats too.
  */
 
 export interface DialogMessage {
@@ -26,7 +26,7 @@ const isObject = (value: unknown): value is Shape =>
 const isString = (value: unknown): value is string => typeof value === 'string'
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
 
-const isBrief = (value: unknown): value is Brief =>
+export const isBrief = (value: unknown): value is Brief =>
   isObject(value) &&
   (value.vibe === undefined || isString(value.vibe)) &&
   (value.destinationId === undefined || isString(value.destinationId)) &&
@@ -34,16 +34,19 @@ const isBrief = (value: unknown): value is Brief =>
   (value.nights === undefined || isNumber(value.nights)) &&
   (value.party === undefined || isString(value.party)) &&
   (value.mood === undefined || isString(value.mood)) &&
-  (value.budget === undefined || isNumber(value.budget))
+  (value.budget === undefined || isNumber(value.budget)) &&
+  (value.quiet === undefined || value.quiet === true) &&
+  (value.height === undefined || isString(value.height)) &&
+  (value.view === undefined || isString(value.view))
 
-const isQuestion = (value: unknown): value is Question =>
+export const isQuestion = (value: unknown): value is Question =>
   isObject(value) &&
   isString(value.id) &&
   isString(value.text) &&
   Array.isArray(value.replies) &&
   value.replies.every(isString)
 
-const isPlan = (value: unknown): value is Plan =>
+export const isPlan = (value: unknown): value is Plan =>
   isObject(value) &&
   isString(value.emoji) &&
   isString(value.atmosphere) &&
@@ -64,7 +67,8 @@ const isPlan = (value: unknown): value is Plan =>
       isString(o.destination.country) &&
       (o.hotel === undefined || (isObject(o.hotel) && isString(o.hotel.id) && isNumber(o.hotel.rating))) &&
       isNumber(o.total) &&
-      typeof o.fitsBudget === 'boolean',
+      typeof o.fitsBudget === 'boolean' &&
+      (o.reasons === undefined || (Array.isArray(o.reasons) && o.reasons.every(isString))),
   )
 
 const isMessage = (value: unknown): value is DialogMessage =>
@@ -93,12 +97,11 @@ export function loadDialog(): Dialog | null {
   }
 }
 
-/** Saves the dialog; an empty one erases it. Without storage the dialog just lives in memory. */
-export function saveDialog(dialog: Dialog) {
+/** Erases the old dialog once it has moved into a chat. */
+export function clearDialog() {
   try {
-    if (dialog.messages.length === 0) window.sessionStorage.removeItem(DIALOG_KEY)
-    else window.sessionStorage.setItem(DIALOG_KEY, JSON.stringify(dialog))
+    window.sessionStorage.removeItem(DIALOG_KEY)
   } catch {
-    // Storage is full or disabled: the chat keeps working, the dialog is not kept.
+    // Storage is disabled: there is nothing to erase.
   }
 }
