@@ -3,7 +3,7 @@
 - [x] 1.2 Тесты, комментарии, README; поиском по репозиторию «Тихий вечер» не остаётся (кроме `openspec/changes/archive`); оставшиеся упоминания в specs после `selection-to-search` (например сценарий «Тихий вечер» в «Отели под настроение») — добавить в дельты этого change
 
 ## 2. Векторы
-- [ ] 2.1 `npm run db:embed` после merge PR; если запрещено — передать оркестратору
+- [x] 2.1 `npm run db:embed` после merge PR; если запрещено — передать оркестратору
 
 ## 3. Проверка
 - [x] 3.1 `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check`
