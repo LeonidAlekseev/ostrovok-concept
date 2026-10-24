@@ -77,8 +77,28 @@ describe('otaHotel', () => {
       isNew: false,
     })
     expect(hotel.description).toMatch(/^Отель Malcom and Barret — 3-звёздочный отель в 2,2 км от центра Валенсии\./)
-    expect(hotel.sectionScores).toHaveLength(8)
-    expect(hotel.reviews.length).toBeGreaterThan(0)
+  })
+
+  it('has no generated reviews, section scores or guest photos, rated or not', () => {
+    const hotel = otaHotel(raw(), 'valencia', STAY)
+    expect(hotel).toMatchObject({ rating: 9.2, reviewCount: 3567, sectionScores: [], reviews: [], guestPhotos: [] })
+  })
+
+  it('lists every room type: the priced ones first, the others without rates or a guess at the guests', () => {
+    const groups = ['a', 'b', 'c', 'd'].map((rg) => ({ rg_hash: rg, name_struct: { main_name: `Номер ${rg}` } }))
+    const hotel = otaHotel(
+      raw({ room_groups: groups }, [rate(14020, { rg: 'c' }), rate(11779, { rg: 'a' })]),
+      'valencia',
+      STAY,
+    )
+    expect(hotel.rooms.map((r) => [r.id, r.rates.length])).toEqual([
+      ['room-a', 1],
+      ['room-c', 1],
+      ['room-b', 0],
+      ['room-d', 0],
+    ])
+    expect(hotel.rooms[2]).toMatchObject({ name: 'Номер b', area: null, capacity: 0 })
+    expect(cheapestRate(hotel).room.id).toBe('room-a')
   })
 
   it('reads the stars ×10, and a hotel without them shows none', () => {
@@ -141,6 +161,21 @@ describe('otaHotel', () => {
     const hotel = otaHotel(raw({}, []), 'valencia', STAY, { master_id: 9322089, price: 35337 })
     expect(hotel.priceFrom).toBe(11800)
     expect(hotel.rooms).toHaveLength(1)
+    const [first, ...rest] = otaHotel(
+      raw(
+        {
+          room_groups: [
+            { rg_hash: 'a', name_struct: { main_name: 'A' } },
+            { rg_hash: 'b', name_struct: { main_name: 'B' } },
+          ],
+        },
+        [],
+      ),
+      'valencia',
+      STAY,
+      { master_id: 9322089, price: 35337 },
+    ).rooms
+    expect([first.rates.length, rest.map((r) => r.rates.length)]).toEqual([1, [0]])
     expect(cheapestRate(hotel).rate).toMatchObject({ pricePerNight: 11800, cancellation: { kind: 'non-refundable' } })
     expect(() => otaHotel(raw({}, []), 'valencia', STAY)).toThrow(/neither a rate nor a map pin/)
   })

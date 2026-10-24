@@ -85,3 +85,26 @@ describe('RoomRates', () => {
     expect(screen.getAllByText('Невозвратный тариф').length).toBeGreaterThan(0)
   })
 })
+
+describe('a room without a rate', () => {
+  const unpriced = { ...room, id: 'room-x', name: 'Номер без тарифа', capacity: 0, rates: [] }
+  const real = { ...hotel, rooms: [room, unpriced] }
+
+  it('says there is no price and offers nothing to pick', () => {
+    render(<RoomList hotel={real} stay={stay} guests={guests} onPickDates={noop} />)
+    expect(screen.getByText('Нет цены на выбранные даты')).toBeTruthy()
+    expect(screen.getAllByRole('link', { name: /Выбрать/ })).toHaveLength(1)
+  })
+
+  it('has no button to pick dates either', () => {
+    render(<RoomList hotel={real} stay={null} guests={guests} onPickDates={noop} />)
+    expect(screen.getAllByRole('button', { name: 'Выберите даты' })).toHaveLength(1)
+    expect(screen.getByText('Нет цены на выбранные даты')).toBeTruthy()
+  })
+
+  it('has no rates to book on the rates page', () => {
+    render(<RoomRates hotel={real} room={unpriced} stay={stay} guests={guests} onPickDates={noop} />)
+    expect(screen.getByText('Нет цены на выбранные даты')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Забронировать' })).toBeNull()
+  })
+})

@@ -53,6 +53,16 @@ describe('HotelRating', () => {
     expect(within(block).queryByRole('list', { name: 'Распределение оценок' })).toBeNull()
   })
 
+  it('shows the rating of a real hotel and "Отзывы появятся позже" without a list, scores or a dialog', () => {
+    render(<HotelRating hotel={{ ...rated, id: 'ota-1', reviews: [], sectionScores: [], guestPhotos: [] }} />)
+    const block = screen.getByRole('region', { name: 'Оценка гостей' })
+    expect(within(block).getByText('Основано на 1 323 отзывах гостей.')).toBeDefined()
+    expect(within(block).getByText('Отзывы появятся позже')).toBeDefined()
+    expect(within(block).queryByRole('list', { name: 'Оценки по разделам' })).toBeNull()
+    expect(within(block).queryByRole('button', { name: /Читать отзывы/ })).toBeNull()
+    expect(within(block).queryByText(/На вашем языке/)).toBeNull()
+  })
+
   it('words the counts by number: 21 and 1 review, 846 reviews', () => {
     const { unmount } = render(<HotelRating hotel={{ ...hotel, reviewCount: 21 }} />)
     expect(screen.getByText('Основано на 21 отзыве гостей.')).toBeDefined()
