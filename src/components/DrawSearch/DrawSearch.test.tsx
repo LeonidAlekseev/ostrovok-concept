@@ -128,6 +128,33 @@ describe('DrawSearch canvas', () => {
     expect(next().disabled).toBe(true)
   })
 
+  // draw-search, Scenario: Пустой холст — no visible hint, «Далее» off, nothing to describe it with.
+  it('shows no hint on the empty canvas', () => {
+    renderDialog()
+    expect(screen.queryByText(/Закрасьте ещё немного холста/)).toBeNull()
+    expect(next().disabled).toBe(true)
+    expect(next().getAttribute('aria-describedby')).toBeNull()
+    expect(document.getElementById('draw-hint')).toBeNull()
+  })
+
+  it('keeps the hint off under 3% and describes «Далее» once it is enabled', async () => {
+    const user = userEvent.setup()
+    renderDialog()
+    const canvas = screen.getByRole('img', { name: 'Пустой холст' })
+    fireEvent.pointerDown(canvas, { pointerId: 1, button: 0, clientX: 10, clientY: 10 })
+    fireEvent.pointerMove(canvas, { pointerId: 1, clientX: 30, clientY: 10 })
+    fireEvent.pointerUp(canvas, { pointerId: 1 })
+    expect(screen.queryByText(/Закрасьте ещё немного холста/)).toBeNull()
+    expect(next().getAttribute('aria-describedby')).toBeNull()
+
+    // Enough paint: «Далее» is on and points at its hidden description.
+    for (let i = 0; i < 8 && next().disabled; i++)
+      await user.click(screen.getByRole('button', { name: 'Добавить мазок' }))
+    expect(next().disabled).toBe(false)
+    expect(next().getAttribute('aria-describedby')).toBe('draw-hint')
+    expect(document.getElementById('draw-hint')?.textContent).toBe('По цветам рисунка подберём отели.')
+  })
+
   it('paints green from the keyboard', async () => {
     const user = userEvent.setup()
     renderDialog()
