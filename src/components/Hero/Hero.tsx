@@ -504,7 +504,7 @@ export function Hero({ cities: markers, hotels, featured }: Props) {
                   variant="success"
                   className="self-start rounded-sm px-1 py-0 text-(length:--badge-size) leading-[1.25] tracking-[0.02em] uppercase"
                 >
-                  Новый отель · {destination.name}
+                  {hotel.isNew ? 'Новый отель' : 'Отель'} · {destination.name}
                 </Badge>
                 {/* The link covers the whole card. */}
                 <Link

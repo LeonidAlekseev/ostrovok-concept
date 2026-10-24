@@ -38,6 +38,15 @@ describe('Hero in the server render', () => {
     expect(page.querySelector('a[href^="/routes/"]')).toBeNull()
   })
 
+  // hero-globe, Requirement: Карточка отеля на глобусе — Отель без пометки «новый»
+  it('labels a hotel without the «new» mark as a plain hotel', () => {
+    const plain = { ...firstOfPrague, isNew: false }
+    const plainPage = document.createElement('div')
+    plainPage.innerHTML = renderToStaticMarkup(<Hero cities={cities} hotels={[plain]} featured={prague} />)
+    expect(plainPage.textContent).toContain('Отель · Прага')
+    expect(plainPage.textContent).not.toContain('Новый отель')
+  })
+
   // hero-globe, Requirement: Ширина карточки отеля — Длинное название
   it('keeps the hotel card to its old maximum width and cuts a long name with an ellipsis', () => {
     const link = page.querySelector('a[href^="/hotels/"]')!
