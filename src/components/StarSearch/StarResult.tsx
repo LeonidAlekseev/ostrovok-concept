@@ -75,9 +75,7 @@ export function StarResult({ reading, stay, name, onRestart }: Props) {
         <ArrowRight aria-hidden />
       </Link>
 
-      <p className="text-sm text-(--decor-star-muted)">
-        Гороскоп — для настроения, а не для планов. Цены и даты проверьте при бронировании.
-      </p>
+      <p className="text-sm text-(--decor-star-muted)">Гороскоп — для настроения, а не для планов.</p>
 
       <StarVideo reading={reading} name={name} />
 

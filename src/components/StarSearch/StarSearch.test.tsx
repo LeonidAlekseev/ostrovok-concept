@@ -181,7 +181,8 @@ describe('StarSearch reading', () => {
     const heading = screen.getByRole('heading', { name: /Анна, ваш знак — Овен/ })
     expect(document.activeElement).toBe(heading)
     expect(screen.getAllByRole('status').some((s) => /^Звёзды выбрали: [^,]+$/.test(s.textContent!))).toBe(true)
-    expect(screen.getByText(/Гороскоп — для настроения, а не для планов/)).toBeTruthy()
+    expect(screen.getByText('Гороскоп — для настроения, а не для планов.')).toBeTruthy()
+    expect(screen.queryByText(/Цены и даты проверьте при бронировании/)).toBeNull()
 
     // star-search, Requirement: Итог гадания — один отель: no hotel card, the selection with the dates of the reading.
     expect(screen.queryByRole('region', { name: 'Звёзды выбрали отель' })).toBeNull()
