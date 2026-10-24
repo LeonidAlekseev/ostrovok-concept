@@ -187,6 +187,34 @@ describe('makePlan', () => {
   })
 })
 
+describe('the assistant’s own pick among the cities shown', () => {
+  const today = '2026-10-19'
+  const valencia = destinations.filter((d) => d.id === 'valencia')
+
+  it('plans Valencia for a winter «Удиви меня» in production (Scenario: Зима в production)', () => {
+    const plan = makePlan({ vibe: 'any', when: 'any', party: 'any' }, today, valencia, [])
+    expect(plan.options.length).toBeGreaterThan(0)
+    for (const o of plan.options) expect(o.destination.id).toBe('valencia')
+    expect(plan.why).not.toBe('')
+  })
+
+  it('keeps the seasonal favourite when it has a city shown', () => {
+    const shown = destinations.filter((d) => ['paris', 'valencia'].includes(d.id))
+    const plan = makePlan({ vibe: 'any', when: 0, party: 'couple' }, today, shown, [])
+    expect(plan.why).toBe(
+      'Выбрал сам: вдвоём лучше всего там, где красиво. Значит, город, в который влюбляешься вдвоём.',
+    )
+    for (const o of plan.options) expect(o.destination.id).toBe('paris')
+  })
+
+  it('takes the shown cities without a theme when no theme has one', () => {
+    const plain = { ...valencia[0], id: 'plain-city', scenarios: ['weekend' as const] }
+    const plan = makePlan({ vibe: 'any', when: 'any', party: 'any' }, today, [plain], [])
+    expect(plan.options.map((o) => o.destination.id)).toEqual(['plain-city'])
+    expect(plan.why).toBe('Смена картинки без долгого перелёта.')
+  })
+})
+
 describe('makePlan with the semantic matches', () => {
   const today = '2026-10-19'
   const inCity = (id: string) => hotels.filter((h) => h.destinationId === id)
