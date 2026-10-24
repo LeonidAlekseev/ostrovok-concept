@@ -25,8 +25,6 @@ export interface Destination {
 export interface Scenario {
   id: ScenarioId
   title: string
-  image: string
-  alt: string
 }
 
 export const destinations: Destination[] = [
@@ -456,12 +454,7 @@ export const destinations: Destination[] = [
 export const FEATURED_DESTINATION_ID = 'prague'
 
 export const scenarios: Scenario[] = [
-  { id: 'sea', title: 'У моря', image: '/images/sea-navagio.webp', alt: 'Бирюзовая бухта Навагио на острове Закинф' },
-  {
-    id: 'weekend',
-    title: 'На выходные',
-    image: '/images/florence-duomo.webp',
-    alt: 'Исторический центр Флоренции с собором Санта-Мария-дель-Фьоре',
-  },
-  { id: 'europe', title: 'Города Европы', image: '/images/paris-eiffel.webp', alt: 'Эйфелева башня на закате' },
+  { id: 'sea', title: 'У моря' },
+  { id: 'weekend', title: 'На выходные' },
+  { id: 'europe', title: 'Города Европы' },
 ]

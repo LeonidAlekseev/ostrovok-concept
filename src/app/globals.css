@@ -25,8 +25,6 @@
   --brand-text-2: #667085;
   --brand-green: #4cc13a;
   --brand-green-soft: #dcf7c4;
-  /* Muted text on the lime (--brand): 5.3:1 contrast. */
-  --brand-green-gray: #3f5a30;
   /* Background of the page and the hero; the transparent header shows it too. */
   --brand-lime: #a5e87b;
   --brand-danger: #d92d20;
