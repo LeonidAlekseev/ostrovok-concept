@@ -79,66 +79,71 @@ export function VibeSearch() {
         </p>
       </div>
 
-      <div className="relative grid w-full grid-cols-2 gap-[clamp(10px,3vw,28px)] pb-[clamp(20px,5vw,34px)]">
-        {sides.map(({ title, image, Icon, tags, className, tint, objectPosition, plate }) => (
-          <div
-            key={title}
-            className={`relative aspect-[11/18] overflow-hidden rounded-[clamp(18px,5vw,34px)] ring-2 ${tint} ${className}`}
-          >
-            <div className="absolute inset-x-0 bottom-0 h-[76%] [mask-image:linear-gradient(to_bottom,transparent,black_30%)]">
-              <Image
-                src={image}
-                alt=""
-                fill
-                sizes="(min-width: 920px) 430px, 48vw"
-                className="object-cover"
-                style={{ objectPosition }}
-              />
-            </div>
-            <div className="absolute inset-0 bg-(image:--decor-vibe-shade-top)" aria-hidden />
-            <div className="relative flex flex-col gap-[clamp(6px,1.6vw,14px)] p-[clamp(8px,2.6vw,24px)] text-white">
-              <div className="flex items-center gap-[clamp(6px,1.8vw,14px)]">
-                <span
-                  className={`grid size-[clamp(34px,9vw,68px)] shrink-0 place-items-center rounded-[28%] shadow-(--shadow-card) ${plate}`}
-                >
-                  <Icon className="size-[56%]" aria-hidden />
-                </span>
-                <p className="text-[clamp(15px,4.4vw,32px)]/[1.05] font-extrabold">{title}</p>
+      <div className="relative w-full pb-[clamp(20px,5vw,34px)]">
+        <div className="relative grid grid-cols-2 gap-[clamp(10px,3vw,28px)]">
+          {sides.map(({ title, image, Icon, tags, className, tint, objectPosition, plate }) => (
+            <div
+              key={title}
+              className={`relative aspect-[11/18] overflow-hidden rounded-[clamp(18px,5vw,34px)] ring-2 ${tint} ${className}`}
+            >
+              <div className="absolute inset-x-0 bottom-0 h-[76%] [mask-image:linear-gradient(to_bottom,transparent,black_30%)]">
+                <Image
+                  src={image}
+                  alt=""
+                  fill
+                  sizes="(min-width: 920px) 430px, 48vw"
+                  className="object-cover"
+                  style={{ objectPosition }}
+                />
               </div>
-              <ul className="flex flex-col items-start gap-[clamp(3px,1vw,8px)]">
-                {tags.map((tag) => (
-                  <li
-                    key={tag}
-                    className="rounded-full border border-white/30 bg-white/15 px-[clamp(7px,2vw,16px)] py-[clamp(1px,0.5vw,4px)] text-[clamp(11px,3vw,20px)] backdrop-blur-sm"
+              <div className="absolute inset-0 bg-(image:--decor-vibe-shade-top)" aria-hidden />
+              <div className="relative flex flex-col gap-[clamp(6px,1.6vw,14px)] p-[clamp(8px,2.6vw,24px)] text-white">
+                <div className="flex items-center gap-[clamp(6px,1.8vw,14px)]">
+                  <span
+                    className={`grid size-[clamp(34px,9vw,68px)] shrink-0 place-items-center rounded-[28%] shadow-(--shadow-card) ${plate}`}
                   >
-                    {tag}
-                  </li>
-                ))}
-              </ul>
+                    <Icon className="size-[56%]" aria-hidden />
+                  </span>
+                  <p className="text-[clamp(15px,4.4vw,32px)]/[1.05] font-extrabold">{title}</p>
+                </div>
+                <ul className="flex flex-col items-start gap-[clamp(3px,1vw,8px)]">
+                  {tags.map((tag) => (
+                    <li
+                      key={tag}
+                      className="rounded-full border border-white/30 bg-white/15 px-[clamp(7px,2vw,16px)] py-[clamp(1px,0.5vw,4px)] text-[clamp(11px,3vw,20px)] backdrop-blur-sm"
+                    >
+                      {tag}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
+          ))}
+          {/* The lightning and the letters share one cell of the card row, so both sit on its centre. */}
+          <div className="pointer-events-none absolute inset-0 grid grid-cols-1 grid-rows-1 place-items-center">
+            <span className="col-start-1 row-start-1 h-[56%] min-[900px]:h-[68%]">
+              <Image
+                src="/images/vibe/vs-lightning.webp"
+                alt=""
+                width={368}
+                height={1000}
+                sizes="(min-width: 920px) 300px, 100px"
+                className="h-full w-auto max-w-none"
+              />
+            </span>
+            <span className="col-start-1 row-start-1">
+              <Image
+                src="/images/vibe/vs-letters.webp"
+                alt=""
+                width={480}
+                height={465}
+                sizes="(min-width: 920px) 240px, 28vw"
+                className="w-[clamp(76px,24vw,240px)] max-w-none animate-vibe-beat motion-reduce:animate-none"
+              />
+              <span className="sr-only">против</span>
+            </span>
           </div>
-        ))}
-        <span className="pointer-events-none absolute top-[71%] left-1/2 h-[56%] -translate-1/2 min-[900px]:top-[62%] min-[900px]:h-[68%]">
-          <Image
-            src="/images/vibe/vs-lightning.webp"
-            alt=""
-            width={368}
-            height={1000}
-            sizes="(min-width: 920px) 300px, 100px"
-            className="h-full w-auto max-w-none"
-          />
-        </span>
-        <span className="pointer-events-none absolute top-[71%] left-1/2 -translate-1/2 min-[900px]:top-[calc(50%-clamp(10px,2.5vw,17px))]">
-          <Image
-            src="/images/vibe/vs-letters.webp"
-            alt=""
-            width={480}
-            height={465}
-            sizes="(min-width: 920px) 240px, 28vw"
-            className="w-[clamp(76px,24vw,240px)] max-w-none animate-vibe-beat motion-reduce:animate-none"
-          />
-          <span className="sr-only">против</span>
-        </span>
+        </div>
         <Button
           size="lg"
           shape="pill"
