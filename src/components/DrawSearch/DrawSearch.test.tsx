@@ -44,11 +44,11 @@ describe('DrawSearch section', () => {
   it('opens the window with an empty canvas and the palette', async () => {
     const user = userEvent.setup()
     render(<DrawSearch />)
-    const section = screen.getByRole('region', { name: 'Нарисуй своё путешествие' })
+    const section = screen.getByRole('region', { name: 'Нарисуй свой отдых' })
     expect(section.getAttribute('id')).toBe('draw')
 
     await user.click(within(section).getByRole('button', { name: 'Нарисовать' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Нарисуй своё путешествие' })
+    const dialog = await screen.findByRole('dialog', { name: 'Нарисуй свой отдых' })
     expect(within(dialog).getByText('Шаг 1 из 3')).toBeTruthy()
     expect(within(dialog).getByRole('img', { name: 'Пустой холст' })).toBeTruthy()
     const palette = within(dialog).getByRole('group', { name: 'Палитра настроений' })
@@ -64,7 +64,7 @@ describe('DrawSearch section', () => {
     expect(within(card).getAllByRole('button')).toHaveLength(10)
 
     await user.click(within(card).getByRole('button', { name: 'Рисовать цветом «Природа и тишина»' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Нарисуй своё путешествие' })
+    const dialog = await screen.findByRole('dialog', { name: 'Нарисуй свой отдых' })
     expect(within(dialog).getByRole('button', { name: 'Природа и тишина', pressed: true })).toBeTruthy()
   })
 
@@ -221,7 +221,7 @@ describe('DrawSearch steps', () => {
 
     // draw-search, Scenario: Изменить рисунок
     await user.click(screen.getByRole('button', { name: 'Изменить рисунок' }))
-    expect(status().textContent).toBe('Шаг 1 из 3: Нарисуй своё путешествие')
+    expect(status().textContent).toBe('Шаг 1 из 3: Нарисуй свой отдых')
     expect(screen.getByRole('img', { name: 'Рисунок: мазков — 1' })).toBeTruthy()
     expect(next().disabled).toBe(false)
   })

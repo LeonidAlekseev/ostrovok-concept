@@ -3,7 +3,7 @@ import type { Hotel } from './catalog'
 import type { IsoDate } from './dates'
 
 /**
- * "Поиск по звёздам": a deterministic reading on the notions of western (tropical) astrology — the sun sign,
+ * "Звёзды подскажут": a deterministic reading on the notions of western (tropical) astrology — the sun sign,
  * its element and modality, the Sun and the Moon on the check-in day, the Moon's phase, aspects between
  * signs and the signs of the catalogue's cities. Same input, same reading.
  */
