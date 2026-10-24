@@ -2,7 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { stayTotal } from './offer'
 import { hotels, newHotels } from './catalogGenerator'
 import { destinations } from '../data/destinations'
-import { describeBrief, makePlan, mergeBrief, missingNote, nextQuestion, parseWish, presetChips } from './assistant'
+import {
+  describeBrief,
+  foldBrief,
+  makePlan,
+  mergeBrief,
+  missingNote,
+  nextQuestion,
+  normalizeBrief,
+  parseWish,
+  presetChips,
+} from './assistant'
 
 describe('parseWish', () => {
   it('reads theme, month and budget from a full request', () => {
@@ -306,5 +316,81 @@ describe('the presets of Eval', () => {
       'Романтика',
       'Удиви меня',
     ])
+  })
+})
+
+// assistant-exact-dates, Requirement: Разбор пожелания (named days of the stay)
+describe('named days of the stay', () => {
+  const today = '2026-10-24'
+  const dates = { checkIn: '2026-11-10', checkOut: '2026-11-15' }
+
+  it('plans the named days and their length (Scenario: Конкретные даты)', () => {
+    const plan = makePlan(
+      { destinationId: 'valencia', dates, when: 10, nights: 5, party: 'couple' },
+      today,
+      destinations,
+      newHotels,
+    )
+    expect(plan.query).toMatchObject({ checkIn: '2026-11-10', checkOut: '2026-11-15' })
+    expect(plan.nights).toBe(5)
+  })
+
+  it('takes the named days over the month and the length of the rules', () => {
+    const plan = makePlan({ vibe: 'sea', dates, when: 10, nights: 2, party: 'solo' }, today, destinations, newHotels)
+    expect(plan.query).toMatchObject({ checkIn: '2026-11-10', checkOut: '2026-11-15' })
+    expect(plan.nights).toBe(5)
+  })
+
+  it('keeps the plan by the month without named days', () => {
+    const plan = makePlan({ vibe: 'sea', when: 10, party: 'solo' }, today, destinations, newHotels)
+    expect(plan.query.checkIn).toBe('2026-11-07')
+  })
+
+  it('keeps the other conditions when the check-in moves (Scenario: Уточнение дат)', () => {
+    const brief = { destinationId: 'valencia', party: 'couple', dates, when: 10, nights: 5, budget: 90_000 } as const
+    const moved = foldBrief(
+      brief,
+      { dates: { checkIn: '2026-11-12', checkOut: '2026-11-17' }, when: 10, nights: 5 },
+      'а с 12-го?',
+      'when',
+    )
+    expect(moved).toEqual({ ...brief, dates: { checkIn: '2026-11-12', checkOut: '2026-11-17' } })
+  })
+
+  it('drops the named days on "не важно" for the dates asked', () => {
+    const brief = { vibe: 'sea' as const, dates, when: 10, nights: 5 }
+    expect(foldBrief(brief, {}, 'не важно', 'dates')).toEqual({ vibe: 'sea', when: 10, nights: 5 })
+  })
+
+  it('replaces the named days by a month of its own', () => {
+    const brief = { vibe: 'sea' as const, dates, when: 10, nights: 5 }
+    expect(mergeBrief(brief, 'в декабре', 'when', destinations)).toEqual({ vibe: 'sea', when: 11, nights: 5 })
+  })
+
+  it('asks for the dates when the named ones have passed', () => {
+    const question = nextQuestion({ vibe: 'sea', dates: { checkIn: '2026-10-10', checkOut: '2026-10-15' } }, today)
+    expect(question?.id).toBe('dates')
+    expect(question?.replies).toEqual([])
+  })
+
+  it('asks for the dates when the model could not take them', () => {
+    expect(nextQuestion({ vibe: 'sea', when: 10, datesRejected: true }, today)?.id).toBe('dates')
+    expect(nextQuestion({ vibe: 'sea', when: 10, dates }, today)?.id).toBe('party')
+  })
+
+  it('shows the named days in the brief', () => {
+    expect(describeBrief({ destinationId: 'valencia', dates, when: 10, nights: 5 }, destinations)).toBe(
+      'Валенсия · 10 нояб. — 15 нояб. · 5 ночей',
+    )
+  })
+
+  it('keeps only real days of at most a month of nights from the client', () => {
+    expect(normalizeBrief({ dates: { checkIn: '2026-02-31', checkOut: '2026-03-02' } }, destinations)).toEqual({})
+    expect(normalizeBrief({ dates: { checkIn: '2026-11-15', checkOut: '2026-11-10' } }, destinations)).toEqual({})
+    expect(normalizeBrief({ dates: { checkIn: '2026-11-10', checkOut: '2026-11-15' } }, destinations)).toEqual({
+      dates,
+      when: 10,
+      nights: 5,
+    })
   })
 })
