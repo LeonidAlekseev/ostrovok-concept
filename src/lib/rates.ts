@@ -18,8 +18,6 @@ export const guestsPerRoom = ({ adults, children, rooms }: Guests) => Math.ceil(
 
 /** Why the room cannot be booked for these guests, or `null`. */
 export function unavailableReason(room: Room, guests: Guests): string | null {
-  // A room of unknown capacity has no rate to book anyway.
-  if (room.capacity === 0) return null
   return guestsPerRoom(guests) > room.capacity
     ? `Вмещает до ${room.capacity} ${room.capacity === 1 ? 'гостя' : 'гостей'}`
     : null

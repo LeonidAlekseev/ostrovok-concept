@@ -1,5 +1,5 @@
 // Rebuilds the catalogue rows of the real hotels (`ota-*` in `hotels`) from their raw Ostrovok data in `ota_hotels`,
-// with no search JSON: all the room types of the hotel, no generated reviews, section scores or guests' photos.
+// with no search JSON: the rooms of the rates only (not the directory `room_groups`), no generated reviews, section scores or guests' photos.
 //   npm run db:rebuild:ota -- --dry-run   (reads only: prints what would change)
 //   npm run db:rebuild:ota                (writes the changed rows)
 // Idempotent: a row whose data is already the rebuilt one is left alone, so a second run writes nothing. Keeps the
@@ -103,7 +103,6 @@ if (orphans.length) throw new Error(`hotels has rows without ota_hotels: ${orpha
 const asStored = (value: unknown) => JSON.parse(JSON.stringify(value))
 const changed = hotels.filter((hotel) => !isDeepStrictEqual(asStored(hotel), existing.get(hotel.id)!.data))
 const rooms = (list: typeof hotels) => list.reduce((sum, hotel) => sum + hotel.rooms.length, 0)
-const unpriced = hotels.reduce((sum, hotel) => sum + hotel.rooms.filter((room) => room.rates.length === 0).length, 0)
 const before = [...existing.values()].reduce(
   (sum, row) => sum + ((row.data as { rooms: unknown[] }).rooms?.length ?? 0),
   0,
@@ -114,7 +113,7 @@ const priceChanged = hotels.filter(
 
 console.log(`stay: ${stay.nights} nights from ${stay.checkIn}`)
 console.log(`ota_hotels: ${otaRows.length}, hotels ota-*: ${existing.size}`)
-console.log(`rooms: ${before} now, ${rooms(hotels)} rebuilt (${unpriced} without a rate)`)
+console.log(`rooms: ${before} now, ${rooms(hotels)} rebuilt (from the rates)`)
 console.log(`reviews left: ${hotels.reduce((sum, hotel) => sum + hotel.reviews.length, 0)}`)
 console.log(`priceFrom changes: ${priceChanged.length}`)
 console.log(`rows to rewrite: ${changed.length}`)

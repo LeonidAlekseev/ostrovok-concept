@@ -42,6 +42,6 @@ describe('hotelDocument', () => {
     expect(plain).not.toMatch(/Здание|Шум|видом/)
     expect(text).toContain('Здание: 12 этажей.')
     expect(text).toContain('Шум по карте шума: ночью ниже 40 дБ — тихо ночью.')
-    expect(text).toContain('Номера с видом (по описанию): на море.')
+    expect(text).toContain('В описаниях номеров отеля есть вид на море.')
   })
 })

@@ -202,10 +202,10 @@ export interface Room {
   area: number | null
   /** Empty when unknown. */
   beds: string
-  /** Guests one room sleeps; 0 when unknown. */
+  /** Guests one room sleeps. */
   capacity: number
   photos: Photo[]
-  /** Cheapest first; empty when there is no rate for the stay: no price, nothing to book. */
+  /** Cheapest first. */
   rates: Rate[]
 }
 
@@ -292,16 +292,9 @@ export interface Hotel extends HotelSummary {
 
 export const roundUp100 = (value: number) => Math.ceil(value / 100) * 100
 
-/** The note of a room without a rate for the stay. */
-export const NO_PRICE_LABEL = 'Нет цены на выбранные даты'
-
 /** The room's line under its name: «18 м² · 1 двуспальная кровать · до 2 гостей», without the unknown parts. */
 export const roomFacts = (room: Pick<Room, 'area' | 'beds' | 'capacity'>): string =>
-  [
-    room.area !== null && `${room.area} м²`,
-    room.beds,
-    room.capacity > 0 && `до ${countRu(room.capacity, ['гостя', 'гостей', 'гостей'])}`,
-  ]
+  [room.area !== null && `${room.area} м²`, room.beds, `до ${countRu(room.capacity, ['гостя', 'гостей', 'гостей'])}`]
     .filter(Boolean)
     .join(' · ')
 
@@ -310,8 +303,7 @@ export const findRate = (room: Room, rateId: string) => room.rates.find((r) => r
 
 /** The hotel's cheapest rate and its room. */
 export function cheapestRate(hotel: Hotel): { room: Room; rate: Rate } {
-  const first = hotel.rooms.find((room) => room.rates.length > 0)!
-  let best = { room: first, rate: first.rates[0] }
+  let best = { room: hotel.rooms[0], rate: hotel.rooms[0].rates[0] }
   for (const room of hotel.rooms)
     for (const rate of room.rates) if (rate.pricePerNight < best.rate.pricePerNight) best = { room, rate }
   return best

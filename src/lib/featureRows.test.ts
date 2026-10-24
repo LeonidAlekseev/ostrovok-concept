@@ -40,6 +40,21 @@ describe('featureRow', () => {
 })
 
 describe('viewRows', () => {
+  it('one row a view of a room_group_id, the first record of the id carrying the rg_hash', () => {
+    expect(
+      viewRows(7, [
+        { rg_hash: 'r1', room_group_id: 5, name_struct: { main_name: 'Люкс с видом на море' } },
+        { rg_hash: 'r2', room_group_id: 5, name_struct: { main_name: 'Люкс с видом на море, 2 кровати' } },
+        { rg_hash: 'r3', room_group_id: 6, name_struct: { main_name: 'Люкс с видом на море' } },
+        { rg_hash: 'r4', room_group_id: 5, name_struct: { main_name: 'Люкс с видом на город' } },
+      ]),
+    ).toEqual([
+      { hotel_id: 'ota-7', master_id: 7, rg_hash: 'r1', view: 'sea' },
+      { hotel_id: 'ota-7', master_id: 7, rg_hash: 'r3', view: 'sea' },
+      { hotel_id: 'ota-7', master_id: 7, rg_hash: 'r4', view: 'city' },
+    ])
+  })
+
   it('a row a view of a room group, without the name', () => {
     expect(
       viewRows(7, [
