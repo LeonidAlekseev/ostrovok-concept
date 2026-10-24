@@ -24,6 +24,8 @@
       номера — высокий — в очереди; после `search-entry-pages`, `hide-synthetic-in-production` и
       `generate-db-types` (согласовано 2026-10-24).
 - [ ] `stay-count-wording` — «Найдено N вариантов» (`SearchResultsPage.tsx:303`) — лёгкий — в очереди.
+- [ ] `search-links-fallback` — на 404 и в бронировании без предложения две ссылки «Спросить Эвал» и «Искать
+      вручную» вместо «Найти отель» — лёгкий — в очереди (согласовано 2026-10-24).
 - [ ] `fix-search-caret-hydration` — гидратация `caret-color` в combobox поиска на главной (768 px) — лёгкий — в
       очереди.
 - [ ] `remove-dead-assets` — `scenarios.image/alt`, три WebP, `--brand-green-gray` — лёгкий — в очереди; после
