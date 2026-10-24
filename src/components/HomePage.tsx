@@ -39,7 +39,7 @@ export function HomePage({ newHotels, selections }: Props) {
       <div className="mx-auto flex max-w-(--page-max) flex-col gap-[clamp(10px,3vw,24px)] px-(--page-x)">
         <section
           id="search"
-          className="relative z-10 -mt-[clamp(180px,46.5vw,225px)] scroll-mt-4 md:-mt-36 lg:-mt-[calc(var(--spacing)*31.5)]"
+          className="relative z-10 -mt-[25vw] scroll-mt-4 md:-mt-36 lg:-mt-[calc(var(--spacing)*31.5)]"
           aria-label="Поиск отелей"
         >
           <SearchPanel />
