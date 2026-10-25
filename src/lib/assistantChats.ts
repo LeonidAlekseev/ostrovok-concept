@@ -1,4 +1,12 @@
-import type { AssistantRequest, Brief, Plan, Question, TurnStep } from './assistant'
+import {
+  MAX_PHOTOS,
+  PHOTO_TEXT,
+  type AssistantRequest,
+  type Brief,
+  type Plan,
+  type Question,
+  type TurnStep,
+} from './assistant'
 import { clearDialog, isBrief, isPlan, isQuestion, loadDialog } from './assistantDialog'
 
 /**
@@ -19,7 +27,26 @@ export interface AgentStep {
   result?: string
 }
 
+/**
+ * A photo of the traveller's message, optimised in the browser (src/lib/imageOptimize.ts). A guest has only the
+ * `preview`; a signed-in user's photo is in Storage (`path`, shown by a signed link) and the preview stays in memory
+ * only; a shared snapshot's photo has its public `url`. A photo with none of them (the guest's storage overflowed)
+ * reads «Фото».
+ */
+export interface Attachment {
+  /** `<user_id>/<chat_id>/<message_id>/<n>.webp` in the private bucket `assistant-attachments`. */
+  path?: string
+  /** A data URL of 320 px. */
+  preview?: string
+  /** The public link of the copy in a shared snapshot (`assistant-shared-attachments`). */
+  url?: string
+  width: number
+  height: number
+}
+
 export interface MessageData {
+  /** The traveller's photos. */
+  attachments?: Attachment[]
   plan?: Plan
   step?: AgentStep
   /** The traveller's «Другие варианты»: the answer skips the hotels the chat has shown. */
@@ -97,7 +124,15 @@ export const byRecent = (a: Chat, b: Chat) => b.updatedAt.localeCompare(a.update
 export const dialogOf = (chat: Chat): AssistantRequest['messages'] =>
   chat.messages
     .filter((m) => m.status === 'done' && (m.role === 'user' || m.role === 'assistant'))
-    .map((m) => ({ role: m.role === 'user' ? 'user' : 'assistant', text: m.text }))
+    .map((m) => ({
+      role: m.role === 'user' ? 'user' : 'assistant',
+      // A message of photos only still says something: the route reads «Фото».
+      text: m.text || (m.data.attachments?.length ? PHOTO_TEXT : ''),
+    }))
+
+/** The traveller's newest message with photos. */
+export const lastPhotoMessage = (chat: Chat): ChatMessage | undefined =>
+  chat.messages.findLast((m) => m.role === 'user' && (m.data.attachments?.length ?? 0) > 0)
 
 // ---------------------------------------------------------------------------------------------
 // Validation: the guest's storage and the rows of Supabase are untrusted.
@@ -115,12 +150,35 @@ const isStep = (value: unknown): value is AgentStep =>
   isString(value.title) &&
   (value.result === undefined || isString(value.result))
 
+const isSize = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= 10_000
+/** The only pictures a message shows: its own data URL and the links of Supabase Storage. */
+const PREVIEW = /^data:image\/(?:webp|jpeg|png);base64,/
+const LINK = /^https?:\/\//
+const PATH = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/\d+\.(?:webp|jpg)$/i
+
+/** The photo's known parts; one without a valid size reads as none. */
+function parseAttachment(value: unknown): Attachment | null {
+  if (!isObject(value) || !isSize(value.width) || !isSize(value.height)) return null
+  return {
+    ...(isString(value.path) && PATH.test(value.path) && { path: value.path }),
+    ...(isString(value.preview) && PREVIEW.test(value.preview) && { preview: value.preview }),
+    ...(isString(value.url) && LINK.test(value.url) && { url: value.url }),
+    width: value.width,
+    height: value.height,
+  }
+}
+
 /** The known parts of a message's data; a plan of an older version loses its ready-made route. */
 export function parseData(value: unknown): MessageData | null {
   if (!isObject(value)) return null
   if (value.plan !== undefined && !isPlan(value.plan)) return null
   if (value.step !== undefined && !isStep(value.step)) return null
+  const attachments = Array.isArray(value.attachments)
+    ? value.attachments.slice(0, MAX_PHOTOS).flatMap((a) => parseAttachment(a) ?? [])
+    : []
   return {
+    ...(attachments.length > 0 && { attachments }),
     ...(value.plan !== undefined && { plan: value.plan as Plan }),
     ...(value.step !== undefined && { step: value.step as AgentStep }),
     ...(value.more === true && { more: true as const }),
@@ -214,15 +272,43 @@ export function loadGuestChats(): Chat[] {
   return chats.sort(byRecent)
 }
 
-/** Saves the guest's chats with messages, the newest `MAX_GUEST_CHATS`; none erases the key. */
+/** The photo without its preview: in Storage it is shown by its link, otherwise it reads «Фото». */
+export const withoutPreview = ({ path, url, width, height }: Attachment): Attachment => ({
+  ...(path && { path }),
+  ...(url && { url }),
+  width,
+  height,
+})
+
+/** The chat without the previews of its photos: the messages keep «Фото». */
+const withoutPreviews = (chat: Chat): Chat => ({
+  ...chat,
+  messages: chat.messages.map((m) =>
+    m.data.attachments ? { ...m, data: { ...m.data, attachments: m.data.attachments.map(withoutPreview) } } : m,
+  ),
+})
+const hasPreviews = (chat: Chat) => chat.messages.some((m) => m.data.attachments?.some((a) => a.preview))
+
+/**
+ * Saves the guest's chats with messages, the newest `MAX_GUEST_CHATS`; none erases the key. When the storage is
+ * full, the previews of the oldest chats go first, one chat at a time.
+ */
 export function saveGuestChats(chats: readonly Chat[]) {
   try {
-    const kept = chats
+    let kept = chats
       .filter((c) => c.messages.length > 0)
       .sort(byRecent)
       .slice(0, MAX_GUEST_CHATS)
-    if (kept.length === 0) window.localStorage.removeItem(CHATS_KEY)
-    else window.localStorage.setItem(CHATS_KEY, JSON.stringify(kept))
+    if (kept.length === 0) return window.localStorage.removeItem(CHATS_KEY)
+    for (;;) {
+      try {
+        return window.localStorage.setItem(CHATS_KEY, JSON.stringify(kept))
+      } catch (error) {
+        const oldest = kept.findLastIndex(hasPreviews)
+        if (oldest < 0) throw error
+        kept = kept.map((chat, i) => (i === oldest ? withoutPreviews(chat) : chat))
+      }
+    }
   } catch {
     // Storage is full or disabled: the chats live in memory only.
   }

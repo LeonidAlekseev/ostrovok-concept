@@ -40,6 +40,7 @@ import type { ChatMessage } from '../../lib/assistantChats'
 import { formatDateRange } from '../../lib/dates'
 import { formatDecimal, formatPrice, guestsLabel } from '../../lib/format'
 import { FavoriteButton } from '../FavoriteButton/FavoriteButton'
+import { MessagePhotos, type PhotoUrl } from './ChatPhotos'
 
 /** The agent's bubble; with a plan it takes the full width. */
 const agentBubble =
@@ -54,6 +55,9 @@ const timeClass = 'px-1 text-xs/[normal] text-muted-foreground'
 
 export type ChooseSearch = HotelSearch['searchFor']
 
+/** A shared chat has the public links of its photos and the previews that never reached Storage. */
+const sharedPhotoUrl: PhotoUrl = (attachment) => attachment.url ?? attachment.preview
+
 interface FeedProps {
   chatId: string
   messages: readonly ChatMessage[]
@@ -62,6 +66,8 @@ interface FeedProps {
   onRetry?: (messageId: string) => void
   /** The buttons under the newest answer with hotels; none in a shared chat. */
   planActions?: (plan: Plan) => ReactNode
+  /** What shows a photo of a message; a shared chat has the public links. */
+  photoUrl?: PhotoUrl
 }
 
 /**
@@ -69,7 +75,7 @@ interface FeedProps {
  * message only while the traveller is at the end, and the traveller's own message settles at the top. Reading the
  * older messages, they get a button to the new one instead of a jump.
  */
-export function Feed({ chatId, messages, onChoose, onRetry, planActions }: FeedProps) {
+export function Feed({ chatId, messages, onChoose, onRetry, planActions, photoUrl = sharedPhotoUrl }: FeedProps) {
   const lastPlanId = messages.findLast((m) => m.role === 'assistant' && m.data.plan?.options.length)?.id
   return (
     // A new provider per chat: each opens at its own end.
@@ -87,6 +93,7 @@ export function Feed({ chatId, messages, onChoose, onRetry, planActions }: FeedP
               >
                 <MessageItem
                   message={message}
+                  photoUrl={photoUrl}
                   onChoose={onChoose}
                   onRetry={onRetry && (() => onRetry(message.id))}
                   actions={message.id === lastPlanId && message.data.plan ? planActions?.(message.data.plan) : null}
@@ -108,6 +115,7 @@ export function Feed({ chatId, messages, onChoose, onRetry, planActions }: FeedP
 
 interface MessageProps {
   message: ChatMessage
+  photoUrl: PhotoUrl
   onChoose: ChooseSearch
   onRetry?: () => void
   actions?: ReactNode
@@ -121,17 +129,20 @@ function MessageTime({ iso, align }: { iso: string; align?: 'end' }) {
   )
 }
 
-function MessageItem({ message, onChoose, onRetry, actions }: MessageProps) {
+function MessageItem({ message, photoUrl, onChoose, onRetry, actions }: MessageProps) {
   const { role, status, text, data, createdAt } = message
   if (role === 'user')
     return (
       <Message align="end">
-        <MessageContent className="gap-1">
-          <Bubble align="end" className={userBubble}>
-            <BubbleContent>
-              <p className={messageTextClass}>{text}</p>
-            </BubbleContent>
-          </Bubble>
+        <MessageContent className="items-end gap-1">
+          {data.attachments && <MessagePhotos attachments={data.attachments} photoUrl={photoUrl} />}
+          {text && (
+            <Bubble align="end" className={userBubble}>
+              <BubbleContent>
+                <p className={messageTextClass}>{text}</p>
+              </BubbleContent>
+            </Bubble>
+          )}
           <MessageTime iso={createdAt} align="end" />
         </MessageContent>
       </Message>

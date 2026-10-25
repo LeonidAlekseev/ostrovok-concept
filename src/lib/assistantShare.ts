@@ -2,13 +2,16 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Brief } from './assistant'
 import { isBrief } from './assistantDialog'
 import { chatTitle, parseMessage, type Chat, type ChatMessage } from './assistantChats'
+import { PHOTO_BUCKET } from './assistantChatsRemote'
 import type { Database, Json } from './db/database.types'
 
 /**
  * «Поделиться» a chat with Эвал: a read-only snapshot of it in `assistant_chat_shares`
  * (supabase/migrations/…_assistant_chat_shares.sql) opened by anyone at `/assistant/shared/<id>`. Only a signed-in
  * user shares, with their session (RLS: their own rows); anyone reads one snapshot by id through the
- * `assistant_chat_share` function. Until the migration is applied, sharing fails with `SHARE_ERROR`.
+ * `assistant_chat_share` function. Until the migration is applied, sharing fails with `SHARE_ERROR`. The photos of
+ * the chat are copied to the public bucket `SHARED_PHOTO_BUCKET` under the snapshot's id, so anyone with the link
+ * sees them and deleting the chat leaves them.
  */
 
 type Client = SupabaseClient<Database>
@@ -47,12 +50,55 @@ export function parseSnapshot(value: unknown): ShareSnapshot | null {
   return { title, brief, messages: messages.flatMap((m) => parseMessage(m) ?? []) }
 }
 
+export const SHARED_PHOTO_BUCKET = 'assistant-shared-attachments'
+
+/**
+ * The snapshot's photos copied from the private bucket to the public one, at `<user_id>/<share_id>/<n>.webp`, with
+ * their public links. A photo that is not copied reads «Фото» in the snapshot; a preview that never reached Storage
+ * stays as it is.
+ */
+async function sharePhotos(client: Client, shareId: string, snapshot: ShareSnapshot): Promise<ShareSnapshot> {
+  if (!snapshot.messages.some((m) => m.data.attachments?.some((a) => a.path))) return snapshot
+  const { data } = await client.auth.getSession()
+  const userId = data.session?.user.id
+  const own = client.storage.from(PHOTO_BUCKET)
+  let n = 0
+  const messages: ChatMessage[] = []
+  for (const message of snapshot.messages) {
+    const attachments = message.data.attachments
+    if (!attachments) {
+      messages.push(message)
+      continue
+    }
+    const copies = []
+    for (const { path, preview, width, height } of attachments) {
+      const size = { width, height }
+      if (!path) {
+        copies.push(preview ? { ...size, preview } : size)
+        continue
+      }
+      const to = `${userId}/${shareId}/${n++}.${path.endsWith('.jpg') ? 'jpg' : 'webp'}`
+      const { error } = userId
+        ? await own.copy(path, to, { destinationBucket: SHARED_PHOTO_BUCKET })
+        : { error: { message: 'no session' } }
+      if (error) {
+        console.warn(`${SHARED_PHOTO_BUCKET}: ${error.message.slice(0, 200)}`)
+        copies.push(size)
+      } else copies.push({ ...size, url: client.storage.from(SHARED_PHOTO_BUCKET).getPublicUrl(to).data.publicUrl })
+    }
+    messages.push({ ...message, data: { ...message.data, attachments: copies } })
+  }
+  return { ...snapshot, messages }
+}
+
 /** Saves the snapshot of the chat; the id of the link. Any failure throws `SHARE_ERROR`. */
 export async function shareChat(client: Client, chat: Chat): Promise<string> {
-  const snapshot = snapshotOf(chat)
+  // The id is made here: the photos are copied under it before the snapshot is written.
+  const id = crypto.randomUUID()
+  const snapshot = await sharePhotos(client, id, snapshotOf(chat))
   const { data, error } = await client
     .from('assistant_chat_shares')
-    .insert({ title: snapshot.title.slice(0, 200), snapshot: snapshot as unknown as NonNullable<Json> })
+    .insert({ id, title: snapshot.title.slice(0, 200), snapshot: snapshot as unknown as NonNullable<Json> })
     .select('id')
     .single()
   if (error || !data) {

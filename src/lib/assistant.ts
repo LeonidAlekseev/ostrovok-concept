@@ -57,11 +57,15 @@ export interface Brief {
 export type QuestionId = 'vibe' | 'when' | 'party' | 'dates'
 
 export interface Question {
-  id: QuestionId
+  /** `photo` asks what to do with the photos of the message; it is not a part of the brief. */
+  id: QuestionId | 'photo'
   text: string
   /** Quick replies; each is sent as if the traveller typed it. */
   replies: string[]
 }
+
+/** A question of the brief: what the plan still lacks. */
+type BriefQuestion = Question & { id: QuestionId }
 
 export interface AssistantOption {
   destination: Destination
@@ -256,7 +260,11 @@ const VIBE_REPLIES: [label: string, vibe: VibeId | null][] = [
  * The question the brief still lacks. With the `destinations` shown, the themes without a city in the season are
  * not offered as quick replies.
  */
-export function nextQuestion(brief: Brief, today: IsoDate, destinations?: readonly Destination[]): Question | null {
+export function nextQuestion(
+  brief: Brief,
+  today: IsoDate,
+  destinations?: readonly Destination[],
+): BriefQuestion | null {
   // Named days that are not taken, or that have passed since they were named: the plan waits for them.
   if (brief.datesRejected || (brief.dates && brief.dates.checkIn < today))
     return {
@@ -626,6 +634,39 @@ export function normalizeBrief(
 export interface AssistantRequest {
   messages: { role: 'user' | 'assistant'; text: string }[]
   brief: Brief
+  /**
+   * The photos of the traveller's newest message with photos (or of the one Эвал asked about): optimised WebP or
+   * JPEG data URLs, at most `MAX_PHOTOS` (src/lib/imageOptimize.ts).
+   */
+  photos?: string[]
+}
+
+/** Photos a message takes. */
+export const MAX_PHOTOS = 4
+/** The text a message of photos only has in the dialog the model reads. */
+export const PHOTO_TEXT = 'Фото'
+export const PHOTO_SIMILAR = 'Найти похожие отели'
+export const PHOTO_REFINE = 'Учесть в запросе'
+/** What Эвал asks when the message does not say what to do with its photos. */
+export const PHOTO_QUESTION: Question = {
+  id: 'photo',
+  text: 'Что сделать с фото? Могу найти похожие отели или учесть увиденное в запросе.',
+  replies: [PHOTO_SIMILAR, PHOTO_REFINE],
+}
+/** What Эвал says when the model that sees photos is unavailable (no key, an error, the time out, the limit). */
+export const PHOTO_UNSEEN =
+  'Не смог рассмотреть фото. Опишите словами, что на нём важно — вид, стиль, место, — и я подберу.'
+
+/**
+ * What came of the photos: `ask` — the message does not say what to do with them (`PHOTO_QUESTION`); `similar` —
+ * the hotels like the photo are the `matches`; `refine` — what the photo shows went into the brief; `unseen` — the
+ * photos could not be looked at. `seen` is what the model saw, in Russian; `like` — what the hotels are like it in
+ * («вид на море, бассейн»).
+ */
+export interface PhotoAnswer {
+  action: 'ask' | 'similar' | 'refine' | 'unseen'
+  seen?: string
+  like?: string
 }
 
 /** A step of Эвал's turn on the server: one of its agents and what came of it. */
@@ -655,6 +696,8 @@ export interface AssistantResponse {
    * part from general knowledge: shown apart, marked «Не проверено».
    */
   unverified?: string
+  /** The answer to the photos of the request. */
+  photo?: PhotoAnswer
 }
 
 /** What Эвал says about a hotel when it cannot answer at all (no network, the route is down). */
@@ -667,6 +710,8 @@ export const MAX_HISTORY = 20
  * the semantic search's hotels, when the plan is due.
  */
 const ASSISTANT_TIMEOUT_MS = 15_000
+/** With photos the route looks at them first (up to 12 s) and answers within 28 s. */
+const PHOTO_TIMEOUT_MS = 30_000
 
 const isRecord = (value: unknown): value is Record<string, HotelFeatures> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -677,6 +722,17 @@ const isStep = (value: unknown): value is TurnStep =>
   ['search', 'features'].includes((value as TurnStep).agent) &&
   typeof (value as TurnStep).title === 'string' &&
   ['done', 'failed'].includes((value as TurnStep).status)
+const PHOTO_ACTIONS: readonly PhotoAnswer['action'][] = ['ask', 'similar', 'refine', 'unseen']
+const parsePhoto = (value: unknown): PhotoAnswer | undefined => {
+  if (typeof value !== 'object' || value === null) return undefined
+  const { action, seen, like } = value as Record<string, unknown>
+  if (!PHOTO_ACTIONS.includes(action as PhotoAnswer['action'])) return undefined
+  return {
+    action: action as PhotoAnswer['action'],
+    ...(typeof seen === 'string' && seen && { seen }),
+    ...(typeof like === 'string' && like && { like }),
+  }
+}
 
 /** «Данных о шуме у отелей Праги нет — …»: what Эвал says instead of guessing. */
 export function missingNote(missing: readonly Criterion[], cities: readonly Destination[]): string {
@@ -701,15 +757,16 @@ export async function askAssistant(
     .filter((m) => m.text.trim())
     .slice(-MAX_HISTORY)
     .map((m) => ({ ...m, text: m.text.slice(0, MAX_MESSAGE_LENGTH) }))
-  const body: AssistantRequest = { ...request, messages }
+  const photos = request.photos?.slice(0, MAX_PHOTOS) ?? []
+  // No photos, no field: the body stays as small as before.
+  const body: AssistantRequest = { ...request, messages, photos: photos.length > 0 ? photos : undefined }
+  const timeout = AbortSignal.timeout(photos.length > 0 ? PHOTO_TIMEOUT_MS : ASSISTANT_TIMEOUT_MS)
   try {
     const response = await fetch('/api/assistant', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      signal: signal
-        ? AbortSignal.any([signal, AbortSignal.timeout(ASSISTANT_TIMEOUT_MS)])
-        : AbortSignal.timeout(ASSISTANT_TIMEOUT_MS),
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     })
     if (response.ok) {
       const data = (await response.json()) as AssistantResponse
@@ -722,6 +779,7 @@ export async function askAssistant(
         ...(isRecord(data.features) && { features: data.features }),
         ...(Array.isArray(data.missing) && { missing: data.missing.filter(isCriterion) }),
         ...(Array.isArray(data.steps) && { steps: data.steps.filter(isStep) }),
+        ...(parsePhoto(data.photo) && { photo: parsePhoto(data.photo) }),
       }
     }
   } catch {
@@ -730,5 +788,7 @@ export async function askAssistant(
   // A chat about a hotel has no rules of its own here: the hotel's data are on the server.
   if (request.brief.hotelId) return { brief: request.brief, reply: HOTEL_UNAVAILABLE, source: 'rules' }
   const input = request.messages.at(-1)?.text ?? ''
-  return { brief: mergeBrief(request.brief, input, asked, destinations), source: 'rules' }
+  const brief = mergeBrief(request.brief, input, asked, destinations)
+  // The rules cannot see photos: Эвал says so instead of pretending.
+  return { brief, source: 'rules', ...(photos.length > 0 && { photo: { action: 'unseen' as const } }) }
 }

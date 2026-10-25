@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { stayTotal } from './offer'
 import { hotels, newHotels } from './catalogGenerator'
 import { destinations } from '../data/destinations'
 import {
+  askAssistant,
   describeBrief,
   foldBrief,
   makePlan,
@@ -429,5 +430,52 @@ describe('named days of the stay', () => {
       when: 10,
       nights: 5,
     })
+  })
+})
+
+// assistant-search, Requirement: Что сделать с фото
+describe('askAssistant with photos', () => {
+  const photo = 'data:image/webp;base64,AAAA'
+  const request = { messages: [{ role: 'user' as const, text: 'Фото' }], brief: {}, photos: [photo, photo] }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('sends the photos and reads the answer about them', async () => {
+    const fetch = vi.fn(async () => Response.json({ brief: {}, source: 'rules', photo: { action: 'ask' } }))
+    vi.stubGlobal('fetch', fetch)
+    const response = await askAssistant(request, null, destinations)
+    expect(response.photo).toEqual({ action: 'ask' })
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+    expect(JSON.parse(init.body as string).photos).toEqual([photo, photo])
+  })
+
+  it('keeps the answer’s known actions only', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ brief: {}, source: 'model', photo: { action: 'paint', seen: 1 } })),
+    )
+    expect((await askAssistant(request, null, destinations)).photo).toBeUndefined()
+  })
+
+  it('says it could not look at the photos when the route fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 503 })),
+    )
+    expect(await askAssistant(request, null, destinations)).toEqual({
+      brief: {},
+      source: 'rules',
+      photo: { action: 'unseen' },
+    })
+  })
+
+  it('sends no photos field without photos', async () => {
+    const fetch = vi.fn(async () => Response.json({ brief: {}, source: 'rules' }))
+    vi.stubGlobal('fetch', fetch)
+    await askAssistant({ ...request, photos: [] }, null, destinations)
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+    expect(JSON.parse(init.body as string)).not.toHaveProperty('photos')
   })
 })

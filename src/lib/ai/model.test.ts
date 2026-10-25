@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getSecret } from '../secrets'
-import { ASSISTANT_MODEL, getAssistantModel } from './model'
+import { ASSISTANT_MODEL, VISION_MODEL, getAssistantModel, getVisionModel } from './model'
 
 vi.mock('../secrets', () => ({ getSecret: vi.fn() }))
 
@@ -19,5 +19,17 @@ describe('getAssistantModel', () => {
     vi.mocked(getSecret).mockResolvedValue('test-key')
     const model = await getAssistantModel()
     expect(model).toMatchObject({ modelId: ASSISTANT_MODEL, provider: 'nvidia.chat' })
+  })
+})
+
+describe('getVisionModel', () => {
+  it('gives no model without NVIDIA_API_KEY', async () => {
+    vi.mocked(getSecret).mockResolvedValue(undefined)
+    expect(await getVisionModel()).toBeUndefined()
+  })
+
+  it('gives the model that sees photos with the key', async () => {
+    vi.mocked(getSecret).mockResolvedValue('test-key')
+    expect(await getVisionModel()).toMatchObject({ modelId: VISION_MODEL, provider: 'nvidia.chat' })
   })
 })

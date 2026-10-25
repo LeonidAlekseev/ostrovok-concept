@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   CHATS_KEY,
   MAX_GUEST_CHATS,
   chatTitle,
   dialogOf,
   hotelChatOf,
+  lastPhotoMessage,
   loadGuestChats,
   newChat,
   parseChat,
@@ -144,5 +145,74 @@ describe('the chats about a hotel', () => {
     expect(parseChat(JSON.parse(JSON.stringify(recent)))?.brief.hotelId).toBe('ota-1')
     expect(hotelChatOf([old, other, recent, empty], 'ota-1')).toBe(recent)
     expect(hotelChatOf([other], 'ota-1')).toBeUndefined()
+  })
+})
+
+// assistant-search, Requirements: Фото во вложениях, Фото у гостя
+describe('the photos of a message', () => {
+  const preview = 'data:image/webp;base64,AAAA'
+  const path = `${crypto.randomUUID()}/${crypto.randomUUID()}/${crypto.randomUUID()}/0.webp`
+
+  it('keeps the photos’ path, preview, link and size; drops what is not a picture of the chat', () => {
+    const data = {
+      attachments: [
+        { path, width: 1600, height: 1200 },
+        { preview, width: 320, height: 240 },
+        { url: 'https://x.supabase.co/storage/v1/object/public/a/0.webp', width: 10, height: 10 },
+        { preview: 'javascript:alert(1)', url: 'ftp://x', path: '../other/0.webp', width: 5, height: 5 },
+        { preview, width: 0, height: 10 },
+        'photo',
+      ],
+    }
+    const parsed = parseChat(
+      JSON.parse(
+        JSON.stringify(
+          chatWith('2026-10-25T10:00:00.000Z', message('user', '', { data: data as unknown as ChatMessage['data'] })),
+        ),
+      ),
+    )
+    expect(parsed?.messages[0].data.attachments).toEqual([
+      { path, width: 1600, height: 1200 },
+      { preview, width: 320, height: 240 },
+      { url: 'https://x.supabase.co/storage/v1/object/public/a/0.webp', width: 10, height: 10 },
+      { width: 5, height: 5 },
+    ])
+  })
+
+  it('takes at most four photos a message', () => {
+    const attachments = Array.from({ length: 6 }, () => ({ preview, width: 1, height: 1 }))
+    const parsed = parseChat(chatWith('2026-10-25T10:00:00.000Z', message('user', '', { data: { attachments } })))
+    expect(parsed?.messages[0].data.attachments).toHaveLength(4)
+  })
+
+  it('reads a message of photos only as «Фото» for the model and finds the newest one', () => {
+    const photos = message('user', '', { data: { attachments: [{ preview, width: 1, height: 1 }] } })
+    const chat = chatWith(
+      '2026-10-25T10:00:00.000Z',
+      message('user', 'в Валенсию'),
+      photos,
+      message('assistant', 'Что сделать с фото?'),
+    )
+    expect(dialogOf(chat).map((m) => m.text)).toEqual(['в Валенсию', 'Фото', 'Что сделать с фото?'])
+    expect(lastPhotoMessage(chat)?.id).toBe(photos.id)
+  })
+
+  it('lets the oldest chats’ previews go when the guest’s storage is full, the messages stay', () => {
+    const photo = (at: string) =>
+      chatWith(at, message('user', 'вот', { data: { attachments: [{ preview, width: 320, height: 240 }] } }))
+    const chats = [photo('2026-10-25T10:00:00.000Z'), photo('2026-10-24T10:00:00.000Z')]
+    const setItem = Storage.prototype.setItem
+    let calls = 0
+    // The first write overflows; the one without the older chat's preview fits.
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key, value) {
+      if (calls++ === 0) throw new DOMException('full', 'QuotaExceededError')
+      setItem.call(this, key, value)
+    })
+    saveGuestChats(chats)
+    spy.mockRestore()
+    const saved = loadGuestChats()
+    expect(saved[0].messages[0].data.attachments).toEqual([{ preview, width: 320, height: 240 }])
+    expect(saved[1].messages[0].data.attachments).toEqual([{ width: 320, height: 240 }])
+    expect(saved[1].messages[0].text).toBe('вот')
   })
 })
