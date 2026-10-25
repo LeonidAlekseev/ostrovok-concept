@@ -87,9 +87,17 @@ export interface PhotoSight {
   features: string[]
   /** The city or the region, only when recognisable. */
   place?: string
+  /** The photo shows nothing a hotel is chosen by (a blur, a plain colour, a document, a face): no search by it. */
+  unusable?: true
 }
 
 const sightSchema = z.object({
+  usable: z
+    .boolean()
+    .catch(true)
+    .describe(
+      'false ТОЛЬКО если на фото вообще нет места: ни пейзажа, ни моря, ни гор, ни города, ни интерьера (однотонные пятна, полностью размытое фото, текст документа); любое фото места или номера — true',
+    ),
   description: z
     .string()
     .describe('1–2 предложения по-русски: стиль, вид, окружение, что важно для выбора отеля; без выдумок'),
@@ -164,17 +172,34 @@ export async function seePhotos(
     ...new Set(output.features.flatMap((feature) => russian(feature, MAX_FEATURE)?.toLocaleLowerCase('ru') ?? [])),
   ].slice(0, MAX_FEATURES)
   const place = russian(output.place, MAX_PLACE)
-  return { description, ...(view && { view }), features, ...(place && { place }) }
+  return {
+    description,
+    ...(view && { view }),
+    features,
+    ...(place && { place }),
+    // A photo with a view or features is of a place, whatever the flag says: the model is too quick to drop one.
+    ...(output.usable === false && !view && features.length === 0 && { unusable: true as const }),
+  }
 }
 
 /** The view as the rules of the wish read it: «вид на море». */
 const viewPhrase = (view: ViewKind | undefined) => (view && view !== 'street' ? `вид ${VIEW_LABEL[view]}` : undefined)
 
-/** The words the search by meaning looks for: the photo's description and its features. */
-export const similarQuery = (sight: PhotoSight): string =>
-  [sight.description, viewPhrase(sight.view), ...sight.features, sight.place]
-    .flatMap((part) => part?.replace(/[.!?…]+$/, '') || [])
-    .join('. ')
+/** The query of the search by meaning stays short: the embedding answers it quickest. */
+export const MAX_SIMILAR_QUERY = 300
+
+/**
+ * The words the search by meaning looks for: the photo's features first, then its description, cut short. The
+ * second is the retry's: other words, so it does not wait on the first one's stalled request.
+ */
+export function similarQueries(sight: PhotoSight): [string, string] {
+  const short = (text: string) => text.slice(0, MAX_SIMILAR_QUERY).trim()
+  const features = sightFeatures(sight)
+  const description = sight.description.replace(/[.!?…]+$/, '')
+  const first = short([features, description].filter(Boolean).join('. '))
+  const retry = short(features || description.slice(0, 150))
+  return [first, retry === first ? `${first}, отель` : retry]
+}
 
 /** «вид на море, бассейн, Валенсия»: what the photo adds to the wish, short. */
 export const sightFeatures = (sight: PhotoSight): string =>

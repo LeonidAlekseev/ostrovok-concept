@@ -13,7 +13,9 @@ import {
   planCities,
   PHOTO_QUESTION,
   PHOTO_TEXT,
+  PHOTO_MISSED,
   PHOTO_UNSEEN,
+  PHOTO_UNUSABLE,
   type AssistantResponse,
   type Brief,
   type Question,
@@ -82,7 +84,9 @@ export function compose(
   if (photo?.action === 'ask') return { brief, question: PHOTO_QUESTION, text: PHOTO_QUESTION.text, data: {} }
   if (photo?.action === 'unseen') return { brief, question: null, text: PHOTO_UNSEEN, data: {} }
   const seen = photo?.seen ? `Вижу на фото: ${photo.seen.replace(/[.!]?$/, '.')}` : ''
+  if (photo?.action === 'unusable') return { brief, question: null, text: `${seen} ${PHOTO_UNUSABLE}`.trim(), data: {} }
   if (photo?.action === 'similar') {
+    if (photo.missed) return { brief, question: null, text: `${seen} ${PHOTO_MISSED}`.trim(), data: {} }
     if (!matches?.length)
       return {
         brief,
@@ -314,16 +318,11 @@ export function useChats(
       // The question about photos is not a part of the brief.
       const question = chat.question?.id === 'photo' ? null : (chat.question?.id ?? null)
       const today = todayIso()
-      // Only the photos kept in Storage are waited for: a turn without them starts at once.
+      // The photos of the turn; the ones kept in Storage come later, after the turn's state is set.
       const found = requestPhotos(chat, pending.createdAt)
-      const sent = found instanceof Promise ? await found : found
-      if (controller.signal.aborted) {
-        if (inflight.current.get(chatId) === controller) inflight.current.delete(chatId)
-        return
-      }
       // The plan is surely due when the rules alone complete the brief: its first step shows while Эвал works.
       const planDue =
-        !sent && !chat.brief.hotelId && !nextQuestion(mergeBrief(chat.brief, input, question, destinations), today)
+        !found && !chat.brief.hotelId && !nextQuestion(mergeBrief(chat.brief, input, question, destinations), today)
       const stepId = newId()
       update(chatId, (c) => ({
         ...c,
@@ -346,6 +345,9 @@ export function useChats(
       }))
 
       try {
+        // Only the photos in Storage are waited for: the turn is already marked in flight, so no other one starts.
+        const sent = found instanceof Promise ? await found : found
+        if (controller.signal.aborted) return
         const [response] = await Promise.all([
           askAssistant(
             { messages: history, brief: chat.brief, ...(sent && { photos: sent }) },

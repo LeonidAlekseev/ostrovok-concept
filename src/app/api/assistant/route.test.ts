@@ -1,4 +1,4 @@
-import type { LanguageModel } from 'ai'
+import { APICallError, type LanguageModel } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getAssistantModel, getVisionModel } from '@/lib/ai/model'
@@ -489,12 +489,64 @@ describe('POST /api/assistant with photos', () => {
     })
     expect(body.matches.map((h: { id: string }) => h.id)).toEqual(['prague-skyline-hostel'])
     const [text, options] = vi.mocked(semanticSearch).mock.calls[0]
-    expect(text).toBe('Номер в старом городе с деревянными балками. старый город')
+    expect(text).toBe('старый город. Номер в старом городе с деревянными балками')
     expect(options.destinationIds).toBeUndefined()
     // The photos go to the model that sees them as images.
     const vision = (await vi.mocked(getVisionModel).mock.results[0].value) as MockLanguageModelV4
     const parts = vision.doGenerateCalls[0].prompt.at(-1)!.content as { type: string }[]
     expect(parts.map((p) => p.type)).toEqual(['file', 'text'])
+  })
+
+  it('tries again with other words when the search does not answer, then says so honestly', async () => {
+    setModel(undefined)
+    sees({ description: 'Номер с видом на море.', features: ['вид на море'] })
+    vi.mocked(semanticSearch)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce([hit('prague-skyline-hostel')])
+    const found = await (await withPhotos('найди похожий')).json()
+    expect(found.matches.map((h: { id: string }) => h.id)).toEqual(['prague-skyline-hostel'])
+    const [[first, firstOptions], [retry]] = vi.mocked(semanticSearch).mock.calls
+    expect(first).toBe('вид на море. Номер с видом на море')
+    expect(retry).toBe('вид на море')
+    expect(firstOptions.timeoutMs).toBeLessThanOrEqual(6000)
+
+    // Nothing found at once is not the search failing.
+    vi.mocked(semanticSearch).mockReset().mockResolvedValue(null)
+    const none = await (await withPhotos('найди похожий')).json()
+    expect(none.photo.missed).toBeUndefined()
+    expect(none.steps[0]).toMatchObject({ status: 'done', result: 'похожих не нашёл' })
+
+    // A search that takes its whole time did not answer.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.mocked(semanticSearch)
+      .mockReset()
+      .mockImplementation(async (_, { timeoutMs = 0 }) => {
+        vi.setSystemTime(Date.now() + timeoutMs)
+        return null
+      })
+    const missed = await (await withPhotos('найди похожий')).json()
+    vi.useRealTimers()
+    expect(missed.photo).toMatchObject({ action: 'similar', missed: true })
+    expect(missed.matches).toBeUndefined()
+    expect(missed.steps).toEqual([
+      { agent: 'search', title: 'Ищу отели, похожие на фото', status: 'failed', result: 'поиск не ответил' },
+    ])
+    expect(semanticSearch).toHaveBeenCalledTimes(2)
+    expect(vi.mocked(semanticSearch).mock.calls[1][1].timeoutMs).toBeGreaterThanOrEqual(2000)
+  })
+
+  it('looks for nothing by a photo with nothing a hotel is chosen by', async () => {
+    setModel(undefined)
+    sees({ usable: false, description: 'Только цветные полосы.' })
+    for (const text of ['найди похожий', 'Учесть в запросе']) {
+      const body = await (await withPhotos(text)).json()
+      expect(body).toEqual({
+        brief: {},
+        source: 'model',
+        photo: { action: 'unusable', seen: 'Только цветные полосы.' },
+      })
+    }
+    expect(semanticSearch).not.toHaveBeenCalled()
   })
 
   it('looks in the chat’s city when it has one', async () => {
@@ -530,6 +582,25 @@ describe('POST /api/assistant with photos', () => {
     )
     expect((await (await withPhotos('найди похожий')).json()).photo).toEqual({ action: 'unseen' })
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('504 Gateway Timeout'))
+    // An error of the API brings its status and its short answer, not the request.
+    vi.mocked(getVisionModel).mockResolvedValue(
+      new MockLanguageModelV4({
+        doGenerate: async () => {
+          throw new APICallError({
+            message: '',
+            url: 'https://integrate.api.nvidia.com/v1/chat/completions',
+            requestBodyValues: { messages: ['secret photo'] },
+            statusCode: 429,
+            responseBody: `{"detail":"Too many requests ${'x'.repeat(400)}"}`,
+          })
+        },
+      }) as LanguageModel,
+    )
+    await withPhotos('найди похожий')
+    const line = vi.mocked(console.warn).mock.calls.at(-1)![0] as string
+    expect(line).toContain('HTTP 429: {"detail":"Too many requests')
+    expect(line).not.toContain('secret photo')
+    expect(line.length).toBeLessThan(400)
     sees({ description: 'A room with a view.' })
     expect((await (await withPhotos('найди похожий')).json()).photo).toEqual({ action: 'unseen' })
   })

@@ -8,7 +8,8 @@ import {
   refinedText,
   seePhotos,
   sightFeatures,
-  similarQuery,
+  MAX_SIMILAR_QUERY,
+  similarQueries,
 } from './vision'
 
 const usage = {
@@ -77,6 +78,26 @@ describe('seePhotos', () => {
     expect(call.responseFormat).toMatchObject({ type: 'json' })
   })
 
+  it('keeps a photo with a view or features usable whatever the flag says', async () => {
+    const sight = await seePhotos(
+      modelSays({ usable: false, description: 'Пляж и море.', view: 'sea', features: ['пляж'] }),
+      [photo],
+    )
+    expect(sight).not.toHaveProperty('unusable')
+  })
+
+  it('marks a photo that shows nothing a hotel is chosen by', async () => {
+    const sight = await seePhotos(
+      modelSays({ usable: false, description: 'Только цветные полосы без деталей.', features: [] }),
+      [photo],
+    )
+    expect(sight).toEqual({ description: 'Только цветные полосы без деталей.', features: [], unusable: true })
+    // The schema the model gets asks for it.
+    const model = modelSays({ usable: true, description: 'Бассейн.', features: [] })
+    expect(await seePhotos(model, [photo])).not.toHaveProperty('unusable')
+    expect(model.doGenerateCalls[0].prompt[0].content).toContain('usable')
+  })
+
   it('drops an unknown view and an unsure place', async () => {
     const sight = await seePhotos(
       modelSays({ description: 'Бассейн у отеля среди пальм.', view: 'moon', features: [], place: null }),
@@ -97,7 +118,14 @@ describe('the photo in the search', () => {
   const sight = { description: 'Номер с видом на море.', view: 'sea' as const, features: ['бассейн'] }
 
   it('looks for similar hotels by the description and the features', () => {
-    expect(similarQuery(sight)).toBe('Номер с видом на море. вид на море. бассейн')
+    expect(similarQueries(sight)).toEqual(['вид на море, бассейн. Номер с видом на море', 'вид на море, бассейн'])
+    // Without features the retry is other words all the same: it must not wait on the first request.
+    const [first, retry] = similarQueries({ description: 'Тихий двор.', features: [] })
+    expect(first).toBe('Тихий двор')
+    expect(retry).not.toBe(first)
+    const long = similarQueries({ description: 'Номер у моря. '.repeat(40), features: ['бассейн'] })
+    expect(long[0].length).toBeLessThanOrEqual(MAX_SIMILAR_QUERY)
+    expect(long[1]).toBe('бассейн')
     expect(sightFeatures(sight)).toBe('вид на море, бассейн')
   })
 

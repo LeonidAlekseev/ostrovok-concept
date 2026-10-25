@@ -654,19 +654,27 @@ export const PHOTO_QUESTION: Question = {
   replies: [PHOTO_SIMILAR, PHOTO_REFINE],
 }
 /** What Эвал says when the model that sees photos is unavailable (no key, an error, the time out, the limit). */
+/** What Эвал says when the photos show nothing a hotel is chosen by. */
+export const PHOTO_UNUSABLE =
+  'По такому фото не подобрать отель — опишите словами, что для вас важно: вид, стиль, место.'
+/** What Эвал says when the search for similar hotels did not answer in time. */
+export const PHOTO_MISSED =
+  'Поиск похожих отелей сейчас не ответил — попробуйте ещё раз чуть позже или опишите словами, что для вас важно.'
 export const PHOTO_UNSEEN =
   'Не смог рассмотреть фото. Опишите словами, что на нём важно — вид, стиль, место, — и я подберу.'
 
 /**
  * What came of the photos: `ask` — the message does not say what to do with them (`PHOTO_QUESTION`); `similar` —
  * the hotels like the photo are the `matches`; `refine` — what the photo shows went into the brief; `unseen` — the
- * photos could not be looked at. `seen` is what the model saw, in Russian; `like` — what the hotels are like it in
+ * photos could not be looked at; `unusable` — they show nothing a hotel is chosen by. `seen` is what the model saw, in Russian; `like` — what the hotels are like it in
  * («вид на море, бассейн»).
  */
 export interface PhotoAnswer {
-  action: 'ask' | 'similar' | 'refine' | 'unseen'
+  action: 'ask' | 'similar' | 'refine' | 'unseen' | 'unusable'
   seen?: string
   like?: string
+  /** `similar`: the search by meaning did not answer in time, so no hotels were looked for. */
+  missed?: true
 }
 
 /** A step of Эвал's turn on the server: one of its agents and what came of it. */
@@ -722,15 +730,16 @@ const isStep = (value: unknown): value is TurnStep =>
   ['search', 'features'].includes((value as TurnStep).agent) &&
   typeof (value as TurnStep).title === 'string' &&
   ['done', 'failed'].includes((value as TurnStep).status)
-const PHOTO_ACTIONS: readonly PhotoAnswer['action'][] = ['ask', 'similar', 'refine', 'unseen']
+const PHOTO_ACTIONS: readonly PhotoAnswer['action'][] = ['ask', 'similar', 'refine', 'unseen', 'unusable']
 const parsePhoto = (value: unknown): PhotoAnswer | undefined => {
   if (typeof value !== 'object' || value === null) return undefined
-  const { action, seen, like } = value as Record<string, unknown>
+  const { action, seen, like, missed } = value as Record<string, unknown>
   if (!PHOTO_ACTIONS.includes(action as PhotoAnswer['action'])) return undefined
   return {
     action: action as PhotoAnswer['action'],
     ...(typeof seen === 'string' && seen && { seen }),
     ...(typeof like === 'string' && like && { like }),
+    ...(missed === true && { missed: true as const }),
   }
 }
 

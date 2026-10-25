@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { answerWithModel, ruleAnswer } from '@/lib/ai/hotelAnswer'
 import { getAssistantModel, getVisionModel } from '@/lib/ai/model'
+import { APICallError } from 'ai'
 import { allowRequest, allowVisionRequest, clientIp } from '@/lib/ai/rateLimit'
 import { SEMANTIC_TIMEOUT_MS, semanticSearch } from '@/lib/ai/semantic'
 import { MATCHES, runTurn, type TurnContext } from '@/lib/ai/turn'
@@ -13,7 +14,7 @@ import {
   refinedText,
   seePhotos,
   sightFeatures,
-  similarQuery,
+  similarQueries,
   type PhotoSight,
 } from '@/lib/ai/vision'
 import {
@@ -53,11 +54,21 @@ const ANSWER_BUDGET_MS = 14_000
 const PHOTO_BUDGET_MS = 28_000
 /** The look at the photos needs this much of the answer's time to be worth starting. */
 const MIN_VISION_MS = 3000
+/** The first try of the search for similar hotels; usually it takes about 2 s. */
+const FIRST_SEARCH_MS = 6000
+/** A retry of the search needs this much time to be worth starting. */
+const MIN_SEARCH_MS = 2000
+/** Left of the answer's time for the hotels' summaries and the answer itself. */
+const SEARCH_RESERVE_MS = 500
 
 const warn = (what: string, error: unknown) => {
   // The kind and the provider's short message; never the request itself.
   const reason = error instanceof Error ? `${error.name}: ${error.message.slice(0, 200)}` : String(error)
-  console.warn(`assistant: ${what} (${reason})`)
+  // The provider's status and its short answer: an empty message tells nothing.
+  const call = APICallError.isInstance(error)
+    ? `, HTTP ${error.statusCode ?? '—'}${error.responseBody ? `: ${error.responseBody.replace(/\s+/g, ' ').slice(0, 200)}` : ''}`
+    : ''
+  console.warn(`assistant: ${what} (${reason}${call})`)
 }
 
 /**
@@ -178,24 +189,44 @@ async function look(photos: readonly string[], ip: string, deadline: number, sig
 async function similarTurn(sight: PhotoSight, { brief, deadline, signal }: WishContext) {
   const title = 'Ищу отели, похожие на фото'
   const like = sightFeatures(sight)
-  const hits = await semanticSearch(similarQuery(sight), {
-    ...(brief.destinationId && { destinationIds: [brief.destinationId] }),
-    k: MATCHES,
-    timeoutMs: Math.min(SEMANTIC_TIMEOUT_MS, deadline - Date.now()),
-    signal,
-  })
+  const [query, retry] = similarQueries(sight)
+  // `null` is both «nothing found» and a failure: one that took the whole time is the search not answering.
+  let missed = false
+  const search = async (text: string, timeoutMs: number) => {
+    const start = Date.now()
+    const hits = await semanticSearch(text, {
+      ...(brief.destinationId && { destinationIds: [brief.destinationId] }),
+      k: MATCHES,
+      timeoutMs,
+      signal,
+    })
+    missed = !hits && Date.now() - start >= timeoutMs * 0.9
+    return hits
+  }
+  // The embedding of the NVIDIA API now and then stalls for minutes: a short first try, then other words with
+  // the rest of the answer's time.
+  let hits = await search(query, Math.min(FIRST_SEARCH_MS, deadline - Date.now() - SEARCH_RESERVE_MS))
+  const left = Math.min(SEMANTIC_TIMEOUT_MS, deadline - Date.now() - SEARCH_RESERVE_MS)
+  if (!hits && left >= MIN_SEARCH_MS) hits = await search(retry, left)
   const byId = new Map(hits?.length ? (await loadHotelSummaries().catch(() => [])).map((h) => [h.id, h]) : [])
   const matches = (hits ?? []).flatMap((hit) => byId.get(hit.id) ?? [])
-  const step: TurnStep = {
-    agent: 'search',
-    title,
-    status: 'done',
-    result: matches.length ? `нашёл ${matches.length}` : 'похожих не нашёл',
-  }
+  const step: TurnStep = missed
+    ? { agent: 'search', title, status: 'failed', result: 'поиск не ответил' }
+    : {
+        agent: 'search',
+        title,
+        status: 'done',
+        result: matches.length ? `нашёл ${matches.length}` : 'похожих не нашёл',
+      }
   return {
     brief,
     source: 'model',
-    photo: { action: 'similar', seen: sight.description, ...(like && { like }) },
+    photo: {
+      action: 'similar',
+      seen: sight.description,
+      ...(like && { like }),
+      ...(missed ? { missed: true as const } : {}),
+    },
     ...(matches.length > 0 && { matches }),
     steps: [step],
   } satisfies AssistantResponse
@@ -223,6 +254,8 @@ async function photoTurn(photos: readonly string[], ip: string, context: WishCon
   if (intent === 'unclear') return { brief, source: 'rules', photo: { action: 'ask' } }
   const sight = await look(photos, ip, deadline, signal)
   if (!sight) return { brief, source: 'rules', photo: { action: 'unseen' } }
+  // Nothing on the photo to choose a hotel by: no search and no wish of it, Эвал asks for words.
+  if (sight.unusable) return { brief, source: 'model', photo: { action: 'unusable', seen: sight.description } }
   if (intent === 'similar') return similarTurn(sight, context)
   const text = refinedText(input, sight).slice(0, MAX_MESSAGE_LENGTH)
   const answer = await wishTurn({ ...context, messages: [...messages.slice(0, -1), { role: 'user', text }] })

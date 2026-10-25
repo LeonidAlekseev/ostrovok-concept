@@ -9,6 +9,10 @@ import { SharedChat } from './SharedChat'
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
+// A guest by default; a test of the account sets its own Supabase client.
+const supabase = vi.hoisted(() => ({ client: null as unknown }))
+vi.mock('@/lib/supabase/client', () => ({ getBrowserClient: () => supabase.client }))
+
 // jsdom has no canvas: the optimised photo is the file's name in a data URL.
 vi.mock('../../lib/imageOptimize', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/imageOptimize')>()
@@ -32,6 +36,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  supabase.client = null
   vi.restoreAllMocks()
   window.localStorage.clear()
   fetchMock.mockReset()
@@ -195,6 +200,38 @@ describe('what Эвал does with the photos', () => {
     expect(screen.queryByRole('list', { name: 'Быстрые ответы' })).toBeNull()
   })
 
+  it('shows no hotels for a photo with nothing a hotel is chosen by and asks for words', async () => {
+    fetchMock.mockResolvedValue(answer({ brief: {}, photo: { action: 'unusable', seen: 'Только цветные полосы' } }))
+    const { user } = renderAssistant()
+    await user.upload(picker(), photo('a.jpg'))
+    await user.type(input(), 'найди похожий отель{Enter}')
+    expect(
+      await within(log()).findByText(
+        'Вижу на фото: Только цветные полосы. По такому фото не подобрать отель — опишите словами, что для вас важно: вид, стиль, место.',
+      ),
+    ).toBeTruthy()
+    expect(within(log()).queryByText(/Нашёл похожие отели/)).toBeNull()
+    expect(within(log()).queryAllByRole('article')).toHaveLength(0)
+  })
+
+  it('says so when the search for similar hotels did not answer', async () => {
+    fetchMock.mockResolvedValue(
+      answer({
+        brief: {},
+        photo: { action: 'similar', seen: 'Номер у моря', missed: true },
+        steps: [{ agent: 'search', title: 'Ищу отели, похожие на фото', status: 'failed', result: 'поиск не ответил' }],
+      }),
+    )
+    const { user } = renderAssistant()
+    await user.upload(picker(), photo('a.jpg'))
+    await user.type(input(), 'найди похожий{Enter}')
+    expect(
+      await within(log()).findByText(/^Вижу на фото: Номер у моря\. Поиск похожих отелей сейчас не ответил/),
+    ).toBeTruthy()
+    expect(within(log()).getByText('Ищу отели, похожие на фото — поиск не ответил')).toBeTruthy()
+    expect(within(log()).queryAllByRole('article')).toHaveLength(0)
+  })
+
   it('tells what it saw before the brief when the photo went into the wish', async () => {
     fetchMock.mockResolvedValue(
       answer({ brief: { view: 'sea' }, photo: { action: 'refine', seen: 'Вид на море с балкона' } }),
@@ -256,5 +293,105 @@ describe('a shared chat with photos', () => {
     )
     const button = await within(log()).findByRole('button', { name: 'Открыть фото 1' })
     expect(button.querySelector('img')?.getAttribute('src')).toBe(url)
+  })
+})
+
+/** A query of supabase-js: every method chains, awaiting it gives `result`. */
+function query(result: { data: unknown; error: null }) {
+  const chain: Record<string, unknown> = {}
+  for (const method of ['select', 'order', 'limit', 'upsert', 'delete', 'eq', 'in']) chain[method] = vi.fn(() => chain)
+  chain.then = (resolve: (value: unknown) => unknown) => Promise.resolve(result).then(resolve)
+  return chain
+}
+
+// assistant-search, Requirement: Хранение фото
+describe('a signed-in user’s photos', () => {
+  function signedIn() {
+    const userId = '11111111-1111-4111-8111-111111111111'
+    const chatId = crypto.randomUUID()
+    const messageId = crypto.randomUUID()
+    const path = `${userId}/${chatId}/${messageId}/0.webp`
+    const row = {
+      id: chatId,
+      title: 'Фото',
+      brief: {},
+      question: null,
+      unread: false,
+      createdAt: '2026-10-25T10:00:00.000Z',
+      updatedAt: '2026-10-25T10:00:00.002Z',
+      messages: [
+        {
+          id: messageId,
+          role: 'user',
+          status: 'done',
+          text: '',
+          data: { attachments: [{ path, width: 1600, height: 1200 }] },
+          createdAt: '2026-10-25T10:00:00.000Z',
+        },
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          status: 'pending',
+          text: '',
+          data: {},
+          createdAt: '2026-10-25T10:00:00.002Z',
+        },
+      ],
+    }
+    // The photo comes from Storage a while later: the turn waits for it.
+    let release!: () => void
+    const downloaded = new Promise<void>((resolve) => (release = resolve))
+    const download = vi.fn(async () => {
+      await downloaded
+      return { data: new Blob(['photo'], { type: 'image/webp' }), error: null }
+    })
+    supabase.client = {
+      auth: { getSession: async () => ({ data: { session: { user: { id: userId, email: 'a@b.c' } } } }) },
+      from: (table: string) => query({ data: table === 'assistant_chats' ? [row] : null, error: null }),
+      storage: {
+        from: () => ({
+          download,
+          createSignedUrls: async (paths: string[]) => ({
+            data: paths.map((p) => ({ path: p, signedUrl: `https://cdn.example/${p}`, error: null })),
+            error: null,
+          }),
+        }),
+      },
+    }
+    fetchMock.mockResolvedValue(answer({ brief: {}, photo: { action: 'ask' } }))
+    window.history.replaceState(null, '', `/assistant/${chatId}`)
+    return { download, release: () => release(), path }
+  }
+
+  it('asks a pending answer with photos in Storage once after a reload', async () => {
+    const { download, release, path } = signedIn()
+    renderAssistant()
+
+    await waitFor(() => expect(download).toHaveBeenCalled())
+    // The chats change meanwhile (the signed links come): no second turn starts.
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    release()
+    expect(await within(log()).findByText(/Что сделать с фото\?/)).toBeTruthy()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(download).toHaveBeenCalledTimes(1)
+    expect(bodyOf(0).photos).toEqual([`data:image/webp;base64,${btoa('photo')}`])
+    expect(
+      within(log()).getByRole('button', { name: 'Открыть фото 1' }).querySelector('img')?.getAttribute('src'),
+    ).toBe(`https://cdn.example/${path}`)
+  })
+
+  it('starts no second turn when the page mounts again while the photos load', async () => {
+    const { download, release } = signedIn()
+    const { unmount } = renderAssistant()
+    await waitFor(() => expect(download).toHaveBeenCalledTimes(1))
+    // The first page goes (its turn is cancelled), a new one asks again.
+    unmount()
+    render(<AssistantSearch newHotels={newHotels} onChoose={() => ({})} />)
+    await waitFor(() => expect(download).toHaveBeenCalledTimes(2))
+    release()
+    expect(await within(log()).findByText(/Что сделать с фото\?/)).toBeTruthy()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })
