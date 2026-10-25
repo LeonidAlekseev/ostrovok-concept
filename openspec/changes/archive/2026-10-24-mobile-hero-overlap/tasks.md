@@ -6,5 +6,5 @@
 
 ## 2. Проверки
 
-- [ ] 2.1 `npm run lint`, `npm run typecheck`, `npm test` на передний план.
+- [x] 2.1 `npm run lint`, `npm run typecheck`, `npm test` на передний план. Выполнено в CI PR #221 (run 40119743866): lint, typecheck, test зелёные
 - [x] 2.2 `openspec validate mobile-hero-overlap --strict`, `openspec archive mobile-hero-overlap --yes`, `openspec validate --all --strict`.
