@@ -6,7 +6,7 @@ import { hotels, getHotel } from './catalogGenerator'
 import {
   axisShares,
   BALANCE,
-  onePerCity,
+  fillVibe,
   poleImage,
   readVibe,
   VIBE_AXES,
@@ -30,9 +30,9 @@ describe('VIBE_AXES', () => {
     expect(fits.at(-1)![1]).toBe(-1)
   })
 
-  it('has seven pairs, the first one is «Тихий вечер» / «Шумная вечеринка»', () => {
+  it('has seven pairs, the first one is «Уютный вечер» / «Шумная вечеринка»', () => {
     expect(VIBE_AXES).toHaveLength(7)
-    expect(VIBE_AXES[0]).toMatchObject({ left: 'Тихий вечер', right: 'Шумная вечеринка' })
+    expect(VIBE_AXES[0]).toMatchObject({ left: 'Уютный вечер', right: 'Шумная вечеринка' })
   })
 
   it('keeps every fit in [−1, 1]', () => {
@@ -90,7 +90,7 @@ describe('vibeArchetype', () => {
   })
 
   it('names the vibe by the two answers it matches', () => {
-    // «Тихий вечер» and «Подальше от суеты».
+    // «Уютный вечер» and «Подальше от суеты».
     expect(vibeArchetype([-1, 0, 0, 0, 0, 0, -1]).name).toBe('Тихая гавань')
     // «Шумная вечеринка» and «Гулять до ночи».
     expect(vibeArchetype([1, 0, 0, 1, 0, 0, 0]).name).toBe('Душа вечеринки')
@@ -134,7 +134,7 @@ describe('vibeHotels', () => {
     )
   })
 
-  it('fits «Тихий вечер» everywhere: far from the centre, without a bar', () => {
+  it('fits «Уютный вечер» everywhere: far from the centre, without a bar', () => {
     for (const hotel of vibeHotels(all(-1), catalogue, destinations)) {
       expect(hotel.amenities, hotel.id).not.toContain('bar')
       expect(hotel.distanceKm, hotel.id).toBeGreaterThan(2.5)
@@ -166,7 +166,7 @@ describe('readVibe', () => {
 describe('vibeWish', () => {
   it('names the archetype and the chosen sides', () => {
     expect(vibeWish([-1, -1, 0, 0, 0, 0, 0])).toBe(
-      'Тихая гавань: тишина, простор и вечер без спешки. Настроение: Тихий вечер, Море.',
+      'Тихая гавань: тишина, простор и вечер без спешки. Настроение: Уютный вечер, Море.',
     )
     expect(vibeWish(all(1))).toContain('Настроение: Шумная вечеринка, Город, Большой отель')
   })
@@ -176,11 +176,35 @@ describe('vibeWish', () => {
   })
 })
 
-describe('onePerCity', () => {
-  it('keeps the first hotel of each city, up to VIBE_HOTELS', () => {
-    const picked = onePerCity(catalogue)
+describe('fillVibe', () => {
+  it('keeps the best hotel of each city first, then fills up to VIBE_HOTELS from the cities taken', () => {
+    const picked = fillVibe(catalogue)
     expect(picked).toHaveLength(VIBE_HOTELS)
     expect(new Set(picked.map((h) => h.destinationId)).size).toBe(VIBE_HOTELS)
     expect(picked[0]).toBe(catalogue[0])
+  })
+
+  it('takes six hotels of one city when it is the only one', () => {
+    const city = catalogue[0].destinationId
+    const oneCity = catalogue.filter((h) => h.destinationId === city)
+    const picked = fillVibe(oneCity)
+    expect(picked).toHaveLength(VIBE_HOTELS)
+    expect(picked.every((h) => h.destinationId === city)).toBe(true)
+    expect(picked).toEqual(oneCity.slice(0, VIBE_HOTELS))
+  })
+
+  it('takes one hotel per city when there are six or more cities', () => {
+    const cities = [...new Set(catalogue.map((h) => h.destinationId))]
+    const picked = fillVibe(catalogue)
+    expect(picked.map((h) => h.destinationId)).toEqual(cities.slice(0, VIBE_HOTELS))
+  })
+
+  it('fills from the cities taken, in the order of the ranking', () => {
+    const [x, y] = [...new Set(catalogue.map((h) => h.destinationId))]
+    const of = (city: string) => catalogue.filter((h) => h.destinationId === city)
+    const [x1, x2, x3] = of(x)
+    const [y1, y2, y3] = of(y)
+    const ranked = [x1, y1, x2, y2, x3, y3]
+    expect(fillVibe(ranked).map((h) => h.id)).toEqual(ranked.map((h) => h.id))
   })
 })

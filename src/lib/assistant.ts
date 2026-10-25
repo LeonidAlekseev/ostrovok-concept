@@ -1,6 +1,14 @@
 import type { Destination } from '../data/destinations'
 import type { HotelSummary } from './catalog'
-import { addDays, fromIso, toIso, type IsoDate } from './dates'
+import {
+  CRITERION_LABEL,
+  VIEW_LABEL,
+  featureReasons,
+  type Criterion,
+  type HotelFeatures,
+  type ViewKind,
+} from './features'
+import { addDays, formatShortRange, fromIso, nightsBetween, toIso, type IsoDate } from './dates'
 import { countRu, formatPrice } from './format'
 import { stayTotal } from './offer'
 import { MAX_NIGHTS, type Guests, type SearchQuery } from './search'
@@ -17,25 +25,47 @@ export type Party = 'solo' | 'couple' | 'family' | 'friends'
 /** Zero-based month, or "as soon as possible". `any` means the traveller left it to the assistant. */
 type When = number | 'soon' | 'any'
 
+/** The named days of a stay («с 10 по 15 ноября»): check-in and check-out. */
+export interface StayDates {
+  checkIn: IsoDate
+  checkOut: IsoDate
+}
+
 export interface Brief {
   vibe?: VibeId | 'any'
   destinationId?: string
   when?: When
+  /** The named days of the stay: the plan's dates; `when` is their month and `nights` their length. */
+  dates?: StayDates
+  /** Named days that are past, impossible or too long: they are not taken, and Эвал asks for them. */
+  datesRejected?: true
   nights?: number
   party?: Party | 'any'
   mood?: Mood
   /** Whole-stay budget, ₽. */
   budget?: number
+  /** A quiet place at night: the noise map's night band (`hotel_features`). */
+  quiet?: true
+  /** A taller or a lower building. */
+  height?: 'high' | 'low'
+  /** A window view of a room; `any` is «с видом» without saying of what. */
+  view?: ViewKind | 'any'
+  /** The hotel the chat is about (a chat opened on a hotel's page): Эвал answers about it instead of picking hotels. */
+  hotelId?: string
 }
 
-export type QuestionId = 'vibe' | 'when' | 'party'
+export type QuestionId = 'vibe' | 'when' | 'party' | 'dates'
 
 export interface Question {
-  id: QuestionId
+  /** `photo` asks what to do with the photos of the message; it is not a part of the brief. */
+  id: QuestionId | 'photo'
   text: string
   /** Quick replies; each is sent as if the traveller typed it. */
   replies: string[]
 }
+
+/** A question of the brief: what the plan still lacks. */
+type BriefQuestion = Question & { id: QuestionId }
 
 export interface AssistantOption {
   destination: Destination
@@ -43,6 +73,10 @@ export interface AssistantOption {
   perNight: number
   total: number
   fitsBudget: boolean
+  /** Why the hotel fits: «ночью ниже 40 дБ», «здание 12 этажей», «нет данных о шуме». Absent in older plans. */
+  reasons?: string[]
+  /** The views the hotel's room names tell of (`hotel_room_views`); absent without data and in older plans. */
+  views?: ViewKind[]
 }
 
 export interface Plan {
@@ -57,10 +91,10 @@ export interface Plan {
 
 /** The starter cards of the assistant: a photo from `public/assistant/chips` (scripts/build-assistant-chips.mjs). */
 export const starterChips = [
-  { emoji: '🌴', label: 'На море', photo: '/assistant/chips/sea.webp' },
-  { emoji: '⛰️', label: 'В горы', photo: '/assistant/chips/mountains.webp' },
-  { emoji: '🏛️', label: 'Города', photo: '/assistant/chips/cities.webp' },
-]
+  { emoji: '🌴', label: 'На море', photo: '/assistant/chips/sea.webp', vibe: 'sea' },
+  { emoji: '⛰️', label: 'В горы', photo: '/assistant/chips/mountains.webp', vibe: 'mountains' },
+  { emoji: '🏛️', label: 'Города', photo: '/assistant/chips/cities.webp', vibe: 'europe' },
+] as const satisfies readonly { emoji: string; label: string; photo: string; vibe: VibeId }[]
 
 const MONTHS = [
   'январ',
@@ -117,6 +151,21 @@ const PARTY_RULES: [Party, RegExp][] = [
   ['solo', word('один|одна|сам[аи]?(?![а-яё])|в одиночку|соло')],
 ]
 
+/** A quiet night: «тихий», «а потише», «чтобы ночью не шумело», «без шума». */
+const QUIET = word('тих|тиш|не\\s+шум|без\\s+шума|шумоизол|выспат')
+const HIGH = word('повыше|высок[а-яё]*\\s+(?:этаж|здан|дом)|высотк|высотн|верхн[а-яё]*\\s+этаж|многоэтаж|высоко')
+const LOW = word('пониже|невысок|низк[а-яё]*\\s+(?:этаж|здан|дом)|малоэтаж|нижн[а-яё]*\\s+этаж|невысоко')
+const VIEW_RULES: [ViewKind | 'any', RegExp][] = [
+  ['sea', /вид[а-яё]*\s+на\s+(?:мор|океан|пляж|залив)/],
+  ['water', /вид[а-яё]*\s+на\s+(?:воду|реку|озеро|канал|порт)/],
+  ['mountain', /вид[а-яё]*\s+на\s+гор(?!од)/],
+  ['park', /вид[а-яё]*\s+на\s+парк/],
+  ['garden', /вид[а-яё]*\s+на\s+сад/],
+  ['pool', /вид[а-яё]*\s+на\s+бассейн/],
+  ['city', /вид[а-яё]*\s+на\s+(?:город|площадь)/],
+  ['any', /(?<![а-яё])(?:с\s+видом|вид\s+из\s+окна|красив[а-яё]*\s+вид|панорамн|видовой)/],
+]
+
 const ANY = word('не важно|неважно|вс[её] равно|любо[ей]|не знаю|удиви|на тво[йё]|реши сам|выбери сам|без разницы')
 
 const normalize = (s: string) => s.toLocaleLowerCase('ru').replace(/ /g, ' ')
@@ -150,6 +199,11 @@ export function parseWish(input: string, destinations: readonly Destination[]): 
     brief.when ??= 'soon'
   }
 
+  if (QUIET.test(text)) brief.quiet = true
+  if (LOW.test(text)) brief.height = 'low'
+  else if (HIGH.test(text)) brief.height = 'high'
+  brief.view = VIEW_RULES.find(([, re]) => re.test(text))?.[0]
+
   // "до 70 000 ₽", "70к", "70 тыс.", "бюджет 120000" — but not "на 5 ночей".
   for (const m of text.matchAll(/(\d[\d ]*\d|\d)\s*(тыс[а-я.]*|к(?![а-яё])|₽|руб[а-я.]*|р\.)?/g)) {
     const value = Number(m[1].replace(/ /g, ''))
@@ -176,23 +230,55 @@ export function mergeBrief(
 /** `mergeBrief` for a reply already read (by the rules or by the language model). */
 export function foldBrief(brief: Brief, parsed: Brief, input: string, asked: QuestionId | null): Brief {
   const next: Brief = { ...brief }
+  // Rejected days are asked again only while the newest message still lacks them.
+  delete next.datesRejected
   for (const key of Object.keys(parsed) as (keyof Brief)[]) {
     if (parsed[key] !== undefined) Object.assign(next, { [key]: parsed[key] })
   }
+  // A month of its own ("в декабре") replaces the named days.
+  if (parsed.when !== undefined && !parsed.dates) delete next.dates
   // The trip's theme is set by the first message; a later "на выходные" only sets the dates.
   if (brief.vibe && brief.vibe !== 'any' && parsed.vibe === 'weekend') next.vibe = brief.vibe
+  // "не важно" for the dates asked drops the named days, so the plan goes by the month.
+  if (asked === 'dates' && !parsed.dates && ANY.test(normalize(input))) delete next.dates
   // Without a pending question, "удиви меня" hands over the theme.
   const open = asked ?? (next.vibe || next.destinationId ? null : 'vibe')
-  if (open && next[open] === brief[open] && ANY.test(normalize(input))) next[open] = 'any'
+  if (open && open !== 'dates' && next[open] === brief[open] && ANY.test(normalize(input))) next[open] = 'any'
   return next
 }
 
-export function nextQuestion(brief: Brief, today: IsoDate): Question | null {
+/** The quick replies to the question of the theme, each with its theme; «Удиви меня» has none. */
+const VIBE_REPLIES: [label: string, vibe: VibeId | null][] = [
+  ['На море', 'sea'],
+  ['В горы', 'mountains'],
+  ['Города Европы', 'europe'],
+  ['Романтика', 'romantic'],
+  ['Удиви меня', null],
+]
+
+/**
+ * The question the brief still lacks. With the `destinations` shown, the themes without a city in the season are
+ * not offered as quick replies.
+ */
+export function nextQuestion(
+  brief: Brief,
+  today: IsoDate,
+  destinations?: readonly Destination[],
+): BriefQuestion | null {
+  // Named days that are not taken, or that have passed since they were named: the plan waits for them.
+  if (brief.datesRejected || (brief.dates && brief.dates.checkIn < today))
+    return {
+      id: 'dates',
+      text: 'Не могу взять эти даты: они уже прошли или не сходятся. Назовите даты заезда и выезда, например «с 10 по 15 ноября».',
+      replies: [],
+    }
   if (!brief.vibe && !brief.destinationId)
     return {
       id: 'vibe',
       text: 'Какое настроение у поездки? Море, горы, старые города — или довериться мне?',
-      replies: ['На море', 'В горы', 'Города Европы', 'Романтика', 'Удиви меня'],
+      replies: VIBE_REPLIES.filter(
+        ([, vibe]) => !vibe || !destinations || hasCandidates(vibe, brief, today, destinations),
+      ).map(([label]) => label),
     }
   if (brief.when === undefined) {
     const month = fromIso(today).getMonth()
@@ -230,14 +316,27 @@ function candidatesFor(vibe: VibeId, month: number, destinations: readonly Desti
   return list
 }
 
-/** The assistant's own pick when the traveller leaves the theme open. */
-function chooseVibe(brief: Brief, month: number): { vibe: VibeId; reason: string } {
-  if (brief.party === 'family') return { vibe: 'sea', reason: 'с детьми проще всего у тёплого моря' }
-  if (isWinter(month)) return { vibe: 'exotic', reason: 'зимой хочется туда, где лето' }
-  if (month >= 5 && month <= 7) return { vibe: 'sea', reason: 'лето создано для моря' }
-  if (brief.party === 'couple') return { vibe: 'romantic', reason: 'вдвоём лучше всего там, где красиво' }
-  if (brief.mood === 'active') return { vibe: 'metropolis', reason: 'для движа нужен большой город' }
-  return { vibe: 'europe', reason: 'межсезонье — лучшее время гулять по старым городам' }
+/**
+ * The assistant's own pick when the traveller leaves the theme open: the seasonal favourites first, then the other
+ * themes, and only a theme with a city shown for the season. `null` when no theme has one.
+ */
+function chooseVibe(
+  brief: Brief,
+  month: number,
+  destinations: readonly Destination[],
+): { vibe: VibeId; reason: string } | null {
+  const favourites: { vibe: VibeId; reason: string }[] = []
+  if (brief.party === 'family') favourites.push({ vibe: 'sea', reason: 'с детьми проще всего у тёплого моря' })
+  if (isWinter(month)) favourites.push({ vibe: 'exotic', reason: 'зимой хочется туда, где лето' })
+  if (month >= 5 && month <= 7) favourites.push({ vibe: 'sea', reason: 'лето создано для моря' })
+  if (brief.party === 'couple') favourites.push({ vibe: 'romantic', reason: 'вдвоём лучше всего там, где красиво' })
+  if (brief.mood === 'active') favourites.push({ vibe: 'metropolis', reason: 'для движа нужен большой город' })
+  favourites.push({ vibe: 'europe', reason: 'межсезонье — лучшее время гулять по старым городам' })
+  const others = (['sea', 'europe', 'romantic', 'exotic', 'metropolis'] as const).map((vibe) => ({
+    vibe,
+    reason: 'в эти даты есть подходящие города',
+  }))
+  return [...favourites, ...others].find(({ vibe }) => candidatesFor(vibe, month, destinations).length > 0) ?? null
 }
 
 const ATMOSPHERES: Record<VibeId, Record<Mood | 'default', [emoji: string, title: string, text: string]>> = {
@@ -278,7 +377,8 @@ const ATMOSPHERES: Record<VibeId, Record<Mood | 'default', [emoji: string, title
   },
 }
 
-const PARTY_GUESTS: Record<Party, Guests> = {
+/** The guests of a party: the plan's search and the trip's parameters on `/assistant`. */
+export const PARTY_GUESTS: Record<Party, Guests> = {
   solo: { adults: 1, children: 0, rooms: 1 },
   couple: { adults: 2, children: 0, rooms: 1 },
   family: { adults: 2, children: 1, rooms: 1 },
@@ -291,6 +391,7 @@ function nextWeekday(from: IsoDate, weekday: number): IsoDate {
 }
 
 function travelDates(brief: Brief, nights: number, today: IsoDate): IsoDate {
+  if (brief.dates) return brief.dates.checkIn
   const tomorrow = addDays(today, 1)
   const weekday = nights <= 3 ? 5 : 6
   const { when } = brief
@@ -306,14 +407,27 @@ function travelDates(brief: Brief, nights: number, today: IsoDate): IsoDate {
 const tripMonth = (brief: Brief, today: IsoDate) =>
   typeof brief.when === 'number' ? brief.when : fromIso(addDays(today, brief.when === 'soon' ? 3 : 14)).getMonth()
 
+/** The theme has a city shown for the trip's season: a preset without one leads nowhere. */
+const hasCandidates = (vibe: VibeId, brief: Brief, today: IsoDate, destinations: readonly Destination[]) =>
+  candidatesFor(vibe, tripMonth(brief, today), destinations).length > 0
+
+/** The starter cards whose theme has a city shown in the season of a trip planned today. */
+export const presetChips = (destinations: readonly Destination[], today: IsoDate) =>
+  starterChips.filter((chip) => hasCandidates(chip.vibe, {}, today, destinations))
+
 /** The theme of the plan (the traveller's, the named city's or the assistant's own pick) and its cities. */
 function planScope(brief: Brief, today: IsoDate, destinations: readonly Destination[]) {
   const month = tripMonth(brief, today)
   const named = destinations.find((d) => d.id === brief.destinationId)
-  const own = brief.vibe && brief.vibe !== 'any' ? { vibe: brief.vibe, reason: '' } : null
-  const fallbackVibe = named?.scenarios[0] ?? 'europe'
-  const { vibe, reason } = own ?? (named ? { vibe: fallbackVibe, reason: '' } : chooseVibe(brief, month))
-  return { vibe, reason, named, pool: named ? [named] : candidatesFor(vibe, month, destinations) }
+  const own = brief.vibe && brief.vibe !== 'any' ? brief.vibe : null
+  if (own || named) {
+    const vibe = own ?? named?.scenarios[0] ?? 'europe'
+    return { vibe, reason: '', named, pool: named ? [named] : candidatesFor(vibe, month, destinations) }
+  }
+  const picked = chooseVibe(brief, month, destinations)
+  if (picked) return { ...picked, named, pool: candidatesFor(picked.vibe, month, destinations) }
+  // No theme has a city shown for the season: the shown cities, under the theme of the first of them.
+  return { vibe: destinations[0]?.scenarios[0] ?? 'europe', reason: '', named, pool: [...destinations] }
 }
 
 /** The cities the plan of a complete `brief` picks from: the semantic search looks for hotels there. */
@@ -322,6 +436,10 @@ export const planCities = (brief: Brief, today: IsoDate, destinations: readonly 
 
 /** Options in a plan. */
 const PLAN_OPTIONS = 3
+
+/** The different views of the hotel's room names, the street last: what a hotel card of the plan lists. */
+const roomViews = (features: HotelFeatures | undefined): ViewKind[] =>
+  [...new Set(features?.views.map((v) => v.view))].sort((a, b) => Number(a === 'street') - Number(b === 'street'))
 
 /**
  * The plan over the `destinations`, with a hotel from `hotels` (the "recently added" ones) where a city has
@@ -334,11 +452,16 @@ export function makePlan(
   destinations: readonly Destination[],
   hotels: readonly HotelSummary[],
   matches: readonly HotelSummary[] = [],
+  features: Readonly<Record<string, HotelFeatures>> = {},
+  /** The hotels already shown in the chat: «Другие варианты» skips them. */
+  exclude: ReadonlySet<string> = new Set(),
 ): Plan {
   const { vibe, reason, named, pool } = planScope(brief, today, destinations)
   const [emoji, atmosphere, text] = ATMOSPHERES[vibe][brief.mood ?? 'default']
 
-  const nights = Math.min(brief.nights ?? (vibe === 'weekend' ? 2 : brief.party === 'family' ? 7 : 5), MAX_NIGHTS)
+  const nights = brief.dates
+    ? nightsBetween(brief.dates.checkIn, brief.dates.checkOut)
+    : Math.min(brief.nights ?? (vibe === 'weekend' ? 2 : brief.party === 'family' ? 7 : 5), MAX_NIGHTS)
   const guests = PARTY_GUESTS[brief.party && brief.party !== 'any' ? brief.party : 'couple']
   const checkIn = travelDates(brief, nights, today)
 
@@ -349,13 +472,24 @@ export function makePlan(
   const option = (destination: Destination, hotel: HotelSummary | undefined): AssistantOption => {
     const perNight = hotel?.priceFrom ?? destination.priceFrom
     const sum = total(perNight)
-    return { destination, hotel, perNight, total: sum, fitsBudget: !brief.budget || sum <= brief.budget }
+    const reasons = hotel ? featureReasons(features[hotel.id], brief) : []
+    const views = hotel ? roomViews(features[hotel.id]) : []
+    return {
+      destination,
+      hotel,
+      perNight,
+      total: sum,
+      fitsBudget: !brief.budget || sum <= brief.budget,
+      ...(reasons.length > 0 && { reasons }),
+      ...(views.length > 0 && { views }),
+    }
   }
 
   // The semantic matches in the plan's cities keep their order, within the budget first.
   const cityOf = new Map(pool.map((d) => [d.id, d]))
   const found: AssistantOption[] = []
   for (const hotel of matches) {
+    if (exclude.has(hotel.id)) continue
     const destination = cityOf.get(hotel.destinationId)
     if (!destination || (!named && found.some((o) => o.destination.id === destination.id))) continue
     found.push(option(destination, hotel))
@@ -366,7 +500,7 @@ export function makePlan(
     .filter((destination) => !found.some((o) => o.destination.id === destination.id))
     .map((destination) => {
       const cityHotels = hotels
-        .filter((h) => h.destinationId === destination.id)
+        .filter((h) => h.destinationId === destination.id && !exclude.has(h.id))
         .sort((a, b) => (preferCheap ? a.priceFrom - b.priceFrom : b.rating - a.rating))
       const affordable = cityHotels.find((h) => !brief.budget || total(h.priceFrom) <= brief.budget)
       const cheapest = cityHotels.reduce<HotelSummary | undefined>(
@@ -381,7 +515,8 @@ export function makePlan(
         (b.hotel?.rating ?? 8) - (a.hotel?.rating ?? 8) ||
         a.total - b.total,
     )
-  const options = [...found, ...ruled].slice(0, PLAN_OPTIONS)
+  // «Другие варианты»: a city whose hotels were all shown has nothing new to offer.
+  const options = [...found, ...ruled].filter((o) => exclude.size === 0 || o.hotel).slice(0, PLAN_OPTIONS)
 
   const why = reason ? `Выбрал сам: ${reason}. Значит, ${text}.` : `${text[0].toLocaleUpperCase('ru')}${text.slice(1)}.`
   return {
@@ -417,10 +552,19 @@ export function describeBrief(brief: Brief, destinations: readonly Destination[]
   return [
     named?.name ?? (brief.vibe && brief.vibe !== 'any' ? VIBE_LABEL[brief.vibe] : null),
     brief.mood === 'calm' ? 'спокойно' : brief.mood === 'active' ? 'активно' : null,
-    typeof brief.when === 'number' ? `в ${MONTH_IN[brief.when]}` : brief.when === 'soon' ? 'в ближайшее время' : null,
+    brief.dates
+      ? formatShortRange(brief.dates.checkIn, brief.dates.checkOut)
+      : typeof brief.when === 'number'
+        ? `в ${MONTH_IN[brief.when]}`
+        : brief.when === 'soon'
+          ? 'в ближайшее время'
+          : null,
     brief.nights ? countRu(brief.nights, ['ночь', 'ночи', 'ночей']) : null,
     brief.party && brief.party !== 'any' ? PARTY_LABEL[brief.party] : null,
     brief.budget ? `до ${formatPrice(brief.budget)}` : null,
+    brief.quiet ? 'тихо ночью' : null,
+    brief.height === 'high' ? 'здание повыше' : brief.height === 'low' ? 'здание пониже' : null,
+    brief.view === 'any' ? 'с видом из окна' : brief.view ? `вид ${VIEW_LABEL[brief.view]}` : null,
   ]
     .filter(Boolean)
     .join(' · ')
@@ -430,24 +574,59 @@ const MOODS: readonly Mood[] = ['calm', 'active']
 const intIn = (value: unknown, min: number, max: number) =>
   typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max ? value : undefined
 
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * Two named days of a stay: real calendar days (not 31 февраля), check-out after check-in, at most `MAX_NIGHTS`
+ * nights apart. Whether the check-in is still ahead is for the caller, who knows today.
+ */
+export function stayDates(checkIn: unknown, checkOut: unknown): StayDates | undefined {
+  if (typeof checkIn !== 'string' || typeof checkOut !== 'string') return undefined
+  if (![checkIn, checkOut].every((day) => ISO_DAY.test(day) && toIso(fromIso(day)) === day)) return undefined
+  const nights = nightsBetween(checkIn, checkOut)
+  return nights >= 1 && nights <= MAX_NIGHTS ? { checkIn, checkOut } : undefined
+}
+
+/** The brief's month and nights of named days: `when` is the month of the check-in, `nights` the stay's length. */
+export function briefWithStay(dates: StayDates): Pick<Brief, 'dates' | 'when' | 'nights'> {
+  return {
+    dates,
+    when: fromIso(dates.checkIn).getMonth(),
+    nights: nightsBetween(dates.checkIn, dates.checkOut),
+  }
+}
+
+const MAX_HOTEL_ID_LENGTH = 120
+
 /**
  * Keeps only what the assistant understands: a catalog city, known themes and answers, a month 0–11,
- * 1–30 nights and a whole budget in ₽. Reads untrusted input — the client's brief or the model's answer.
+ * 1–30 nights, named days of a stay and a whole budget in ₽. Reads untrusted input — the client's brief or the
+ * model's answer.
  */
 export function normalizeBrief(
   raw: Partial<Record<keyof Brief, unknown>>,
   destinations: readonly Destination[],
 ): Brief {
   const brief: Brief = {}
-  const { vibe, destinationId, when, nights, party, mood, budget } = raw
+  const { vibe, destinationId, when, nights, party, mood, budget, quiet, height, view, dates, datesRejected } = raw
+  const { hotelId } = raw
   if (vibe === 'any' || (typeof vibe === 'string' && Object.hasOwn(VIBE_LABEL, vibe))) brief.vibe = vibe as VibeId
   if (destinations.some((d) => d.id === destinationId)) brief.destinationId = destinationId as string
   if (when === 'soon' || when === 'any') brief.when = when
   else if (intIn(when, 0, 11) !== undefined) brief.when = when as number
   if (typeof nights === 'number' && nights >= 1) brief.nights = Math.min(Math.round(nights), MAX_NIGHTS)
+  const { checkIn, checkOut } = (dates ?? {}) as Partial<StayDates>
+  const stay = stayDates(checkIn, checkOut)
+  if (stay) Object.assign(brief, briefWithStay(stay))
+  if (datesRejected === true) brief.datesRejected = true
   if (party === 'any' || (typeof party === 'string' && Object.hasOwn(PARTY_LABEL, party))) brief.party = party as Party
   if (MOODS.includes(mood as Mood)) brief.mood = mood as Mood
   if (typeof budget === 'number' && budget >= 1) brief.budget = Math.round(budget)
+  if (quiet === true) brief.quiet = true
+  if (height === 'high' || height === 'low') brief.height = height
+  if (view === 'any' || (typeof view === 'string' && Object.hasOwn(VIEW_LABEL, view))) brief.view = view as ViewKind
+  // Only the shape: the route checks the id against the catalogue.
+  if (typeof hotelId === 'string' && hotelId && hotelId.length <= MAX_HOTEL_ID_LENGTH) brief.hotelId = hotelId
   return brief
 }
 
@@ -455,6 +634,56 @@ export function normalizeBrief(
 export interface AssistantRequest {
   messages: { role: 'user' | 'assistant'; text: string }[]
   brief: Brief
+  /**
+   * The photos of the traveller's newest message with photos (or of the one Эвал asked about): optimised WebP or
+   * JPEG data URLs, at most `MAX_PHOTOS` (src/lib/imageOptimize.ts).
+   */
+  photos?: string[]
+}
+
+/** Photos a message takes. */
+export const MAX_PHOTOS = 4
+/** The text a message of photos only has in the dialog the model reads. */
+export const PHOTO_TEXT = 'Фото'
+export const PHOTO_SIMILAR = 'Найти похожие отели'
+export const PHOTO_REFINE = 'Учесть в запросе'
+/** What Эвал asks when the message does not say what to do with its photos. */
+export const PHOTO_QUESTION: Question = {
+  id: 'photo',
+  text: 'Что сделать с фото? Могу найти похожие отели или учесть увиденное в запросе.',
+  replies: [PHOTO_SIMILAR, PHOTO_REFINE],
+}
+/** What Эвал says when the model that sees photos is unavailable (no key, an error, the time out, the limit). */
+/** What Эвал says when the photos show nothing a hotel is chosen by. */
+export const PHOTO_UNUSABLE =
+  'По такому фото не подобрать отель — опишите словами, что для вас важно: вид, стиль, место.'
+/** What Эвал says when the search for similar hotels did not answer in time. */
+export const PHOTO_MISSED =
+  'Поиск похожих отелей сейчас не ответил — попробуйте ещё раз чуть позже или опишите словами, что для вас важно.'
+export const PHOTO_UNSEEN =
+  'Не смог рассмотреть фото. Опишите словами, что на нём важно — вид, стиль, место, — и я подберу.'
+
+/**
+ * What came of the photos: `ask` — the message does not say what to do with them (`PHOTO_QUESTION`); `similar` —
+ * the hotels like the photo are the `matches`; `refine` — what the photo shows went into the brief; `unseen` — the
+ * photos could not be looked at; `unusable` — they show nothing a hotel is chosen by. `seen` is what the model saw, in Russian; `like` — what the hotels are like it in
+ * («вид на море, бассейн»).
+ */
+export interface PhotoAnswer {
+  action: 'ask' | 'similar' | 'refine' | 'unseen' | 'unusable'
+  seen?: string
+  like?: string
+  /** `similar`: the search by meaning did not answer in time, so no hotels were looked for. */
+  missed?: true
+}
+
+/** A step of Эвал's turn on the server: one of its agents and what came of it. */
+export interface TurnStep {
+  /** `search` picks the hotels by meaning, `features` checks their building, noise and views. */
+  agent: 'search' | 'features'
+  title: string
+  status: 'done' | 'failed'
+  result?: string
 }
 
 export interface AssistantResponse {
@@ -464,7 +693,23 @@ export interface AssistantResponse {
   source: 'model' | 'rules'
   /** Hotels the semantic search found for the traveller's words once the brief is complete, best first. */
   matches?: HotelSummary[]
+  /** The building, noise and room views of the `matches` that have data. */
+  features?: Record<string, HotelFeatures>
+  /** The criteria no hotel of the plan's cities has data for: Эвал says so. */
+  missing?: Criterion[]
+  /** The steps of the turn, in order, once the plan is due. */
+  steps?: TurnStep[]
+  /**
+   * In a chat about a hotel (`brief.hotelId`) `reply` is the answer from the hotel's data and this is the model's
+   * part from general knowledge: shown apart, marked «Не проверено».
+   */
+  unverified?: string
+  /** The answer to the photos of the request. */
+  photo?: PhotoAnswer
 }
+
+/** What Эвал says about a hotel when it cannot answer at all (no network, the route is down). */
+export const HOTEL_UNAVAILABLE = 'Сейчас не могу ответить. Попробуйте позже.'
 
 export const MAX_MESSAGE_LENGTH = 500
 export const MAX_HISTORY = 20
@@ -473,6 +718,38 @@ export const MAX_HISTORY = 20
  * the semantic search's hotels, when the plan is due.
  */
 const ASSISTANT_TIMEOUT_MS = 15_000
+/** With photos the route looks at them first (up to 12 s) and answers within 28 s. */
+const PHOTO_TIMEOUT_MS = 30_000
+
+const isRecord = (value: unknown): value is Record<string, HotelFeatures> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+const isCriterion = (value: unknown): value is Criterion => value === 'quiet' || value === 'height' || value === 'view'
+const isStep = (value: unknown): value is TurnStep =>
+  typeof value === 'object' &&
+  value !== null &&
+  ['search', 'features'].includes((value as TurnStep).agent) &&
+  typeof (value as TurnStep).title === 'string' &&
+  ['done', 'failed'].includes((value as TurnStep).status)
+const PHOTO_ACTIONS: readonly PhotoAnswer['action'][] = ['ask', 'similar', 'refine', 'unseen', 'unusable']
+const parsePhoto = (value: unknown): PhotoAnswer | undefined => {
+  if (typeof value !== 'object' || value === null) return undefined
+  const { action, seen, like, missed } = value as Record<string, unknown>
+  if (!PHOTO_ACTIONS.includes(action as PhotoAnswer['action'])) return undefined
+  return {
+    action: action as PhotoAnswer['action'],
+    ...(typeof seen === 'string' && seen && { seen }),
+    ...(typeof like === 'string' && like && { like }),
+    ...(missed === true && { missed: true as const }),
+  }
+}
+
+/** «Данных о шуме у отелей Праги нет — …»: what Эвал says instead of guessing. */
+export function missingNote(missing: readonly Criterion[], cities: readonly Destination[]): string {
+  if (missing.length === 0) return ''
+  const what = missing.map((c) => CRITERION_LABEL[c]).join(', ')
+  const where = cities.length === 1 ? ` у отелей ${cities[0].genitive}` : ' у отелей этих городов'
+  return `Данных о ${what}${where} нет — подобрал без этого условия.`
+}
 
 /**
  * Reads the newest message of `messages` into `brief` through the assistant route. Any failure — no
@@ -489,28 +766,38 @@ export async function askAssistant(
     .filter((m) => m.text.trim())
     .slice(-MAX_HISTORY)
     .map((m) => ({ ...m, text: m.text.slice(0, MAX_MESSAGE_LENGTH) }))
-  const body: AssistantRequest = { ...request, messages }
+  const photos = request.photos?.slice(0, MAX_PHOTOS) ?? []
+  // No photos, no field: the body stays as small as before.
+  const body: AssistantRequest = { ...request, messages, photos: photos.length > 0 ? photos : undefined }
+  const timeout = AbortSignal.timeout(photos.length > 0 ? PHOTO_TIMEOUT_MS : ASSISTANT_TIMEOUT_MS)
   try {
     const response = await fetch('/api/assistant', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      signal: signal
-        ? AbortSignal.any([signal, AbortSignal.timeout(ASSISTANT_TIMEOUT_MS)])
-        : AbortSignal.timeout(ASSISTANT_TIMEOUT_MS),
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     })
     if (response.ok) {
       const data = (await response.json()) as AssistantResponse
       return {
         brief: normalizeBrief(data.brief ?? {}, destinations),
         reply: typeof data.reply === 'string' ? data.reply : undefined,
+        ...(typeof data.unverified === 'string' && data.unverified && { unverified: data.unverified }),
         source: data.source === 'model' ? 'model' : 'rules',
         matches: Array.isArray(data.matches) ? data.matches : undefined,
+        ...(isRecord(data.features) && { features: data.features }),
+        ...(Array.isArray(data.missing) && { missing: data.missing.filter(isCriterion) }),
+        ...(Array.isArray(data.steps) && { steps: data.steps.filter(isStep) }),
+        ...(parsePhoto(data.photo) && { photo: parsePhoto(data.photo) }),
       }
     }
   } catch {
     // Falls through to the rules below.
   }
+  // A chat about a hotel has no rules of its own here: the hotel's data are on the server.
+  if (request.brief.hotelId) return { brief: request.brief, reply: HOTEL_UNAVAILABLE, source: 'rules' }
   const input = request.messages.at(-1)?.text ?? ''
-  return { brief: mergeBrief(request.brief, input, asked, destinations), source: 'rules' }
+  const brief = mergeBrief(request.brief, input, asked, destinations)
+  // The rules cannot see photos: Эвал says so instead of pretending.
+  return { brief, source: 'rules', ...(photos.length > 0 && { photo: { action: 'unseen' as const } }) }
 }

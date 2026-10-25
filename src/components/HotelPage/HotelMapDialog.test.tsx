@@ -111,7 +111,7 @@ beforeEach(() => {
 describe('HotelMapDialog', () => {
   it('opens the results map centred on the hotel, closes with the cross and Escape, returning focus, with no "Закрыть" button', async () => {
     const user = userEvent.setup()
-    render(<HotelMapDialog hotel={hotel} />)
+    render(<HotelMapDialog hotel={hotel} trigger={<button type="button">Показать на карте</button>} />)
     const button = screen.getByRole('button', { name: 'Показать на карте' })
 
     const { dialog } = await openMap(user)
@@ -135,7 +135,7 @@ describe('HotelMapDialog', () => {
 describe('HotelMapDialog markers', () => {
   it('shows a price marker per hotel of the city, this one ringed and above the rest', async () => {
     const user = userEvent.setup()
-    render(withStay(stay, <HotelMapDialog hotel={hotel} />))
+    render(withStay(stay, <HotelMapDialog hotel={hotel} trigger={<button type="button">Показать на карте</button>} />))
     const { map } = await openMap(user)
 
     const markers = within(map).getAllByRole('button')
@@ -159,7 +159,7 @@ describe('HotelMapDialog markers', () => {
   it('keeps the current hotel out of the groups of its neighbours', async () => {
     mapMock.zoom = 1
     const user = userEvent.setup()
-    render(withStay(stay, <HotelMapDialog hotel={hotel} />))
+    render(withStay(stay, <HotelMapDialog hotel={hotel} trigger={<button type="button">Показать на карте</button>} />))
     const { map } = await openMap(user)
 
     const group = within(map).getByRole('button', { name: /приблизить/ })
@@ -175,7 +175,7 @@ describe('HotelMapDialog markers', () => {
 describe('HotelMapDialog navigation', () => {
   it('opens another hotel with the dates and guests of the page', async () => {
     const user = userEvent.setup()
-    render(withStay(stay, <HotelMapDialog hotel={hotel} />))
+    render(withStay(stay, <HotelMapDialog hotel={hotel} trigger={<button type="button">Показать на карте</button>} />))
     const { map } = await openMap(user)
 
     await user.click(within(map).getByRole('button', { name: new RegExp(`^${others[0].name},`) }))
@@ -193,7 +193,7 @@ describe('HotelMapDialog navigation', () => {
 
   it('without dates shows the night price and passes the guests only', async () => {
     const user = userEvent.setup()
-    render(withStay(null, <HotelMapDialog hotel={hotel} />))
+    render(withStay(null, <HotelMapDialog hotel={hotel} trigger={<button type="button">Показать на карте</button>} />))
     const { map } = await openMap(user)
 
     expect(
@@ -209,7 +209,7 @@ describe('HotelMapDialog navigation', () => {
 
   it('does not navigate when the current hotel is pressed', async () => {
     const user = userEvent.setup()
-    render(withStay(stay, <HotelMapDialog hotel={hotel} />))
+    render(withStay(stay, <HotelMapDialog hotel={hotel} trigger={<button type="button">Показать на карте</button>} />))
     const { map } = await openMap(user)
 
     await user.click(within(map).getByRole('button', { name: new RegExp(`^${hotel.name},`) }))

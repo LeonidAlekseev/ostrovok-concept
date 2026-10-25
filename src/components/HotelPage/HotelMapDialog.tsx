@@ -1,17 +1,15 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, type ReactElement } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
-import { Map as MapIcon } from 'lucide-react'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import type { Hotel } from '@/lib/catalog'
 import { useHotels } from '@/hooks/useHotels'
 import { lowestPrice } from '@/lib/offer'
 import { setGuestParams, setStayParams } from '@/lib/search'
 import { todayIso } from '@/lib/dates'
 import type { MapCamera } from '../SearchResultsPage/searchView'
-import { DialogButton } from './DialogButton'
 import { HotelMapUnavailable } from './HotelMapUnavailable'
 import { useHotelStay } from './stayContext'
 
@@ -61,11 +59,14 @@ function HotelMap({ hotel }: { hotel: Hotel }) {
   )
 }
 
-/** "Показать на карте": a dialog with the map of the results around this hotel; it closes with the cross or Escape. */
-export function HotelMapDialog({ hotel }: { hotel: Hotel }) {
+/**
+ * The map of the results around this hotel in a dialog, opened by `trigger` (the map preview, "Показать на
+ * карте"); it closes with the cross or Escape.
+ */
+export function HotelMapDialog({ hotel, trigger }: { hotel: Hotel; trigger: ReactElement }) {
   return (
     <Dialog>
-      <DialogButton icon={MapIcon}>Показать на карте</DialogButton>
+      <DialogTrigger render={trigger} />
       <DialogContent className="gap-3 text-base sm:max-w-2xl">
         <DialogTitle className="pr-8 text-lg">{hotel.name}</DialogTitle>
         <DialogDescription>{hotel.address}</DialogDescription>

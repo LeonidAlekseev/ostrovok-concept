@@ -1,14 +1,18 @@
-import type { LanguageModel } from 'ai'
+import { APICallError, type LanguageModel } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getAssistantModel } from '@/lib/ai/model'
+import { getAssistantModel, getVisionModel } from '@/lib/ai/model'
 import { semanticSearch } from '@/lib/ai/semantic'
+import { loadHotelFeatures } from '@/lib/db/features'
+import type { HotelFeatures } from '@/lib/features'
 import { nextQuestion } from '@/lib/assistant'
+import { getHotel } from '@/lib/catalogGenerator'
 import { POST } from './route'
 
-vi.mock('@/lib/ai/model', () => ({ getAssistantModel: vi.fn() }))
+vi.mock('@/lib/ai/model', () => ({ getAssistantModel: vi.fn(), getVisionModel: vi.fn() }))
 vi.mock('@/lib/ai/semantic', () => ({ SEMANTIC_TIMEOUT_MS: 8000, semanticSearch: vi.fn() }))
 vi.mock('@/lib/db/catalog', () => import('@/test/catalog'))
+vi.mock('@/lib/db/features', () => ({ loadHotelFeatures: vi.fn() }))
 
 const usage = {
   inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
@@ -56,8 +60,10 @@ function post(body: unknown, address = `10.0.0.${++ip}`) {
 const ask = (text: string, brief = {}) => post({ messages: [{ role: 'user', text }], brief })
 
 beforeEach(() => {
+  vi.mocked(getVisionModel).mockResolvedValue(undefined)
   vi.spyOn(console, 'warn').mockImplementation(() => {})
   vi.mocked(semanticSearch).mockResolvedValue(null)
+  vi.mocked(loadHotelFeatures).mockResolvedValue(new Map())
 })
 afterEach(() => {
   vi.restoreAllMocks()
@@ -150,11 +156,20 @@ describe('POST /api/assistant', () => {
     expect(brief).toEqual({ vibe: 'sea' })
   })
 
+  it('reads the hotel criteria with the model when the message backs them', async () => {
+    setModel(new MockLanguageModelV4({ doGenerate: answer({ height: 'high', quiet: true, view: 'any' }) }))
+    const { brief } = await (await ask('а повыше?', { destinationId: 'lisbon', quiet: true })).json()
+    // «а повыше?» says nothing of the view: the model's guess is dropped, the earlier quiet stays.
+    expect(brief).toEqual({ destinationId: 'lisbon', quiet: true, height: 'high' })
+    setModel(new MockLanguageModelV4({ doGenerate: answer({ view: 'any' }) }))
+    expect((await (await ask('чтобы был красивый вид из окна')).json()).brief).toEqual({ view: 'any' })
+  })
+
   it('turns reasoning off for the 8 seconds', async () => {
     const model = new MockLanguageModelV4({ doGenerate: answer({}) })
     setModel(model)
     await ask('море')
-    expect(model.doGenerateCalls[0].providerOptions).toEqual({ openrouter: { reasoning: { effort: 'none' } } })
+    expect(model.doGenerateCalls[0].reasoning).toBe('none')
   })
 
   it('adds the answer to what is understood (Scenario: Уточнение темы)', async () => {
@@ -278,5 +293,333 @@ describe('POST /api/assistant: the semantic search', () => {
     expect(semanticSearch).toHaveBeenCalledTimes(1)
     expect(body.matches).toBeUndefined()
     expect(body.source).toBe('rules')
+  })
+})
+
+// assistant-search, Requirements: Подбор по свойствам здания и окружения, Шаги агентов в чате
+describe('POST /api/assistant: the steps and the hotel features', () => {
+  const complete = { destinationId: 'lisbon', when: 9, party: 'solo' }
+  // The tests' catalogue has no Valencia (its hotels are real): Lisbon's made-up hotels stand in with made-up data.
+  const lisbon = async () => (await import('@/test/catalog')).loadCityHotels(['lisbon'])
+  const features = (entries: [string, Omit<HotelFeatures, 'views'> & Partial<HotelFeatures>][]) =>
+    vi.mocked(loadHotelFeatures).mockResolvedValue(new Map(entries.map(([id, f]) => [id, { views: [], ...f }])))
+
+  it('runs the turn as steps once the plan is due (Scenario: Шаг агента)', async () => {
+    setModel(undefined)
+    const body = await (await ask('подбери что-нибудь', complete)).json()
+    expect(body.steps).toEqual([
+      { agent: 'search', title: 'Подбираю отели по вашему описанию', status: 'done', result: 'подобрал по каталогу' },
+    ])
+    expect((await (await ask('море')).json()).steps).toBeUndefined()
+  })
+
+  it('offers the hotels with the quietest nights and names the noise (Scenario: Тихий отель)', async () => {
+    setModel(undefined)
+    const [a, b, c] = await lisbon()
+    features([
+      [a.id, { lnight: { min: 60, max: 64 }, floors: 5 }],
+      [b.id, { lnight: { max: 39 }, floors: 3 }],
+      [c.id, { lnight: { min: 45, max: 49 }, floors: 12 }],
+    ])
+    const body = await (await ask('тихий отель, чтобы ночью не шумело', complete)).json()
+    expect(body.brief).toMatchObject({ quiet: true })
+    expect(body.matches.map((h: { id: string }) => h.id)).toEqual([b.id, c.id, a.id])
+    expect(body.features[b.id].lnight).toEqual({ max: 39 })
+    expect(body.steps.at(-1)).toEqual({
+      agent: 'features',
+      title: 'Проверяю данные о шуме',
+      status: 'done',
+      result: `подходят 3 отеля из ${(await lisbon()).length}`,
+    })
+    expect(body).not.toHaveProperty('missing')
+  })
+
+  it('keeps the quiet ones and goes higher on «а повыше?» (Scenario: Уточнение)', async () => {
+    setModel(undefined)
+    const [a, b, c] = await lisbon()
+    features([
+      [a.id, { lnight: { max: 39 }, floors: 4 }],
+      [b.id, { lnight: { max: 39 }, floors: 15 }],
+      [c.id, { lnight: { min: 65, max: 69 }, floors: 24 }],
+    ])
+    const body = await (await ask('а повыше?', { ...complete, quiet: true })).json()
+    expect(body.brief).toMatchObject({ quiet: true, height: 'high' })
+    expect(body.matches.map((h: { id: string }) => h.id)).toEqual([b.id, a.id, c.id])
+  })
+
+  it('names the room types with the view (Scenario: Вид не у всех номеров)', async () => {
+    setModel(undefined)
+    const [a, b] = await lisbon()
+    features([
+      [a.id, { views: [{ roomName: 'Люкс с видом на море', view: 'sea' }] }],
+      [b.id, { views: [{ roomName: 'Номер с видом на город', view: 'city' }] }],
+    ])
+    const body = await (await ask('номер с видом на море', complete)).json()
+    expect(body.matches.map((h: { id: string }) => h.id)).toEqual([a.id])
+    expect(body.features[a.id].views).toEqual([{ roomName: 'Люкс с видом на море', view: 'sea' }])
+  })
+
+  it('says there is no data instead of guessing (Scenario: Нет данных)', async () => {
+    setModel(undefined)
+    const body = await (
+      await ask('а там шумно? нужен тихий отель', { destinationId: 'prague', when: 9, party: 'solo' })
+    ).json()
+    expect(body.missing).toEqual(['quiet'])
+    expect(body.matches).toBeUndefined()
+    expect(body.steps.at(-1)).toMatchObject({ agent: 'features', status: 'done', result: 'нет данных' })
+  })
+
+  it('reports a failed step and goes on', async () => {
+    setModel(undefined)
+    vi.mocked(loadHotelFeatures).mockRejectedValue(new Error('down'))
+    const body = await (await ask('тихий отель', complete)).json()
+    expect(body.steps.at(-1)).toMatchObject({ agent: 'features', status: 'failed' })
+    expect(body.brief).toMatchObject({ quiet: true })
+  })
+})
+
+// assistant-search, Requirements: Вопрос об отеле, Пометка непроверенного
+describe('POST /api/assistant: a question about a hotel', () => {
+  const hotelId = 'prague-old-town-lantern'
+  const hotel = getHotel(hotelId)!
+  const aboutHotel = (text: string, brief: Record<string, unknown> = {}) => ask(text, { hotelId, ...brief })
+
+  it('answers about the hotel by rules without a key: no questions, no plan (Scenario: Номера без дат)', async () => {
+    setModel(undefined)
+    const body = await (await aboutHotel('Какие номера есть?')).json()
+    expect(body).toMatchObject({ brief: { hotelId, destinationId: 'prague' }, source: 'rules' })
+    expect(body.reply).toContain(hotel.rooms[0].name)
+    expect(body.reply).toContain('Выберите даты')
+    expect(body).not.toHaveProperty('matches')
+    expect(body).not.toHaveProperty('steps')
+    expect(semanticSearch).not.toHaveBeenCalled()
+  })
+
+  it('admits it has no places nearby without a key (Scenario: Без модели)', async () => {
+    setModel(undefined)
+    const { reply, unverified } = await (await aboutHotel('Что рядом с отелем?')).json()
+    expect(reply).toContain('данных о местах рядом пока нет')
+    expect(unverified).toBeUndefined()
+  })
+
+  it('gives the model the hotel’s data and returns its unverified part apart (Scenario: Что рядом)', async () => {
+    const model = new MockLanguageModelV4({
+      doGenerate: {
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify({ answer: 'В данных мест рядом нет.', unverified: 'Обычно рядом есть кафе.' }),
+          },
+        ],
+        finishReason: { unified: 'stop' as const, raw: undefined },
+        usage,
+        warnings: [],
+      },
+    })
+    setModel(model)
+    const body = await (
+      await aboutHotel('Что рядом с отелем?', { dates: { checkIn: '2026-11-10', checkOut: '2026-11-12' } })
+    ).json()
+    expect(body).toMatchObject({
+      reply: 'В данных мест рядом нет.',
+      unverified: 'Обычно рядом есть кафе.',
+      source: 'model',
+      brief: { hotelId, dates: { checkIn: '2026-11-10', checkOut: '2026-11-12' } },
+    })
+    expect(model.doGenerateCalls[0].prompt[0].content).toContain(hotel.name)
+  })
+
+  it('falls back to the rules when the model fails', async () => {
+    setModel(
+      new MockLanguageModelV4({
+        doGenerate: async () => {
+          throw new Error('429 Rate limit exceeded')
+        },
+      }),
+    )
+    const body = await (await aboutHotel('Есть ли парковка?')).json()
+    expect(body.source).toBe('rules')
+    expect(body.reply).toMatch(/парковк/i)
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('429 Rate limit exceeded'))
+  })
+
+  it('treats an id the catalogue does not know as a chat like any other', async () => {
+    setModel(undefined)
+    const body = await (await ask('в горы', { hotelId: 'no-such-hotel' })).json()
+    expect(body).toEqual({ brief: { vibe: 'mountains' }, source: 'rules' })
+  })
+})
+
+// assistant-search, Requirement: Что сделать с фото
+describe('POST /api/assistant with photos', () => {
+  const photo = 'data:image/webp;base64,UklGRhIAAABXRUJQVlA4'
+  const withPhotos = (text: string, photos = [photo], brief = {}, address?: string) =>
+    post({ messages: [{ role: 'user', text }], brief, photos }, address)
+  const sees = (fields: Record<string, unknown>) =>
+    vi.mocked(getVisionModel).mockResolvedValue(
+      new MockLanguageModelV4({
+        doGenerate: answer({ features: [], view: null, place: null, ...fields }),
+      }) as LanguageModel,
+    )
+  const hit = (id: string) => ({ id, destinationId: 'prague', score: 0.9 })
+
+  it('asks what to do with photos sent without words (Scenario: Фото без текста)', async () => {
+    setModel(undefined)
+    const body = await (await withPhotos('Фото')).json()
+    expect(body).toEqual({ brief: {}, source: 'rules', photo: { action: 'ask' } })
+    expect(getVisionModel).not.toHaveBeenCalled()
+  })
+
+  it('asks when the text model cannot tell either', async () => {
+    setModel(new MockLanguageModelV4({ doGenerate: answer({ intent: 'unclear' }) }))
+    const body = await (await withPhotos('смотри, что нашёл')).json()
+    expect(body.photo).toEqual({ action: 'ask' })
+  })
+
+  it('looks for similar hotels by the photo’s description at once (Scenario: Понятный текст)', async () => {
+    setModel(undefined)
+    sees({ description: 'Номер в старом городе с деревянными балками.', features: ['старый город'] })
+    vi.mocked(semanticSearch).mockResolvedValue([hit('prague-skyline-hostel'), hit('unknown')])
+    const body = await (await withPhotos('найди похожий отель')).json()
+    expect(body).toMatchObject({
+      brief: {},
+      source: 'model',
+      photo: { action: 'similar', seen: 'Номер в старом городе с деревянными балками.', like: 'старый город' },
+      steps: [{ agent: 'search', title: 'Ищу отели, похожие на фото', status: 'done', result: 'нашёл 1' }],
+    })
+    expect(body.matches.map((h: { id: string }) => h.id)).toEqual(['prague-skyline-hostel'])
+    const [text, options] = vi.mocked(semanticSearch).mock.calls[0]
+    expect(text).toBe('старый город. Номер в старом городе с деревянными балками')
+    expect(options.destinationIds).toBeUndefined()
+    // The photos go to the model that sees them as images.
+    const vision = (await vi.mocked(getVisionModel).mock.results[0].value) as MockLanguageModelV4
+    const parts = vision.doGenerateCalls[0].prompt.at(-1)!.content as { type: string }[]
+    expect(parts.map((p) => p.type)).toEqual(['file', 'text'])
+  })
+
+  it('tries again with other words when the search does not answer, then says so honestly', async () => {
+    setModel(undefined)
+    sees({ description: 'Номер с видом на море.', features: ['вид на море'] })
+    vi.mocked(semanticSearch)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce([hit('prague-skyline-hostel')])
+    const found = await (await withPhotos('найди похожий')).json()
+    expect(found.matches.map((h: { id: string }) => h.id)).toEqual(['prague-skyline-hostel'])
+    const [[first, firstOptions], [retry]] = vi.mocked(semanticSearch).mock.calls
+    expect(first).toBe('вид на море. Номер с видом на море')
+    expect(retry).toBe('вид на море')
+    expect(firstOptions.timeoutMs).toBeLessThanOrEqual(6000)
+
+    // Nothing found at once is not the search failing.
+    vi.mocked(semanticSearch).mockReset().mockResolvedValue(null)
+    const none = await (await withPhotos('найди похожий')).json()
+    expect(none.photo.missed).toBeUndefined()
+    expect(none.steps[0]).toMatchObject({ status: 'done', result: 'похожих не нашёл' })
+
+    // A search that takes its whole time did not answer.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.mocked(semanticSearch)
+      .mockReset()
+      .mockImplementation(async (_, { timeoutMs = 0 }) => {
+        vi.setSystemTime(Date.now() + timeoutMs)
+        return null
+      })
+    const missed = await (await withPhotos('найди похожий')).json()
+    vi.useRealTimers()
+    expect(missed.photo).toMatchObject({ action: 'similar', missed: true })
+    expect(missed.matches).toBeUndefined()
+    expect(missed.steps).toEqual([
+      { agent: 'search', title: 'Ищу отели, похожие на фото', status: 'failed', result: 'поиск не ответил' },
+    ])
+    expect(semanticSearch).toHaveBeenCalledTimes(2)
+    expect(vi.mocked(semanticSearch).mock.calls[1][1].timeoutMs).toBeGreaterThanOrEqual(2000)
+  })
+
+  it('looks for nothing by a photo with nothing a hotel is chosen by', async () => {
+    setModel(undefined)
+    sees({ usable: false, description: 'Только цветные полосы.' })
+    for (const text of ['найди похожий', 'Учесть в запросе']) {
+      const body = await (await withPhotos(text)).json()
+      expect(body).toEqual({
+        brief: {},
+        source: 'model',
+        photo: { action: 'unusable', seen: 'Только цветные полосы.' },
+      })
+    }
+    expect(semanticSearch).not.toHaveBeenCalled()
+  })
+
+  it('looks in the chat’s city when it has one', async () => {
+    setModel(undefined)
+    sees({ description: 'Тихий двор с садом.' })
+    await withPhotos('Найти похожие отели', [photo], { destinationId: 'prague' })
+    expect(vi.mocked(semanticSearch).mock.calls[0][1].destinationIds).toEqual(['prague'])
+  })
+
+  it('adds what the photo shows to the wish and goes on (Scenario: Учесть в запросе)', async () => {
+    setModel(undefined)
+    sees({ description: 'Вид на море с балкона.', view: 'sea', features: ['балкон'] })
+    const body = await (await withPhotos('Учесть в запросе', [photo], { destinationId: 'valencia' })).json()
+    expect(body.photo).toEqual({ action: 'refine', seen: 'Вид на море с балкона.' })
+    expect(body.brief).toMatchObject({ destinationId: 'valencia', view: 'sea' })
+    expect(body.source).toBe('rules')
+  })
+
+  it('says it could not look at the photos without the model (Scenario: Без модели фото)', async () => {
+    setModel(undefined)
+    const body = await (await withPhotos('найди похожий')).json()
+    expect(body).toEqual({ brief: {}, source: 'rules', photo: { action: 'unseen' } })
+  })
+
+  it('says so on a model error or an answer not in Russian', async () => {
+    setModel(undefined)
+    vi.mocked(getVisionModel).mockResolvedValue(
+      new MockLanguageModelV4({
+        doGenerate: async () => {
+          throw new Error('504 Gateway Timeout')
+        },
+      }) as LanguageModel,
+    )
+    expect((await (await withPhotos('найди похожий')).json()).photo).toEqual({ action: 'unseen' })
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('504 Gateway Timeout'))
+    // An error of the API brings its status and its short answer, not the request.
+    vi.mocked(getVisionModel).mockResolvedValue(
+      new MockLanguageModelV4({
+        doGenerate: async () => {
+          throw new APICallError({
+            message: '',
+            url: 'https://integrate.api.nvidia.com/v1/chat/completions',
+            requestBodyValues: { messages: ['secret photo'] },
+            statusCode: 429,
+            responseBody: `{"detail":"Too many requests ${'x'.repeat(400)}"}`,
+          })
+        },
+      }) as LanguageModel,
+    )
+    await withPhotos('найди похожий')
+    const line = vi.mocked(console.warn).mock.calls.at(-1)![0] as string
+    expect(line).toContain('HTTP 429: {"detail":"Too many requests')
+    expect(line).not.toContain('secret photo')
+    expect(line.length).toBeLessThan(400)
+    sees({ description: 'A room with a view.' })
+    expect((await (await withPhotos('найди похожий')).json()).photo).toEqual({ action: 'unseen' })
+  })
+
+  it('has a limit of its own for the model that sees photos', async () => {
+    setModel(undefined)
+    sees({ description: 'Бассейн.' })
+    const answers = []
+    for (let i = 0; i < 7; i++)
+      answers.push((await (await withPhotos('найди похожий', [photo], {}, '10.9.9.9')).json()).photo)
+    expect(answers.slice(0, 6).every((p) => p.action === 'similar')).toBe(true)
+    expect(answers[6]).toEqual({ action: 'unseen' })
+  })
+
+  it('takes at most four optimised photos', async () => {
+    setModel(undefined)
+    expect((await withPhotos('найди похожий', Array(5).fill(photo))).status).toBe(400)
+    expect((await withPhotos('найди похожий', ['data:image/svg+xml;base64,AAAA'])).status).toBe(400)
+    expect((await withPhotos('найди похожий', ['https://example.com/a.webp'])).status).toBe(400)
+    expect((await withPhotos('найди похожий', [`data:image/webp;base64,${'A'.repeat(1_500_000)}`])).status).toBe(400)
   })
 })

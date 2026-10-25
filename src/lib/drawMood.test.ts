@@ -52,7 +52,7 @@ describe('strokeArea', () => {
 
 // draw-search, Requirement: Настроение по цветам
 describe('drawAnswers', () => {
-  it('reads a blue drawing as «Море» and «Тихий вечер»', () => {
+  it('reads a blue drawing as «Море» and «Уютный вечер»', () => {
     const answers = drawAnswers([line('blue', 300), line('blue', 200)])
     expect(on(answers, 'place')).toBe(-1)
     expect(on(answers, 'evening')).toBe(-1)

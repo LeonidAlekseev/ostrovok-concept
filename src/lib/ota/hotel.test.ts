@@ -77,8 +77,26 @@ describe('otaHotel', () => {
       isNew: false,
     })
     expect(hotel.description).toMatch(/^Отель Malcom and Barret — 3-звёздочный отель в 2,2 км от центра Валенсии\./)
-    expect(hotel.sectionScores).toHaveLength(8)
-    expect(hotel.reviews.length).toBeGreaterThan(0)
+  })
+
+  it('has no generated reviews, section scores or guest photos, rated or not', () => {
+    const hotel = otaHotel(raw(), 'valencia', STAY)
+    expect(hotel).toMatchObject({ rating: 9.2, reviewCount: 3567, sectionScores: [], reviews: [], guestPhotos: [] })
+  })
+
+  it('lists only the rooms of the rates, the cheapest first, never the room types of the directory', () => {
+    const groups = ['a', 'b', 'c', 'd'].map((rg) => ({ rg_hash: rg, name_struct: { main_name: `Номер ${rg}` } }))
+    const hotel = otaHotel(
+      raw({ room_groups: groups }, [rate(14020, { rg: 'c' }), rate(11779, { rg: 'a' })]),
+      'valencia',
+      STAY,
+    )
+    expect(hotel.rooms.map((r) => [r.id, r.rates.length])).toEqual([
+      ['room-a', 1],
+      ['room-c', 1],
+    ])
+    expect(hotel.rooms.every((r) => r.capacity > 0)).toBe(true)
+    expect(cheapestRate(hotel).room.id).toBe('room-a')
   })
 
   it('reads the stars ×10, and a hotel without them shows none', () => {

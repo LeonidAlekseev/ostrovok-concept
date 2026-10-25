@@ -15,16 +15,20 @@
     "test": "vitest run",
     "secrets:reveal": "node scripts/secrets.mjs reveal",
     "secrets:hide": "node scripts/secrets.mjs hide",
+    "db:types": "node --env-file-if-exists=.env.local scripts/db-types.mjs",
     "db:push": "node --env-file-if-exists=.env.local scripts/db-push.mjs",
     "db:seed": "node --env-file-if-exists=.env.local scripts/seed.ts",
     "db:seed:valencia": "node --env-file-if-exists=.env.local scripts/seed-valencia.ts",
-    "db:embed": "node --env-file-if-exists=.env.local scripts/embed.ts"
+    "db:rebuild:ota": "node --env-file-if-exists=.env.local scripts/rebuild-ota-hotels.ts",
+    "db:embed": "node --env-file-if-exists=.env.local scripts/embed.ts",
+    "db:features": "node --env-file-if-exists=.env.local scripts/hotel-features.ts"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "^3.0.75",
     "@base-ui/react": "^1.9.0",
     "@fontsource-variable/onest": "^5.3.1",
     "@fontsource/caveat": "^5.3.0",
-    "@openrouter/ai-sdk-provider": "^3.1.0",
+    "@shadcn/react": "^0.3.1",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
     "ai": "^7.0.148",

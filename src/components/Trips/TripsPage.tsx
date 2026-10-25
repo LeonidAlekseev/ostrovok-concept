@@ -45,9 +45,14 @@ function Trips() {
               {list.length === 0 ? (
                 <div className="flex flex-col items-start gap-3">
                   <p className="text-muted-foreground">{empty}</p>
-                  <Link className={buttonVariants()} href="/">
-                    Найти отель
-                  </Link>
+                  <div className="flex flex-wrap gap-3">
+                    <Link className={buttonVariants()} href="/assistant">
+                      Спросить Эвал
+                    </Link>
+                    <Link className={buttonVariants({ variant: 'outline' })} href="/search">
+                      Искать вручную
+                    </Link>
+                  </div>
                 </div>
               ) : loaded.status === 'loading' ? (
                 <p className="text-muted-foreground">Загружаем поездки…</p>

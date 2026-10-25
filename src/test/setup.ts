@@ -5,6 +5,7 @@ import type { ReadingInput } from '@/lib/horoscope'
 import { sessionStore } from '@/lib/session'
 import type { Answer } from '@/lib/vibe'
 import { catalogFetch } from './catalog'
+import { setProduction } from './env'
 
 // Testing Library unmounts on its own only when the runner exposes globals; this config does not.
 afterEach(cleanup)
@@ -20,6 +21,10 @@ document.addEventListener('click', (event) => {
 // jsdom has no layout and no element scrolling: scrollTo is a no-op, as for a strip without width.
 Element.prototype.scrollTo ??= () => {}
 Element.prototype.scrollIntoView ??= () => {}
+
+// Outside production unless a test calls setProduction (src/test/env.ts); reset after each test.
+vi.mock('@/lib/env', () => import('./env'))
+afterEach(() => setProduction(false))
 
 // The catalogue comes from the generator (src/test/catalog.ts): the destinations of the root layout, the
 // server actions and `GET /api/hotels`.

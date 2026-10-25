@@ -1,14 +1,13 @@
 // Embeds the catalog for the semantic search: every hotel gets a vector from nvidia/nemotron-3.5-embed-8b in the `embeddings` table.
 //   npm run db:embed   (Node runs the TypeScript itself; the keys come from .env.local, see README «Ключи API»)
-// Only new and changed hotels go to the model (`content_hash`); vectors of removed objects (and of the routes the
-// site no longer has) are deleted.
-// Batches of BATCH texts; a 429 or a 5xx is retried with a growing pause. Needs NEXT_PUBLIC_SUPABASE_URL,
-// SUPABASE_SERVICE_ROLE_KEY and OPENROUTER_API_KEY; prints counts, never the keys. Exits with 1 on errors.
+// Only new and changed hotels go to the model (`content_hash`); vectors of removed hotels are deleted.
+// Batches of BATCH texts, at most 40 requests a minute (the NVIDIA key's limit); a 429 or a 5xx is retried with a
+// pause. Needs NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and NVIDIA_API_KEY; prints counts, never the keys.
+// Exits with 1 on errors.
 import { createHash } from 'node:crypto'
 import { registerHooks } from 'node:module'
-import { setTimeout as sleep } from 'node:timers/promises'
 import { createClient } from '@supabase/supabase-js'
-import { APICallError, embedMany } from 'ai'
+import { embedMany } from 'ai'
 
 // The app's modules import each other without extensions, as the bundler allows; Node needs `.ts`.
 registerHooks({
@@ -24,14 +23,17 @@ registerHooks({
 
 const { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, embeddingModel, toVector } = await import('../src/lib/ai/embedding.ts')
 const { hotelDocument } = await import('../src/lib/ai/documents.ts')
+const { featuresOf } = await import('../src/lib/features.ts')
+const { NVIDIA_KEY, pacer, withRetry } = await import('../src/lib/ai/nvidia.ts')
 const { vibeScale } = await import('../src/lib/vibe.ts')
 
 type Destination = import('../src/data/destinations.ts').Destination
 type Hotel = import('../src/lib/catalog.ts').Hotel
+type FeatureRow = import('../src/lib/features.ts').FeatureRowRead
+type RoomViewRow = import('../src/lib/features.ts').RoomViewRowRead
 
 const BATCH = 32
 const PAGE = 1000
-const ATTEMPTS = 6
 
 function required(name: string): string {
   const value = process.env[name]
@@ -42,7 +44,8 @@ function required(name: string): string {
 const supabase = createClient(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
   auth: { persistSession: false, autoRefreshToken: false },
 })
-const model = embeddingModel(required('OPENROUTER_API_KEY'), 'passage')
+const model = embeddingModel(required(NVIDIA_KEY), 'passage')
+const turn = pacer()
 
 /** Every row of `table`, page by page; `null` when the table does not exist yet. */
 async function readAll<T>(table: string, columns: string, orderBy = ['id']): Promise<T[] | null> {
@@ -73,12 +76,26 @@ const destinations = ((await readAll<{ data: Destination }>('destinations', 'dat
 const cityOf = new Map(destinations.map((d) => [d.id, d]))
 const hotels = ((await readAll<{ data: Hotel }>('hotels', 'data')) ?? []).map((row) => row.data)
 
+// The building, the noise and the room views of `npm run db:features`; none before its migration.
+const features = featuresOf(
+  (await readAll<FeatureRow>(
+    'hotel_features',
+    'hotel_id, floors, height_m, lden_min, lden_max, lnight_min, lnight_max',
+    ['hotel_id'],
+  )) ?? [],
+  (await readAll<RoomViewRow>('hotel_room_views_named', 'hotel_id, view, room_name', [
+    'hotel_id',
+    'rg_hash',
+    'view',
+  ])) ?? [],
+)
+
 const scale = vibeScale(hotels, destinations)
 const documents: Document[] = []
 for (const hotel of hotels) {
   const city = cityOf.get(hotel.destinationId)
   if (!city) continue
-  const content = hotelDocument(hotel, city, scale)
+  const content = hotelDocument(hotel, city, scale, features.get(hotel.id))
   documents.push({ kind: 'hotel', ref_id: hotel.id, destination_id: city.id, content, content_hash: hash(content) })
 }
 
@@ -91,22 +108,16 @@ const key = (row: { kind: string; ref_id: string }) => `${row.kind}:${row.ref_id
 const storedHash = new Map(stored.map((row) => [key(row), row.content_hash]))
 const todo = documents.filter((d) => storedHash.get(key(d)) !== d.content_hash)
 
-/** The batch's vectors; a retryable error (429, 5xx, network) waits 2, 4, 8… s and tries again. */
+/** The batch's vectors; each try waits its turn under the limit, a retryable error (429, 5xx, network) is tried again. */
 async function embedBatch(values: string[]): Promise<number[][]> {
-  for (let attempt = 1; ; attempt++) {
-    try {
+  return withRetry(
+    async () => {
+      await turn()
       const { embeddings } = await embedMany({ model, values, maxRetries: 0 })
       return embeddings
-    } catch (error) {
-      const retryable = !APICallError.isInstance(error) || error.isRetryable
-      if (!retryable || attempt === ATTEMPTS) throw error
-      const pause = 2 ** attempt * 1000
-      console.warn(
-        `  retry ${attempt}/${ATTEMPTS - 1} in ${pause / 1000} s (${(error as Error).message.slice(0, 120)})`,
-      )
-      await sleep(pause)
-    }
-  }
+    },
+    { onRetry: (message) => console.warn(`  ${message}`) },
+  )
 }
 
 let embedded = 0
@@ -131,7 +142,7 @@ for (let i = 0; i < todo.length; i += BATCH) {
   }
 }
 
-// Vectors of hotels gone from the catalog, and of the routes.
+// Vectors of hotels gone from the catalog.
 const current = new Set(documents.map(key))
 const stale = stored.filter((row) => !current.has(key(row)))
 for (const row of stale) {

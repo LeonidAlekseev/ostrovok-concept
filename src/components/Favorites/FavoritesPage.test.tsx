@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { addDays, todayIso } from '@/lib/dates'
 import { favoritesStore } from '@/lib/storage'
+import { setProduction } from '@/test/env'
 import { FavoritesPage } from './FavoritesPage'
 import { waitForCatalog } from '@/test/waitForCatalog'
 
@@ -12,11 +13,13 @@ afterEach(() => localStorage.clear())
 
 // favorites
 describe('FavoritesPage', () => {
-  it('shows the empty state with a search link', async () => {
+  it('shows the empty state with two search links', async () => {
     render(<FavoritesPage />)
     await waitForCatalog()
     expect(screen.getByText('В избранном пока пусто')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Найти отель' }).getAttribute('href')).toBe('/')
+    expect(screen.getByRole('link', { name: 'Спросить Эвал' }).getAttribute('href')).toBe('/assistant')
+    expect(screen.getByRole('link', { name: 'Искать вручную' }).getAttribute('href')).toBe('/search')
+    expect(screen.queryByRole('link', { name: 'Найти отель' })).toBeNull()
   })
 
   it('lists a saved hotel with a link to it with the start dates, without signing in', async () => {
@@ -58,5 +61,17 @@ describe('FavoritesPage', () => {
     await user.click(screen.getByRole('button', { name: 'Убрать из избранного' }))
     expect(favoritesStore.get()).toEqual([])
     expect(screen.getByText('В избранном пока пусто')).toBeTruthy()
+  })
+})
+
+// hotel-catalog, Requirement: Синтетические отели только вне production
+describe('FavoritesPage in production', () => {
+  it('shows the empty state for a saved synthetic hotel, without an error', async () => {
+    setProduction(true)
+    favoritesStore.set([HOTEL])
+    render(<FavoritesPage />)
+    await waitForCatalog()
+    expect(screen.getByText('В избранном пока пусто')).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 })

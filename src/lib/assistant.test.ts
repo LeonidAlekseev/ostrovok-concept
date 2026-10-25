@@ -1,8 +1,19 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { stayTotal } from './offer'
 import { hotels, newHotels } from './catalogGenerator'
 import { destinations } from '../data/destinations'
-import { makePlan, mergeBrief, parseWish } from './assistant'
+import {
+  askAssistant,
+  describeBrief,
+  foldBrief,
+  makePlan,
+  mergeBrief,
+  missingNote,
+  nextQuestion,
+  normalizeBrief,
+  parseWish,
+  presetChips,
+} from './assistant'
 
 describe('parseWish', () => {
   it('reads theme, month and budget from a full request', () => {
@@ -93,6 +104,35 @@ describe('mergeBrief', () => {
 
 describe('makePlan', () => {
   const today = '2026-10-19' // Monday
+
+  // assistant-search, Requirement: Действия под ответом — «Другие варианты»
+  it('skips the hotels the chat has shown for «Другие варианты»', () => {
+    const brief = { destinationId: 'lisbon', when: 9, party: 'solo' as const }
+    const city = hotels.filter((h) => h.destinationId === 'lisbon')
+    const first = makePlan(brief, today, destinations, newHotels, city)
+    const shown = new Set(first.options.flatMap((o) => (o.hotel ? [o.hotel.id] : [])))
+    const more = makePlan(brief, today, destinations, newHotels, city, {}, shown)
+    expect(more.options.length).toBeGreaterThan(0)
+    expect(more.options.every((o) => o.hotel && !shown.has(o.hotel.id))).toBe(true)
+  })
+
+  // assistant-search, Requirement: Карточки отелей в ответе
+  it('gives a hotel the views of its room names, and none without data', () => {
+    const brief = { destinationId: 'lisbon', when: 9, party: 'solo' as const }
+    const [hotel, other] = hotels.filter((h) => h.destinationId === 'lisbon')
+    const features = {
+      [hotel.id]: {
+        views: [
+          { roomName: 'Номер с видом на улицу', view: 'street' as const },
+          { roomName: 'Люкс с видом на море', view: 'sea' as const },
+          { roomName: 'Делюкс с видом на море', view: 'sea' as const },
+        ],
+      },
+    }
+    const plan = makePlan(brief, today, destinations, newHotels, [hotel, other], features)
+    expect(plan.options.find((o) => o.hotel?.id === hotel.id)?.views).toEqual(['sea', 'street'])
+    expect(plan.options.find((o) => o.hotel?.id === other.id)).not.toHaveProperty('views')
+  })
 
   it('plans a theme chosen by the traveller', () => {
     const plan = makePlan({ vibe: 'sea', when: 10, party: 'couple' }, today, destinations, newHotels)
@@ -187,6 +227,34 @@ describe('makePlan', () => {
   })
 })
 
+describe('the assistant’s own pick among the cities shown', () => {
+  const today = '2026-10-19'
+  const valencia = destinations.filter((d) => d.id === 'valencia')
+
+  it('plans Valencia for a winter «Удиви меня» in production (Scenario: Зима в production)', () => {
+    const plan = makePlan({ vibe: 'any', when: 'any', party: 'any' }, today, valencia, [])
+    expect(plan.options.length).toBeGreaterThan(0)
+    for (const o of plan.options) expect(o.destination.id).toBe('valencia')
+    expect(plan.why).not.toBe('')
+  })
+
+  it('keeps the seasonal favourite when it has a city shown', () => {
+    const shown = destinations.filter((d) => ['paris', 'valencia'].includes(d.id))
+    const plan = makePlan({ vibe: 'any', when: 0, party: 'couple' }, today, shown, [])
+    expect(plan.why).toBe(
+      'Выбрал сам: вдвоём лучше всего там, где красиво. Значит, город, в который влюбляешься вдвоём.',
+    )
+    for (const o of plan.options) expect(o.destination.id).toBe('paris')
+  })
+
+  it('takes the shown cities without a theme when no theme has one', () => {
+    const plain = { ...valencia[0], id: 'plain-city', scenarios: ['weekend' as const] }
+    const plan = makePlan({ vibe: 'any', when: 'any', party: 'any' }, today, [plain], [])
+    expect(plan.options.map((o) => o.destination.id)).toEqual(['plain-city'])
+    expect(plan.why).toBe('Смена картинки без долгого перелёта.')
+  })
+})
+
 describe('makePlan with the semantic matches', () => {
   const today = '2026-10-19'
   const inCity = (id: string) => hotels.filter((h) => h.destinationId === id)
@@ -223,5 +291,191 @@ describe('makePlan with the semantic matches', () => {
     const plan = makePlan(brief, today, destinations, newHotels, [dear, cheap])
     expect(plan.options.map((o) => o.hotel?.id)).toEqual([cheap.id, dear.id])
     expect(plan.options[1].fitsBudget).toBe(false)
+  })
+})
+
+// assistant-search, Requirement: Подбор по свойствам здания и окружения
+describe('the hotel criteria', () => {
+  it('reads a quiet night, the building’s height and the view', () => {
+    expect(parseWish('тихий отель в Валенсии, чтобы ночью не шумело', destinations)).toMatchObject({ quiet: true })
+    expect(parseWish('а повыше?', destinations)).toEqual({ height: 'high' })
+    expect(parseWish('а пониже, на нижних этажах', destinations)).toEqual({ height: 'low' })
+    expect(parseWish('номер с видом на море', destinations)).toMatchObject({ view: 'sea', vibe: 'sea' })
+    expect(parseWish('чтобы был красивый вид из окна', destinations)).toMatchObject({ view: 'any' })
+    expect(parseWish('хочу на море в октябре', destinations).view).toBeUndefined()
+  })
+
+  it('keeps the earlier conditions of the chat on a refinement (Scenario: Уточнение)', () => {
+    const quiet = mergeBrief({}, 'тихий отель в Лиссабоне в октябре, один', null, destinations)
+    expect(quiet).toMatchObject({ destinationId: 'lisbon', quiet: true, when: 9, party: 'solo' })
+    const higher = mergeBrief(quiet, 'а повыше?', null, destinations)
+    expect(higher).toEqual({ ...quiet, height: 'high' })
+    expect(describeBrief(higher, destinations)).toBe(
+      'Лиссабон · спокойно · в октябре · один · тихо ночью · здание повыше',
+    )
+  })
+
+  it('explains a hotel without the data honestly (Scenario: Нет данных)', () => {
+    const brief = { destinationId: 'prague', when: 9, party: 'solo' as const, quiet: true as const }
+    const plan = makePlan(brief, '2026-10-01', destinations, newHotels)
+    expect(plan.options.length).toBeGreaterThan(0)
+    for (const option of plan.options) expect(option.reasons).toEqual(['нет данных о шуме'])
+    const prague = destinations.filter((d) => d.id === 'prague')
+    expect(missingNote(['quiet'], prague)).toBe('Данных о шуме у отелей Праги нет — подобрал без этого условия.')
+    expect(missingNote([], prague)).toBe('')
+  })
+})
+
+// assistant-search, Requirement: Начальный экран
+describe('the presets of Eval', () => {
+  const valencia = destinations.filter((d) => d.id === 'valencia')
+
+  it('offers only the themes with a city shown in the season (Scenario: Пресеты без видимых городов)', () => {
+    // Production shows Valencia only: no mountains; the sea only outside winter.
+    expect(presetChips(valencia, '2026-06-01').map((c) => c.label)).toEqual(['На море', 'Города'])
+    expect(presetChips(valencia, '2026-11-20').map((c) => c.label)).toEqual(['Города'])
+    expect(presetChips(destinations, '2026-11-20').map((c) => c.label)).toEqual(['На море', 'В горы', 'Города'])
+  })
+
+  it('leaves out the quick replies without a city', () => {
+    expect(nextQuestion({}, '2026-06-01', valencia)?.replies).toEqual(['На море', 'Города Европы', 'Удиви меня'])
+    expect(nextQuestion({}, '2026-06-01')?.replies).toEqual([
+      'На море',
+      'В горы',
+      'Города Европы',
+      'Романтика',
+      'Удиви меня',
+    ])
+  })
+})
+
+// assistant-exact-dates, Requirement: Разбор пожелания (named days of the stay)
+describe('named days of the stay', () => {
+  const today = '2026-10-24'
+  const dates = { checkIn: '2026-11-10', checkOut: '2026-11-15' }
+
+  it('plans the named days and their length (Scenario: Конкретные даты)', () => {
+    const plan = makePlan(
+      { destinationId: 'valencia', dates, when: 10, nights: 5, party: 'couple' },
+      today,
+      destinations,
+      newHotels,
+    )
+    expect(plan.query).toMatchObject({ checkIn: '2026-11-10', checkOut: '2026-11-15' })
+    expect(plan.nights).toBe(5)
+  })
+
+  it('takes the named days over the month and the length of the rules', () => {
+    const plan = makePlan({ vibe: 'sea', dates, when: 10, nights: 2, party: 'solo' }, today, destinations, newHotels)
+    expect(plan.query).toMatchObject({ checkIn: '2026-11-10', checkOut: '2026-11-15' })
+    expect(plan.nights).toBe(5)
+  })
+
+  it('keeps the plan by the month without named days', () => {
+    const plan = makePlan({ vibe: 'sea', when: 10, party: 'solo' }, today, destinations, newHotels)
+    expect(plan.query.checkIn).toBe('2026-11-07')
+  })
+
+  it('keeps the other conditions when the check-in moves (Scenario: Уточнение дат)', () => {
+    const brief = { destinationId: 'valencia', party: 'couple', dates, when: 10, nights: 5, budget: 90_000 } as const
+    const moved = foldBrief(
+      brief,
+      { dates: { checkIn: '2026-11-12', checkOut: '2026-11-17' }, when: 10, nights: 5 },
+      'а с 12-го?',
+      'when',
+    )
+    expect(moved).toEqual({ ...brief, dates: { checkIn: '2026-11-12', checkOut: '2026-11-17' } })
+  })
+
+  it('drops the named days on "не важно" for the dates asked', () => {
+    const brief = { vibe: 'sea' as const, dates, when: 10, nights: 5 }
+    expect(foldBrief(brief, {}, 'не важно', 'dates')).toEqual({ vibe: 'sea', when: 10, nights: 5 })
+  })
+
+  it('replaces the named days by a month of its own', () => {
+    const brief = { vibe: 'sea' as const, dates, when: 10, nights: 5 }
+    expect(mergeBrief(brief, 'в декабре', 'when', destinations)).toEqual({ vibe: 'sea', when: 11, nights: 5 })
+  })
+
+  it('asks for the dates when the named ones have passed', () => {
+    const question = nextQuestion({ vibe: 'sea', dates: { checkIn: '2026-10-10', checkOut: '2026-10-15' } }, today)
+    expect(question?.id).toBe('dates')
+    expect(question?.replies).toEqual([])
+  })
+
+  it('asks for the dates when the model could not take them', () => {
+    expect(nextQuestion({ vibe: 'sea', when: 10, datesRejected: true }, today)?.id).toBe('dates')
+    expect(nextQuestion({ vibe: 'sea', when: 10, dates }, today)?.id).toBe('party')
+  })
+
+  it('shows the named days in the brief', () => {
+    expect(describeBrief({ destinationId: 'valencia', dates, when: 10, nights: 5 }, destinations)).toBe(
+      'Валенсия · 10 нояб. — 15 нояб. · 5 ночей',
+    )
+  })
+
+  // assistant-search, Requirement: Вопрос об отеле
+  it('keeps the hotel of the chat only as a short string', () => {
+    expect(normalizeBrief({ hotelId: 'ota-1' }, destinations)).toEqual({ hotelId: 'ota-1' })
+    expect(normalizeBrief({ hotelId: '' }, destinations)).toEqual({})
+    expect(normalizeBrief({ hotelId: 7 }, destinations)).toEqual({})
+    expect(normalizeBrief({ hotelId: 'x'.repeat(121) }, destinations)).toEqual({})
+  })
+
+  it('keeps only real days of at most a month of nights from the client', () => {
+    expect(normalizeBrief({ dates: { checkIn: '2026-02-31', checkOut: '2026-03-02' } }, destinations)).toEqual({})
+    expect(normalizeBrief({ dates: { checkIn: '2026-11-15', checkOut: '2026-11-10' } }, destinations)).toEqual({})
+    expect(normalizeBrief({ dates: { checkIn: '2026-11-10', checkOut: '2026-11-15' } }, destinations)).toEqual({
+      dates,
+      when: 10,
+      nights: 5,
+    })
+  })
+})
+
+// assistant-search, Requirement: Что сделать с фото
+describe('askAssistant with photos', () => {
+  const photo = 'data:image/webp;base64,AAAA'
+  const request = { messages: [{ role: 'user' as const, text: 'Фото' }], brief: {}, photos: [photo, photo] }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('sends the photos and reads the answer about them', async () => {
+    const fetch = vi.fn(async () => Response.json({ brief: {}, source: 'rules', photo: { action: 'ask' } }))
+    vi.stubGlobal('fetch', fetch)
+    const response = await askAssistant(request, null, destinations)
+    expect(response.photo).toEqual({ action: 'ask' })
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+    expect(JSON.parse(init.body as string).photos).toEqual([photo, photo])
+  })
+
+  it('keeps the answer’s known actions only', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ brief: {}, source: 'model', photo: { action: 'paint', seen: 1 } })),
+    )
+    expect((await askAssistant(request, null, destinations)).photo).toBeUndefined()
+  })
+
+  it('says it could not look at the photos when the route fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 503 })),
+    )
+    expect(await askAssistant(request, null, destinations)).toEqual({
+      brief: {},
+      source: 'rules',
+      photo: { action: 'unseen' },
+    })
+  })
+
+  it('sends no photos field without photos', async () => {
+    const fetch = vi.fn(async () => Response.json({ brief: {}, source: 'rules' }))
+    vi.stubGlobal('fetch', fetch)
+    await askAssistant({ ...request, photos: [] }, null, destinations)
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+    expect(JSON.parse(init.body as string)).not.toHaveProperty('photos')
   })
 })

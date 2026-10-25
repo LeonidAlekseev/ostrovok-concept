@@ -1,17 +1,23 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { setProduction } from '@/test/env'
 import { destinations } from '../data/destinations'
 import {
   findScenario,
   fromSearchParams,
   parseGuestParams,
+  parseSelection,
   parseStayParams,
   resolveTarget,
+  selectionHref,
   suggestDestinations,
   toSearchParams,
   validateSearch,
   withStartDates,
   type SearchQuery,
 } from './search'
+
+vi.mock('@/lib/env', () => import('@/test/env'))
+afterEach(() => setProduction(false))
 
 const ids = (list: { id: string }[]) => list.map((d) => d.id)
 
@@ -43,13 +49,22 @@ describe('resolveTarget', () => {
 
 describe('findScenario', () => {
   it('finds a scenario by title ignoring case, outer spaces and ё/е', () => {
-    expect(findScenario('  нА вЫХОДНЫЕ ')).toMatchObject({ id: 'weekend' })
-    expect(findScenario('Города Ёвропы')).toMatchObject({ id: 'europe' })
+    expect(findScenario('  нА вЫХОДНЫЕ ', destinations)).toMatchObject({ id: 'weekend' })
+    expect(findScenario('Города Ёвропы', destinations)).toMatchObject({ id: 'europe' })
   })
 
   it('returns undefined for empty or unknown text', () => {
-    expect(findScenario('   ')).toBeUndefined()
-    expect(findScenario('В горы')).toBeUndefined()
+    expect(findScenario('   ', destinations)).toBeUndefined()
+    expect(findScenario('В горы', destinations)).toBeUndefined()
+  })
+
+  // hotel-catalog, Requirement: Синтетические отели только вне production
+  it('hides a scenario no destination shown has', () => {
+    const valencia = destinations.filter((d) => d.id === 'valencia')
+    expect(findScenario('На выходные', valencia)).toBeUndefined()
+    expect(resolveTarget('На выходные', valencia)).toBeNull()
+    expect(fromSearchParams(new URLSearchParams('scenario=weekend'), valencia).destination).toBe('')
+    expect(findScenario('Города Европы', valencia)).toMatchObject({ id: 'europe' })
   })
 })
 
@@ -232,5 +247,77 @@ describe('parseGuestParams', () => {
       children: 0,
       rooms: NaN,
     })
+  })
+})
+
+// search-results-page, Requirement: Подборка отелей
+describe('selectionHref', () => {
+  const stay = { checkIn: '2026-10-20', checkOut: '2026-10-21', guests: { adults: 2, children: 0, rooms: 1 } }
+
+  it('writes the hotels, the source, the pick and the stay of every source in one address', () => {
+    expect(selectionHref({ hotels: ['ota-1', 'rome-a'], from: 'vibe', pick: 'quiet-harbour' }, stay)).toBe(
+      '/search?hotels=ota-1,rome-a&from=vibe&pick=quiet-harbour&checkin=2026-10-20&checkout=2026-10-21&adults=2&rooms=1',
+    )
+    expect(selectionHref({ hotels: ['ota-1'], from: 'stars', pick: 'aries' }, stay)).toMatch(
+      /^\/search\?hotels=ota-1&from=stars&pick=aries&checkin=/,
+    )
+    expect(selectionHref({ hotels: ['ota-1'], from: 'draw', pick: 'minimalist' }, null)).toBe(
+      '/search?hotels=ota-1&from=draw&pick=minimalist',
+    )
+  })
+
+  it('is read back by parseSelection and fromSearchParams', () => {
+    const href = selectionHref({ hotels: ['ota-1', 'rome-a'], from: 'draw', pick: 'minimalist' }, stay)
+    const params = new URL(href, 'https://x').searchParams
+    expect(parseSelection(params)).toEqual({
+      kind: 'selection',
+      hotels: ['ota-1', 'rome-a'],
+      title: 'Подборка по вашему рисунку: Эстет-минималист',
+    })
+    expect(fromSearchParams(params, destinations)).toEqual({ destination: '', ...stay })
+  })
+})
+
+describe('parseSelection', () => {
+  const parse = (search: string) => parseSelection(new URLSearchParams(search))
+
+  it('is null without hotels', () => {
+    expect(parse('destination=prague')).toBeNull()
+  })
+
+  it('titles the selection by its source', () => {
+    expect(parse('hotels=a&from=vibe&pick=quiet-harbour')?.title).toBe('Подборка по вашему вайбу: Тихая гавань')
+    expect(parse('hotels=a&from=vibe&pick=balance')?.title).toBe('Подборка по вашему вайбу: Баланс во всём')
+    expect(parse('hotels=a&from=stars&pick=aries')?.title).toBe('Подборка звёзд для Овна')
+    expect(parse('hotels=a&from=stars&pick=pisces')?.title).toBe('Подборка звёзд для Рыб')
+    expect(parse('hotels=a&from=draw&pick=luxury')?.title).toBe('Подборка по вашему рисунку: Ценитель роскоши')
+  })
+
+  // Scenario: Неизвестный источник
+  it('titles an unknown source or pick «Подобранные отели»', () => {
+    for (const search of [
+      'hotels=a',
+      'hotels=a&from=vibe',
+      'hotels=a&from=vibe&pick=aries',
+      'hotels=a&from=stars&pick=quiet-harbour',
+      'hotels=a&from=toString&pick=x',
+      'hotels=a&from=ai&pick=<b>hi</b>',
+    ])
+      expect(parse(search)?.title, search).toBe('Подобранные отели')
+  })
+
+  it('skips malformed and repeated ids', () => {
+    expect(parse('hotels=ota-1,,OTA-2,ota-1,rome-a,a%20b,../x')?.hotels).toEqual(['ota-1', 'rome-a'])
+  })
+
+  it('skips the hidden hotels: production shows only the real ones', () => {
+    expect(parse('hotels=ota-1,rome-a')?.hotels).toEqual(['ota-1', 'rome-a'])
+    setProduction(true)
+    expect(parse('hotels=ota-1,rome-a')?.hotels).toEqual(['ota-1'])
+  })
+
+  it('keeps at most 60 hotels, as /api/hotels loads', () => {
+    const many = Array.from({ length: 70 }, (_, i) => `ota-${i}`)
+    expect(parse(`hotels=${many.join(',')}`)?.hotels).toEqual(many.slice(0, 60))
   })
 })

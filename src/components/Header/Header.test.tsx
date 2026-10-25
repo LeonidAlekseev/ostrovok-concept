@@ -85,7 +85,7 @@ describe('Header', () => {
     expect(panel.contains(document.activeElement)).toBe(true)
     await user.tab()
     expect(panel.contains(document.activeElement)).toBe(true)
-    expect(document.activeElement?.getAttribute('href')).toBe('/trips')
+    expect(document.activeElement?.getAttribute('href')).toBe('/search')
   })
 
   it('closes a panel on a press outside the actions', async () => {
@@ -102,13 +102,15 @@ describe('Header', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
+  // site-header, Requirement: Ссылки на поиск в меню, Scenario: Меню
   it('lists the sections in the menu and closes it on a choice', async () => {
     const user = setup()
     await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
     const nav = screen.getByRole('navigation', { name: 'Основное меню' })
     const items = [...nav.querySelectorAll('a, button')].map((el) => [el.textContent, el.getAttribute('href')])
     expect(items).toEqual([
-      ['Поиск отелей', '/#search'],
+      ['Спросить Эвал', '/assistant'],
+      ['Искать вручную', '/search'],
       ['Мои поездки', '/trips'],
       ['Избранное', '/favorites'],
       ['Уведомления', null],
@@ -166,24 +168,24 @@ describe('Header chrome', () => {
       window.history.pushState({}, '', path)
       const html = renderToString(<Header />)
       window.history.pushState({}, '', '/')
-      // Grey by default; the page content (the hero, the hotel photo) turns it transparent through CSS alone.
+      // Grey by default; the page content (the hero) turns it transparent through CSS alone.
       expect(html).toMatch(/<header class="[^"]*\bbg-background\b/)
       expect(html).toContain('group-has-[#hero-title]/page:bg-transparent')
-      expect(html).toContain('group-has-[[data-header-photo]]/page:bg-transparent')
-      expect(html).toContain('group-has-[[data-header-photo]]/page:text-white')
+      expect(html).not.toContain('data-header-photo')
     },
   )
 
-  it('turns the logo and icons white through CSS over the hotel photo, not by pathname', () => {
+  it('keeps the logo and icons blue on the hotel page', () => {
     window.history.pushState({}, '', '/hotels/prague-old-town-lantern')
     setup()
     window.history.pushState({}, '', '/')
-    expect(screen.getByRole('link', { name: 'О!бъективно — на главную' }).className).toMatch(
-      /(^|\s)group-has-\[\[data-header-photo\]\]\/page:text-white(\s|$)/,
-    )
-    expect(screen.getByRole('button', { name: 'Открыть меню' }).className).toMatch(
-      /(^|\s)group-has-\[\[data-header-photo\]\]\/page:text-white(\s|$)/,
-    )
+    for (const el of [
+      screen.getByRole('link', { name: 'О!бъективно — на главную' }),
+      screen.getByRole('button', { name: 'Открыть меню' }),
+    ]) {
+      expect(el.className).toMatch(/(^|\s)text-primary(\s|$)/)
+      expect(el.className).not.toContain('text-white')
+    }
   })
 
   it('is flat and blue, never sticky', () => {

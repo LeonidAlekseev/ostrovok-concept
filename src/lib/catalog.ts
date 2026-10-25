@@ -1,4 +1,5 @@
-import type { IsoDate } from './dates'
+import { addDays, type IsoDate } from './dates'
+import { isProduction } from './env'
 import { countRu } from './format'
 
 /**
@@ -246,6 +247,18 @@ export interface HotelSummary {
   isNew: boolean
 }
 
+/** The id of a real hotel starts so: `ota-<master_id>`, from an Ostrovok search (`npm run db:seed:valencia`). */
+export const REAL_HOTEL_ID_PREFIX = 'ota-'
+
+/** A hotel the catalogue generator made up, not one from an Ostrovok search. */
+export const isSyntheticHotel = (hotel: Pick<HotelSummary, 'id'>) => !hotel.id.startsWith(REAL_HOTEL_ID_PREFIX)
+
+/**
+ * The catalogue shows a hotel: production only the real ones, preview and `next dev` the made-up ones too. The
+ * synthetic hotels stay in Supabase either way; src/lib/db/catalog.ts reads the catalogue through this.
+ */
+export const isVisibleHotel = (hotel: Pick<HotelSummary, 'id'>) => !isProduction || !isSyntheticHotel(hotel)
+
 export interface NearestStation {
   station: string
   /** Walking distance, m. */
@@ -302,26 +315,83 @@ export const workLabels = (hotel: Pick<Hotel, 'wifiMbps' | 'workspace'>): string
   ...(hotel.workspace ? ['Рабочая зона'] : []),
 ]
 
-/** Travel times from the hotel, minutes. */
-export interface TravelTimes {
-  /** By car to the city centre: 3 minutes a kilometre, at least 1. */
+/** Distances from the hotel, kilometres. */
+export interface TravelDistances {
+  /** To the city centre. */
   centre: number
-  /** On foot to the stop of the city transport. */
-  transport: number
-  /** On foot to the metro (80 m a minute), `null` in a city without a metro. */
+  /** To the metro, `null` in a city without a metro. */
   metro: number | null
+  /** Straight to the city's airport, `null` where the airport is not known. */
+  airport: number | null
 }
 
-export const travelTimes = (hotel: Pick<Hotel, 'distanceKm' | 'metro'>): TravelTimes => ({
-  // Rounded to tenths first: 1.7 × 3 is 5.1000000000000005 in floating point.
-  centre: Math.max(1, Math.ceil(Math.round(hotel.distanceKm * 30) / 10)),
-  transport: 5,
-  metro: hotel.metro && Math.ceil(hotel.metro.meters / 80),
-})
+/**
+ * The airports the hotel page measures to, by destination. Only Valencia's is known: Valencia Airport (VLC),
+ * 39°29′22″N 0°28′54″W, from https://en.wikipedia.org/wiki/Valencia_Airport.
+ */
+export const AIRPORTS: Readonly<Record<string, { code: string; lat: number; lon: number }>> = {
+  valencia: { code: 'VLC', lat: 39.48944, lon: -0.48167 },
+}
+
+const EARTH_RADIUS_KM = 6371
+
+/** The great-circle distance between two points, km. */
+export function straightKm(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
+  const rad = Math.PI / 180
+  const dLat = (b.lat - a.lat) * rad
+  const dLon = (b.lon - a.lon) * rad
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(h))
+}
+
+export const travelDistances = (
+  hotel: Pick<Hotel, 'distanceKm' | 'metro' | 'destinationId' | 'lat' | 'lon'>,
+): TravelDistances => {
+  const airport = AIRPORTS[hotel.destinationId]
+  return {
+    centre: hotel.distanceKm,
+    metro: hotel.metro && hotel.metro.meters / 1000,
+    airport: airport ? straightKm(hotel, airport) : null,
+  }
+}
 
 /** A hotel offers free cancellation when at least one of its rates does. */
 export const hasFreeCancellation = (hotel: Pick<Hotel, 'rooms'>): boolean =>
   hotel.rooms.some((room) => room.rates.some((rate) => rate.cancellation.kind === 'free'))
+
+/**
+ * The last day of free cancellation of the cheapest rate that still has it for a check-in on `checkIn`, or `null`:
+ * no rate is refundable, or every free period is over by `today`. The time of day is not in the data.
+ */
+export function freeCancellationDeadline(
+  hotel: Pick<Hotel, 'rooms'>,
+  checkIn: IsoDate,
+  today: IsoDate,
+): IsoDate | null {
+  let best: { price: number; until: IsoDate } | null = null
+  for (const room of hotel.rooms)
+    for (const rate of room.rates) {
+      if (rate.cancellation.kind !== 'free') continue
+      const until = addDays(checkIn, -rate.cancellation.daysBefore)
+      if (until >= today && (!best || rate.pricePerNight < best.price)) best = { price: rate.pricePerNight, until }
+    }
+  return best && best.until
+}
+
+/** «Высокая оценка гостей» from this score up. */
+export const HIGH_RATING = 8
+/** «Близко к центру» up to this many km. */
+export const NEAR_CENTRE_KM = 2
+
+export type GuestReason =
+  { kind: 'rating'; rating: number } | { kind: 'centre'; km: number } | { kind: 'free-cancellation' }
+
+/** «Почему гости выбирают нас»: only what the hotel's own data says, in this order; empty for none. */
+export const guestReasons = (hotel: Pick<Hotel, 'rating' | 'distanceKm' | 'rooms'>): GuestReason[] => [
+  ...(hotel.rating >= HIGH_RATING ? [{ kind: 'rating' as const, rating: hotel.rating }] : []),
+  ...(hotel.distanceKm <= NEAR_CENTRE_KM ? [{ kind: 'centre' as const, km: hotel.distanceKm }] : []),
+  ...(hasFreeCancellation(hotel) ? [{ kind: 'free-cancellation' as const }] : []),
+]
 
 /** The photos a hotel card leafs through. */
 export const TILE_PHOTOS = 5

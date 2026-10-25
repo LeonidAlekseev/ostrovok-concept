@@ -13,7 +13,7 @@ import {
 } from './catalog'
 import { nightsBetween } from './dates'
 import { averageNight, stayTotal } from './offer'
-import type { SearchQuery, SearchTarget, Stay } from './search'
+import type { SearchQuery, SearchTarget, Selection, Stay } from './search'
 
 /**
  * Search results page: the demo search over the hotel catalogue, and the filters and sorting the
@@ -23,9 +23,9 @@ import type { SearchQuery, SearchTarget, Stay } from './search'
 
 export interface SearchResult {
   query: SearchQuery
-  target: SearchTarget
+  target: SearchTarget | Selection
   nights: number
-  /** Hotels of the destination, or of every destination of the scenario. */
+  /** Hotels of the destination, of every destination of the scenario, or of the selection. */
   hotels: Hotel[]
 }
 
@@ -43,7 +43,7 @@ export const targetDestinations = (target: SearchTarget, destinations: readonly 
  */
 export async function runDemoSearch(
   query: SearchQuery,
-  target: SearchTarget,
+  target: SearchTarget | Selection,
   hotels: Hotel[] | Promise<Hotel[]>,
   signal?: AbortSignal,
 ): Promise<SearchResult> {

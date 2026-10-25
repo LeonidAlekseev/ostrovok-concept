@@ -25,8 +25,6 @@
   --brand-text-2: #667085;
   --brand-green: #4cc13a;
   --brand-green-soft: #dcf7c4;
-  /* Muted text on the lime (--brand): 5.3:1 contrast. */
-  --brand-green-gray: #3f5a30;
   /* Background of the page and the hero; the transparent header shows it too. */
   --brand-lime: #a5e87b;
   --brand-danger: #d92d20;
@@ -161,6 +159,21 @@
   --decor-vibe-loud: linear-gradient(135deg, var(--decor-vibe-loud-from), var(--decor-vibe-loud-to));
   /* The «N из 7» bar fills blue to violet; the shade under the white captions of the vibe photos. */
   --decor-vibe-progress: linear-gradient(90deg, var(--brand-blue), var(--decor-violet));
+  /* The «Это твой вайб» block: the gradient word, the glow of the frames and of the button, the shade under the title. */
+  --decor-vibe-title: linear-gradient(
+    90deg,
+    var(--decor-violet),
+    var(--decor-vibe-loud-from) 55%,
+    var(--decor-vibe-loud-to)
+  );
+  --decor-vibe-calm-glow: 0 0 28px 2px color-mix(in srgb, var(--decor-vibe-calm-from) 55%, transparent);
+  --decor-vibe-loud-glow: 0 0 28px 2px color-mix(in srgb, var(--decor-vibe-loud-from) 55%, transparent);
+  --decor-vibe-button-glow: 0 8px 30px color-mix(in srgb, var(--decor-vibe-loud-from) 50%, transparent);
+  --decor-vibe-shade-top: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--decor-night) 70%, transparent),
+    transparent 55%
+  );
   --decor-vibe-shade: linear-gradient(to top, color-mix(in srgb, var(--decor-night) 85%, transparent), transparent 65%);
   /* Draw search: the rainbow of its main buttons and of the «Подбираем отель» bar, and the glow under them. */
   --decor-rainbow: linear-gradient(
@@ -206,8 +219,6 @@
 
   /* Animations of the components, started by animate-<name> classes. Per-element delays are inline
      animation-delay styles. */
-  /* The assistant's typing indicator: three dots bouncing in turn. */
-  --animate-typing-dot: typing-dot 1s ease-in-out infinite;
   /* The magic orb: the glow breathes, sparkles twinkle around it, and while the
      stars are read the sign's symbol surfaces from the nebula (2.5 s, the length of the reading). */
   --animate-orb-glow: orb-glow 3s ease-in-out infinite;
@@ -243,19 +254,6 @@
     }
     to {
       height: 0;
-    }
-  }
-
-  @keyframes typing-dot {
-    0%,
-    80%,
-    100% {
-      opacity: 0.35;
-      transform: translateY(0);
-    }
-    40% {
-      opacity: 1;
-      transform: translateY(-3px);
     }
   }
 

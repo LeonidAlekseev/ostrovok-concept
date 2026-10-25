@@ -121,3 +121,58 @@ describe('HotelTile free cancellation', () => {
     expect(screen.queryByText('Бесплатная отмена')).toBeNull()
   })
 })
+
+// home-page, Requirement: Карточка отеля в подборках
+describe('HotelTile plain', () => {
+  it('shows the first photo alone, without arrows, counter and badges', () => {
+    render(<HotelTile hotel={hotel} href={`/hotels/${hotel.id}`} plain />)
+    const card = screen.getByRole('article')
+    expect(within(card).queryByRole('group', { name: 'Фото отеля' })).toBeNull()
+    expect(within(card).queryByRole('button')).toBeNull()
+    expect(within(card).queryByText('1 / 5')).toBeNull()
+    expect(within(card).queryByText('Бесплатная отмена')).toBeNull()
+    expect(within(card).queryByText(formatDecimal(hotel.rating))).toBeNull()
+    expect(within(card).queryByRole('img', { name: countRu(hotel.stars, ['звезда', 'звезды', 'звёзд']) })).toBeNull()
+
+    const photoLinks = card.querySelectorAll('a[aria-hidden="true"]')
+    expect(photoLinks).toHaveLength(1)
+    expect(photoLinks[0].getAttribute('href')).toBe(`/hotels/${hotel.id}`)
+    expect(photoLinks[0].querySelector('[role="img"]')).not.toBeNull()
+    expect(card.firstElementChild).toBe(photoLinks[0])
+  })
+
+  it('has no favourite button on the photo', () => {
+    render(<HotelTile hotel={hotel} href="/" plain />)
+    expect(screen.queryByRole('button', { name: 'Добавить в избранное' })).toBeNull()
+  })
+
+  it('shows no kind of stay for apartments, but keeps the name, the distance and the prices', () => {
+    const apartments = fullHotelsIn('prague').find((h) => h.stayType === 'apartments')!
+    render(<HotelTile hotel={apartments} href="/" plain />)
+    const card = screen.getByRole('article')
+    expect(within(card).queryByText('Апартаменты ·')).toBeNull()
+    expect(within(card).getByRole('link', { name: apartments.name })).toBeDefined()
+    const heading = within(card).getByRole('heading', { level: 3, name: apartments.name })
+    expect(heading.nextElementSibling?.textContent).toBe(`${formatDecimal(apartments.distanceKm)} км от центра Праги`)
+    expect(within(card).getByText(formatPrice(apartments.priceFrom), exact)).toBeDefined()
+    expect(within(card).getByRole('img', { name: 'GURU' })).toBeDefined()
+  })
+})
+
+// hotel-tile, Requirement: Плашка generated на карточке
+describe('HotelTile generated', () => {
+  const real: Hotel = { ...hotel, id: 'ota-9322089' }
+
+  it.each([
+    ['the results card', false],
+    ['the plain card of the selections', true],
+  ])('marks a synthetic hotel on %s (Scenario: Карточка в выдаче)', (_, plain) => {
+    render(<HotelTile hotel={hotel} href="/" plain={plain} />)
+    expect(screen.getByText('generated').className).toMatch(/\bbg-black\/40\b/)
+  })
+
+  it.each([false, true])('does not mark a real hotel, plain: %s (Scenario: Настоящий отель)', (plain) => {
+    render(<HotelTile hotel={real} href="/" plain={plain} />)
+    expect(screen.queryByText('generated')).toBeNull()
+  })
+})

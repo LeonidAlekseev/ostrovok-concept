@@ -1,12 +1,24 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getHotel } from '@/lib/catalogGenerator'
-import { CatalogUnavailableError, loadHotel, loadHotels, loadNewHotels } from './catalog'
+import { setProduction } from '@/test/env'
+import {
+  CatalogUnavailableError,
+  loadCityHotels,
+  loadDestinations,
+  loadHotel,
+  loadHotels,
+  loadHotelSummaries,
+  loadNewHotels,
+} from './catalog'
 
-/** A Supabase query builder that records its calls and answers with `db.result`. */
+type Result = { data: unknown[] | null; error: { message: string } | null }
+
+/** A Supabase query builder that records its calls and answers with the table's `db.tables` or `db.result`. */
 const db = vi.hoisted(() => ({
   configured: true,
   calls: [] as unknown[][],
-  result: { data: [] as unknown[] | null, error: null as { message: string } | null },
+  result: { data: [], error: null } as Result,
+  tables: {} as Record<string, Result>,
 }))
 
 vi.mock('@/lib/supabase/config', () => ({
@@ -17,17 +29,26 @@ vi.mock('@/lib/supabase/config', () => ({
   supabaseAnonKey: 'anon',
 }))
 vi.mock('@supabase/supabase-js', () => {
-  const builder: Record<string, unknown> = {
-    then: (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) =>
-      Promise.resolve(db.result).then(resolve, reject),
-  }
-  for (const method of ['from', 'select', 'eq', 'in', 'order', 'returns'])
-    builder[method] = (...args: unknown[]) => {
-      db.calls.push([method, ...args])
-      return builder
+  // One builder per query: a loader may read several tables at once.
+  const query = (table: string) => {
+    const builder: Record<string, unknown> = {
+      then: (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) =>
+        Promise.resolve(db.tables[table] ?? db.result).then(resolve, reject),
     }
-  return { createClient: () => builder }
+    for (const method of ['select', 'eq', 'in', 'order', 'returns'])
+      builder[method] = (...args: unknown[]) => {
+        db.calls.push([method, ...args])
+        return builder
+      }
+    return builder
+  }
+  const from = (table: string) => {
+    db.calls.push(['from', table])
+    return query(table)
+  }
+  return { createClient: () => ({ from }) }
 })
+vi.mock('@/lib/env', () => import('@/test/env'))
 // Next's cache needs the server; the reads themselves are what is tested here.
 vi.mock('next/cache', () => ({ unstable_cache: (read: unknown) => read }))
 
@@ -38,7 +59,9 @@ beforeEach(() => {
   db.configured = true
   db.calls = []
   db.result = { data: [], error: null }
+  db.tables = {}
 })
+afterEach(() => setProduction(false))
 
 // hotel-catalog, Requirement: Чтение каталога из Supabase
 describe('the catalogue from Supabase', () => {
@@ -85,5 +108,61 @@ describe('the catalogue from Supabase', () => {
     db.configured = false
     await expect(loadHotel(lantern.id)).rejects.toThrow('npm run secrets:reveal')
     expect(db.calls).toEqual([])
+  })
+})
+
+// hotel-catalog, Requirement: Синтетические отели только вне production
+describe('the hotels shown', () => {
+  const real = (n: number, isNew = false) => ({ id: `ota-${n}`, destinationId: 'valencia', isNew })
+  const summaries = [
+    { id: 'prague-a', destinationId: 'prague', isNew: true },
+    { id: 'prague-b', destinationId: 'prague', isNew: false },
+    real(1),
+    real(2),
+    real(3),
+    real(4),
+  ]
+  beforeEach(() => {
+    db.tables = {
+      destinations: {
+        data: [{ data: { id: 'prague' } }, { data: { id: 'valencia' } }, { data: { id: 'rome' } }],
+        error: null,
+      },
+      hotels: { data: summaries, error: null },
+    }
+  })
+
+  it('shows every hotel and every city with hotels outside production (Scenario: Preview)', async () => {
+    expect((await loadHotelSummaries()).map((h) => h.id)).toEqual(summaries.map((h) => h.id))
+    expect((await loadDestinations()).map((d) => d.id)).toEqual(['prague', 'valencia'])
+  })
+
+  it('shows only the real hotels and their cities in production (Scenario: Production)', async () => {
+    setProduction(true)
+    expect((await loadHotelSummaries()).map((h) => h.id)).toEqual(['ota-1', 'ota-2', 'ota-3', 'ota-4'])
+    expect((await loadDestinations()).map((d) => d.id)).toEqual(['valencia'])
+  })
+
+  it('spotlights the first hotels of a city without hand-picked ones (Scenario: Глобус в production)', async () => {
+    expect((await loadNewHotels()).map((h) => h.id)).toEqual(['prague-a', 'ota-1', 'ota-2', 'ota-3'])
+    setProduction(true)
+    expect((await loadNewHotels()).map((h) => h.id)).toEqual(['ota-1', 'ota-2', 'ota-3'])
+  })
+
+  it('does not read a synthetic hotel in production (Scenario: Синтетический отель в production)', async () => {
+    setProduction(true)
+    expect(await loadHotel(lantern.id)).toBeUndefined()
+    expect(db.calls).toEqual([])
+  })
+
+  it('skips the synthetic hotels by id and in the cities in production (Scenario: API)', async () => {
+    setProduction(true)
+    const valencian = { ...lantern, id: 'ota-1', destinationId: 'valencia' }
+    db.tables.hotels = { data: [{ data: valencian }], error: null }
+    expect((await loadHotels([lantern.id, 'ota-1'])).map((h) => h.id)).toEqual(['ota-1'])
+    expect(db.calls).toContainEqual(['in', 'id', ['ota-1']])
+
+    db.tables.hotels = { data: [{ data: lantern }, { data: valencian }], error: null }
+    expect((await loadCityHotels(['prague'])).map((h) => h.id)).toEqual(['ota-1'])
   })
 })

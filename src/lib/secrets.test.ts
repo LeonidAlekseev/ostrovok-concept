@@ -7,8 +7,8 @@ import { SECRET_FILE, decryptEnv } from './secretsFile.mjs'
 
 const dotenv = `# Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co
-OPENROUTER_API_KEY="sk-or-test"
-OPENROUTER_MODEL=
+NVIDIA_API_KEY="nvapi-test"
+DEMO_USER_PASSWORD=
 `
 
 let privateKey: string
@@ -27,14 +27,14 @@ describe('decryptEnv', () => {
     expect(text).toBe(dotenv)
     expect(env).toEqual({
       NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
-      OPENROUTER_API_KEY: 'sk-or-test',
-      OPENROUTER_MODEL: '',
+      NVIDIA_API_KEY: 'nvapi-test',
+      DEMO_USER_PASSWORD: '',
     })
   })
 
   it('accepts a key pasted on one line with escaped newlines', async () => {
     const { env } = await decryptEnv(privateKey.replace(/\n/g, '\\n'), encrypted)
-    expect(env.OPENROUTER_API_KEY).toBe('sk-or-test')
+    expect(env.NVIDIA_API_KEY).toBe('nvapi-test')
   })
 
   it('rejects a foreign key', async () => {
@@ -51,7 +51,7 @@ describe('getSecret', () => {
     dir = await mkdtemp(path.join(tmpdir(), 'secrets-'))
     await writeFile(path.join(dir, SECRET_FILE), encrypted)
     vi.spyOn(process, 'cwd').mockReturnValue(dir)
-    vi.stubEnv('OPENROUTER_API_KEY', '')
+    vi.stubEnv('NVIDIA_API_KEY', '')
   })
 
   afterEach(async () => {
@@ -64,22 +64,22 @@ describe('getSecret', () => {
 
   it('returns undefined without GIT_SECRET_PRIVATE_KEY', async () => {
     vi.stubEnv('GIT_SECRET_PRIVATE_KEY', '')
-    expect(await (await load())('OPENROUTER_API_KEY')).toBeUndefined()
+    expect(await (await load())('NVIDIA_API_KEY')).toBeUndefined()
   })
 
   it('prefers process.env', async () => {
     vi.stubEnv('GIT_SECRET_PRIVATE_KEY', privateKey)
-    vi.stubEnv('OPENROUTER_API_KEY', 'from-env')
-    expect(await (await load())('OPENROUTER_API_KEY')).toBe('from-env')
+    vi.stubEnv('NVIDIA_API_KEY', 'from-env')
+    expect(await (await load())('NVIDIA_API_KEY')).toBe('from-env')
   })
 
   it('decrypts the file once and caches it', async () => {
     vi.stubEnv('GIT_SECRET_PRIVATE_KEY', privateKey)
     const getSecret = await load()
-    expect(await getSecret('OPENROUTER_API_KEY')).toBe('sk-or-test')
+    expect(await getSecret('NVIDIA_API_KEY')).toBe('nvapi-test')
     await rm(path.join(dir, SECRET_FILE))
     expect(await getSecret('NEXT_PUBLIC_SUPABASE_URL')).toBe('https://example.supabase.co')
-    expect(await getSecret('OPENROUTER_MODEL')).toBeUndefined()
+    expect(await getSecret('DEMO_USER_PASSWORD')).toBeUndefined()
     expect(await getSecret('MISSING')).toBeUndefined()
   })
 
@@ -87,8 +87,8 @@ describe('getSecret', () => {
     vi.stubEnv('GIT_SECRET_PRIVATE_KEY', privateKey)
     await rm(path.join(dir, SECRET_FILE))
     const getSecret = await load()
-    await expect(getSecret('OPENROUTER_API_KEY')).rejects.toThrow()
+    await expect(getSecret('NVIDIA_API_KEY')).rejects.toThrow()
     await writeFile(path.join(dir, SECRET_FILE), encrypted)
-    expect(await getSecret('OPENROUTER_API_KEY')).toBe('sk-or-test')
+    expect(await getSecret('NVIDIA_API_KEY')).toBe('nvapi-test')
   })
 })

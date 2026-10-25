@@ -1,6 +1,7 @@
 import {
   AMENITIES,
   PHOTO_TONE_COUNT,
+  REAL_HOTEL_ID_PREFIX,
   roundUp100,
   type Amenity,
   type Cancellation,
@@ -17,8 +18,9 @@ import type { OtaHotel, OtaMapHotel, OtaRate, OtaSearch } from './search'
 
 /**
  * A hotel of an Ostrovok search as a catalogue `Hotel`: the name, the address, the place, the stars, the
- * rating, the price, the photos, the amenities and the room with its rate are real; what the search does not
- * have (the description, the section scores, the reviews, the Wi‑Fi) the catalogue generator fills in.
+ * rating, the price, the photos, the amenities, the room with its rate and the review count are real; what the
+ * search does not have (the description, the Wi‑Fi) the catalogue generator fills in. The reviews, the section
+ * scores and the guests' photos are never generated: a real hotel shows only what Ostrovok has.
  */
 
 /** The search's stay: its check-in (an instant) and its length, which the prices of the search are for. */
@@ -48,7 +50,7 @@ export function searchStay(search: Pick<OtaSearch, 'hotels'>): OtaStay {
   return { checkIn, nights: [...nights][0] }
 }
 
-export const otaHotelId = (masterId: number) => `ota-${masterId}`
+export const otaHotelId = (masterId: number) => `${REAL_HOTEL_ID_PREFIX}${masterId}`
 
 const STAY_TYPE_OF_KIND: Record<string, StayType> = {
   Hostel: 'hostel',
@@ -189,6 +191,7 @@ export function otaHotel(raw: OtaHotel, destinationId: string, stay: OtaStay, pi
     }),
     rooms: rooms ?? [pinRoom(raw, priceFrom)],
   })
-  // Nobody has rated the hotel yet: no scores, no reviews and no photos of the guests.
-  return rating > 0 ? hotel : { ...hotel, sectionScores: [], reviews: [], guestPhotos: [] }
+  // Ostrovok's rating and review count are real; the reviews, the scores of the sections and the guests' photos
+  // are not in the search, and the generator's would be made up.
+  return { ...hotel, sectionScores: [], reviews: [], guestPhotos: [] }
 }

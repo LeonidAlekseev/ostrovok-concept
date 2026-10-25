@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { addDays, formatLongDate, todayIso } from '../../lib/dates'
 import { StarSearch } from './StarSearch'
-import { StarSearchDialog } from './StarSearchDialog'
+import { READING_MS, StarSearchDialog } from './StarSearchDialog'
 import { ZodiacRing } from './ZodiacRing'
 import { renderReadingVideo } from './starVideo'
 
@@ -19,11 +19,16 @@ beforeEach(() => {
   // Tuesday, 20 October 2026: the calendar's past days and the +10 day check-in stay in one month.
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(2026, 9, 20, 12))
+  // The reading lasts READING_MS: the tests do not wait for it in real time.
+  const realSetTimeout = globalThis.setTimeout
+  vi.spyOn(globalThis, 'setTimeout').mockImplementation(((handler: TimerHandler, ms?: number, ...args: unknown[]) =>
+    realSetTimeout(handler, ms === READING_MS ? 50 : ms, ...args)) as typeof setTimeout)
   URL.createObjectURL = vi.fn(() => 'blob:video')
   URL.revokeObjectURL = vi.fn()
 })
 
 afterEach(() => {
+  vi.restoreAllMocks()
   vi.useRealTimers()
   vi.unstubAllGlobals()
   share.mockReset()
@@ -51,10 +56,10 @@ describe('StarSearch section', () => {
   it('opens the window with the focus in the first field', async () => {
     const user = userEvent.setup()
     render(<StarSearch />)
-    expect(screen.getByRole('heading', { name: 'Поиск по звёздам' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Звёзды подскажут' })).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: 'Найти по звёздам' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Поиск по звёздам' })
+    const dialog = await screen.findByRole('dialog', { name: 'Звёзды подскажут' })
     await waitFor(() => expect(document.activeElement).toBe(within(dialog).getByLabelText('Как вас зовут?')))
   })
 
@@ -155,7 +160,7 @@ describe('StarSearch form', () => {
 
 // star-search, Requirement: Гадание и результат
 describe('StarSearch reading', () => {
-  it('reads the stars for 2.5 s, then shows the result', async () => {
+  it('reads the stars, then shows the result', async () => {
     const user = userEvent.setup()
     renderDialog()
     await fillForm(user)
@@ -163,10 +168,10 @@ describe('StarSearch reading', () => {
 
     expect(screen.getByRole('status').textContent).toBe('Звёзды совещаются…')
     expect(screen.queryByRole('heading', { name: /ваш знак/ })).toBeNull()
-    expect(await screen.findByRole('heading', { name: /Анна, ваш знак — Овен/ }, { timeout: 4000 })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: /Анна, ваш знак — Овен/ }, {})).toBeTruthy()
   })
 
-  it('skips the animation under reduced motion and answers with one hotel', async () => {
+  it("skips the animation under reduced motion and answers with a selection of the stars' hotels", async () => {
     reduceMotion()
     const user = userEvent.setup()
     renderDialog()
@@ -175,17 +180,23 @@ describe('StarSearch reading', () => {
 
     const heading = screen.getByRole('heading', { name: /Анна, ваш знак — Овен/ })
     expect(document.activeElement).toBe(heading)
-    expect(screen.getAllByRole('status').some((s) => /^Звёзды выбрали: /.test(s.textContent!))).toBe(true)
-    expect(screen.getByText(/Гороскоп — для настроения, а не для планов/)).toBeTruthy()
+    expect(screen.getAllByRole('status').some((s) => /^Звёзды выбрали: [^,]+$/.test(s.textContent!))).toBe(true)
+    expect(screen.getByText('Гороскоп — для настроения, а не для планов.')).toBeTruthy()
+    expect(screen.queryByText(/Цены и даты проверьте при бронировании/)).toBeNull()
 
-    // star-search, Requirement: Итог гадания — один отель: the hotel's page with the dates of the reading.
-    const hotel = screen.getByRole('region', { name: 'Звёзды выбрали отель' })
+    // star-search, Requirement: Итог гадания — один отель: no hotel card, the selection with the dates of the reading.
+    expect(screen.queryByRole('region', { name: 'Звёзды выбрали отель' })).toBeNull()
+    expect(screen.queryByText(/₽/)).toBeNull()
     const links = screen.getAllByRole('link')
     expect(links).toHaveLength(1)
-    expect(within(hotel).getByRole('link').getAttribute('href')).toMatch(
-      /^\/hotels\/[a-z-]+\?checkin=\d{4}-\d{2}-\d{2}&/,
-    )
-    expect(within(hotel).getByText(/^от .+ ₽ за ночь$/)).toBeTruthy()
+    expect(links[0].textContent).toBe('Посмотреть подборку')
+    const url = new URL(links[0].getAttribute('href')!, 'https://x')
+    expect(url.pathname).toBe('/search')
+    expect(url.searchParams.get('hotels')!.split(',')).toHaveLength(3)
+    expect(url.searchParams.get('from')).toBe('stars')
+    expect(url.searchParams.get('pick')).toBe('aries')
+    expect(url.searchParams.get('checkin')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(url.searchParams.get('checkout')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(screen.queryByText('Запасные варианты')).toBeNull()
     expect(screen.queryByText(/маршрут/i)).toBeNull()
   })
@@ -205,7 +216,7 @@ describe('StarSearch reading', () => {
     await user.click(north)
     await user.click(screen.getByRole('button', { name: 'Гадать' }))
     const status = screen.getAllByRole('status').find((s) => /^Звёзды выбрали: /.test(s.textContent!))!
-    expect(status.textContent).toMatch(/, (Осло|Стокгольм|Хельсинки|Рейкьявик|Калининград)$/)
+    expect(status.textContent).toMatch(/^Звёзды выбрали: (Осло|Стокгольм|Хельсинки|Рейкьявик|Калининград)$/)
   })
 
   it('reads the stars in the chosen country and city', async () => {
@@ -225,11 +236,12 @@ describe('StarSearch reading', () => {
     await user.selectOptions(city, 'Рим')
     await user.click(screen.getByRole('button', { name: 'Гадать' }))
     const status = screen.getAllByRole('status').find((s) => /^Звёзды выбрали: /.test(s.textContent!))!
-    expect(status.textContent).toMatch(/, Рим$/)
-    // star-search, Requirement: Гадание среди выбранных городов: the hotel of Rome.
-    const hotel = within(screen.getByRole('region', { name: 'Звёзды выбрали отель' })).getByRole('link')
-    expect(hotel.textContent).toContain('Рим, Италия')
-    expect(hotel.getAttribute('href')).toMatch(/^\/hotels\/rome-/)
+    expect(status.textContent).toBe('Звёзды выбрали: Рим')
+    // star-search, Requirement: Гадание среди выбранных городов: the hotels of Rome.
+    const selection = screen.getByRole('link', { name: 'Посмотреть подборку' })
+    const ids = new URL(selection.getAttribute('href')!, 'https://x').searchParams.get('hotels')!.split(',')
+    expect(ids.length).toBeGreaterThan(0)
+    for (const id of ids) expect(id).toMatch(/^rome-/)
   })
 
   it('is the same for the same answers', async () => {
@@ -257,10 +269,10 @@ describe('StarSearch video', () => {
   it('moves the progress bar in 1 % steps, not on every frame', async () => {
     vi.stubGlobal('MediaRecorder', { isTypeSupported: () => true })
     let finish!: () => void
-    vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _pick, _type, { onProgress }) => {
+    vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _type, { onProgress }) => {
       await new Promise<void>((resolve) => (finish = resolve))
       onProgress(0)
-      for (let i = 1; i <= 300; i++) {
+      for (let i = 1; i <= 100; i++) {
         onProgress(i / 1000)
         await new Promise((resolve) => setTimeout(resolve, 0))
       }
@@ -274,17 +286,17 @@ describe('StarSearch video', () => {
     const observer = new MutationObserver(() => writes.push(bar.getAttribute('aria-valuenow')!))
     observer.observe(bar, { attributes: true, subtree: true })
     finish()
-    await screen.findByRole('button', { name: /Скачать видео|Поделиться видео/ }, { timeout: 12_000 })
+    await screen.findByRole('button', { name: /Скачать видео|Поделиться видео/ }, {})
     observer.disconnect()
-    // 300 frames cover 30 % of the bar.
-    expect(writes.length).toBeLessThanOrEqual(31)
-  }, 15_000)
+    // 100 frames cover 10 % of the bar.
+    expect(writes.length).toBeLessThanOrEqual(11)
+  })
 
   it('warns not to hide the tab while recording and says so after a restart', async () => {
     vi.stubGlobal('MediaRecorder', { isTypeSupported: () => true })
     let restart!: () => void
     let finish!: () => void
-    vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _pick, _type, { onRestart }) => {
+    vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _type, { onRestart }) => {
       restart = onRestart
       await new Promise<void>((resolve) => (finish = resolve))
       return video

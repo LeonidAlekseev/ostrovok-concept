@@ -41,7 +41,7 @@ export function StarSearch() {
         id="stars-title"
         className="bg-(image:--decor-gold-gradient) bg-clip-text text-[clamp(30px,8.4vw,56px)]/[1.1] font-bold tracking-[-0.02em] text-transparent"
       >
-        Поиск по звёздам
+        Звёзды подскажут
       </h2>
       <p className="max-w-[40ch] text-[clamp(15px,3.9vw,20px)] text-(--decor-light)">
         Знак зодиака, <span className="text-(--decor-lavender)">Луна в день заезда</span> и аспекты{' '}

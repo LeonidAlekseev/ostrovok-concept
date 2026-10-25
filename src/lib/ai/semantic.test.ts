@@ -1,11 +1,13 @@
 import { embed, rerank } from 'ai'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { setProduction } from '@/test/env'
 import { getSecret } from '../secrets'
 import { semanticSearch } from './semantic'
 
 const rpc = vi.fn()
 
 vi.mock('../secrets', () => ({ getSecret: vi.fn() }))
+vi.mock('@/lib/env', () => import('@/test/env'))
 vi.mock('@/lib/supabase/config', () => ({
   isSupabaseConfigured: true,
   supabaseUrl: 'https://db.test',
@@ -37,6 +39,7 @@ beforeEach(() => {
   vi.mocked(embed).mockResolvedValue({ embedding: [0.1, 0.2] } as Awaited<ReturnType<typeof embed>>)
   rpc.mockResolvedValue({ data: matches, error: null })
 })
+afterEach(() => setProduction(false))
 
 const reranked = (ranking: { originalIndex: number; score: number }[]) =>
   ({ ranking }) as unknown as Awaited<ReturnType<typeof rerank>>
@@ -78,6 +81,37 @@ describe('semanticSearch', () => {
     expect(embed).toHaveBeenCalledTimes(3)
   })
 
+  it('keeps the shared vector when the first of two concurrent searches is cancelled', async () => {
+    vi.mocked(rerank).mockResolvedValue(reranked([{ originalIndex: 0, score: 0.9 }]))
+    let answer!: (result: Awaited<ReturnType<typeof embed>>) => void
+    vi.mocked(embed).mockImplementationOnce(
+      ({ abortSignal }) =>
+        new Promise((resolve, reject) => {
+          abortSignal?.addEventListener('abort', () => reject(abortSignal.reason))
+          answer = resolve
+        }),
+    )
+    const text = words()
+    const first = new AbortController()
+    const cancelled = semanticSearch(text, { signal: first.signal })
+    const second = semanticSearch(text, {})
+    await vi.waitFor(() => expect(embed).toHaveBeenCalledTimes(1))
+    first.abort()
+    expect(await cancelled).toBeNull()
+    answer({ embedding: [0.1, 0.2] } as Awaited<ReturnType<typeof embed>>)
+    expect(await second).toEqual([{ id: 'prague-central-hostel', destinationId: 'prague', score: 0.9 }])
+    expect(embed).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not keep a shared vector that failed for everyone waiting on it', async () => {
+    const text = words()
+    vi.mocked(embed).mockRejectedValueOnce(new Error('timeout'))
+    expect(await Promise.all([semanticSearch(text, {}), semanticSearch(text, {})])).toEqual([null, null])
+    vi.mocked(rerank).mockResolvedValue(reranked([{ originalIndex: 0, score: 0.9 }]))
+    expect(await semanticSearch(text, {})).not.toBeNull()
+    expect(embed).toHaveBeenCalledTimes(2)
+  })
+
   it('keeps the vectors’ order when the reranker fails', async () => {
     vi.mocked(rerank).mockRejectedValue(new Error('429'))
     const hits = await semanticSearch(words(), { k: 2 })
@@ -90,6 +124,8 @@ describe('semanticSearch', () => {
   it('gives null without the key, on a model error, without vectors or without text', async () => {
     vi.mocked(getSecret).mockResolvedValueOnce(undefined)
     expect(await semanticSearch(words(), {})).toBeNull()
+    expect(getSecret).toHaveBeenCalledWith('NVIDIA_API_KEY')
+    expect(embed).not.toHaveBeenCalled()
     vi.mocked(embed).mockRejectedValueOnce(new Error('timeout'))
     expect(await semanticSearch(words(), {})).toBeNull()
     rpc.mockResolvedValueOnce({ data: [], error: null })
@@ -107,5 +143,23 @@ describe('semanticSearch', () => {
     await semanticSearch(text, {})
     await semanticSearch(text, {})
     expect(embed).toHaveBeenCalledTimes(1)
+  })
+})
+
+// hotel-catalog, Requirement: Синтетические отели только вне production
+describe('semanticSearch in production', () => {
+  it('finds only the real hotels', async () => {
+    setProduction(true)
+    const real = { ref_id: 'ota-1', destination_id: 'valencia', content: 'Отель у моря', similarity: 0.4 }
+    rpc.mockResolvedValue({ data: [...matches, real], error: null })
+    vi.mocked(rerank).mockResolvedValue(reranked([{ originalIndex: 0, score: 0.8 }]))
+    expect(await semanticSearch(words(), { k: 2 })).toEqual([{ id: 'ota-1', destinationId: 'valencia', score: 0.8 }])
+    expect(vi.mocked(rerank).mock.calls[0][0]).toMatchObject({ documents: ['Отель у моря'], topN: 1 })
+  })
+
+  it('falls back to the rules when every match is synthetic', async () => {
+    setProduction(true)
+    expect(await semanticSearch(words(), {})).toBeNull()
+    expect(rerank).not.toHaveBeenCalled()
   })
 })

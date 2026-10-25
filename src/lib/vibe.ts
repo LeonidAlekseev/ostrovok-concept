@@ -57,7 +57,7 @@ const has = (hotel: Hotel, amenity: Hotel['amenities'][number]) => hotel.ameniti
 export const VIBE_AXES: readonly VibeAxis[] = [
   {
     id: 'evening',
-    left: 'Тихий вечер',
+    left: 'Уютный вечер',
     right: 'Шумная вечеринка',
     fit: (h, scale) => (has(h, 'bar') ? 0.5 : -0.5) + (has(h, 'restaurant') ? 0.25 : -0.25) + centrality(h, scale) / 4,
   },
@@ -111,17 +111,19 @@ export const VIBE_AXES: readonly VibeAxis[] = [
 
 export const VIBE_STEPS = VIBE_AXES.length
 
-/** The photo of a side of an axis: `public/images/vibe/evening-left.webp` is «Тихий вечер». */
+/** The photo of a side of an axis: `public/images/vibe/evening-left.webp` is «Уютный вечер». */
 export const poleImage = (axisId: string, side: -1 | 1) => `/images/vibe/${axisId}-${side < 0 ? 'left' : 'right'}.webp`
 
 export interface Archetype {
+  /** The archetype in an address: `pick` of the selection on /search. */
+  id: string
   name: string
   description: string
   /** The photo of the main pole; «Баланс во всём» has its own. */
   image: string
 }
 
-/** A side of an axis: `evening:-1` is «Тихий вечер». */
+/** A side of an axis: `evening:-1` is «Уютный вечер». */
 type Pole = `${string}:${-1 | 1}`
 
 /** The sides the answers chose; «Не могу выбрать» chooses none. */
@@ -131,36 +133,65 @@ const chosenPoles = (answers: readonly Answer[]) =>
 /** The first pole of an archetype is its main axis. Every pole is in some archetype, so any answer but «Не могу выбрать» everywhere has a match. */
 const ARCHETYPES: readonly (Omit<Archetype, 'image'> & { poles: readonly [Pole, Pole] })[] = [
   {
+    id: 'quiet-harbour',
     name: 'Тихая гавань',
     description: 'Тишина, простор и вечер без спешки',
     poles: ['evening:-1', 'location:-1'],
   },
-  { name: 'Душа вечеринки', description: 'Музыка, бары и прогулки до рассвета', poles: ['evening:1', 'leisure:1'] },
   {
+    id: 'party-soul',
+    name: 'Душа вечеринки',
+    description: 'Музыка, бары и прогулки до рассвета',
+    poles: ['evening:1', 'leisure:1'],
+  },
+  {
+    id: 'city-explorer',
     name: 'Городской исследователь',
     description: 'Новые улицы и новые места каждый вечер',
     poles: ['place:1', 'food:1'],
   },
   {
+    id: 'sea-hedonist',
     name: 'Морской гедонист',
     description: 'Море, спа и бассейн — отдых без будильника',
     poles: ['place:-1', 'leisure:-1'],
   },
   {
+    id: 'minimalist',
     name: 'Эстет-минималист',
     description: 'Маленький отель с характером и ничего лишнего',
     poles: ['size:-1', 'budget:-1'],
   },
-  { name: 'Ценитель роскоши', description: 'Большой отель и всё самое лучшее', poles: ['size:1', 'budget:1'] },
-  { name: 'Сердце города', description: 'Жить в центре и быть в гуще событий', poles: ['location:1', 'place:1'] },
-  { name: 'Уютный сибарит', description: 'Завтрак в постель и долгий день в спа', poles: ['food:-1', 'leisure:-1'] },
+  {
+    id: 'luxury',
+    name: 'Ценитель роскоши',
+    description: 'Большой отель и всё самое лучшее',
+    poles: ['size:1', 'budget:1'],
+  },
+  {
+    id: 'city-heart',
+    name: 'Сердце города',
+    description: 'Жить в центре и быть в гуще событий',
+    poles: ['location:1', 'place:1'],
+  },
+  {
+    id: 'cozy-sybarite',
+    name: 'Уютный сибарит',
+    description: 'Завтрак в постель и долгий день в спа',
+    poles: ['food:-1', 'leisure:-1'],
+  },
 ]
 
 export const BALANCE: Archetype = {
+  id: 'balance',
   name: 'Баланс во всём',
   description: 'Всего понемногу — и всё по настроению',
   image: '/images/vibe/balance.webp',
 }
+
+/** The name of the archetype `id`, or `undefined` for an unknown one. */
+export const archetypeName = (id: string): string | undefined =>
+  (id === BALANCE.id ? BALANCE : ARCHETYPES.find((a) => a.id === id))?.name
 
 /**
  * The archetype of the answers: the one whose two poles match most of them; on a tie the one whose main
@@ -196,11 +227,11 @@ export const axisShares = (answers: readonly Answer[]): AxisShare[] =>
     return { axis, left, right: 100 - left }
   })
 
-/** Hotels in a vibe result: one per city. */
+/** Hotels in a vibe result: one per city, then more from the same cities. */
 export const VIBE_HOTELS = 6
 
 /**
- * The `hotels` that fit the answers best, one per city: the sum of the answers times the hotel's fits; equal
+ * The `hotels` that fit the answers best, one per city first: the sum of the answers times the hotel's fits; equal
  * scores go to the better rated, then the cheaper, then by id, so the same answers give the same list.
  */
 export function vibeHotels(
@@ -220,25 +251,30 @@ export function vibeHotels(
       a.hotel.priceFrom - b.hotel.priceFrom ||
       a.hotel.id.localeCompare(b.hotel.id),
   )
-  return onePerCity(scored.map(({ hotel }) => hotel))
+  return fillVibe(scored.map(({ hotel }) => hotel))
 }
 
-/** The first `VIBE_HOTELS` of the `hotels`, one per city. */
-export function onePerCity(hotels: readonly Hotel[]): Hotel[] {
+/**
+ * `VIBE_HOTELS` of the ranked `hotels`: the best of each city first, then, while fewer than that, the next ones
+ * in order from the cities already taken. Keeps the ranking, so the same input gives the same list.
+ */
+export function fillVibe(hotels: readonly Hotel[]): Hotel[] {
   const cities = new Set<string>()
   const picked: Hotel[] = []
+  const rest: Hotel[] = []
   for (const hotel of hotels) {
-    if (cities.has(hotel.destinationId)) continue
-    cities.add(hotel.destinationId)
-    picked.push(hotel)
-    if (picked.length === VIBE_HOTELS) break
+    if (cities.has(hotel.destinationId)) rest.push(hotel)
+    else {
+      cities.add(hotel.destinationId)
+      picked.push(hotel)
+    }
   }
-  return picked
+  return [...picked, ...rest].slice(0, VIBE_HOTELS)
 }
 
 /**
  * The answers as words for the semantic search: the archetype and the chosen sides, as the hotels' texts
- * name them («Настроение: Тихий вечер, Море…»). Empty when every answer is «Не могу выбрать».
+ * name them («Настроение: Уютный вечер, Море…»). Empty when every answer is «Не могу выбрать».
  */
 export function vibeWish(answers: readonly Answer[]): string {
   const sides = VIBE_AXES.flatMap((axis, i) => (answers[i] ? [answers[i] < 0 ? axis.left : axis.right] : []))

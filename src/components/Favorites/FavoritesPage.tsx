@@ -28,9 +28,14 @@ function Favorites() {
       <div className="flex flex-col items-start gap-3">
         <p className="text-lg font-semibold">В избранном пока пусто</p>
         <p className="text-muted-foreground">Нажмите на сердечко у отеля, чтобы сохранить его здесь.</p>
-        <Link className={buttonVariants()} href="/">
-          Найти отель
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <Link className={buttonVariants()} href="/assistant">
+            Спросить Эвал
+          </Link>
+          <Link className={buttonVariants({ variant: 'outline' })} href="/search">
+            Искать вручную
+          </Link>
+        </div>
       </div>
     )
   }

@@ -14,7 +14,7 @@ export function VibeImage({ vibe }: { vibe: Vibe }) {
   const [state, setState] = useState<State>({ kind: 'rendering' })
   const [note, setNote] = useState('')
 
-  const title = `${BRAND_NAME} Поиск вайба`
+  const title = `${BRAND_NAME} Это твой вайб`
   const text = `Мой вайб — «${vibe.archetype.name}». А какой у тебя?`
   const site = () => window.location.origin
 

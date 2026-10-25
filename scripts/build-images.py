@@ -4,9 +4,6 @@ Usage:
     uv run --with pillow --with numpy python scripts/build-images.py <sources-dir>
 
 Expected files in <sources-dir> (see public/images/CREDITS.md for origins):
-    florence.jpg  Florence panorama with the Duomo
-    eiffel.jpg    Eiffel Tower at sunset
-    sea.jpg       Navagio bay, Zakynthos
     <axis>-<left|right>.<ext>, balance.<ext>
                   the vibe search photos (see VIBE below and public/images/CREDITS.md)
     sky.png       Night sky with the Moon, background of the star search (optional)
@@ -38,10 +35,6 @@ def save_to(img: Image.Image, path: Path, width: int, quality: int = 80) -> None
     img = img.resize((width, round(img.height * width / img.width)), Image.LANCZOS)
     img.save(path, "WEBP", quality=quality, method=6, alpha_quality=min(quality, 50))
     print(f"{path.relative_to(OUT)}: {img.size[0]}x{img.size[1]}, {path.stat().st_size // 1024} KB")
-
-
-def save(img: Image.Image, name: str, width: int, quality: int = 80) -> None:
-    save_to(img, OUT / name, width, quality)
 
 
 # The orb in orb.png: centre and radius of the glass sphere, measured on the 1254 px source.
@@ -104,18 +97,6 @@ def save_vibe(img: Image.Image, name: str) -> None:
 
 def main(src: Path) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-
-    photos = {
-        "sea.jpg": ("sea-navagio.webp", 1.15, 0.6, 0.6, 1.0, 900),
-        "florence.jpg": ("florence-duomo.webp", 1.15, 0.64, 0.3, 2.2, 900),
-        "eiffel.jpg": ("paris-eiffel.webp", 1.15, 0.585, 0.42, 1.9, 900),
-    }
-    for source, (name, ratio, cx, cy, zoom, width) in photos.items():
-        if not (src / source).exists():
-            print(f"{source}: missing, {name} kept as is")
-            continue
-        img = Image.open(src / source).convert("RGB")
-        save(crop_to(img, ratio, cx, cy, zoom), name, width)
 
     (OUT / VIBE_DIR).mkdir(exist_ok=True)
     for name, (cx, cy, zoom) in VIBE.items():

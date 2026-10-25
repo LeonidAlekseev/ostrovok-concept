@@ -64,8 +64,8 @@ export function DrawSearch() {
       <div className="flex items-center gap-[clamp(6px,2vw,24px)]">
         <Rays />
         <h2 id="draw-title" className="text-[clamp(30px,8.4vw,60px)]/[1.08] font-extrabold tracking-[-0.02em]">
-          Нарисуй своё <br />
-          путешествие
+          Нарисуй свой <br />
+          отдых
         </h2>
         <Rays className="-scale-x-100" />
       </div>

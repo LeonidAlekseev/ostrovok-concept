@@ -1,35 +1,58 @@
-import type { HotelSummary } from '../../lib/catalog'
-import type { HotelSearch } from '../../hooks/useHotelSearch'
-import { AssistantSearch } from './AssistantSearch'
+import Image from 'next/image'
+import Link from 'next/link'
+import { cn } from '@/lib/utils'
+import { searchGlassPanel } from './glass'
 
-/* Liquid glass with no backing card: the globe shows through, blurred and saturated, tinted sky to mint. */
-const glassFill =
-  '[background:linear-gradient(150deg,color-mix(in_srgb,var(--decor-assistant-sky)_55%,transparent),color-mix(in_srgb,color-mix(in_srgb,var(--decor-assistant-sky),var(--decor-assistant-mint))_45%,transparent)_55%,color-mix(in_srgb,var(--decor-assistant-mint)_55%,transparent))]'
-const glassBlur = '[backdrop-filter:blur(24px)_saturate(170%)]'
-const glassRim =
-  'shadow-[inset_0_1px_0_color-mix(in_srgb,var(--decor-light)_90%,transparent),inset_0_0_0_1.5px_color-mix(in_srgb,var(--decor-light)_55%,transparent),inset_0_0_32px_color-mix(in_srgb,var(--decor-light)_30%,transparent),0_20px_50px_color-mix(in_srgb,var(--shadow-color)_14%,transparent),0_2px_6px_color-mix(in_srgb,var(--shadow-color)_4%,transparent)]'
-// Specular highlight along the top-left edge, painted under the content (the panel is a stacking context).
-const glassSheen =
-  "before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:rounded-[inherit] before:content-[''] before:[background:radial-gradient(120%_60%_at_0%_0%,color-mix(in_srgb,var(--decor-light)_50%,transparent),transparent_55%),radial-gradient(80%_50%_at_100%_100%,color-mix(in_srgb,var(--decor-light)_20%,transparent),transparent_60%)]"
-const glassOpaque =
-  '[@media(prefers-reduced-transparency:reduce)]:[background:var(--decor-assistant-fallback)] [@media(prefers-reduced-transparency:reduce)]:[backdrop-filter:none]'
+/** The two ways to search; the figures are drawn to face the middle of the panel. */
+const entries = [
+  { href: '/assistant', label: 'Спросить Эвал', src: '/images/search-panel/robot.webp', width: 517, side: 'start' },
+  { href: '/search', label: 'Искать вручную', src: '/images/search-panel/explorer.webp', width: 473, side: 'end' },
+] as const
 
-interface Props {
-  /** Searches for the assistant's choice: opens the results page. */
-  onChoose: HotelSearch['searchFor']
-  /** The "recently added" hotels the assistant suggests. */
-  newHotels: readonly HotelSummary[]
-}
-
-/** The search of the home page: the assistant on liquid glass; the manual form lives on `/search`. */
-export function SearchPanel({ onChoose, newHotels }: Props) {
+/**
+ * The search of the home page: two cards on liquid glass, Eval and the manual form, each on its own page.
+ * Phones stack the figure over the label, the figure rising above the panel; from md the figure stands at the
+ * outer edge of its card, still taller than the panel.
+ */
+export function SearchPanel() {
   return (
-    // Children that bleed to the window edge (scrolling chips) read --pad.
+    // [data-search-panel] bounds the globe's hotel card on phones (Hero).
     <div
-      data-assistant-window
-      className={`relative isolate z-10 rounded-[clamp(24px,6vw,36px)] p-(--pad) [--pad:clamp(14px,3.8vw,28px)] ${glassFill} ${glassBlur} ${glassRim} ${glassSheen} ${glassOpaque}`}
+      data-search-panel
+      className={cn(
+        searchGlassPanel,
+        'grid grid-cols-2 divide-x divide-[color-mix(in_srgb,var(--decor-light)_55%,transparent)] rounded-[clamp(24px,6vw,36px)]',
+      )}
     >
-      <AssistantSearch newHotels={newHotels} onChoose={onChoose} />
+      {entries.map(({ href, label, src, width, side }) => (
+        <Link
+          key={href}
+          href={href}
+          className={cn(
+            'group flex flex-col items-center gap-[clamp(6px,2vw,12px)] px-2 first:rounded-l-[inherit] last:rounded-r-[inherit] pb-[clamp(14px,4vw,28px)] no-underline outline-offset-[-3px] focus-visible:outline-3 focus-visible:outline-ring',
+            'md:h-[clamp(176px,19vw,240px)] md:flex-row md:items-end md:justify-center md:gap-[clamp(16px,2.6vw,40px)] md:px-[clamp(12px,2vw,32px)] md:pb-0',
+            side === 'end' && 'md:flex-row-reverse',
+          )}
+        >
+          <Image
+            src={src}
+            alt=""
+            width={width}
+            height={640}
+            loading="eager"
+            sizes="(min-width: 768px) 270px, 40vw"
+            className={cn(
+              // Grows from its bottom edge on a fine pointer and on keyboard focus; transform leaves the layout as is.
+              'h-[clamp(116px,36vw,272px)] w-auto flex-none origin-bottom -mt-[clamp(48px,15vw,112px)] transition-transform duration-200 ease-out motion-safe:group-hover:-translate-y-1 motion-safe:[@media(hover:hover)_and_(pointer:fine)]:group-hover:scale-[1.06] motion-safe:group-focus-visible:scale-[1.06]',
+              // From md the figure is taller than the card: aligned to its bottom, it rises above the panel.
+              'md:mt-0 md:mb-[clamp(-14px,-1vw,-6px)] md:h-[clamp(212px,24vw,320px)]',
+            )}
+          />
+          <span className="w-min text-center text-[clamp(17px,5vw,34px)] leading-[1.1] font-bold tracking-[-0.02em] text-foreground md:self-center md:text-left md:text-[clamp(26px,3.3vw,44px)]">
+            {label}
+          </span>
+        </Link>
+      ))}
     </div>
   )
 }

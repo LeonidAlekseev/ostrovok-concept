@@ -43,10 +43,15 @@ export default async function RootLayout({ children, modal }: { children: ReactN
       {/* Each page renders its own `main`; the footer sits at the bottom of short pages. */}
       <body className="group/page flex min-h-dvh flex-col">
         <CatalogProvider destinations={destinations}>
-          <Header />
+          {/* Eval's chats take the whole screen from `lg`, and a chat on a phone: without the header and the footer. */}
+          <div className="contents group-has-data-[assistant-app=chat]/page:hidden lg:group-has-data-[assistant-app]/page:hidden">
+            <Header />
+          </div>
           {children}
           {modal}
-          <Footer />
+          <div className="contents group-has-data-[assistant-app]/page:hidden">
+            <Footer />
+          </div>
         </CatalogProvider>
       </body>
     </html>
