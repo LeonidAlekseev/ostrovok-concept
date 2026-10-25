@@ -355,7 +355,7 @@ function OptionCard({ option, full, plan, onChoose }: OptionCardProps) {
   const search = () => onChoose({ ...plan.query, destination: destination.name })
   return (
     <article className="flex w-full flex-col overflow-hidden rounded-2xl bg-card p-2 shadow-(--shadow-card)">
-      <span className="block aspect-[4/3] w-full rounded-xl bg-[linear-gradient(135deg,var(--decor-photo-from),var(--decor-photo-to))]" />
+      <span className="block aspect-[4/3] w-full rounded-xl bg-muted" />
       <div className="flex flex-1 flex-col gap-1 px-2 pt-3 pb-1">
         <h4 className="text-[17px]/[1.25] font-bold">{summary?.name ?? destination.name}</h4>
         <button
@@ -434,7 +434,7 @@ function PlanComment({ plan, full }: { plan: Plan; full: ReadonlyMap<string, Hot
                   </Fragment>
                 ))}
                 {!option.fitsBudget && (
-                  <Badge variant="destructive" className="ml-1.5 align-middle">
+                  <Badge variant="destructive" className="ml-1.5 bg-card align-middle ring-1 ring-destructive/40">
                     выше бюджета
                   </Badge>
                 )}
