@@ -6,6 +6,7 @@ import { semanticSearch } from '@/lib/ai/semantic'
 import { loadHotelFeatures } from '@/lib/db/features'
 import type { HotelFeatures } from '@/lib/features'
 import { nextQuestion } from '@/lib/assistant'
+import { getHotel } from '@/lib/catalogGenerator'
 import { POST } from './route'
 
 vi.mock('@/lib/ai/model', () => ({ getAssistantModel: vi.fn() }))
@@ -373,5 +374,77 @@ describe('POST /api/assistant: the steps and the hotel features', () => {
     const body = await (await ask('тихий отель', complete)).json()
     expect(body.steps.at(-1)).toMatchObject({ agent: 'features', status: 'failed' })
     expect(body.brief).toMatchObject({ quiet: true })
+  })
+})
+
+// assistant-search, Requirements: Вопрос об отеле, Пометка непроверенного
+describe('POST /api/assistant: a question about a hotel', () => {
+  const hotelId = 'prague-old-town-lantern'
+  const hotel = getHotel(hotelId)!
+  const aboutHotel = (text: string, brief: Record<string, unknown> = {}) => ask(text, { hotelId, ...brief })
+
+  it('answers about the hotel by rules without a key: no questions, no plan (Scenario: Номера без дат)', async () => {
+    setModel(undefined)
+    const body = await (await aboutHotel('Какие номера есть?')).json()
+    expect(body).toMatchObject({ brief: { hotelId, destinationId: 'prague' }, source: 'rules' })
+    expect(body.reply).toContain(hotel.rooms[0].name)
+    expect(body.reply).toContain('Выберите даты')
+    expect(body).not.toHaveProperty('matches')
+    expect(body).not.toHaveProperty('steps')
+    expect(semanticSearch).not.toHaveBeenCalled()
+  })
+
+  it('admits it has no places nearby without a key (Scenario: Без модели)', async () => {
+    setModel(undefined)
+    const { reply, unverified } = await (await aboutHotel('Что рядом с отелем?')).json()
+    expect(reply).toContain('данных о местах рядом пока нет')
+    expect(unverified).toBeUndefined()
+  })
+
+  it('gives the model the hotel’s data and returns its unverified part apart (Scenario: Что рядом)', async () => {
+    const model = new MockLanguageModelV4({
+      doGenerate: {
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify({ answer: 'В данных мест рядом нет.', unverified: 'Обычно рядом есть кафе.' }),
+          },
+        ],
+        finishReason: { unified: 'stop' as const, raw: undefined },
+        usage,
+        warnings: [],
+      },
+    })
+    setModel(model)
+    const body = await (
+      await aboutHotel('Что рядом с отелем?', { dates: { checkIn: '2026-11-10', checkOut: '2026-11-12' } })
+    ).json()
+    expect(body).toMatchObject({
+      reply: 'В данных мест рядом нет.',
+      unverified: 'Обычно рядом есть кафе.',
+      source: 'model',
+      brief: { hotelId, dates: { checkIn: '2026-11-10', checkOut: '2026-11-12' } },
+    })
+    expect(model.doGenerateCalls[0].prompt[0].content).toContain(hotel.name)
+  })
+
+  it('falls back to the rules when the model fails', async () => {
+    setModel(
+      new MockLanguageModelV4({
+        doGenerate: async () => {
+          throw new Error('429 Rate limit exceeded')
+        },
+      }),
+    )
+    const body = await (await aboutHotel('Есть ли парковка?')).json()
+    expect(body.source).toBe('rules')
+    expect(body.reply).toMatch(/парковк/i)
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('429 Rate limit exceeded'))
+  })
+
+  it('treats an id the catalogue does not know as a chat like any other', async () => {
+    setModel(undefined)
+    const body = await (await ask('в горы', { hotelId: 'no-such-hotel' })).json()
+    expect(body).toEqual({ brief: { vibe: 'mountains' }, source: 'rules' })
   })
 })

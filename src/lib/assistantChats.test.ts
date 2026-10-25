@@ -5,6 +5,7 @@ import {
   MAX_GUEST_CHATS,
   chatTitle,
   dialogOf,
+  hotelChatOf,
   loadGuestChats,
   newChat,
   parseChat,
@@ -115,5 +116,33 @@ describe('the guest’s chats', () => {
     ])
     expect(window.sessionStorage.getItem(DIALOG_KEY)).toBeNull()
     expect(loadGuestChats()).toHaveLength(1)
+  })
+})
+
+// assistant-search, Requirements: Вопрос об отеле, Пометка непроверенного
+describe('the chats about a hotel', () => {
+  it('keeps the unverified part of an answer and drops a damaged one', () => {
+    const kept = parseChat({
+      ...chatWith('2026-10-25T10:00:00Z', message('assistant', 'Из данных', { data: { unverified: 'Из знаний' } })),
+    })
+    expect(kept?.messages[0].data).toEqual({ unverified: 'Из знаний' })
+    const odd = parseChat(
+      chatWith('2026-10-25T10:00:00Z', message('assistant', 'x', { data: { unverified: 5 } as never })),
+    )
+    expect(odd?.messages[0].data).toEqual({})
+  })
+
+  it('keeps the hotel in the brief and finds the newest chat of a hotel', () => {
+    const about = (updatedAt: string, hotelId: string, ...messages: ChatMessage[]): Chat => ({
+      ...chatWith(updatedAt, ...messages),
+      brief: { hotelId },
+    })
+    const old = about('2026-10-24T10:00:00Z', 'ota-1', message('user', 'a'))
+    const recent = about('2026-10-25T10:00:00Z', 'ota-1', message('user', 'b'))
+    const other = about('2026-10-25T11:00:00Z', 'ota-2', message('user', 'c'))
+    const empty = about('2026-10-25T12:00:00Z', 'ota-1')
+    expect(parseChat(JSON.parse(JSON.stringify(recent)))?.brief.hotelId).toBe('ota-1')
+    expect(hotelChatOf([old, other, recent, empty], 'ota-1')).toBe(recent)
+    expect(hotelChatOf([other], 'ota-1')).toBeUndefined()
   })
 })

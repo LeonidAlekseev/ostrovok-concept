@@ -6,12 +6,13 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/s
 import { formatPrice } from '@/lib/format'
 import type { Hotel } from '@/lib/catalog'
 import { BookingCard } from './BookingCard'
+import { HotelAssistant } from './HotelAssistant'
 import { useHotelStay } from './stayContext'
 import { useStayPrice } from './useStayPrice'
 
 /**
  * Below `lg` the button stuck to the bottom of the page: "Выбрать даты", with dates "Забронировать · <price>".
- * It opens the booking card in a panel from the bottom, tall enough for the calendar, which opens downwards, to fit
+ * It opens the booking card with Эвал under it in a panel from the bottom, tall enough for the calendar, which opens downwards, to fit
  * under the days; the card's "Забронировать" closes it at the rooms.
  */
 export function MobileBooking({ hotel }: { hotel: Hotel }) {
@@ -47,7 +48,7 @@ export function MobileBooking({ hotel }: { hotel: Hotel }) {
               setOpen(false)
             }}
           />
-          {/* The hotel-page-assistant change puts the assistant here. */}
+          <HotelAssistant className="mt-4 rounded-2xl border p-4" />
         </SheetContent>
       </Sheet>
     </div>
