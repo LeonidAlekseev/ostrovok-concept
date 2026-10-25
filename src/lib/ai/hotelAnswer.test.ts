@@ -2,7 +2,7 @@ import { MockLanguageModelV4 } from 'ai/test'
 import { describe, expect, it } from 'vitest'
 import { getHotel } from '../catalogGenerator'
 import type { Hotel } from '../catalog'
-import { answerWithModel, hotelFacts, NO_NEARBY_DATA, ruleAnswer } from './hotelAnswer'
+import { answerWithModel, hotelFacts, isRussian, NO_NEARBY_DATA, ruleAnswer } from './hotelAnswer'
 
 const base = getHotel('prague-old-town-lantern')!
 const hotel: Hotel = { ...base, amenities: ['wifi', 'parking', 'pets'] }
@@ -70,6 +70,26 @@ describe('hotelFacts', () => {
 
 // assistant-search, Requirement: Пометка непроверенного
 describe('answerWithModel', () => {
+  it('accepts the Latin name of the hotel and «Wi‑Fi» in a Russian answer', async () => {
+    const text = `В отеле ${hotel.name} есть бесплатный Wi‑Fi и парковка на Av Ausias March.`
+    expect(isRussian(text)).toBe(true)
+    expect(await ask(modelSays({ answer: text, unverified: 'Рядом, возможно, есть Mercado Central.' }))).toEqual({
+      answer: text,
+      unverified: 'Рядом, возможно, есть Mercado Central.',
+    })
+  })
+
+  it('rejects an answer in English or in another script', async () => {
+    expect(isRussian('The hotel has free Wi-Fi and parking.')).toBe(false)
+    expect(isRussian('酒店有免费停车位')).toBe(false)
+    await expect(ask(modelSays({ answer: 'The hotel has free Wi-Fi and parking.', unverified: null }))).rejects.toThrow(
+      'no answer',
+    )
+    expect(await ask(modelSays({ answer: 'Есть парковка.', unverified: 'There is a cafe nearby.' }))).toEqual({
+      answer: 'Есть парковка.',
+    })
+  })
+
   const ask = (model: MockLanguageModelV4) =>
     answerWithModel(model, { messages: [{ role: 'user', text: 'Что рядом с отелем?' }] }, hotel, { dates })
 

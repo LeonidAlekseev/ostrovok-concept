@@ -7,7 +7,7 @@ import { nightsBetween } from '../dates'
 import type { HotelFeatures } from '../features'
 import { formatDecimal, formatPrice } from '../format'
 import { averageNight, stayTotal } from '../offer'
-import { MODEL_TIMEOUT_MS, OTHER_SCRIPT } from './understand'
+import { MODEL_TIMEOUT_MS } from './understand'
 
 /**
  * Эвал's answer to a question about one hotel (`brief.hotelId`): from the hotel's data — the description, the
@@ -148,9 +148,22 @@ function instructions(hotel: Hotel, dates?: StayDates, features?: HotelFeatures)
   ].join('\n')
 }
 
+/** A letter that is neither Cyrillic nor Latin: the model slipped into Chinese or Korean. */
+const FOREIGN_SCRIPT = /(?![\p{Script=Cyrillic}\p{Script=Latin}])\p{L}/u
+/** At least this share of the letters is Cyrillic: names, «Wi‑Fi» and streets of a hotel are Latin. */
+const MIN_CYRILLIC_SHARE = 0.5
+
+/** Mainly Russian: the hotel's Latin names and terms are fine, an answer in English or in another script is not. */
+export function isRussian(text: string): boolean {
+  if (FOREIGN_SCRIPT.test(text)) return false
+  const letters = text.match(/\p{L}/gu) ?? []
+  const cyrillic = letters.filter((letter) => /\p{Script=Cyrillic}/u.test(letter))
+  return letters.length > 0 && cyrillic.length / letters.length >= MIN_CYRILLIC_SHARE
+}
+
 const clean = (value: string | null | undefined, max: number): string | undefined => {
   const text = value?.trim().slice(0, max)
-  return text && !OTHER_SCRIPT.test(text) ? text : undefined
+  return text && isRussian(text) ? text : undefined
 }
 
 /**

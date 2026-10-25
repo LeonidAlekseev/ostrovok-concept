@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createContext, use, useEffect, useId, useState, type FormEvent, type ReactNode } from 'react'
 import { RotateCcw, SendHorizontal, TriangleAlert } from 'lucide-react'
 import { cn } from 'cn'
@@ -100,7 +101,8 @@ export function HotelAssistantProvider({ hotel, children }: { hotel: Hotel; chil
 export function HotelAssistant({ className }: { className?: string }) {
   const chats = use(HotelChatContext)
   if (!chats) throw new Error('HotelAssistant needs a HotelAssistantProvider')
-  const { active, ready, send, retry } = chats
+  const { active, ready, send, retry, flush } = chats
+  const router = useRouter()
   const [text, setText] = useState('')
   const inputId = useId()
   const titleId = useId()
@@ -133,6 +135,21 @@ export function HotelAssistant({ className }: { className?: string }) {
         {started && (
           <Link
             href={`/assistant/${encodeURIComponent(active.id)}`}
+            // The chat of a signed-in traveller is written to the account first: the page of Эвал reads it from there.
+            onClick={(event) => {
+              if (
+                event.defaultPrevented ||
+                event.button !== 0 ||
+                event.metaKey ||
+                event.ctrlKey ||
+                event.shiftKey ||
+                event.altKey
+              )
+                return
+              event.preventDefault()
+              const href = event.currentTarget.getAttribute('href')!
+              void flush().then(() => router.push(href))
+            }}
             className={buttonVariants({
               variant: 'outline',
               size: 'sm',

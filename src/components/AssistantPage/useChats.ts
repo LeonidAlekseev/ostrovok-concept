@@ -96,6 +96,8 @@ export interface Chats {
   remove: (chatId: string) => void
   /** The trip's parameters edited by hand: the next answer goes by them. */
   setBrief: (chatId: string, brief: Brief) => void
+  /** Resolves once the changes so far are saved (in the account: written to Supabase), e.g. before opening a chat elsewhere. */
+  flush: () => Promise<void>
 }
 
 /**
@@ -406,5 +408,6 @@ export function useChats(
     rename,
     remove,
     setBrief,
+    flush: () => queue.current,
   }
 }

@@ -5,11 +5,11 @@ import { CHATS_KEY, newChat, type Chat } from '@/lib/assistantChats'
 import { getHotel } from '@/lib/catalogGenerator'
 import { HotelPage } from './HotelPage'
 
-const nav = vi.hoisted(() => ({ query: '' }))
+const nav = vi.hoisted(() => ({ query: '', push: vi.fn() }))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(nav.query),
   usePathname: () => '/hotels/x',
-  useRouter: () => ({ replace: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn(), push: nav.push }),
 }))
 
 const hotel = getHotel('prague-old-town-lantern')!
@@ -19,6 +19,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(2026, 9, 20, 12))
   nav.query = ''
+  nav.push.mockReset()
   // The "thinking" pause of Эвал does not wait in real time.
   const realSetTimeout = globalThis.setTimeout
   vi.spyOn(globalThis, 'setTimeout').mockImplementation(((handler: TimerHandler, ms?: number, ...args: unknown[]) =>
@@ -111,6 +112,19 @@ describe('HotelAssistant', () => {
     const link = await within(card()).findByRole('link', { name: 'Открыть в Эвале' })
     await waitFor(() => expect(saved()).toHaveLength(1))
     expect(link.getAttribute('href')).toBe(`/assistant/${saved()[0].id}`)
+  })
+
+  it('opens the saved chat only after the chat is written (Scenario: Открыть в Эвале)', async () => {
+    reply({ reply: 'Да: парковка.' })
+    const { user } = renderPage()
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Есть ли парковка?' })).toHaveProperty('disabled', false),
+    )
+    await user.click(screen.getByRole('button', { name: 'Есть ли парковка?' }))
+    const link = await within(card()).findByRole('link', { name: 'Открыть в Эвале' })
+    await waitFor(() => expect(saved()).toHaveLength(1))
+    await user.click(link)
+    await waitFor(() => expect(nav.push).toHaveBeenCalledWith(`/assistant/${saved()[0].id}`))
   })
 
   it('continues the hotel’s last chat on the next visit (Scenario: Возврат на страницу отеля)', async () => {
