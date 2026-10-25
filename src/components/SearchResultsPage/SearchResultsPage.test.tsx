@@ -176,6 +176,10 @@ vi.mock('maplibre-gl', () => {
   return { Map, Marker, Popup, LngLatBounds, setWorkerUrl: () => {} }
 })
 
+// Every test mounts the whole results page in jsdom and queries it by role (each query computes the style of every
+// element): 0.3-1.3 s alone, several times that on a busy machine. The default 5 s is not enough for the file.
+vi.setConfig({ testTimeout: 20_000 })
+
 const NOW = new Date(2026, 9, 19, 12)
 const STAY = 'checkin=2026-10-20&checkout=2026-10-23&adults=2&rooms=1'
 const PRAGUE = `destination=prague&${STAY}`
@@ -193,14 +197,14 @@ function open(search: string, { desktop = false } = {}) {
 
 /** Waits for the demo search to finish. */
 const results = () =>
-  waitFor(() => expect(document.body.textContent).toMatch(/Найдено \d+|Ничего не нашлось/), { timeout: 3000 })
+  waitFor(() => expect(document.body.textContent).toMatch(/Найдено \d+|Ничего не нашлось/), { timeout: 10_000 })
 // The markers are buttons labelled with the name and the price; a role query would compute the style of every element.
 const markerButtons = () =>
   Array.from(document.querySelectorAll<HTMLElement>('button[aria-label]')).filter((b) =>
     /, [\d\s]+₽$/.test(b.getAttribute('aria-label')!),
   )
 const markers = async () => {
-  await waitFor(() => expect(markerButtons().length).toBeGreaterThan(0), { timeout: 3000 })
+  await waitFor(() => expect(markerButtons().length).toBeGreaterThan(0), { timeout: 10_000 })
   return markerButtons()
 }
 // Role queries compute the style of every element to see what is hidden: the cards are plain `article`s.
@@ -733,7 +737,7 @@ describe('SearchResultsPage map', () => {
     open(PRAGUE, { desktop: true })
     await results()
 
-    expect(await screen.findByText('Карта недоступна', {}, { timeout: 3000 })).toBeDefined()
+    expect(await screen.findByText('Карта недоступна', {}, { timeout: 10_000 })).toBeDefined()
     await user.click(screen.getByRole('button', { name: '5 звёзд' }))
     await waitFor(() => expect(window.location.search).toContain('stars=5'))
     expect(cards().length).toBeGreaterThan(0)
@@ -1001,7 +1005,7 @@ describe('SearchResultsPage back from the hotel page', () => {
 
 // search-results-page, Requirement: Карта результатов поиска, Scenario: Группа
 describe('SearchResultsPage map groups', () => {
-  const groups = () => screen.findAllByRole('button', { name: /приблизить$/ }, { timeout: 3000 })
+  const groups = () => screen.findAllByRole('button', { name: /приблизить$/ }, { timeout: 10_000 })
 
   it('groups close markers into "N от X ₽" with the cheapest price, and zooms in when pressed', async () => {
     const user = userEvent.setup()

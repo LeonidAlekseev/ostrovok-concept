@@ -29,6 +29,9 @@ vi.mock('../../lib/imageOptimize', async (importOriginal) => {
 
 const fetchMock = vi.fn<typeof fetch>()
 const THINK_MS = 650
+// Heavy by nature: a multi-step dialog rendered in jsdom takes ~0.5 s alone and several times that on a busy machine,
+// so the default 5 s is not enough there.
+const HEAVY = 20_000
 beforeEach(() => {
   const realSetTimeout = globalThis.setTimeout
   vi.spyOn(globalThis, 'setTimeout').mockImplementation(((handler: TimerHandler, ms?: number, ...args: unknown[]) =>
@@ -64,36 +67,44 @@ const answer = (body: object) => Response.json({ source: 'model', ...body })
 
 // assistant-search, Requirement: Фото во вложениях
 describe('the photos of a message', () => {
-  it('sends two photos with the message and clears the field (Scenario: Отправка фото)', async () => {
-    fetchMock.mockResolvedValue(answer({ brief: {}, photo: { action: 'ask' } }))
-    const { user } = renderAssistant()
+  it(
+    'sends two photos with the message and clears the field (Scenario: Отправка фото)',
+    async () => {
+      fetchMock.mockResolvedValue(answer({ brief: {}, photo: { action: 'ask' } }))
+      const { user } = renderAssistant()
 
-    await user.upload(picker(), [photo('a.jpg'), photo('b.png', 'image/png')])
-    expect(within(attached()!).getAllByRole('img')).toHaveLength(2)
-    expect(screen.getByText(/2 из 4 фото/)).toBeTruthy()
-    await user.click(send())
+      await user.upload(picker(), [photo('a.jpg'), photo('b.png', 'image/png')])
+      expect(within(attached()!).getAllByRole('img')).toHaveLength(2)
+      expect(screen.getByText(/2 из 4 фото/)).toBeTruthy()
+      await user.click(send())
 
-    const photos = await within(log()).findByRole('list', { name: 'Фото' })
-    expect(within(photos).getAllByRole('button', { name: /Открыть фото/ })).toHaveLength(2)
-    expect(attached()).toBeNull()
-    expect((input() as HTMLTextAreaElement).value).toBe('')
-    // The route gets the photos of 1600 px and «Фото» for the message without words.
-    expect(bodyOf(0)).toEqual({
-      messages: [{ role: 'user', text: 'Фото' }],
-      brief: {},
-      photos: [`data:image/webp;base64,${btoa('a.jpg')}`, `data:image/webp;base64,${btoa('b.png')}`],
-    })
-  })
+      const photos = await within(log()).findByRole('list', { name: 'Фото' })
+      expect(within(photos).getAllByRole('button', { name: /Открыть фото/ })).toHaveLength(2)
+      expect(attached()).toBeNull()
+      expect((input() as HTMLTextAreaElement).value).toBe('')
+      // The route gets the photos of 1600 px and «Фото» for the message without words.
+      expect(bodyOf(0)).toEqual({
+        messages: [{ role: 'user', text: 'Фото' }],
+        brief: {},
+        photos: [`data:image/webp;base64,${btoa('a.jpg')}`, `data:image/webp;base64,${btoa('b.png')}`],
+      })
+    },
+    HEAVY,
+  )
 
-  it('sends the words and the photos together', async () => {
-    fetchMock.mockResolvedValue(answer({ brief: {}, photo: { action: 'unseen' } }))
-    const { user } = renderAssistant()
-    await user.upload(picker(), photo('a.jpg'))
-    await user.type(input(), 'найди похожий{Enter}')
-    expect(await within(log()).findByText('Провайдер распознавания фото не отвечает. Повторите позже.')).toBeTruthy()
-    expect(bodyOf(0).messages).toEqual([{ role: 'user', text: 'найди похожий' }])
-    expect(bodyOf(0).photos).toHaveLength(1)
-  })
+  it(
+    'sends the words and the photos together',
+    async () => {
+      fetchMock.mockResolvedValue(answer({ brief: {}, photo: { action: 'unseen' } }))
+      const { user } = renderAssistant()
+      await user.upload(picker(), photo('a.jpg'))
+      await user.type(input(), 'найди похожий{Enter}')
+      expect(await within(log()).findByText('Провайдер распознавания фото не отвечает. Повторите позже.')).toBeTruthy()
+      expect(bodyOf(0).messages).toEqual([{ role: 'user', text: 'найди похожий' }])
+      expect(bodyOf(0).photos).toHaveLength(1)
+    },
+    HEAVY,
+  )
 
   it('shows the switch to another model in one request (Scenario: Провайдер ответил со второго раза)', async () => {
     fetchMock.mockResolvedValue(
@@ -126,21 +137,25 @@ describe('the photos of a message', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('says the limit is over without retries (Scenario: Лимит запросов к модели фото)', async () => {
-    fetchMock
-      .mockResolvedValueOnce(answer({ brief: {}, photo: { action: 'limited' } }))
-      .mockResolvedValueOnce(Response.json({ error: 'Too many requests' }, { status: 429 }))
-    const { user } = renderAssistant()
-    await user.upload(picker(), photo('a.jpg'))
-    await user.type(input(), 'найди похожий{Enter}')
-    const limit = 'Превышен лимит запросов к модели распознавания фото. Повторите позже.'
-    expect(await within(log()).findByText(limit)).toBeTruthy()
-    // The route's own limit reads the same.
-    await user.upload(picker(), photo('b.jpg'))
-    await user.type(input(), 'найди похожий{Enter}')
-    await waitFor(() => expect(within(log()).getAllByText(limit)).toHaveLength(2))
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-  })
+  it(
+    'says the limit is over without retries (Scenario: Лимит запросов к модели фото)',
+    async () => {
+      fetchMock
+        .mockResolvedValueOnce(answer({ brief: {}, photo: { action: 'limited' } }))
+        .mockResolvedValueOnce(Response.json({ error: 'Too many requests' }, { status: 429 }))
+      const { user } = renderAssistant()
+      await user.upload(picker(), photo('a.jpg'))
+      await user.type(input(), 'найди похожий{Enter}')
+      const limit = 'Превышен лимит запросов к модели распознавания фото. Повторите позже.'
+      expect(await within(log()).findByText(limit)).toBeTruthy()
+      // The route's own limit reads the same.
+      await user.upload(picker(), photo('b.jpg'))
+      await user.type(input(), 'найди похожий{Enter}')
+      await waitFor(() => expect(within(log()).getAllByText(limit)).toHaveLength(2))
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    },
+    HEAVY,
+  )
 
   it('takes no fifth photo and says why (Scenario: Пятое фото)', async () => {
     const { user } = renderAssistant()
