@@ -23,7 +23,7 @@ export function MobileBooking({ hotel }: { hotel: Hotel }) {
   const toRooms = useRef(false)
 
   return (
-    <div className="sticky bottom-0 z-20 -mx-(--page-x) mt-auto bg-card px-(--page-x) py-3 shadow-(--shadow-card) lg:hidden">
+    <div className="sticky bottom-0 z-20 -mx-(--page-x) mt-auto px-(--page-x) pt-3 pb-[max(12px,env(safe-area-inset-bottom))] lg:hidden">
       <Sheet
         open={open}
         onOpenChange={(next) => {
