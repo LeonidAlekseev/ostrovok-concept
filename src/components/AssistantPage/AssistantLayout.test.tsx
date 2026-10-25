@@ -154,6 +154,12 @@ describe('the header of a chat', () => {
     expect(within(chatList()).getByRole('button', { name: /Ноябрь в Лиссабоне/ })).toBeTruthy()
   })
 
+  it('keeps the title of a chat about a search plain, not a link', async () => {
+    renderWith([chatOf('Ноябрь в Лиссабоне', 5, ['Привет'])])
+    expect(await screen.findByRole('heading', { name: 'Ноябрь в Лиссабоне' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Ноябрь в Лиссабоне' })).toBeNull()
+  })
+
   it('shows the guests, the dates and the city of the chat', async () => {
     const plan = lisbonPlan()
     renderWith([withPlan('Лиссабон', 5, plan)])
@@ -390,8 +396,16 @@ describe('a chat about a hotel', () => {
     expect(within(feed.parentElement!).getByText('Не проверено')).toBeTruthy()
     expect(within(log()).getAllByText('Не проверено')).toHaveLength(1)
     expect(screen.getByRole('heading', { name: hotel.name })).toBeTruthy()
-    const link = screen.getByRole('link', { name: 'Страница отеля' })
+    const link = screen.getByRole('link', { name: hotel.name })
     expect(link.getAttribute('href')).toMatch(new RegExp(`^/hotels/${hotel.id}\\?`))
+    expect(screen.queryByRole('link', { name: 'Страница отеля' })).toBeNull()
+  })
+
+  it('opens the hotel page by the title of the chat (Scenario: Название чата отеля)', async () => {
+    renderWith([aboutHotel()])
+    const link = await screen.findByRole('link', { name: hotel.name })
+    expect(link.getAttribute('href')).toMatch(new RegExp(`^/hotels/${hotel.id}\\?`))
+    expect(screen.getByRole('button', { name: 'Переименовать чат' })).toBeTruthy()
   })
 
   it('keeps asking about the hotel after «Открыть в Эвале», with no plan or questions (Scenario: Открыть в Эвале)', async () => {
