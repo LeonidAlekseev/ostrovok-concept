@@ -12,7 +12,7 @@ vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'x-forwarded
 const all = (answer: Answer) => Array.from({ length: VIBE_STEPS }, () => answer)
 
 beforeEach(() => {
-  vi.mocked(semanticSearch).mockReset().mockResolvedValue(null)
+  vi.mocked(semanticSearch).mockReset().mockResolvedValue({ status: 'failed', reason: 'no-key' })
 })
 
 describe('vibeHotelsAction', () => {
@@ -32,9 +32,10 @@ describe('vibeHotelsAction with the semantic search', () => {
   it('asks with the chosen sides and leads with its hotels, one per city, the axes filling the rest', async () => {
     const [a, sameCity] = allHotels().filter((h) => h.destinationId === 'prague')
     const b = allHotels().find((h) => h.destinationId === 'tokyo')!
-    vi.mocked(semanticSearch).mockResolvedValue(
-      [a, sameCity, b].map((h) => ({ id: h.id, destinationId: h.destinationId, score: 1 })),
-    )
+    vi.mocked(semanticSearch).mockResolvedValue({
+      status: 'found',
+      hits: [a, sameCity, b].map((h) => ({ id: h.id, destinationId: h.destinationId, score: 1 })),
+    })
     const picked = await vibeHotelsAction(all(-1))
     expect(vi.mocked(semanticSearch).mock.calls[0][0]).toContain('Уютный вечер')
     // Only the hotels: no search for routes.

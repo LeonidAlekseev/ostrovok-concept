@@ -199,18 +199,17 @@ async function similarTurn(sight: PhotoSight, { brief, deadline, signal }: WishC
   const title = 'Ищу отели, похожие на фото'
   const like = sightFeatures(sight)
   const [query, retry] = similarQueries(sight)
-  // `null` is both «nothing found» and a failure: one that took the whole time is the search not answering.
   let missed = false
   const search = async (text: string, timeoutMs: number) => {
-    const start = Date.now()
-    const hits = await semanticSearch(text, {
+    const result = await semanticSearch(text, {
       ...(brief.destinationId && { destinationIds: [brief.destinationId] }),
       k: MATCHES,
       timeoutMs,
       signal,
     })
-    missed = !hits && Date.now() - start >= timeoutMs * 0.9
-    return hits
+    // Only a failure is the search not answering; nothing found is an answer.
+    missed = result.status === 'failed'
+    return result.status === 'found' ? result.hits : null
   }
   // The embedding of the NVIDIA API now and then stalls for minutes: a short first try, then other words with
   // the rest of the answer's time.

@@ -31,12 +31,12 @@ export async function vibeHotelsAction(answers: Answer[]): Promise<Hotel[]> {
   )
   if (!wish || !allowRequest(ip)) return byRules
   // The cities shown: in production the nearest vectors are not spent on the hidden hotels.
-  const hits = await semanticSearch(wish, {
+  const result = await semanticSearch(wish, {
     destinationIds: destinations.map((d) => d.id),
     k: CANDIDATES,
     candidates: CANDIDATES,
   })
-  if (!hits) return byRules
+  if (result.status !== 'found') return byRules
   const byId = new Map(hotels.map((h) => [h.id, h]))
-  return fillVibe([...hits.flatMap((hit) => byId.get(hit.id) ?? []), ...byRules])
+  return fillVibe([...result.hits.flatMap((hit) => byId.get(hit.id) ?? []), ...byRules])
 }

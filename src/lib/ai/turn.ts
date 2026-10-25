@@ -67,15 +67,15 @@ export const searchStep: Step = {
     const timeoutMs = Math.min(context.deadline - Date.now(), SEMANTIC_TIMEOUT_MS)
     if (timeoutMs < MIN_SEMANTIC_MS) return 'подобрал по каталогу'
     const destinationIds = planCities(context.brief, context.today, context.destinations).map((d) => d.id)
-    const hits = await semanticSearch(context.wish, {
+    const result = await semanticSearch(context.wish, {
       destinationIds,
       k: MATCHES,
       timeoutMs,
       signal: context.signal,
     })
-    if (!hits) return 'подобрал по каталогу'
+    if (result.status !== 'found') return 'подобрал по каталогу'
     const byId = new Map((await context.summaries()).map((h) => [h.id, h]))
-    const matches = hits.flatMap((hit) => byId.get(hit.id) ?? [])
+    const matches = result.hits.flatMap((hit) => byId.get(hit.id) ?? [])
     if (matches.length === 0) return 'подобрал по каталогу'
     state.matches = matches
     state.semantic = matches.map((h) => h.id)
