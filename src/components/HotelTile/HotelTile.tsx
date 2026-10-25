@@ -4,8 +4,9 @@ import { MapPin } from 'lucide-react'
 import { cn } from 'cn'
 import { Separator } from '@/components/ui/separator'
 import { hasFreeCancellation, STAY_TYPES, TILE_PHOTOS, type TileHotel } from '../../lib/catalog'
-import { formatDecimal, formatPrice } from '../../lib/format'
+import { countRu, formatDecimal, formatPrice, guestsLabel } from '../../lib/format'
 import { guruPrice } from '../../lib/offer'
+import type { Guests } from '../../lib/search'
 import { useDestination } from '../Catalog/useDestinations'
 import { GeneratedBadge } from '../GeneratedBadge/GeneratedBadge'
 import { GuruLogo } from '../GuruLogo/GuruLogo'
@@ -24,26 +25,38 @@ interface Props extends Omit<ComponentProps<'article'>, 'children'> {
   heading?: 'h2' | 'h3' | 'h4'
   /** The simple card of the persona selections: one photo, without badges, arrows and the kind of stay. */
   plain?: boolean
+  /** The price for a whole stay instead of the regular one, with «за 5 ночей · 2 гостя» under it. */
+  stay?: Stay
+}
+
+/** The price of a stay: the total for its nights and guests. */
+export interface Stay {
+  total: number
+  nights: number
+  guests: Guests
 }
 
 /**
  * The hotel card of the vibe, the stars, favourites and search results: the photo carousel with the free
  * cancellation, the guest rating, the favourite toggle and the stars on it, then the name, the
- * kind of stay if it is not a hotel with the distance to the city centre and the regular and GURU prices.
+ * kind of stay if it is not a hotel with the distance to the city centre and the regular and GURU prices — or
+ * those for a stay, with its nights and guests.
  * The plain card has the first photo alone and no badges, and no kind of stay. A made-up hotel has the
  * «generated» mark on the photo in both.
  */
 export function HotelTile({
   hotel,
   href,
-  price = hotel.priceFrom,
+  price: regular = hotel.priceFrom,
   freeCancellation = hasFreeCancellation(hotel),
   heading: Heading = 'h3',
   plain = false,
+  stay,
   className,
   ...props
 }: Props) {
   const destination = useDestination(hotel.destinationId)
+  const price = stay?.total ?? regular
   return (
     <article
       {...props}
@@ -106,6 +119,11 @@ export function HotelTile({
               <GuruLogo className="text-base" />
             </p>
           </div>
+          {stay && (
+            <p className="-mt-1.5 text-xs/[normal] text-muted-foreground">
+              за {countRu(stay.nights, ['ночь', 'ночи', 'ночей'])} · {guestsLabel(stay.guests)}
+            </p>
+          )}
         </div>
       </div>
     </article>

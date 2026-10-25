@@ -44,9 +44,9 @@ describe('AssistantPage plan', () => {
     render(<AssistantPage newHotels={newHotels} />)
 
     await user.type(screen.getByLabelText('Опишите поездку'), 'Хочу на море в октябре вдвоём, спокойно{Enter}')
-    const [option] = await screen.findAllByRole('button', { name: /^Искать в городе/ }, { timeout: 3000 })
+    const actions = await screen.findByRole('group', { name: 'Что дальше' }, { timeout: 3000 })
     expect(screen.queryByText(/маршрут/i)).toBeNull()
-    await user.click(option)
+    await user.click(within(actions).getByRole('button', { name: 'Фильтры' }))
 
     expect(push).toHaveBeenCalledTimes(1)
     expect(push.mock.calls[0][0]).toMatch(

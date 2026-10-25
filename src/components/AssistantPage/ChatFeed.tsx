@@ -1,6 +1,5 @@
-import Image from 'next/image'
 import Link from 'next/link'
-import { useRef, type ReactNode } from 'react'
+import { Fragment, useRef, type ReactNode } from 'react'
 import {
   ArrowDown,
   Car,
@@ -17,7 +16,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Button, buttonVariants } from '@/components/ui/button'
-import { Message, MessageAvatar, MessageContent, MessageFooter, MessageHeader } from '@/components/ui/message'
+import { Message, MessageContent, MessageFooter, MessageHeader } from '@/components/ui/message'
 import {
   MessageScroller,
   MessageScrollerButton,
@@ -26,31 +25,28 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from '@/components/ui/message-scroller'
-import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import { Trace, TraceIcon, TraceLine, TraceTitle } from '@/components/ui/trace'
 import type { HotelSearch } from '@/hooks/useHotelSearch'
 import { useHotels } from '@/hooks/useHotels'
-import { isRated, type Hotel } from '@/lib/catalog'
+import type { Hotel } from '@/lib/catalog'
 import { VIEW_LABEL } from '@/lib/features'
-import { ratingLabel } from '@/lib/reviews'
 import { hotelHref } from '@/lib/search'
 import type { AssistantOption, Plan } from '../../lib/assistant'
 import { messageTime, nightsLabel } from '../../lib/assistantChatList'
 import type { ChatMessage } from '../../lib/assistantChats'
 import { formatDateRange } from '../../lib/dates'
-import { formatDecimal, formatPrice, guestsLabel } from '../../lib/format'
-import { FavoriteButton } from '../FavoriteButton/FavoriteButton'
+import { formatPrice, guestsLabel } from '../../lib/format'
+import { HotelTile } from '../HotelTile/HotelTile'
 import { MessagePhotos, type PhotoUrl } from './ChatPhotos'
 
-/** The agent's bubble; with a plan it takes the full width. */
+/** The agent's bubble: no avatar beside it, the feed's full width at most. */
 const agentBubble =
-  'max-w-[min(100%,560px)] *:data-[slot=bubble-content]:rounded-[18px_18px_18px_6px] *:data-[slot=bubble-content]:bg-(--decor-light) *:data-[slot=bubble-content]:px-3.5 *:data-[slot=bubble-content]:py-2.5 *:data-[slot=bubble-content]:text-base *:data-[slot=bubble-content]:shadow-[0_1px_3px_color-mix(in_srgb,var(--shadow-color)_8%,transparent)] has-data-[slot=plan]:w-full has-data-[slot=plan]:max-w-full has-data-[slot=plan]:*:data-[slot=bubble-content]:w-full has-data-[slot=plan]:*:data-[slot=bubble-content]:bg-transparent has-data-[slot=plan]:*:data-[slot=bubble-content]:p-0 has-data-[slot=plan]:*:data-[slot=bubble-content]:shadow-none'
+  'max-w-full *:data-[slot=bubble-content]:rounded-[18px_18px_18px_6px] *:data-[slot=bubble-content]:bg-(--decor-light) *:data-[slot=bubble-content]:px-3.5 *:data-[slot=bubble-content]:py-2.5 *:data-[slot=bubble-content]:text-base *:data-[slot=bubble-content]:shadow-[0_1px_3px_color-mix(in_srgb,var(--shadow-color)_8%,transparent)]'
+/** The shadow of the agent's cards and bubbles. */
+const cardShadow = 'shadow-[0_1px_3px_color-mix(in_srgb,var(--shadow-color)_8%,transparent)]'
 const userBubble =
   'max-w-[85%] *:data-[slot=bubble-content]:rounded-[18px_18px_6px] *:data-[slot=bubble-content]:px-3.5 *:data-[slot=bubble-content]:py-2.5 *:data-[slot=bubble-content]:text-base'
-/** Phones hide the agent's avatar: the bubbles need the width. */
-export const messageAvatarClass = 'size-9 flex-none bg-transparent max-sm:hidden'
 const messageTextClass = 'leading-[1.45] whitespace-pre-wrap'
-const avatarSrc = '/assistant/eval.webp'
 const timeClass = 'px-1 text-xs/[normal] text-muted-foreground'
 
 export type ChooseSearch = HotelSearch['searchFor']
@@ -151,7 +147,6 @@ function MessageItem({ message, photoUrl, onChoose, onRetry, actions }: MessageP
   if (status === 'pending')
     return (
       <Message>
-        <EvalAvatar />
         <MessageContent>
           <Bubble variant="muted" className={agentBubble}>
             <BubbleContent aria-label="Эвал думает">
@@ -165,7 +160,6 @@ function MessageItem({ message, photoUrl, onChoose, onRetry, actions }: MessageP
     )
   return (
     <Message>
-      {role === 'owner' ? <span className={messageAvatarClass} aria-hidden /> : <EvalAvatar />}
       <MessageContent className="gap-1">
         {role === 'owner' && <MessageHeader className="px-0">Владелец отеля</MessageHeader>}
         {text && (
@@ -186,13 +180,7 @@ function MessageItem({ message, photoUrl, onChoose, onRetry, actions }: MessageP
             </BubbleContent>
           </Bubble>
         )}
-        {data.plan && (
-          <Bubble variant="muted" className={agentBubble}>
-            <BubbleContent>
-              <PlanView plan={data.plan} onChoose={onChoose} />
-            </BubbleContent>
-          </Bubble>
-        )}
+        {data.plan && <PlanView plan={data.plan} onChoose={onChoose} />}
         {status === 'failed' && onRetry ? (
           <MessageFooter className="px-0">
             <Button variant="outline" size="sm" shape="pill" onClick={onRetry}>
@@ -210,25 +198,35 @@ function MessageItem({ message, photoUrl, onChoose, onRetry, actions }: MessageP
 }
 
 const STEP_STATUS = {
-  pending: { icon: LoaderCircle, label: 'выполняется', line: 'running', className: 'motion-safe:animate-spin' },
-  done: { icon: Check, label: 'готово', line: undefined, className: 'text-success-foreground' },
-  failed: { icon: X, label: 'не удалось', line: 'error', className: '' },
+  pending: {
+    icon: LoaderCircle,
+    label: 'выполняется',
+    line: 'running',
+    circle: 'bg-muted text-muted-foreground [&_svg]:motion-safe:animate-spin',
+  },
+  done: { icon: Check, label: 'готово', line: undefined, circle: 'bg-success-soft text-success-foreground' },
+  failed: { icon: X, label: 'не удалось', line: 'error', circle: 'bg-destructive/10 text-destructive' },
 } as const
 
-/** A step of one of Eval's agents: a trace line of its own with the status, under Eval's avatar column. */
+/** A step of one of Eval's agents: a card of the tool with its status in a circle, the feed's width. */
 function StepItem({ status, step }: { status: ChatMessage['status']; step: NonNullable<ChatMessage['data']['step']> }) {
-  const { icon: Icon, label, line, className } = STEP_STATUS[status]
+  const { icon: Icon, label, line, circle } = STEP_STATUS[status]
   return (
-    <Trace className="ml-11 w-fit max-w-[min(100%,560px)] rounded-2xl bg-(--decor-light) px-3 py-2 shadow-[0_1px_3px_color-mix(in_srgb,var(--shadow-color)_8%,transparent)] max-sm:ml-0">
-      <TraceLine status={line} className="text-sm/[1.35]">
-        <TraceIcon>
-          <Icon className={className} />
+    <Trace className={`rounded-2xl bg-card px-3 py-2.5 ${cardShadow}`}>
+      <TraceLine status={line} className="w-full gap-3 data-[status=error]:text-muted-foreground">
+        <TraceIcon className={`size-8 rounded-full ${circle}`}>
+          <Icon />
         </TraceIcon>
-        <span className="sr-only">Шаг {label}: </span>
-        <TraceTitle className="whitespace-normal">
-          {step.title}
-          {status === 'pending' ? '…' : step.result ? ` — ${step.result}` : ''}
-        </TraceTitle>
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-[11px]/[normal] font-semibold tracking-[0.06em] uppercase">Инструмент</span>
+          <span className="sr-only">Шаг {label}: </span>
+          <TraceTitle
+            className={`text-sm/[1.35] whitespace-normal text-foreground ${status === 'pending' ? 'shimmer' : ''}`}
+          >
+            {step.title}
+            {status === 'pending' ? '…' : step.result ? ` — ${step.result}` : ''}
+          </TraceTitle>
+        </span>
       </TraceLine>
     </Trace>
   )
@@ -239,56 +237,61 @@ interface PlanProps {
   onChoose: ChooseSearch
 }
 
-/** The plan of Eval's answer: its atmosphere, the dates and the hotel cards in a row that scrolls sideways. */
-export function PlanView({ plan, onChoose }: PlanProps) {
-  const nights = nightsLabel(plan.nights)
-  const guests = guestsLabel(plan.query.guests)
+/**
+ * The plan of Eval's answer: its atmosphere and dates, the hotel cards in a row that scrolls sideways, then Eval's
+ * word on why each fits — told from the plan, not kept in the chat.
+ */
+function PlanView({ plan, onChoose }: PlanProps) {
+  const ids = plan.options.flatMap((o) => (o.hotel ? [o.hotel.id] : []))
+  const state = useHotels(ids.length > 0 ? { ids } : null)
+  const full = new Map(state.status === 'done' ? state.hotels.map((h) => [h.id, h]) : [])
   if (plan.options.length === 0)
     return (
-      <div data-slot="plan" className="rounded-[18px] bg-(--decor-light) px-3.5 py-2.5">
-        <p className={messageTextClass}>Не нашёл подходящих вариантов — попробуйте описать поездку иначе.</p>
-      </div>
+      <Bubble variant="muted" className={agentBubble}>
+        <BubbleContent>
+          <p className={messageTextClass}>Не нашёл подходящих вариантов — попробуйте описать поездку иначе.</p>
+        </BubbleContent>
+      </Bubble>
     )
   return (
-    <div data-slot="plan" className="flex flex-col gap-2">
-      <div className="flex flex-col gap-1 rounded-[18px_18px_18px_6px] bg-(--decor-light) px-3.5 py-2.5 shadow-[0_1px_3px_color-mix(in_srgb,var(--shadow-color)_8%,transparent)]">
-        <p className="flex flex-wrap items-center gap-x-2">
-          <span className="w-full text-xs/[normal] tracking-[0.06em] text-muted-foreground uppercase">
-            Атмосфера поездки
-          </span>
-          <span className="text-xl/none" aria-hidden>
-            {plan.emoji}
-          </span>
-          <strong className="font-bold">{plan.atmosphere}</strong>
-        </p>
-        <p className={messageTextClass}>{plan.why}</p>
-        <p className="text-sm/[normal] text-muted-foreground">
-          {formatDateRange(plan.query.checkIn, plan.query.checkOut)} · {nights} · {guests}
-        </p>
-      </div>
-      <HotelRow plan={plan} nights={nights} guests={guests} onChoose={onChoose} />
+    <>
+      <Bubble variant="muted" className={agentBubble}>
+        <BubbleContent className="flex flex-col gap-1">
+          <p className="flex flex-wrap items-center gap-x-2">
+            <span className="w-full text-xs/[normal] tracking-[0.06em] text-muted-foreground uppercase">
+              Атмосфера поездки
+            </span>
+            <span className="text-xl/none" aria-hidden>
+              {plan.emoji}
+            </span>
+            <strong className="font-bold">{plan.atmosphere}</strong>
+          </p>
+          <p className={messageTextClass}>{plan.why}</p>
+          <p className="text-sm/[normal] text-muted-foreground">
+            {formatDateRange(plan.query.checkIn, plan.query.checkOut)} · {nightsLabel(plan.nights)} ·{' '}
+            {guestsLabel(plan.query.guests)}
+          </p>
+        </BubbleContent>
+      </Bubble>
+      <HotelRow plan={plan} full={state.status === 'loading' ? undefined : full} onChoose={onChoose} />
+      <PlanComment plan={plan} full={full} />
       {plan.overBudget && (
         <p className="px-1 text-sm/[normal] text-muted-foreground">
           В бюджет не уложился — показал самые близкие варианты. Можно сократить поездку.
         </p>
       )}
-    </div>
+    </>
   )
 }
 
 interface HotelRowProps extends PlanProps {
-  /** «2 ночи». */
-  nights: string
-  /** «2 гостя». */
-  guests: string
+  /** The full hotels once loaded: the cards need their photos, distance and rates; `undefined` while loading. */
+  full: ReadonlyMap<string, Hotel> | undefined
 }
 
-/** The cards in a row: swiped on phones, scrolled with the arrow on wider screens. */
-function HotelRow({ plan, nights, guests, onChoose }: HotelRowProps) {
+/** The cards in a row, all of one width: swiped on phones, scrolled with the arrow on wider screens. */
+function HotelRow({ plan, full, onChoose }: HotelRowProps) {
   const row = useRef<HTMLUListElement>(null)
-  const ids = plan.options.flatMap((o) => (o.hotel ? [o.hotel.id] : []))
-  const state = useHotels(ids.length > 0 ? { ids } : null)
-  const full = new Map(state.status === 'done' ? state.hotels.map((h) => [h.id, h]) : [])
   return (
     <div className="relative">
       <ul
@@ -297,15 +300,11 @@ function HotelRow({ plan, nights, guests, onChoose }: HotelRowProps) {
         className="-mx-0.5 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-0.5 pt-0.5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {plan.options.map((option) => (
-          <li key={option.hotel?.id ?? option.destination.id} className="flex flex-none snap-start">
-            <HotelOptionCard
-              option={option}
-              hotel={option.hotel && full.get(option.hotel.id)}
-              plan={plan}
-              nights={nights}
-              guests={guests}
-              onChoose={onChoose}
-            />
+          <li
+            key={option.hotel?.id ?? option.destination.id}
+            className="flex w-[clamp(240px,70vw,280px)] flex-none snap-start"
+          >
+            <OptionCard option={option} full={full} plan={plan} onChoose={onChoose} />
           </li>
         ))}
       </ul>
@@ -314,7 +313,7 @@ function HotelRow({ plan, nights, guests, onChoose }: HotelRowProps) {
           variant="outline"
           size="icon"
           shape="pill"
-          className="absolute top-[30%] -right-1 bg-card shadow-(--shadow-card) max-sm:hidden"
+          className="absolute top-[30%] -right-1 z-20 bg-card shadow-(--shadow-card) max-sm:hidden"
           aria-label="Следующие отели"
           onClick={() => row.current?.scrollBy({ left: row.current.clientWidth * 0.8, behavior: 'smooth' })}
         >
@@ -325,64 +324,40 @@ function HotelRow({ plan, nights, guests, onChoose }: HotelRowProps) {
   )
 }
 
-interface HotelOptionCardProps extends HotelRowProps {
+interface OptionCardProps extends HotelRowProps {
   option: AssistantOption
-  /** The full hotel once loaded: its photo, distance to the centre and parking. */
-  hotel?: Hotel
-}
-
-/** «Парковка», «Номера с видом на море»: at most two real features of the hotel, none without data. */
-function featureLines(option: AssistantOption, hotel: Hotel | undefined): { icon: typeof Car; text: string }[] {
-  const lines: { icon: typeof Car; text: string }[] = []
-  if (hotel?.amenities.includes('parking')) lines.push({ icon: Car, text: 'Парковка' })
-  else if (hotel?.amenities.includes('parking-nearby')) lines.push({ icon: Car, text: 'Парковка рядом' })
-  const view = option.views?.[0]
-  // The view is of some room types, as their names say; a reason of the wish for a view tells it already.
-  const told = option.reasons?.some((reason) => reason.includes(' вид'))
-  if (view && !told) lines.push({ icon: Eye, text: `Номера с видом ${VIEW_LABEL[view]}` })
-  return lines.slice(0, 2)
 }
 
 /**
- * A hotel of the plan: the photo with the favourite and the guests' rating, the name, the city (its search on the
- * plan's dates), the real features, why it fits, the total for the stay and «Выбрать» — the hotel's page on the
- * plan's dates. A city without a hotel leads to its search.
+ * An option of the plan: the site's hotel card with the price for the stay, leading to the hotel's page on the plan's
+ * dates. A city without a hotel leads to its search; a hotel that did not load, to its page.
  */
-function HotelOptionCard({ option, hotel, plan, nights, guests, onChoose }: HotelOptionCardProps) {
-  const { destination, hotel: summary, total, fitsBudget, reasons } = option
-  const titleId = `option-${summary?.id ?? destination.id}`
+function OptionCard({ option, full, plan, onChoose }: OptionCardProps) {
+  const { destination, hotel: summary, total } = option
+  const hotel = summary && full?.get(summary.id)
+  const stay = { total, nights: plan.nights, guests: plan.query.guests }
+  if (hotel)
+    return (
+      <HotelTile hotel={hotel} href={hotelHref(hotel.id, plan.query)} stay={stay} heading="h4" className="w-full" />
+    )
+  if (summary && !full)
+    return (
+      <div
+        role="status"
+        aria-label={`Загружаю «${summary.name}»`}
+        className="flex w-full flex-col gap-3 rounded-2xl bg-card p-2 shadow-(--shadow-card)"
+      >
+        <span className="block aspect-[4/3] w-full rounded-xl bg-muted motion-safe:animate-pulse" />
+        <span className="mx-2 h-5 w-3/4 rounded bg-muted motion-safe:animate-pulse" />
+        <span className="mx-2 mb-2 h-4 w-1/2 rounded bg-muted motion-safe:animate-pulse" />
+      </div>
+    )
   const search = () => onChoose({ ...plan.query, destination: destination.name })
   return (
-    <article
-      aria-labelledby={titleId}
-      className="flex w-[clamp(220px,64vw,248px)] flex-col overflow-hidden rounded-2xl bg-card shadow-(--shadow-card)"
-    >
-      <div className="relative aspect-[16/10] w-full overflow-hidden bg-muted">
-        {hotel?.photos[0] ? (
-          <PhotoPlaceholder photo={hotel.photos[0]} className="size-full" />
-        ) : (
-          <span className="block size-full bg-[linear-gradient(135deg,var(--decor-photo-from),var(--decor-photo-to))]" />
-        )}
-        {summary && (
-          <FavoriteButton
-            hotelId={summary.id}
-            className="absolute top-2 right-2 size-8 border-0 bg-card/90 [&_svg]:size-4.5"
-          />
-        )}
-        {summary && isRated(summary) && (
-          <span className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-full bg-card/95 py-0.5 pr-2.5 pl-0.5 text-xs/[normal] font-semibold">
-            <span className="rounded-full bg-success-soft px-1.5 py-0.5 text-success-foreground">
-              <span className="sr-only">Оценка гостей </span>
-              {formatDecimal(summary.rating)}
-            </span>
-            {ratingLabel(summary.rating)}
-          </span>
-        )}
-      </div>
-      <div className="flex flex-1 flex-col gap-1 p-3">
-        <h4 id={titleId} className="line-clamp-2 text-[15px]/[1.3] font-bold">
-          {summary?.name ?? destination.name}
-        </h4>
+    <article className="flex w-full flex-col overflow-hidden rounded-2xl bg-card p-2 shadow-(--shadow-card)">
+      <span className="block aspect-[4/3] w-full rounded-xl bg-muted" />
+      <div className="flex flex-1 flex-col gap-1 px-2 pt-3 pb-1">
+        <h4 className="text-[17px]/[1.25] font-bold">{summary?.name ?? destination.name}</h4>
         <button
           type="button"
           className="flex items-center gap-1.5 text-left text-sm/[1.35] text-muted-foreground hover:text-primary"
@@ -390,36 +365,15 @@ function HotelOptionCard({ option, hotel, plan, nights, guests, onChoose }: Hote
           onClick={search}
         >
           <MapPin className="size-4 flex-none" aria-hidden />
-          <span className="min-w-0 truncate">
-            {hotel ? `${formatDecimal(hotel.distanceKm)} км от центра · ` : ''}
-            {destination.name}
-          </span>
+          <span className="min-w-0 truncate">{destination.name}</span>
           <Search className="size-3.5 flex-none" aria-hidden />
         </button>
-        {featureLines(option, hotel).map(({ icon: Icon, text }) => (
-          <p key={text} className="flex items-center gap-1.5 text-sm/[1.35] text-muted-foreground">
-            <Icon className="size-4 flex-none" aria-hidden />
-            {text}
-          </p>
-        ))}
-        {/* Why the hotel fits the traveller's conditions, or that there is no data to tell. */}
-        {reasons?.map((reason) => (
-          <p key={reason} className="text-xs/[1.35] text-foreground">
-            {reason}
-          </p>
-        ))}
         <div className="mt-auto flex items-end justify-between gap-2 pt-2">
           <p className="min-w-0">
             <span className="block text-lg/tight font-bold whitespace-nowrap">{formatPrice(total)}</span>
-            {fitsBudget ? (
-              <span className="block text-xs/[normal] text-muted-foreground">
-                за {nights} · {guests}
-              </span>
-            ) : (
-              <Badge variant="destructive" className="mt-0.5">
-                выше бюджета
-              </Badge>
-            )}
+            <span className="block text-xs/[normal] text-muted-foreground">
+              за {nightsLabel(plan.nights)} · {guestsLabel(plan.query.guests)}
+            </span>
           </p>
           {summary ? (
             <Link
@@ -440,10 +394,65 @@ function HotelOptionCard({ option, hotel, plan, nights, guests, onChoose }: Hote
   )
 }
 
-export function EvalAvatar() {
+/** «Парковка», «Номера с видом на море»: at most two real features of the hotel, none without data. */
+function featureLines(option: AssistantOption, hotel: Hotel | undefined): { icon: typeof Car; text: string }[] {
+  const lines: { icon: typeof Car; text: string }[] = []
+  if (hotel?.amenities.includes('parking')) lines.push({ icon: Car, text: 'Парковка' })
+  else if (hotel?.amenities.includes('parking-nearby')) lines.push({ icon: Car, text: 'Парковка рядом' })
+  const view = option.views?.[0]
+  // The view is of some room types, as their names say; a reason of the wish for a view tells it already.
+  const told = option.reasons?.some((reason) => reason.includes(' вид'))
+  if (view && !told) lines.push({ icon: Eye, text: `Номера с видом ${VIEW_LABEL[view]}` })
+  return lines.slice(0, 2)
+}
+
+/**
+ * Eval's word after the cards: a line a hotel — its name, why it fits, its real features and «выше бюджета» over the
+ * traveller's budget. A hotel with nothing to tell has no line; with no lines there is no message.
+ */
+function PlanComment({ plan, full }: { plan: Plan; full: ReadonlyMap<string, Hotel> }) {
+  const lines = plan.options.flatMap((option) => {
+    const features = featureLines(option, option.hotel && full.get(option.hotel.id))
+    const reasons = option.reasons ?? []
+    if (reasons.length === 0 && features.length === 0 && option.fitsBudget) return []
+    return [{ option, reasons, features }]
+  })
+  if (lines.length === 0) return null
   return (
-    <MessageAvatar className={`${messageAvatarClass} self-start`}>
-      <Image src={avatarSrc} alt="" width={64} height={64} className="size-full" />
-    </MessageAvatar>
+    <Bubble variant="muted" className={agentBubble}>
+      <BubbleContent>
+        <ul aria-label="Почему эти отели" className="flex flex-col gap-2">
+          {lines.map(({ option, reasons, features }) => (
+            <li key={option.hotel?.id ?? option.destination.id} className="flex flex-col gap-0.5 leading-[1.45]">
+              <p>
+                <strong className="font-bold">{option.hotel?.name ?? option.destination.name}</strong>
+                {reasons.length > 0 && ' — '}
+                {reasons.map((reason, i) => (
+                  <Fragment key={reason}>
+                    {i > 0 && ', '}
+                    <span>{reason}</span>
+                  </Fragment>
+                ))}
+                {!option.fitsBudget && (
+                  <Badge variant="destructive" className="ml-1.5 bg-card align-middle ring-1 ring-destructive/40">
+                    выше бюджета
+                  </Badge>
+                )}
+              </p>
+              {features.length > 0 && (
+                <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm/[1.35] text-muted-foreground">
+                  {features.map(({ icon: Icon, text }) => (
+                    <span key={text} className="flex items-center gap-1.5">
+                      <Icon className="size-4 flex-none" aria-hidden />
+                      {text}
+                    </span>
+                  ))}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      </BubbleContent>
+    </Bubble>
   )
 }
