@@ -571,7 +571,7 @@ describe('POST /api/assistant with photos', () => {
     expect(body).toEqual({ brief: {}, source: 'rules', photo: { action: 'unseen' } })
   })
 
-  it('says so on a model error or an answer not in Russian', async () => {
+  it('marks a model error or an answer not in Russian as unstable for the client to ask again', async () => {
     setModel(undefined)
     vi.mocked(getVisionModel).mockResolvedValue(
       new MockLanguageModelV4({
@@ -580,7 +580,7 @@ describe('POST /api/assistant with photos', () => {
         },
       }) as LanguageModel,
     )
-    expect((await (await withPhotos('найди похожий')).json()).photo).toEqual({ action: 'unseen' })
+    expect((await (await withPhotos('найди похожий')).json()).photo).toEqual({ action: 'unstable' })
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('504 Gateway Timeout'))
     // An error of the API brings its status and its short answer, not the request.
     vi.mocked(getVisionModel).mockResolvedValue(
@@ -602,7 +602,7 @@ describe('POST /api/assistant with photos', () => {
     expect(line).not.toContain('secret photo')
     expect(line.length).toBeLessThan(400)
     sees({ description: 'A room with a view.' })
-    expect((await (await withPhotos('найди похожий')).json()).photo).toEqual({ action: 'unseen' })
+    expect((await (await withPhotos('найди похожий')).json()).photo).toEqual({ action: 'unstable' })
   })
 
   it('has a limit of its own for the model that sees photos', async () => {
