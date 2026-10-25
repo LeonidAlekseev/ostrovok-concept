@@ -89,12 +89,14 @@ export interface Plan {
   overBudget: boolean
 }
 
-/** The starter cards of the assistant: a photo from `public/assistant/chips` (scripts/build-assistant-chips.mjs). */
+/** The starter chips of the assistant; a chip with a `vibe` shows only while that theme has a city in the season. */
 export const starterChips = [
-  { emoji: '🌴', label: 'На море', photo: '/assistant/chips/sea.webp', vibe: 'sea' },
-  { emoji: '⛰️', label: 'В горы', photo: '/assistant/chips/mountains.webp', vibe: 'mountains' },
-  { emoji: '🏛️', label: 'Города', photo: '/assistant/chips/cities.webp', vibe: 'europe' },
-] as const satisfies readonly { emoji: string; label: string; photo: string; vibe: VibeId }[]
+  { emoji: '🏖️', label: 'На море', vibe: 'sea' },
+  { emoji: '⛰️', label: 'В горы', vibe: 'mountains' },
+  { emoji: '🏙️', label: 'В город', vibe: 'europe' },
+  { emoji: '👨‍👩‍👧', label: 'С детьми' },
+  { emoji: '✈️', label: 'Куда угодно' },
+] as const satisfies readonly { emoji: string; label: string; vibe?: VibeId }[]
 
 const MONTHS = [
   'январ',
@@ -166,7 +168,9 @@ const VIEW_RULES: [ViewKind | 'any', RegExp][] = [
   ['any', /(?<![а-яё])(?:с\s+видом|вид\s+из\s+окна|красив[а-яё]*\s+вид|панорамн|видовой)/],
 ]
 
-const ANY = word('не важно|неважно|вс[её] равно|любо[ей]|не знаю|удиви|на тво[йё]|реши сам|выбери сам|без разницы')
+const ANY = word(
+  'не важно|неважно|вс[её] равно|любо[ей]|не знаю|куда угодно|удиви|на тво[йё]|реши сам|выбери сам|без разницы',
+)
 
 const normalize = (s: string) => s.toLocaleLowerCase('ru').replace(/ /g, ' ')
 
@@ -411,9 +415,9 @@ const tripMonth = (brief: Brief, today: IsoDate) =>
 const hasCandidates = (vibe: VibeId, brief: Brief, today: IsoDate, destinations: readonly Destination[]) =>
   candidatesFor(vibe, tripMonth(brief, today), destinations).length > 0
 
-/** The starter cards whose theme has a city shown in the season of a trip planned today. */
+/** The starter chips: the themes with a city shown in the season of a trip planned today, and the two open ones. */
 export const presetChips = (destinations: readonly Destination[], today: IsoDate) =>
-  starterChips.filter((chip) => hasCandidates(chip.vibe, {}, today, destinations))
+  starterChips.filter((chip) => !('vibe' in chip) || hasCandidates(chip.vibe, {}, today, destinations))
 
 /** The theme of the plan (the traveller's, the named city's or the assistant's own pick) and its cities. */
 function planScope(brief: Brief, today: IsoDate, destinations: readonly Destination[]) {

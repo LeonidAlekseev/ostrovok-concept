@@ -33,7 +33,7 @@ import { countRu, guestsLabel } from '../../lib/format'
 import type { Guests } from '../../lib/search'
 
 const cardClass =
-  'flex flex-col gap-3 rounded-[24px] bg-(--decor-light)/85 p-4 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border)_60%,transparent)]'
+  'flex flex-col gap-3 rounded-[24px] bg-(--decor-light) p-4 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border)_60%,transparent)]'
 const rowClass = 'flex items-center gap-3'
 const rowIconClass =
   'grid size-10 flex-none place-items-center rounded-xl bg-[color-mix(in_srgb,var(--primary)_9%,var(--decor-light))] text-primary'
@@ -136,7 +136,7 @@ export function TripPanel({ trip, plan, recent, busy, onEdit, onAsk, className =
         {plan && hotels && (
           <Link
             href={planMapHref(plan)}
-            className="group relative flex h-28 flex-col justify-end overflow-hidden rounded-2xl bg-[linear-gradient(135deg,color-mix(in_srgb,var(--decor-assistant-sky)_30%,var(--decor-light)),color-mix(in_srgb,var(--decor-mint)_80%,var(--decor-light)))] p-2 no-underline"
+            className="group relative flex h-28 flex-col justify-end overflow-hidden rounded-2xl bg-[color-mix(in_srgb,var(--primary)_10%,var(--decor-light))] p-2 no-underline"
           >
             {/* A drawn map: the streets and the pin, not the real map, which opens on the search page. */}
             <span

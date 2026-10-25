@@ -29,7 +29,6 @@ afterEach(() => {
   push.mockClear()
   window.localStorage.clear()
   window.history.replaceState(null, '', '/assistant')
-  delete (window as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition
 })
 
 const answer = (body: object) => Response.json({ source: 'model', ...body })
@@ -389,37 +388,17 @@ describe('the feed', () => {
 
 // assistant-search, Requirement: Голосовой ввод
 describe('the voice input', () => {
-  it('has no microphone without speech recognition (Scenario: Без поддержки)', async () => {
-    renderWith([])
-    expect(await screen.findByLabelText('Опишите поездку')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Надиктовать сообщение' })).toBeNull()
-  })
-
-  it('puts the dictated words into the field without sending them', async () => {
-    let recognition: { onresult: (event: unknown) => void; onend: () => void; lang: string } | undefined
-    class FakeRecognition {
-      lang = ''
-      onresult = () => {}
-      onend = () => {}
-      constructor() {
-        recognition = this as never
-      }
-      start() {}
-      stop() {
-        this.onend()
-      }
-      abort() {}
+  it('has no microphone even where speech recognition exists (Scenario: Без микрофона)', async () => {
+    ;(window as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition = class {}
+    try {
+      renderWith([])
+      expect(await screen.findByLabelText('Опишите поездку')).toBeTruthy()
+      expect(screen.queryByRole('button', { name: 'Надиктовать сообщение' })).toBeNull()
+      expect(screen.getByRole('button', { name: 'Отправить' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: /Приложить фото/ })).toBeTruthy()
+    } finally {
+      delete (window as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition
     }
-    ;(window as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition = FakeRecognition
-    const user = renderWith([])
-    await user.click(await screen.findByRole('button', { name: 'Надиктовать сообщение' }))
-    expect(recognition?.lang).toBe('ru-RU')
-    recognition!.onresult({ results: [Object.assign([{ transcript: 'тихий отель в Валенсии' }], { isFinal: true })] })
-    recognition!.onend()
-    await waitFor(() =>
-      expect((screen.getByLabelText('Опишите поездку') as HTMLTextAreaElement).value).toBe('тихий отель в Валенсии'),
-    )
-    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('shows the time under the messages', async () => {
@@ -461,7 +440,7 @@ describe('an unknown address', () => {
     fetchMock.mockResolvedValue(answer({ brief: { vibe: 'sea' } }))
     window.history.replaceState(null, '', '/assistant/5a1e0c3b-0000-4000-8000-000000000001')
     const user = renderWith([chatOf('Другой', 5, ['Привет'])])
-    expect(await screen.findByRole('heading', { name: /О каком путешествии вы мечтаете/ })).toBeTruthy()
+    expect(await screen.findByText(/О каком путешествии вы мечтаете/)).toBeTruthy()
     await user.type(screen.getByLabelText('Опишите поездку'), 'к морю{Enter}')
     await within(log()).findByText('к морю')
     expect(chatId()).toBe('5a1e0c3b-0000-4000-8000-000000000001')

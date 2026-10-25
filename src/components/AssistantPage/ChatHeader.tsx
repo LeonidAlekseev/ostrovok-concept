@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { useRef, useState } from 'react'
 import { ChevronLeft, EllipsisVertical, Pencil, Trash2 } from 'lucide-react'
@@ -98,6 +99,34 @@ export function ChatHeader({ chat, trip, signedIn, onBack, onRename, onDelete }:
         </DropdownMenuContent>
       </DropdownMenu>
       <DeleteDialog chat={chat} open={confirm} onOpenChange={setConfirm} onDelete={onDelete} />
+    </header>
+  )
+}
+
+/**
+ * The header of a chat that has no message yet: «назад» to the list on phones (when there are chats), Eval's round
+ * avatar, «Новый чат» and «Ассистент Эвал»; no «Поделиться», no menu.
+ */
+export function NewChatHeader({ canGoBack, onBack }: { canGoBack: boolean; onBack: () => void }) {
+  return (
+    <header className="flex flex-none items-center gap-2 sm:gap-3">
+      {canGoBack && (
+        <Button variant="ghost" size="icon-sm" className="-ml-1 lg:hidden" aria-label="Назад к чатам" onClick={onBack}>
+          <ChevronLeft className="size-6" aria-hidden />
+        </Button>
+      )}
+      <Image
+        src="/assistant/eval.webp"
+        alt="Эвал"
+        width={96}
+        height={96}
+        preload
+        className="size-11 flex-none rounded-full bg-muted object-cover"
+      />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <h2 className="truncate text-[clamp(16px,4.2vw,19px)]/[1.3] font-bold tracking-[-0.01em]">Новый чат</h2>
+        <p className="truncate text-sm/[1.35] text-muted-foreground">Ассистент Эвал</p>
+      </div>
     </header>
   )
 }
