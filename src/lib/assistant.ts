@@ -659,23 +659,25 @@ export const PHOTO_UNUSABLE =
 /** What Эвал says when the search for similar hotels did not answer in time. */
 export const PHOTO_MISSED =
   'Поиск похожих отелей сейчас не ответил — попробуйте ещё раз чуть позже или опишите словами, что для вас важно.'
-/** What Эвал says when the model that sees photos does not answer: no key, no network, every retry failed. */
+/** What Эвал says when no model that sees photos answers and the message has no words: no key, no network. */
 export const PHOTO_UNSEEN = 'Провайдер распознавания фото не отвечает. Повторите позже.'
-/** What Эвал says over the limit of requests to the model that sees photos (or of the route). */
+/** What Эвал says over the limit of requests to every model that sees photos (or of the route). */
 export const PHOTO_LIMITED = 'Превышен лимит запросов к модели распознавания фото. Повторите позже.'
-/** The step Эвал shows while it asks the failed model that sees photos again. */
-export const PHOTO_RETRY_STEP = 'Нестабильное подключение к провайдеру, пробую ещё раз'
+/** What Эвал adds when no model that sees photos answered and the text models answered the message's words. */
+export const PHOTO_SKIPPED = 'Модель распознавания фото сейчас недоступна — ответил без фото.'
+/** Эвал's own message after an answer the rules gave because no text model answered. */
+export const MODELS_DOWN =
+  'Модели сейчас недоступны, поэтому отвечаю по простым правилам. Попробуйте чуть позже — подберу точнее.'
 
 /**
  * What came of the photos: `ask` — the message does not say what to do with them (`PHOTO_QUESTION`); `similar` —
  * the hotels like the photo are the `matches`; `refine` — what the photo shows went into the brief; `unseen` — the
- * provider of the model that sees photos does not answer; `limited` — over the limit of requests to it; `unstable` —
- * the model failed, the client asks again; `unusable` —
- * they show nothing a hotel is chosen by. `seen` is what the model saw, in Russian; `like` — what the hotels are like it in
+ * provider of the models that see photos does not answer; `limited` — over the limit of requests to them; `skipped`
+ * — no model that sees photos answered, the message's words were answered without them; `unusable` — they show nothing a hotel is chosen by. `seen` is what the model saw, in Russian; `like` — what the hotels are like it in
  * («вид на море, бассейн»).
  */
 export interface PhotoAnswer {
-  action: 'ask' | 'similar' | 'refine' | 'unseen' | 'limited' | 'unstable' | 'unusable'
+  action: 'ask' | 'similar' | 'refine' | 'unseen' | 'limited' | 'skipped' | 'unusable'
   seen?: string
   like?: string
   /** `similar`: the search by meaning did not answer in time, so no hotels were looked for. */
@@ -684,8 +686,11 @@ export interface PhotoAnswer {
 
 /** A step of Эвал's turn on the server: one of its agents and what came of it. */
 export interface TurnStep {
-  /** `search` picks the hotels by meaning, `features` checks their building, noise and views. */
-  agent: 'search' | 'features'
+  /**
+   * `search` picks the hotels by meaning, `features` checks their building, noise and views, `vision` looks at the
+   * photos (another model when the first failed).
+   */
+  agent: 'search' | 'features' | 'vision'
   title: string
   status: 'done' | 'failed'
   result?: string
@@ -711,6 +716,8 @@ export interface AssistantResponse {
   unverified?: string
   /** The answer to the photos of the request. */
   photo?: PhotoAnswer
+  /** No text model answered, so the rules did: Эвал says so in a message of its own (`MODELS_DOWN`). */
+  modelsDown?: true
 }
 
 /** What Эвал says about a hotel when it cannot answer at all (no network, the route is down). */
@@ -719,11 +726,11 @@ export const HOTEL_UNAVAILABLE = 'Сейчас не могу ответить. �
 export const MAX_MESSAGE_LENGTH = 500
 export const MAX_HISTORY = 20
 /**
- * The client's own limit: the route gives the model 8 s (the rules after that) and answers within 14 s with
+ * The client's own limit: the route gives the text models 8 s (the rules after that) and answers within 14 s with
  * the semantic search's hotels, when the plan is due.
  */
 const ASSISTANT_TIMEOUT_MS = 15_000
-/** With photos the route looks at them first (up to 12 s) and answers within 28 s. */
+/** With photos the route looks at them first (the models in turn, up to 18 s) and answers within 28 s. */
 const PHOTO_TIMEOUT_MS = 30_000
 
 const isRecord = (value: unknown): value is Record<string, HotelFeatures> =>
@@ -732,7 +739,7 @@ const isCriterion = (value: unknown): value is Criterion => value === 'quiet' ||
 const isStep = (value: unknown): value is TurnStep =>
   typeof value === 'object' &&
   value !== null &&
-  ['search', 'features'].includes((value as TurnStep).agent) &&
+  ['search', 'features', 'vision'].includes((value as TurnStep).agent) &&
   typeof (value as TurnStep).title === 'string' &&
   ['done', 'failed'].includes((value as TurnStep).status)
 const PHOTO_ACTIONS: readonly PhotoAnswer['action'][] = [
@@ -741,7 +748,7 @@ const PHOTO_ACTIONS: readonly PhotoAnswer['action'][] = [
   'refine',
   'unseen',
   'limited',
-  'unstable',
+  'skipped',
   'unusable',
 ]
 const parsePhoto = (value: unknown): PhotoAnswer | undefined => {
@@ -803,6 +810,7 @@ export async function askAssistant(
         ...(Array.isArray(data.missing) && { missing: data.missing.filter(isCriterion) }),
         ...(Array.isArray(data.steps) && { steps: data.steps.filter(isStep) }),
         ...(parsePhoto(data.photo) && { photo: parsePhoto(data.photo) }),
+        ...(data.modelsDown === true && { modelsDown: true as const }),
       }
     }
     limited = response.status === 429

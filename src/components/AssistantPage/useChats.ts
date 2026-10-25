@@ -8,6 +8,7 @@ import {
   describeBrief,
   makePlan,
   mergeBrief,
+  MODELS_DOWN,
   missingNote,
   nextQuestion,
   planCities,
@@ -15,7 +16,7 @@ import {
   PHOTO_TEXT,
   PHOTO_LIMITED,
   PHOTO_MISSED,
-  PHOTO_RETRY_STEP,
+  PHOTO_SKIPPED,
   PHOTO_UNSEEN,
   PHOTO_UNUSABLE,
   type AssistantResponse,
@@ -64,9 +65,6 @@ const later = (iso: string, ms: number) => new Date(Date.parse(iso) + ms).toISOS
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const reason = (error: unknown) => (error instanceof Error ? error.message.slice(0, 200) : 'error')
 
-/** The pauses before Эвал asks the failed model that sees photos again: it usually answers within seconds. */
-export const PHOTO_RETRY_MS = [3000, 6000, 10_000] as const
-
 /** The first step the turn will show, while the answer is on its way: only when the plan is surely due. */
 const SEARCH_STEP = { agent: 'search', title: 'Подбираю отели по вашему описанию' } as const
 
@@ -87,9 +85,13 @@ export function compose(
   }
   // The photos: Эвал asks what to do with them, or says it could not look at them.
   if (photo?.action === 'ask') return { brief, question: PHOTO_QUESTION, text: PHOTO_QUESTION.text, data: {} }
-  // The provider does not answer (every retry failed too) or the limit is over: Эвал says so honestly.
-  if (photo?.action === 'unseen' || photo?.action === 'unstable')
-    return { brief, question: null, text: PHOTO_UNSEEN, data: {} }
+  // No model that sees photos answered: the answer to the message's words, and Эвал says the photos went unseen.
+  if (photo?.action === 'skipped') {
+    const answer = compose({ ...response, photo: undefined }, destinations, newHotels, exclude)
+    return { ...answer, text: `${PHOTO_SKIPPED} ${answer.text}`.trim() }
+  }
+  // The provider does not answer (every model of the chain failed) or the limit is over: Эвал says so honestly.
+  if (photo?.action === 'unseen') return { brief, question: null, text: PHOTO_UNSEEN, data: {} }
   if (photo?.action === 'limited') return { brief, question: null, text: PHOTO_LIMITED, data: {} }
   const seen = photo?.seen ? `Вижу на фото: ${photo.seen.replace(/[.!]?$/, '.')}` : ''
   if (photo?.action === 'unusable') return { brief, question: null, text: `${seen} ${PHOTO_UNUSABLE}`.trim(), data: {} }
@@ -363,15 +365,8 @@ export function useChats(
             destinations,
             controller.signal,
           )
-        let [response] = await Promise.all([ask(), delay(THINK_MS)])
-        // The model that sees photos now and then fails: Эвал says so and asks again after a pause.
-        for (const pause of PHOTO_RETRY_MS) {
-          if (controller.signal.aborted || response.photo?.action !== 'unstable') break
-          showRetry(chatId, pending.createdAt)
-          await delay(pause)
-          if (controller.signal.aborted) return
-          response = await ask()
-        }
+        // The route asks the models that see photos in turn itself: one request, its steps tell of a switch.
+        const [response] = await Promise.all([ask(), delay(THINK_MS)])
         if (controller.signal.aborted) return
         finish(chatId, pendingId, response)
       } catch {
@@ -390,23 +385,6 @@ export function useChats(
     // oxlint-disable-next-line react-hooks/exhaustive-deps
     [destinations, newHotels, update, requestPhotos],
   )
-
-  /** The pending step of the turn's retry of the photos, once: `finish` drops it with the other pending steps. */
-  function showRetry(chatId: string, pendingAt: string) {
-    update(chatId, (c) => {
-      const isRetry = (m: ChatMessage) => m.role === 'agent' && m.data.step?.title === PHOTO_RETRY_STEP
-      if (c.messages.some((m) => m.status === 'pending' && isRetry(m))) return c
-      const step: ChatMessage = {
-        id: newId(),
-        role: 'agent',
-        status: 'pending',
-        text: '',
-        data: { step: { agent: 'vision', title: PHOTO_RETRY_STEP } },
-        createdAt: later(pendingAt, -1),
-      }
-      return { ...c, messages: [...c.messages, step].sort((a, b) => a.createdAt.localeCompare(b.createdAt)) }
-    })
-  }
 
   function finish(chatId: string, pendingId: string, response: AssistantResponse) {
     // «Другие варианты» skips the hotels the chat has shown before.
@@ -430,9 +408,23 @@ export function useChats(
         data: { step: { agent: step.agent, title: step.title, ...(step.result && { result: step.result }) } },
         createdAt: later(pending.createdAt, i - steps.length),
       }))
+      // No text model answered and the rules did: Эвал says so in a message of its own, right after the answer.
+      const down: ChatMessage[] = response.modelsDown
+        ? [
+            {
+              id: newId(),
+              role: 'assistant',
+              status: 'done',
+              text: MODELS_DOWN,
+              data: {},
+              createdAt: later(pending.createdAt, 1),
+            },
+          ]
+        : []
       const messages = [
         ...chat.messages.filter((m) => !(m.role === 'agent' && m.status === 'pending')),
         ...stepMessages,
+        ...down,
       ]
         .map((m) => (m.id === pendingId ? { ...m, status: 'done' as const, text, data } : m))
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt))

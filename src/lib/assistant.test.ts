@@ -479,3 +479,15 @@ describe('askAssistant with photos', () => {
     expect(JSON.parse(init.body as string)).not.toHaveProperty('photos')
   })
 })
+
+describe('askAssistant: the models down', () => {
+  it('keeps the route’s mark of the rules answering for the models', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ brief: {}, source: 'rules', modelsDown: true })),
+    )
+    const response = await askAssistant({ messages: [{ role: 'user', text: 'в горы' }], brief: {} }, null, destinations)
+    expect(response.modelsDown).toBe(true)
+    vi.unstubAllGlobals()
+  })
+})

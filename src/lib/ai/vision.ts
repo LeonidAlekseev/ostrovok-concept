@@ -7,16 +7,16 @@ import { isRussian } from './hotelAnswer'
 
 /**
  * The photos of the chat. What the traveller wants of them (`photoIntent`): the hotels like the photo, or what the
- * photo shows added to the wish; then what is on them (`seePhotos`) by the model that sees photos
- * (`VISION_MODEL`). Its answer is in Russian or not taken; the place only when the model recognises it.
+ * photo shows added to the wish; then what is on them (`seePhotos`) by the models that see photos, in turn
+ * (`VISION_CHAIN`). Its answer is in Russian or not taken; the place only when the model recognises it.
  */
 
 export type PhotoIntent = 'similar' | 'refine' | 'unclear'
 
-/** The model that sees photos gets this long; the route answers with the honest «не смог рассмотреть» after it. */
+/** A model that sees photos gets no longer than this; the chain's own times are shorter (src/lib/ai/model.ts). */
 export const VISION_TIMEOUT_MS = 12_000
-/** The model that reads the intent is quick: a message of a few words. */
-const INTENT_TIMEOUT_MS = 5000
+/** The models that read the intent are quick: a message of a few words. */
+export const INTENT_TIMEOUT_MS = 5000
 /** A data URL of an optimised photo (1600 px WebP of about 300 KB) is far under this. */
 export const MAX_PHOTO_URL_LENGTH = 1_400_000
 /** The photos the browser optimised: WebP, or JPEG where the browser cannot encode WebP. */
@@ -32,6 +32,10 @@ const REFINE = word(
 )
 
 const normalize = (text: string) => text.toLocaleLowerCase('ru').replace(/\s+/g, ' ').trim()
+
+/** The traveller's own words: the quick replies and the stand-in of a message of photos only are not. */
+export const ownWords = (text: string): string =>
+  [PHOTO_REFINE, PHOTO_SIMILAR, PHOTO_TEXT].some((label) => normalize(label) === normalize(text)) ? '' : text.trim()
 
 /** What the message's words say about the photos; `unclear` for none or for words the rules do not know. */
 export function photoIntent(text: string): PhotoIntent {
@@ -208,7 +212,5 @@ export const sightFeatures = (sight: PhotoSight): string =>
 /** The traveller's words with what the photo shows, marked «по фото», for the reading of the wish. */
 export function refinedText(text: string, sight: PhotoSight): string {
   const seen = sightFeatures(sight) || sight.description
-  // The quick reply and the stand-in of a message of photos only are not the traveller's words.
-  const own = [PHOTO_REFINE, PHOTO_TEXT].some((label) => normalize(label) === normalize(text)) ? '' : text.trim()
-  return [own, `По фото: ${seen}`].filter(Boolean).join('. ')
+  return [ownWords(text), `По фото: ${seen}`].filter(Boolean).join('. ')
 }
