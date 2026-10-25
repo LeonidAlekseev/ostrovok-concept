@@ -6,7 +6,6 @@ import { newHotels } from '../../lib/catalogGenerator'
 import { catalogFetch } from '../../test/catalog'
 import { AssistantSearch } from './AssistantSearch'
 import { SharedChat } from './SharedChat'
-import { PHOTO_RETRY_MS } from './useChats'
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
@@ -33,12 +32,7 @@ const THINK_MS = 650
 beforeEach(() => {
   const realSetTimeout = globalThis.setTimeout
   vi.spyOn(globalThis, 'setTimeout').mockImplementation(((handler: TimerHandler, ms?: number, ...args: unknown[]) =>
-    realSetTimeout(
-      handler,
-      // The retry of the photos waits a little: its step shows meanwhile.
-      ms === THINK_MS ? 0 : (PHOTO_RETRY_MS as readonly number[]).includes(ms ?? 0) ? 50 : ms,
-      ...args,
-    )) as typeof setTimeout)
+    realSetTimeout(handler, ms === THINK_MS ? 0 : ms, ...args)) as typeof setTimeout)
 })
 
 afterEach(() => {
@@ -101,28 +95,35 @@ describe('the photos of a message', () => {
     expect(bodyOf(0).photos).toHaveLength(1)
   })
 
-  it('says the provider is unstable and asks again (Scenario: Провайдер ответил со второго раза)', async () => {
-    fetchMock
-      .mockResolvedValueOnce(answer({ brief: {}, photo: { action: 'unstable' } }))
-      .mockResolvedValueOnce(answer({ brief: {}, photo: { action: 'unusable', seen: 'Только цветные полосы' } }))
+  it('shows the switch to another model in one request (Scenario: Провайдер ответил со второго раза)', async () => {
+    fetchMock.mockResolvedValue(
+      answer({
+        brief: {},
+        photo: { action: 'unusable', seen: 'Только цветные полосы' },
+        steps: [
+          { agent: 'vision', title: 'Модель фото не ответила, смотрю другой', status: 'done', result: 'посмотрел' },
+        ],
+      }),
+    )
     const { user } = renderAssistant()
     await user.upload(picker(), photo('a.jpg'))
     await user.type(input(), 'найди похожий{Enter}')
-    expect(await within(log()).findByText('Нестабильное подключение к провайдеру, пробую ещё раз…')).toBeTruthy()
     expect(await within(log()).findByText(/^Вижу на фото: Только цветные полосы\./)).toBeTruthy()
-    expect(within(log()).queryByText(/Нестабильное подключение/)).toBeNull()
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(bodyOf(1)).toEqual(bodyOf(0))
+    expect(within(log()).getByText('Модель фото не ответила, смотрю другой — посмотрел')).toBeTruthy()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('gives up after three retries (Scenario: Провайдер не ответил)', async () => {
-    fetchMock.mockImplementation(async () => answer({ brief: {}, photo: { action: 'unstable' } }))
+  it('answers the words without the photos and says so (Scenario: Провайдер не ответил)', async () => {
+    fetchMock.mockResolvedValue(answer({ brief: { destinationId: 'valencia' }, photo: { action: 'skipped' } }))
     const { user } = renderAssistant()
     await user.upload(picker(), photo('a.jpg'))
-    await user.type(input(), 'найди похожий{Enter}')
-    expect(await within(log()).findByText('Провайдер распознавания фото не отвечает. Повторите позже.')).toBeTruthy()
-    expect(fetchMock).toHaveBeenCalledTimes(1 + PHOTO_RETRY_MS.length)
-    expect(within(log()).queryByText(/Нестабильное подключение/)).toBeNull()
+    await user.type(input(), 'хочу в Валенсию{Enter}')
+    expect(
+      await within(log()).findByText(
+        /^Модель распознавания фото сейчас недоступна — ответил без фото\. Записал: Валенсия/,
+      ),
+    ).toBeTruthy()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   it('says the limit is over without retries (Scenario: Лимит запросов к модели фото)', async () => {
@@ -439,5 +440,30 @@ describe('a signed-in user’s photos', () => {
     expect(await within(log()).findByText(/Что сделать с фото\?/)).toBeTruthy()
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+// semantic-search, Requirement: Модели через API NVIDIA
+describe('the rules instead of the models', () => {
+  const DOWN = 'Модели сейчас недоступны, поэтому отвечаю по простым правилам. Попробуйте чуть позже — подберу точнее.'
+
+  it('says so in a message of its own after the answer (Scenario: Ни одна модель не ответила)', async () => {
+    fetchMock.mockResolvedValue(
+      Response.json({ brief: { destinationId: 'valencia' }, source: 'rules', modelsDown: true }),
+    )
+    const { user } = renderAssistant()
+    await user.type(input(), 'хочу в Валенсию{Enter}')
+    const warning = await within(log()).findByText(DOWN)
+    const answerText = within(log()).getByText(/^Записал: Валенсия/)
+    // The warning comes right after the answer.
+    expect(answerText.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('stays quiet without the key (Scenario: Нет ключа)', async () => {
+    fetchMock.mockResolvedValue(Response.json({ brief: { destinationId: 'valencia' }, source: 'rules' }))
+    const { user } = renderAssistant()
+    await user.type(input(), 'хочу в Валенсию{Enter}')
+    expect(await within(log()).findByText(/^Записал: Валенсия/)).toBeTruthy()
+    expect(within(log()).queryByText(DOWN)).toBeNull()
   })
 })

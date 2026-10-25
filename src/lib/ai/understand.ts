@@ -17,7 +17,7 @@ import {
 import { addDays, nightsBetween, type IsoDate } from '../dates'
 import { VIEW_LABEL } from '../features'
 
-/** One attempt: after this the route answers with the rules. */
+/** The text chain's time (src/lib/ai/model.ts): after this the route answers with the rules. */
 export const MODEL_TIMEOUT_MS = 8000
 
 /** A field the message may leave out; a wrong type is dropped instead of failing the whole answer. */
@@ -131,7 +131,7 @@ export async function understandWish(
     instructions: instructions(brief, today, destinations),
     messages: messages.map(({ role, text }) => ({ role, content: text })),
     output: Output.object({ schema: wishSchema }),
-    // A one-shot extraction: thinking only spends the 8 seconds (`reasoning_effort: none` in the request).
+    // A one-shot extraction: thinking only spends the model's seconds (`reasoning_effort: none` in the request).
     reasoning: 'none',
     maxRetries: 0,
     abortSignal: signal ? AbortSignal.any([signal, timeout]) : timeout,
