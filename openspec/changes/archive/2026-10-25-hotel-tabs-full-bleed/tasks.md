@@ -8,4 +8,4 @@
 ## 2. Проверка
 
 - [x] 2.1 Проверить в браузере на 360 и 390 px (страница `/hotels/<id>` и окно отеля из поиска) и на 1280 px; скриншоты не коммитить. Окно отеля из поиска на телефоне не открывается (только на компьютере) — проверено на 1280 px
-- [ ] 2.2 `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check`
+- [x] 2.2 `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check`. В полном прогоне `npm test` 6 таймаутов по 5 с под нагрузкой (SearchResultsPage, AssistantPhotos); эти файлы отдельно — 68/68 проходят; CI зелёный
