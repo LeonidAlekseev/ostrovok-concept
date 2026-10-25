@@ -15,6 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { Chat } from '../../lib/assistantChats'
+import { hotelHref, DEFAULT_GUESTS } from '../../lib/search'
 import { SHARE_ERROR, shareChat, shareHref } from '../../lib/assistantShare'
 import { getBrowserClient } from '../../lib/supabase/client'
 import { ChatIcon } from './ChatList'
@@ -70,7 +71,25 @@ export function ChatHeader({ chat, trip, signedIn, onBack, onRename, onDelete }:
             </Button>
           </div>
         )}
-        {trip && <p className="truncate text-sm/[1.35] text-muted-foreground">{trip}</p>}
+        {(trip || chat.brief.hotelId) && (
+          <p className="flex min-w-0 items-center gap-1.5 text-sm/[1.35] text-muted-foreground">
+            {chat.brief.hotelId && (
+              <>
+                <Link
+                  href={hotelHref(
+                    chat.brief.hotelId,
+                    chat.brief.dates && { ...chat.brief.dates, guests: DEFAULT_GUESTS },
+                  )}
+                  className="flex-none font-medium text-primary hover:underline"
+                >
+                  Страница отеля
+                </Link>
+                {trip && <span aria-hidden>·</span>}
+              </>
+            )}
+            {trip && <span className="truncate">{trip}</span>}
+          </p>
+        )}
       </div>
       <SharePopover chat={chat} signedIn={signedIn} />
       <DropdownMenu>

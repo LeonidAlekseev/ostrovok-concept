@@ -50,6 +50,8 @@ export interface Brief {
   height?: 'high' | 'low'
   /** A window view of a room; `any` is «с видом» without saying of what. */
   view?: ViewKind | 'any'
+  /** The hotel the chat is about (a chat opened on a hotel's page): Эвал answers about it instead of picking hotels. */
+  hotelId?: string
 }
 
 export type QuestionId = 'vibe' | 'when' | 'party' | 'dates'
@@ -586,6 +588,8 @@ export function briefWithStay(dates: StayDates): Pick<Brief, 'dates' | 'when' | 
   }
 }
 
+const MAX_HOTEL_ID_LENGTH = 120
+
 /**
  * Keeps only what the assistant understands: a catalog city, known themes and answers, a month 0–11,
  * 1–30 nights, named days of a stay and a whole budget in ₽. Reads untrusted input — the client's brief or the
@@ -597,6 +601,7 @@ export function normalizeBrief(
 ): Brief {
   const brief: Brief = {}
   const { vibe, destinationId, when, nights, party, mood, budget, quiet, height, view, dates, datesRejected } = raw
+  const { hotelId } = raw
   if (vibe === 'any' || (typeof vibe === 'string' && Object.hasOwn(VIBE_LABEL, vibe))) brief.vibe = vibe as VibeId
   if (destinations.some((d) => d.id === destinationId)) brief.destinationId = destinationId as string
   if (when === 'soon' || when === 'any') brief.when = when
@@ -612,6 +617,8 @@ export function normalizeBrief(
   if (quiet === true) brief.quiet = true
   if (height === 'high' || height === 'low') brief.height = height
   if (view === 'any' || (typeof view === 'string' && Object.hasOwn(VIEW_LABEL, view))) brief.view = view as ViewKind
+  // Only the shape: the route checks the id against the catalogue.
+  if (typeof hotelId === 'string' && hotelId && hotelId.length <= MAX_HOTEL_ID_LENGTH) brief.hotelId = hotelId
   return brief
 }
 
@@ -643,7 +650,15 @@ export interface AssistantResponse {
   missing?: Criterion[]
   /** The steps of the turn, in order, once the plan is due. */
   steps?: TurnStep[]
+  /**
+   * In a chat about a hotel (`brief.hotelId`) `reply` is the answer from the hotel's data and this is the model's
+   * part from general knowledge: shown apart, marked «Не проверено».
+   */
+  unverified?: string
 }
+
+/** What Эвал says about a hotel when it cannot answer at all (no network, the route is down). */
+export const HOTEL_UNAVAILABLE = 'Сейчас не могу ответить. Попробуйте позже.'
 
 export const MAX_MESSAGE_LENGTH = 500
 export const MAX_HISTORY = 20
@@ -701,6 +716,7 @@ export async function askAssistant(
       return {
         brief: normalizeBrief(data.brief ?? {}, destinations),
         reply: typeof data.reply === 'string' ? data.reply : undefined,
+        ...(typeof data.unverified === 'string' && data.unverified && { unverified: data.unverified }),
         source: data.source === 'model' ? 'model' : 'rules',
         matches: Array.isArray(data.matches) ? data.matches : undefined,
         ...(isRecord(data.features) && { features: data.features }),
@@ -711,6 +727,8 @@ export async function askAssistant(
   } catch {
     // Falls through to the rules below.
   }
+  // A chat about a hotel has no rules of its own here: the hotel's data are on the server.
+  if (request.brief.hotelId) return { brief: request.brief, reply: HOTEL_UNAVAILABLE, source: 'rules' }
   const input = request.messages.at(-1)?.text ?? ''
   return { brief: mergeBrief(request.brief, input, asked, destinations), source: 'rules' }
 }

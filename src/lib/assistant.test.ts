@@ -413,6 +413,14 @@ describe('named days of the stay', () => {
     )
   })
 
+  // assistant-search, Requirement: Вопрос об отеле
+  it('keeps the hotel of the chat only as a short string', () => {
+    expect(normalizeBrief({ hotelId: 'ota-1' }, destinations)).toEqual({ hotelId: 'ota-1' })
+    expect(normalizeBrief({ hotelId: '' }, destinations)).toEqual({})
+    expect(normalizeBrief({ hotelId: 7 }, destinations)).toEqual({})
+    expect(normalizeBrief({ hotelId: 'x'.repeat(121) }, destinations)).toEqual({})
+  })
+
   it('keeps only real days of at most a month of nights from the client', () => {
     expect(normalizeBrief({ dates: { checkIn: '2026-02-31', checkOut: '2026-03-02' } }, destinations)).toEqual({})
     expect(normalizeBrief({ dates: { checkIn: '2026-11-15', checkOut: '2026-11-10' } }, destinations)).toEqual({})

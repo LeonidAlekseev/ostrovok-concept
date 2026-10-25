@@ -1,7 +1,19 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRef, type ReactNode } from 'react'
-import { ArrowDown, Car, Check, ChevronRight, Eye, LoaderCircle, MapPin, RotateCcw, Search, X } from 'lucide-react'
+import {
+  ArrowDown,
+  Car,
+  Check,
+  ChevronRight,
+  Eye,
+  LoaderCircle,
+  MapPin,
+  RotateCcw,
+  Search,
+  TriangleAlert,
+  X,
+} from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -149,6 +161,17 @@ function MessageItem({ message, onChoose, onRetry, actions }: MessageProps) {
           <Bubble variant="muted" className={agentBubble}>
             <BubbleContent>
               <p className={messageTextClass}>{text}</p>
+            </BubbleContent>
+          </Bubble>
+        )}
+        {data.unverified && (
+          <Bubble variant="muted" className={agentBubble}>
+            <BubbleContent>
+              <Badge className="mb-1.5">
+                <TriangleAlert aria-hidden />
+                Не проверено
+              </Badge>
+              <p className={messageTextClass}>{data.unverified}</p>
             </BubbleContent>
           </Bubble>
         )}

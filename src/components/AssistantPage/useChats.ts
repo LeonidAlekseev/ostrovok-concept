@@ -3,6 +3,8 @@ import type { Destination } from '@/data/destinations'
 import { useSession } from '@/hooks/useStore'
 import {
   askAssistant,
+  HOTEL_UNAVAILABLE,
+  briefWithStay,
   describeBrief,
   makePlan,
   mergeBrief,
@@ -12,6 +14,7 @@ import {
   type AssistantResponse,
   type Brief,
   type Question,
+  type StayDates,
 } from '@/lib/assistant'
 import {
   chatTitle,
@@ -51,6 +54,11 @@ export function compose(
 ): { brief: Brief; question: Question | null; text: string; data: ChatMessage['data'] } {
   const { brief, reply: remark, matches, features, missing = [] } = response
   const today = todayIso()
+  // A chat about a hotel: the answer is the text, the model's general knowledge goes apart; no questions, no plan.
+  if (brief.hotelId) {
+    const { unverified } = response
+    return { brief, question: null, text: remark ?? HOTEL_UNAVAILABLE, data: unverified ? { unverified } : {} }
+  }
   const question = nextQuestion(brief, today, destinations)
   const understood = describeBrief(brief, destinations)
   if (question) {
@@ -62,6 +70,13 @@ export function compose(
   const note = missingNote(missing, planCities(brief, today, destinations))
   const text = [understood && `Записал: ${understood}.`, note].filter(Boolean).join(' ')
   return { brief, question, text, data: { plan } }
+}
+
+/** The hotel whose page the chat is on: its chat is about the hotel, on the page's dates. */
+export interface HotelContext {
+  id: string
+  name: string
+  dates?: StayDates
 }
 
 export interface Chats {
@@ -93,6 +108,8 @@ export function useChats(
   newHotels: readonly HotelSummary[],
   /** The chat of the address (`/assistant/<id>`); `null` or an id not in the list is a new, empty chat. */
   activeId: string | null,
+  /** On a hotel's page: the chat the traveller starts is about the hotel. */
+  hotel?: HotelContext,
 ): Chats {
   const session = useSession()
   const [mode, setMode] = useState<Mode>({ kind: 'loading' })
@@ -206,7 +223,7 @@ export function useChats(
       const asked = chat.question?.id ?? null
       const today = todayIso()
       // The plan is surely due when the rules alone complete the brief: its first step shows while Эвал works.
-      const planDue = !nextQuestion(mergeBrief(chat.brief, input, asked, destinations), today)
+      const planDue = !chat.brief.hotelId && !nextQuestion(mergeBrief(chat.brief, input, asked, destinations), today)
       const stepId = newId()
       update(chatId, (c) => ({
         ...c,
@@ -324,9 +341,15 @@ export function useChats(
       data: {},
       createdAt: later(now, 2),
     }
+    // A chat about a hotel is named after it, and the page's dates go to the next answer.
+    const about = hotel && (!active.brief.hotelId || active.brief.hotelId === hotel.id)
     const chat: Chat = {
       ...active,
-      title: active.title || chatTitle(text),
+      title: active.title || (about && hotel ? chatTitle(hotel.name) : chatTitle(text)),
+      brief:
+        about && hotel
+          ? { ...active.brief, hotelId: hotel.id, ...(hotel.dates && briefWithStay(hotel.dates)) }
+          : active.brief,
       messages: [...active.messages, user, pending],
       unread: false,
       updatedAt: now,

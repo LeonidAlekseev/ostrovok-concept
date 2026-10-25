@@ -367,3 +367,60 @@ describe('an unknown address', () => {
     expect(chatId()).toBe('5a1e0c3b-0000-4000-8000-000000000001')
   })
 })
+
+// assistant-search, Requirements: Вопрос об отеле, Пометка непроверенного
+describe('a chat about a hotel', () => {
+  const hotel = hotels[0]
+  const aboutHotel = (): Chat => ({
+    ...chatOf(hotel.name, 5, ['Что рядом с отелем?', 'В данных мест рядом нет.']),
+    brief: { hotelId: hotel.id, destinationId: hotel.destinationId },
+  })
+  const withUnverified = (chat: Chat): Chat => ({
+    ...chat,
+    messages: chat.messages.map((m) =>
+      m.role === 'assistant' ? { ...m, data: { unverified: 'Обычно рядом кафе.' } } : m,
+    ),
+  })
+
+  it('shows the hotel in the header and the unverified part marked (Scenario: Что рядом)', async () => {
+    renderWith([withUnverified(aboutHotel())])
+    const feed = await within(log()).findByText('Обычно рядом кафе.')
+    expect(within(log()).getByText('В данных мест рядом нет.')).toBeTruthy()
+    // The mark is in the bubble of the unverified part, not in the one from the data.
+    expect(within(feed.parentElement!).getByText('Не проверено')).toBeTruthy()
+    expect(within(log()).getAllByText('Не проверено')).toHaveLength(1)
+    expect(screen.getByRole('heading', { name: hotel.name })).toBeTruthy()
+    const link = screen.getByRole('link', { name: 'Страница отеля' })
+    expect(link.getAttribute('href')).toMatch(new RegExp(`^/hotels/${hotel.id}\\?`))
+  })
+
+  it('keeps asking about the hotel after «Открыть в Эвале», with no plan or questions (Scenario: Открыть в Эвале)', async () => {
+    fetchMock.mockResolvedValue(answer({ brief: { hotelId: hotel.id }, reply: 'Да: парковка.' }))
+    const chat = aboutHotel()
+    const user = renderWith([chat])
+    await within(log()).findByText('В данных мест рядом нет.')
+    await user.type(screen.getByLabelText('Опишите поездку'), 'Есть ли парковка?{Enter}')
+    expect(await within(log()).findByText('Да: парковка.')).toBeTruthy()
+    expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string).brief).toMatchObject({ hotelId: hotel.id })
+    expect(chatId()).toBe(chat.id)
+    expect(within(log()).queryAllByRole('article')).toHaveLength(0)
+    expect(screen.queryByRole('list', { name: 'Быстрые ответы' })).toBeNull()
+  })
+
+  it('shows the unverified part in a shared chat too (Scenario: Просмотр по ссылке)', () => {
+    const chat = withUnverified(aboutHotel())
+    render(
+      <SharedChat
+        share={{
+          id: chat.id,
+          title: chat.title,
+          brief: chat.brief,
+          messages: chat.messages,
+          createdAt: chat.updatedAt,
+        }}
+      />,
+    )
+    expect(within(log()).getByText('Обычно рядом кафе.')).toBeTruthy()
+    expect(within(log()).getByText('Не проверено')).toBeTruthy()
+  })
+})

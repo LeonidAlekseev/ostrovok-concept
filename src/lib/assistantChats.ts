@@ -24,6 +24,8 @@ export interface MessageData {
   step?: AgentStep
   /** The traveller's «Другие варианты»: the answer skips the hotels the chat has shown. */
   more?: true
+  /** A chat about a hotel: the model's part of the answer from general knowledge, shown marked «Не проверено». */
+  unverified?: string
 }
 
 export interface ChatMessage {
@@ -81,6 +83,10 @@ export const isPending = (chat: Chat) => chat.messages.some((m) => m.status === 
 export const shownHotels = (chat: Chat): Set<string> =>
   new Set(chat.messages.flatMap((m) => m.data.plan?.options.flatMap((o) => (o.hotel ? [o.hotel.id] : [])) ?? []))
 
+/** The newest chat about the hotel (`brief.hotelId`), the one its page continues. */
+export const hotelChatOf = (chats: readonly Chat[], hotelId: string): Chat | undefined =>
+  chats.filter((c) => c.brief.hotelId === hotelId && c.messages.length > 0).sort(byRecent)[0]
+
 /** The newest chat first. */
 export const byRecent = (a: Chat, b: Chat) => b.updatedAt.localeCompare(a.updatedAt)
 
@@ -118,6 +124,7 @@ export function parseData(value: unknown): MessageData | null {
     ...(value.plan !== undefined && { plan: value.plan as Plan }),
     ...(value.step !== undefined && { step: value.step as AgentStep }),
     ...(value.more === true && { more: true as const }),
+    ...(isString(value.unverified) && value.unverified && { unverified: value.unverified }),
   }
 }
 
