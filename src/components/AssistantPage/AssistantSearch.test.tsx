@@ -28,6 +28,10 @@ vi.mock('../../lib/assistant', async (importOriginal) => {
   }
 })
 
+// Heavy by nature: a multi-step dialog rendered in jsdom takes ~0.5 s alone and several times that on a busy machine,
+// so the default 5 s is not enough there.
+const HEAVY = 20_000
+
 // The assistant "thinks" for 650 ms before it answers: the tests do not wait for it in real time.
 const THINK_MS = 650
 beforeEach(() => {
@@ -92,41 +96,49 @@ function deferred() {
 
 // assistant-search, Requirement: Разбор пожелания
 describe('AssistantSearch with the model', () => {
-  it('shows what the model understood from a free phrase (Scenario: Свободная фраза)', async () => {
-    fetchMock.mockResolvedValue(answer({ brief: { vibe: 'sea', budget: 40000 }, reply: 'Тёплое море!' }))
-    const { user } = renderAssistant()
+  it(
+    'shows what the model understood from a free phrase (Scenario: Свободная фраза)',
+    async () => {
+      fetchMock.mockResolvedValue(answer({ brief: { vibe: 'sea', budget: 40000 }, reply: 'Тёплое море!' }))
+      const { user } = renderAssistant()
 
-    await user.type(input(), 'хочу туда, где тепло и можно поплавать с маской{Enter}')
+      await user.type(input(), 'хочу туда, где тепло и можно поплавать с маской{Enter}')
 
-    expect(await inLog('Записал: море · до 40 000 ₽. Когда планируете поехать?')).toBeTruthy()
-    const [url] = fetchMock.mock.calls[0]
-    expect(url).toBe('/api/assistant')
-    expect(bodyOf(0)).toEqual({
-      messages: [{ role: 'user', text: 'хочу туда, где тепло и можно поплавать с маской' }],
-      brief: {},
-    })
-  })
+      expect(await inLog('Записал: море · до 40 000 ₽. Когда планируете поехать?')).toBeTruthy()
+      const [url] = fetchMock.mock.calls[0]
+      expect(url).toBe('/api/assistant')
+      expect(bodyOf(0)).toEqual({
+        messages: [{ role: 'user', text: 'хочу туда, где тепло и можно поплавать с маской' }],
+        brief: {},
+      })
+    },
+    HEAVY,
+  )
 
-  it('sends the dialog so far and the brief with the next message', async () => {
-    fetchMock
-      .mockResolvedValueOnce(answer({ brief: { vibe: 'sea' } }))
-      .mockResolvedValueOnce(answer({ brief: { vibe: 'sea', when: 9 } }))
-    const { user } = renderAssistant()
+  it(
+    'sends the dialog so far and the brief with the next message',
+    async () => {
+      fetchMock
+        .mockResolvedValueOnce(answer({ brief: { vibe: 'sea' } }))
+        .mockResolvedValueOnce(answer({ brief: { vibe: 'sea', when: 9 } }))
+      const { user } = renderAssistant()
 
-    await user.type(input(), 'к морю{Enter}')
-    await inLog(/Когда планируете поехать/)
-    await user.type(input(), 'осенью, в октябре{Enter}')
-    await inLog(/С кем едете/)
+      await user.type(input(), 'к морю{Enter}')
+      await inLog(/Когда планируете поехать/)
+      await user.type(input(), 'осенью, в октябре{Enter}')
+      await inLog(/С кем едете/)
 
-    expect(bodyOf(1)).toEqual({
-      messages: [
-        { role: 'user', text: 'к морю' },
-        { role: 'assistant', text: 'Записал: море. Когда планируете поехать?' },
-        { role: 'user', text: 'осенью, в октябре' },
-      ],
-      brief: { vibe: 'sea' },
-    })
-  })
+      expect(bodyOf(1)).toEqual({
+        messages: [
+          { role: 'user', text: 'к морю' },
+          { role: 'assistant', text: 'Записал: море. Когда планируете поехать?' },
+          { role: 'user', text: 'осенью, в октябре' },
+        ],
+        brief: { vibe: 'sea' },
+      })
+    },
+    HEAVY,
+  )
 
   it('leads with the model remark when nothing is understood yet', async () => {
     fetchMock.mockResolvedValue(answer({ brief: {}, reply: 'Привет!' }))
@@ -382,23 +394,27 @@ describe('AssistantSearch chats', () => {
 
 // assistant-search, Requirement: Чаты после перезагрузки
 describe('AssistantSearch after a reload', () => {
-  it('restores the dialog, the brief and the question (Scenario: Перезагрузка после «Записал»)', async () => {
-    fetchMock
-      .mockResolvedValueOnce(answer({ brief: { vibe: 'sea' } }))
-      .mockResolvedValueOnce(answer({ brief: { vibe: 'sea', when: 9 } }))
-    const { user, unmount } = renderAssistant()
-    await user.type(input(), 'к морю{Enter}')
-    await inLog('Записал: море. Когда планируете поехать?')
+  it(
+    'restores the dialog, the brief and the question (Scenario: Перезагрузка после «Записал»)',
+    async () => {
+      fetchMock
+        .mockResolvedValueOnce(answer({ brief: { vibe: 'sea' } }))
+        .mockResolvedValueOnce(answer({ brief: { vibe: 'sea', when: 9 } }))
+      const { user, unmount } = renderAssistant()
+      await user.type(input(), 'к морю{Enter}')
+      await inLog('Записал: море. Когда планируете поехать?')
 
-    unmount()
-    render(view())
+      unmount()
+      render(view())
 
-    expect(await inLog('Записал: море. Когда планируете поехать?')).toBeTruthy()
-    expect(screen.queryByLabelText('Эвал думает')).toBeNull()
-    await user.type(input(), 'в октябре{Enter}')
-    await inLog(/С кем едете/)
-    expect(bodyOf(1).brief).toEqual({ vibe: 'sea' })
-  })
+      expect(await inLog('Записал: море. Когда планируете поехать?')).toBeTruthy()
+      expect(screen.queryByLabelText('Эвал думает')).toBeNull()
+      await user.type(input(), 'в октябре{Enter}')
+      await inLog(/С кем едете/)
+      expect(bodyOf(1).brief).toEqual({ vibe: 'sea' })
+    },
+    HEAVY,
+  )
 
   it('finishes a pending answer after a reload', async () => {
     fetchMock.mockReturnValueOnce(new Promise(() => {})).mockResolvedValueOnce(answer({ brief: { vibe: 'sea' } }))
@@ -414,26 +430,30 @@ describe('AssistantSearch after a reload', () => {
     expect(bodyOf(1)).toEqual(bodyOf(0))
   })
 
-  it('keeps every chat after a reload (Scenario: Вторая сессия)', async () => {
-    // A body is read once: every request gets its own response.
-    fetchMock.mockImplementation(async () => answer({ brief: { vibe: 'sea' } }))
-    const { user, unmount } = renderAssistant()
-    await user.type(input(), 'к морю{Enter}')
-    await inLog(/Когда планируете поехать/)
-    await user.click(newChatButton())
-    await user.type(input(), 'тихий отель{Enter}')
-    await inLog(/Когда планируете поехать/)
+  it(
+    'keeps every chat after a reload (Scenario: Вторая сессия)',
+    async () => {
+      // A body is read once: every request gets its own response.
+      fetchMock.mockImplementation(async () => answer({ brief: { vibe: 'sea' } }))
+      const { user, unmount } = renderAssistant()
+      await user.type(input(), 'к морю{Enter}')
+      await inLog(/Когда планируете поехать/)
+      await user.click(newChatButton())
+      await user.type(input(), 'тихий отель{Enter}')
+      await inLog(/Когда планируете поехать/)
 
-    unmount()
-    render(view())
+      unmount()
+      render(view())
 
-    const chats = within(chatList()).getAllByRole('button', { name: /^(?!Действия).*(?:к морю|тихий отель)/ })
-    expect(chats.map((c) => c.textContent)).toEqual([
-      expect.stringContaining('тихий отель'),
-      expect.stringContaining('к морю'),
-    ])
-    expect(JSON.parse(window.localStorage.getItem(CHATS_KEY)!)).toHaveLength(2)
-  })
+      const chats = within(chatList()).getAllByRole('button', { name: /^(?!Действия).*(?:к морю|тихий отель)/ })
+      expect(chats.map((c) => c.textContent)).toEqual([
+        expect.stringContaining('тихий отель'),
+        expect.stringContaining('к морю'),
+      ])
+      expect(JSON.parse(window.localStorage.getItem(CHATS_KEY)!)).toHaveLength(2)
+    },
+    HEAVY,
+  )
 
   it('moves the dialog of an older version with a route into a chat (Scenario: Старый диалог с маршрутом)', async () => {
     const brief = { destinationId: 'lisbon', when: 9, party: 'solo' as const }
