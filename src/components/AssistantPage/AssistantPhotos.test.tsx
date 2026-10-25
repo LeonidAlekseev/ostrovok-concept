@@ -96,7 +96,7 @@ describe('the photos of a message', () => {
     const { user } = renderAssistant()
     await user.upload(picker(), photo('a.jpg'))
     await user.type(input(), 'найди похожий{Enter}')
-    expect(await within(log()).findByText(/Не смог рассмотреть фото/)).toBeTruthy()
+    expect(await within(log()).findByText('Провайдер распознавания фото не отвечает. Повторите позже.')).toBeTruthy()
     expect(bodyOf(0).messages).toEqual([{ role: 'user', text: 'найди похожий' }])
     expect(bodyOf(0).photos).toHaveLength(1)
   })
@@ -120,9 +120,25 @@ describe('the photos of a message', () => {
     const { user } = renderAssistant()
     await user.upload(picker(), photo('a.jpg'))
     await user.type(input(), 'найди похожий{Enter}')
-    expect(await within(log()).findByText(/^Провайдер распознавания фото сейчас работает нестабильно/)).toBeTruthy()
+    expect(await within(log()).findByText('Провайдер распознавания фото не отвечает. Повторите позже.')).toBeTruthy()
     expect(fetchMock).toHaveBeenCalledTimes(1 + PHOTO_RETRY_MS.length)
     expect(within(log()).queryByText(/Нестабильное подключение/)).toBeNull()
+  })
+
+  it('says the limit is over without retries (Scenario: Лимит запросов к модели фото)', async () => {
+    fetchMock
+      .mockResolvedValueOnce(answer({ brief: {}, photo: { action: 'limited' } }))
+      .mockResolvedValueOnce(Response.json({ error: 'Too many requests' }, { status: 429 }))
+    const { user } = renderAssistant()
+    await user.upload(picker(), photo('a.jpg'))
+    await user.type(input(), 'найди похожий{Enter}')
+    const limit = 'Превышен лимит запросов к модели распознавания фото. Повторите позже.'
+    expect(await within(log()).findByText(limit)).toBeTruthy()
+    // The route's own limit reads the same.
+    await user.upload(picker(), photo('b.jpg'))
+    await user.type(input(), 'найди похожий{Enter}')
+    await waitFor(() => expect(within(log()).getAllByText(limit)).toHaveLength(2))
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('takes no fifth photo and says why (Scenario: Пятое фото)', async () => {

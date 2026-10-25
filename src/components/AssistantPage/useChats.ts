@@ -13,10 +13,10 @@ import {
   planCities,
   PHOTO_QUESTION,
   PHOTO_TEXT,
+  PHOTO_LIMITED,
   PHOTO_MISSED,
   PHOTO_RETRY_STEP,
   PHOTO_UNSEEN,
-  PHOTO_UNSTABLE,
   PHOTO_UNUSABLE,
   type AssistantResponse,
   type Brief,
@@ -87,8 +87,10 @@ export function compose(
   }
   // The photos: Эвал asks what to do with them, or says it could not look at them.
   if (photo?.action === 'ask') return { brief, question: PHOTO_QUESTION, text: PHOTO_QUESTION.text, data: {} }
-  if (photo?.action === 'unseen') return { brief, question: null, text: PHOTO_UNSEEN, data: {} }
-  if (photo?.action === 'unstable') return { brief, question: null, text: PHOTO_UNSTABLE, data: {} }
+  // The provider does not answer (every retry failed too) or the limit is over: Эвал says so honestly.
+  if (photo?.action === 'unseen' || photo?.action === 'unstable')
+    return { brief, question: null, text: PHOTO_UNSEEN, data: {} }
+  if (photo?.action === 'limited') return { brief, question: null, text: PHOTO_LIMITED, data: {} }
   const seen = photo?.seen ? `Вижу на фото: ${photo.seen.replace(/[.!]?$/, '.')}` : ''
   if (photo?.action === 'unusable') return { brief, question: null, text: `${seen} ${PHOTO_UNUSABLE}`.trim(), data: {} }
   if (photo?.action === 'similar') {
