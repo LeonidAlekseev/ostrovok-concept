@@ -58,7 +58,19 @@ export function ChatHeader({ chat, trip, signedIn, onBack, onRename, onDelete }:
         ) : (
           <div className="flex min-w-0 items-center gap-1">
             <h2 className="min-w-0 truncate text-[clamp(16px,4.2vw,19px)]/[1.3] font-bold tracking-[-0.01em]">
-              {chat.title || 'Новый чат'}
+              {chat.brief.hotelId ? (
+                <Link
+                  href={hotelHref(
+                    chat.brief.hotelId,
+                    chat.brief.dates && { ...chat.brief.dates, guests: DEFAULT_GUESTS },
+                  )}
+                  className="text-primary hover:underline"
+                >
+                  {chat.title || 'Новый чат'}
+                </Link>
+              ) : (
+                chat.title || 'Новый чат'
+              )}
             </h2>
             <Button
               variant="ghost"
@@ -71,25 +83,7 @@ export function ChatHeader({ chat, trip, signedIn, onBack, onRename, onDelete }:
             </Button>
           </div>
         )}
-        {(trip || chat.brief.hotelId) && (
-          <p className="flex min-w-0 items-center gap-1.5 text-sm/[1.35] text-muted-foreground">
-            {chat.brief.hotelId && (
-              <>
-                <Link
-                  href={hotelHref(
-                    chat.brief.hotelId,
-                    chat.brief.dates && { ...chat.brief.dates, guests: DEFAULT_GUESTS },
-                  )}
-                  className="flex-none font-medium text-primary hover:underline"
-                >
-                  Страница отеля
-                </Link>
-                {trip && <span aria-hidden>·</span>}
-              </>
-            )}
-            {trip && <span className="truncate">{trip}</span>}
-          </p>
-        )}
+        {trip && <p className="truncate text-sm/[1.35] text-muted-foreground">{trip}</p>}
       </div>
       <SharePopover chat={chat} signedIn={signedIn} />
       <DropdownMenu>
