@@ -653,24 +653,30 @@ export const PHOTO_QUESTION: Question = {
   text: 'Что сделать с фото? Могу найти похожие отели или учесть увиденное в запросе.',
   replies: [PHOTO_SIMILAR, PHOTO_REFINE],
 }
-/** What Эвал says when the model that sees photos is unavailable (no key, an error, the time out, the limit). */
 /** What Эвал says when the photos show nothing a hotel is chosen by. */
 export const PHOTO_UNUSABLE =
   'По такому фото не подобрать отель — опишите словами, что для вас важно: вид, стиль, место.'
 /** What Эвал says when the search for similar hotels did not answer in time. */
 export const PHOTO_MISSED =
   'Поиск похожих отелей сейчас не ответил — попробуйте ещё раз чуть позже или опишите словами, что для вас важно.'
+/** What Эвал says when the model that sees photos is unavailable (no key, the limit). */
 export const PHOTO_UNSEEN =
   'Не смог рассмотреть фото. Опишите словами, что на нём важно — вид, стиль, место, — и я подберу.'
+/** The step Эвал shows while it asks the failed model that sees photos again. */
+export const PHOTO_RETRY_STEP = 'Нестабильное подключение к провайдеру, пробую ещё раз'
+/** What Эвал says when the model that sees photos failed every try. */
+export const PHOTO_UNSTABLE =
+  'Провайдер распознавания фото сейчас работает нестабильно. Попробуйте отправить фото ещё раз чуть позже или опишите словами, что на нём важно — вид, стиль, место.'
 
 /**
  * What came of the photos: `ask` — the message does not say what to do with them (`PHOTO_QUESTION`); `similar` —
  * the hotels like the photo are the `matches`; `refine` — what the photo shows went into the brief; `unseen` — the
- * photos could not be looked at; `unusable` — they show nothing a hotel is chosen by. `seen` is what the model saw, in Russian; `like` — what the hotels are like it in
+ * photos could not be looked at; `unstable` — the model that sees them failed, the client asks again; `unusable` —
+ * they show nothing a hotel is chosen by. `seen` is what the model saw, in Russian; `like` — what the hotels are like it in
  * («вид на море, бассейн»).
  */
 export interface PhotoAnswer {
-  action: 'ask' | 'similar' | 'refine' | 'unseen' | 'unusable'
+  action: 'ask' | 'similar' | 'refine' | 'unseen' | 'unstable' | 'unusable'
   seen?: string
   like?: string
   /** `similar`: the search by meaning did not answer in time, so no hotels were looked for. */
@@ -730,7 +736,7 @@ const isStep = (value: unknown): value is TurnStep =>
   ['search', 'features'].includes((value as TurnStep).agent) &&
   typeof (value as TurnStep).title === 'string' &&
   ['done', 'failed'].includes((value as TurnStep).status)
-const PHOTO_ACTIONS: readonly PhotoAnswer['action'][] = ['ask', 'similar', 'refine', 'unseen', 'unusable']
+const PHOTO_ACTIONS: readonly PhotoAnswer['action'][] = ['ask', 'similar', 'refine', 'unseen', 'unstable', 'unusable']
 const parsePhoto = (value: unknown): PhotoAnswer | undefined => {
   if (typeof value !== 'object' || value === null) return undefined
   const { action, seen, like, missed } = value as Record<string, unknown>

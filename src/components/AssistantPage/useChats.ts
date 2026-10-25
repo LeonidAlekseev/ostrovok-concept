@@ -14,7 +14,9 @@ import {
   PHOTO_QUESTION,
   PHOTO_TEXT,
   PHOTO_MISSED,
+  PHOTO_RETRY_STEP,
   PHOTO_UNSEEN,
+  PHOTO_UNSTABLE,
   PHOTO_UNUSABLE,
   type AssistantResponse,
   type Brief,
@@ -62,6 +64,9 @@ const later = (iso: string, ms: number) => new Date(Date.parse(iso) + ms).toISOS
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const reason = (error: unknown) => (error instanceof Error ? error.message.slice(0, 200) : 'error')
 
+/** The pauses before Эвал asks the failed model that sees photos again: it usually answers within seconds. */
+export const PHOTO_RETRY_MS = [3000, 6000, 10_000] as const
+
 /** The first step the turn will show, while the answer is on its way: only when the plan is surely due. */
 const SEARCH_STEP = { agent: 'search', title: 'Подбираю отели по вашему описанию' } as const
 
@@ -83,6 +88,7 @@ export function compose(
   // The photos: Эвал asks what to do with them, or says it could not look at them.
   if (photo?.action === 'ask') return { brief, question: PHOTO_QUESTION, text: PHOTO_QUESTION.text, data: {} }
   if (photo?.action === 'unseen') return { brief, question: null, text: PHOTO_UNSEEN, data: {} }
+  if (photo?.action === 'unstable') return { brief, question: null, text: PHOTO_UNSTABLE, data: {} }
   const seen = photo?.seen ? `Вижу на фото: ${photo.seen.replace(/[.!]?$/, '.')}` : ''
   if (photo?.action === 'unusable') return { brief, question: null, text: `${seen} ${PHOTO_UNUSABLE}`.trim(), data: {} }
   if (photo?.action === 'similar') {
@@ -348,15 +354,22 @@ export function useChats(
         // Only the photos in Storage are waited for: the turn is already marked in flight, so no other one starts.
         const sent = found instanceof Promise ? await found : found
         if (controller.signal.aborted) return
-        const [response] = await Promise.all([
+        const ask = () =>
           askAssistant(
             { messages: history, brief: chat.brief, ...(sent && { photos: sent }) },
             question,
             destinations,
             controller.signal,
-          ),
-          delay(THINK_MS),
-        ])
+          )
+        let [response] = await Promise.all([ask(), delay(THINK_MS)])
+        // The model that sees photos now and then fails: Эвал says so and asks again after a pause.
+        for (const pause of PHOTO_RETRY_MS) {
+          if (controller.signal.aborted || response.photo?.action !== 'unstable') break
+          showRetry(chatId, pending.createdAt)
+          await delay(pause)
+          if (controller.signal.aborted) return
+          response = await ask()
+        }
         if (controller.signal.aborted) return
         finish(chatId, pendingId, response)
       } catch {
@@ -375,6 +388,23 @@ export function useChats(
     // oxlint-disable-next-line react-hooks/exhaustive-deps
     [destinations, newHotels, update, requestPhotos],
   )
+
+  /** The pending step of the turn's retry of the photos, once: `finish` drops it with the other pending steps. */
+  function showRetry(chatId: string, pendingAt: string) {
+    update(chatId, (c) => {
+      const isRetry = (m: ChatMessage) => m.role === 'agent' && m.data.step?.title === PHOTO_RETRY_STEP
+      if (c.messages.some((m) => m.status === 'pending' && isRetry(m))) return c
+      const step: ChatMessage = {
+        id: newId(),
+        role: 'agent',
+        status: 'pending',
+        text: '',
+        data: { step: { agent: 'vision', title: PHOTO_RETRY_STEP } },
+        createdAt: later(pendingAt, -1),
+      }
+      return { ...c, messages: [...c.messages, step].sort((a, b) => a.createdAt.localeCompare(b.createdAt)) }
+    })
+  }
 
   function finish(chatId: string, pendingId: string, response: AssistantResponse) {
     // «Другие варианты» skips the hotels the chat has shown before.

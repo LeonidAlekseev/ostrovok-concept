@@ -170,8 +170,16 @@ async function wishTurn({ messages, brief, today, destinations, deadline, signal
   return { brief: next, source: 'rules', ...(await found(next)) } satisfies AssistantResponse
 }
 
-/** What the photos show, or `null` without the model, over the limit, on an error or a timeout. */
-async function look(photos: readonly string[], ip: string, deadline: number, signal: AbortSignal) {
+/**
+ * What the photos show; `null` without the model or over the limit; `unstable` when the model failed (an error, a
+ * timeout, an answer not in Russian): the provider now and then answers 500 or stalls, so the client asks again.
+ */
+async function look(
+  photos: readonly string[],
+  ip: string,
+  deadline: number,
+  signal: AbortSignal,
+): Promise<PhotoSight | 'unstable' | null> {
   const timeoutMs = deadline - Date.now() - MIN_VISION_MS
   if (timeoutMs < MIN_VISION_MS || !allowVisionRequest(ip)) return null
   const model = await getVisionModel()
@@ -181,7 +189,7 @@ async function look(photos: readonly string[], ip: string, deadline: number, sig
   } catch (error) {
     if (signal.aborted) throw error
     warn('the photos were not seen', error)
-    return null
+    return 'unstable'
   }
 }
 
@@ -236,7 +244,7 @@ async function similarTurn(sight: PhotoSight, { brief, deadline, signal }: WishC
  * A message with photos: what to do with them comes from its words (the rules, then the text model), otherwise
  * Эвал asks. «Найти похожие» looks for the hotels by the meaning of the photo's description; «Учесть в запросе» adds
  * what the photo shows to the message, and the wish is read as usual. Without the model that sees photos Эвал says
- * it could not look at them.
+ * it could not look at them; when the model failed the client asks again.
  */
 async function photoTurn(photos: readonly string[], ip: string, context: WishContext): Promise<AssistantResponse> {
   const { messages, brief, signal, deadline } = context
@@ -254,6 +262,7 @@ async function photoTurn(photos: readonly string[], ip: string, context: WishCon
   if (intent === 'unclear') return { brief, source: 'rules', photo: { action: 'ask' } }
   const sight = await look(photos, ip, deadline, signal)
   if (!sight) return { brief, source: 'rules', photo: { action: 'unseen' } }
+  if (sight === 'unstable') return { brief, source: 'rules', photo: { action: 'unstable' } }
   // Nothing on the photo to choose a hotel by: no search and no wish of it, Эвал asks for words.
   if (sight.unusable) return { brief, source: 'model', photo: { action: 'unusable', seen: sight.description } }
   if (intent === 'similar') return similarTurn(sight, context)
