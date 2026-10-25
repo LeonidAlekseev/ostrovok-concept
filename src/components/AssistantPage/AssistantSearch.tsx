@@ -135,10 +135,11 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
     inputRef.current?.focus()
   }
 
-  const removeActive = () => {
-    const index = chats.findIndex((c) => c.id === active.id)
+  const removeChat = (id: string) => {
+    if (id !== active.id) return remove(id)
+    const index = chats.findIndex((c) => c.id === id)
     const next = chats[index + 1] ?? chats[index - 1]
-    remove(active.id)
+    remove(id)
     goToChat(next?.id ?? null, { replace: true })
   }
 
@@ -204,8 +205,11 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
         chats={chats}
         activeId={started || pathId ? active.id : null}
         ready={ready}
+        signedIn={signedIn}
         onChoose={choose}
         onNew={fresh}
+        onRename={rename}
+        onDelete={removeChat}
         className={`${glassPanel} rounded-[28px] p-3 lg:p-4 ${screen === 'chat' ? 'max-lg:hidden' : ''}`}
       />
 
@@ -221,7 +225,7 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
             signedIn={signedIn}
             onBack={backToList}
             onRename={(title) => rename(active.id, title)}
-            onDelete={removeActive}
+            onDelete={() => removeChat(active.id)}
           />
         ) : (
           <div className="flex flex-col gap-3">

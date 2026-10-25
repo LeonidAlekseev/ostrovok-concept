@@ -343,9 +343,16 @@ describe('AssistantSearch chats', () => {
 
     expect(screen.queryByRole('log', { name: 'Диалог с Эвалом' })).toBeNull()
     expect(screen.getByRole('heading', { name: /О каком путешествии вы мечтаете/ })).toBeTruthy()
-    const previous = within(chatList()).getByRole('button', { name: /к морю/ })
+    const previous = within(chatList()).getByRole('button', { name: /^(?!Действия).*(?:к морю)/ })
     await user.click(previous)
     expect(await inLog('Записал: море. Когда планируете поехать?')).toBeTruthy()
+  })
+
+  it('has one «Новый чат» in the list, floating on phones and in the column from lg', () => {
+    renderAssistant()
+    const button = within(chatList()).getByRole('button', { name: 'Новый чат' })
+    expect(button.className).toContain('max-lg:fixed')
+    expect(screen.getAllByRole('button', { name: 'Новый чат' })).toHaveLength(1)
   })
 
   it('brings the answer to its own chat while another is open (Scenarios: Ответ в другом чате, Сброс)', async () => {
@@ -355,7 +362,7 @@ describe('AssistantSearch chats', () => {
     await user.type(input(), 'к морю{Enter}')
     await user.click(newChatButton())
 
-    const waiting = within(chatList()).getByRole('button', { name: /к морю/ })
+    const waiting = within(chatList()).getByRole('button', { name: /^(?!Действия).*(?:к морю)/ })
     expect(waiting.textContent).toContain('ждёт ответа')
 
     await act(async () => reply.resolve(answer({ brief: { vibe: 'sea' } })))
@@ -367,7 +374,9 @@ describe('AssistantSearch chats', () => {
 
     await user.click(waiting)
     expect(await inLog('Записал: море. Когда планируете поехать?')).toBeTruthy()
-    expect(within(chatList()).getByRole('button', { name: /к морю/ }).textContent).not.toContain('новое')
+    expect(within(chatList()).getByRole('button', { name: /^(?!Действия).*(?:к морю)/ }).textContent).not.toContain(
+      'новое',
+    )
   })
 })
 
@@ -418,7 +427,7 @@ describe('AssistantSearch after a reload', () => {
     unmount()
     render(view())
 
-    const chats = within(chatList()).getAllByRole('button', { name: /к морю|тихий отель/ })
+    const chats = within(chatList()).getAllByRole('button', { name: /^(?!Действия).*(?:к морю|тихий отель)/ })
     expect(chats.map((c) => c.textContent)).toEqual([
       expect.stringContaining('тихий отель'),
       expect.stringContaining('к морю'),

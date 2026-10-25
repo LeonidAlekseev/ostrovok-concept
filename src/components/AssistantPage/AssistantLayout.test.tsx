@@ -85,7 +85,7 @@ describe('the layout of Eval’s page', () => {
     expect(window.location.pathname).toBe(`/assistant/${chat.id}`)
     expect(
       within(chatList())
-        .getByRole('button', { name: /Тихий отель/ })
+        .getByRole('button', { name: /^(?!Действия).*Тихий отель/ })
         .getAttribute('aria-current'),
     ).toBe('true')
     const aside = screen.getByRole('complementary', { name: 'О поездке' })
@@ -98,7 +98,7 @@ describe('the layout of Eval’s page', () => {
   it('opens a chat at its address and goes back to the list (Scenario: Телефон)', async () => {
     const older = chatOf('Горы', 60, ['В горы'])
     const user = renderWith([chatOf('Море', 5, ['К морю']), older])
-    await user.click(await within(chatList()).findByRole('button', { name: /Горы/ }))
+    await user.click(await within(chatList()).findByRole('button', { name: /^(?!Действия).*(?:Горы)/ }))
     expect(window.location.pathname).toBe(`/assistant/${older.id}`)
     expect(await within(log()).findByText('В горы')).toBeTruthy()
 
@@ -116,11 +116,11 @@ describe('the list of chats', () => {
     renderWith([chatOf('Сегодняшний', 5, ['Найди тихий отель', 'Записал: тихо ночью.']), old])
     const list = chatList()
     expect(await within(list).findByRole('region', { name: 'Сегодня' })).toBeTruthy()
-    const row = within(within(list).getByRole('region', { name: 'Сегодня' })).getByRole('button')
+    const row = within(within(list).getByRole('region', { name: 'Сегодня' })).getAllByRole('button')[0]
     expect(row.textContent).toContain('Сегодняшний')
     expect(row.textContent).toContain('Записал: тихо ночью.')
     expect(row.textContent).toMatch(/\d\d:\d\d/)
-    expect(within(within(list).getByRole('region', { name: 'Вчера' })).getByRole('button').textContent).toContain(
+    expect(within(within(list).getByRole('region', { name: 'Вчера' })).getAllByRole('button')[0].textContent).toContain(
       'Вчерашний',
     )
   })
@@ -131,14 +131,14 @@ describe('the list of chats', () => {
       chatOf('Валенсия на выходные', 10, ['Куда-нибудь']),
       chatOf('Горы', 15, ['Тбилиси']),
     ])
-    await within(chatList()).findByRole('button', { name: /Горы/ })
+    await within(chatList()).findByRole('button', { name: /^(?!Действия).*(?:Горы)/ })
     await user.type(screen.getByLabelText('Поиск чатов'), 'Валенсия')
     const titles = within(chatList())
       .getAllByRole('button', { name: /./ })
       .filter((b) => b.getAttribute('aria-current') !== null)
       .map((b) => b.textContent)
     expect(titles).toHaveLength(2)
-    expect(within(chatList()).queryByRole('button', { name: /Горы/ })).toBeNull()
+    expect(within(chatList()).queryByRole('button', { name: /^(?!Действия).*(?:Горы)/ })).toBeNull()
   })
 })
 
@@ -151,7 +151,13 @@ describe('the header of a chat', () => {
     await user.clear(field)
     await user.type(field, 'Ноябрь в Лиссабоне{Enter}')
     expect(screen.getByRole('heading', { name: 'Ноябрь в Лиссабоне' })).toBeTruthy()
-    expect(within(chatList()).getByRole('button', { name: /Ноябрь в Лиссабоне/ })).toBeTruthy()
+    expect(within(chatList()).getByRole('button', { name: /^(?!Действия).*(?:Ноябрь в Лиссабоне)/ })).toBeTruthy()
+  })
+
+  it('keeps the title of a chat about a search plain, not a link', async () => {
+    renderWith([chatOf('Ноябрь в Лиссабоне', 5, ['Привет'])])
+    expect(await screen.findByRole('heading', { name: 'Ноябрь в Лиссабоне' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Ноябрь в Лиссабоне' })).toBeNull()
   })
 
   it('shows the guests, the dates and the city of the chat', async () => {
@@ -169,10 +175,50 @@ describe('the header of a chat', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Удалить чат?' })
     await user.click(within(dialog).getByRole('button', { name: 'Удалить' }))
 
-    await waitFor(() => expect(within(chatList()).queryByRole('button', { name: /Первый/ })).toBeNull())
+    await waitFor(() =>
+      expect(within(chatList()).queryByRole('button', { name: /^(?!Действия).*(?:Первый)/ })).toBeNull(),
+    )
     expect(window.location.pathname).toBe(`/assistant/${next.id}`)
     expect(await within(log()).findByText('Второй чат')).toBeTruthy()
     expect(JSON.parse(window.localStorage.getItem(CHATS_KEY)!)).toHaveLength(1)
+  })
+
+  it('deletes a chat from the menu of its row after the confirmation, the open one stays', async () => {
+    const user = renderWith([chatOf('Первый', 5, ['Первый чат']), chatOf('Второй', 30, ['Второй чат'])])
+    await within(log()).findByText('Первый чат')
+    const openId = chatId()
+    await user.click(within(chatList()).getByRole('button', { name: 'Действия с чатом «Второй»' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Удалить' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Удалить чат?' })
+    // The menu does not open the chat.
+    expect(chatId()).toBe(openId)
+    await user.click(within(dialog).getByRole('button', { name: 'Удалить' }))
+
+    await waitFor(() => expect(within(chatList()).queryByRole('button', { name: /^(?!Действия).*Второй/ })).toBeNull())
+    expect(chatId()).toBe(openId)
+    expect(JSON.parse(window.localStorage.getItem(CHATS_KEY)!)).toHaveLength(1)
+  })
+
+  it('renames a chat from the menu of its row without opening it', async () => {
+    const user = renderWith([chatOf('Первый', 5, ['Первый чат']), chatOf('Второй', 30, ['Второй чат'])])
+    await within(log()).findByText('Первый чат')
+    const openId = chatId()
+    await user.click(within(chatList()).getByRole('button', { name: 'Действия с чатом «Второй»' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Переименовать' }))
+    const field = within(chatList()).getByLabelText('Название чата')
+    await user.clear(field)
+    await user.type(field, 'Осень{Enter}')
+
+    expect(await within(chatList()).findByRole('button', { name: 'Действия с чатом «Осень»' })).toBeTruthy()
+    expect(chatId()).toBe(openId)
+  })
+
+  it('offers a guest to sign in to share a chat from the menu of its row', async () => {
+    const user = renderWith([chatOf('Чат', 5, ['Привет'])])
+    await user.click(await within(chatList()).findByRole('button', { name: 'Действия с чатом «Чат»' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Поделиться' }))
+    expect(await screen.findByText(/Войдите, чтобы поделиться чатом/)).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Войти' }).getAttribute('href')).toBe('/login')
   })
 
   it('offers a guest to sign in to share the chat', async () => {
@@ -444,8 +490,16 @@ describe('a chat about a hotel', () => {
     expect(within(feed.parentElement!).getByText('Не проверено')).toBeTruthy()
     expect(within(log()).getAllByText('Не проверено')).toHaveLength(1)
     expect(screen.getByRole('heading', { name: hotel.name })).toBeTruthy()
-    const link = screen.getByRole('link', { name: 'Страница отеля' })
+    const link = screen.getByRole('link', { name: hotel.name })
     expect(link.getAttribute('href')).toMatch(new RegExp(`^/hotels/${hotel.id}\\?`))
+    expect(screen.queryByRole('link', { name: 'Страница отеля' })).toBeNull()
+  })
+
+  it('opens the hotel page by the title of the chat (Scenario: Название чата отеля)', async () => {
+    renderWith([aboutHotel()])
+    const link = await screen.findByRole('link', { name: hotel.name })
+    expect(link.getAttribute('href')).toMatch(new RegExp(`^/hotels/${hotel.id}\\?`))
+    expect(screen.getByRole('button', { name: 'Переименовать чат' })).toBeTruthy()
   })
 
   it('keeps asking about the hotel after «Открыть в Эвале», with no plan or questions (Scenario: Открыть в Эвале)', async () => {
