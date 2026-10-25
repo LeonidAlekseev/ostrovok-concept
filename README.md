@@ -18,6 +18,11 @@ npm test
 npm run format:check
 ```
 
+Для `npm run dev` и `npm run build` нужны `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+(сборка читает каталог из базы и без них останавливается). Остальные имена — в `.env.example`; значения достаёт
+`npm run secrets:reveal` (создаёт `.env.local`, см. «Ключи API»). Для ИИ-ответов нужен `NVIDIA_API_KEY`, без него
+помощник отвечает по правилам. Тесты и lint ключей не требуют.
+
 CI (GitHub Actions, `.github/workflows/ci.yml`) на каждый PR и push в `dev` и `main` запускает
 `npm ci`, `npm run lint`, `npm run typecheck`, `npm test` и `npm run format:check` в job `checks`
 (проверка `CI / checks`). Сборку в CI не запускают: её выполняет Vercel.

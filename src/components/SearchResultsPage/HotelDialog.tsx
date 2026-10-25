@@ -19,8 +19,9 @@ interface Props {
 const searchStay = ({ checkIn, checkOut, guests }: Stay): Stay => ({ checkIn, checkOut, guests })
 
 /**
- * A hotel opened from the results map: the hotel page with the dates and guests of the search, its
- * photo across the top of the dialog and its price bar stuck to the bottom of the scrolling area.
+ * A hotel opened from the results map: the hotel page with the dates and guests of the search in a scrolling
+ * area, and under it a footer with "Закрыть" and a link to the hotel's own page. The booking stands where the
+ * page puts it (the side column, or below `lg` the button stuck to the bottom of the scrolling area).
  */
 export function HotelDialog({ hotel, stay, onClose }: Props) {
   const titleId = useId()

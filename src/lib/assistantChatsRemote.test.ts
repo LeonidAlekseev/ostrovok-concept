@@ -155,6 +155,25 @@ describe('a guest’s photos on sign-in', () => {
     expect(moved.messages[1]).toBe(chat.messages[1])
   })
 
+  it('upload the photos of the chat together, not one after another', async () => {
+    const { client, bucket } = storage()
+    let open = 0
+    let most = 0
+    bucket.upload.mockImplementation(async (path: string) => {
+      open += 1
+      most = Math.max(most, open)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      open -= 1
+      return { data: { path }, error: null }
+    })
+    const messages = [1, 2, 3].map(() =>
+      message({ data: { attachments: [{ preview: webp, width: 320, height: 240 }] } }),
+    )
+    const moved = await moveGuestPhotos(client, userId, { ...newChat(), messages })
+    expect(most).toBe(3)
+    expect(moved.messages.map((m) => m.id)).toEqual(messages.map((m) => m.id))
+  })
+
   it('keep the preview when the upload fails', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const { client } = storage({ fails: true })

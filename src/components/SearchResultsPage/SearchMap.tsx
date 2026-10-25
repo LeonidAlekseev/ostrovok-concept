@@ -226,7 +226,7 @@ export default function SearchMap({
             return createPortal(
               <button
                 type="button"
-                aria-label={`${countRu(cluster.members.length, ['отель', 'отеля', 'отелей'])}, от ${formatPrice(cluster.price)}, приблизить`}
+                aria-label={`${countRu(cluster.members.length, ['вариант', 'варианта', 'вариантов'])}, от ${formatPrice(cluster.price)}, приблизить`}
                 data-active={cluster.members.some(({ hotel }) => hotel.id === activeId) || undefined}
                 onClick={() =>
                   map.easeTo({

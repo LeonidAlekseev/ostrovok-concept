@@ -91,6 +91,7 @@ export const VIBE_AXES: readonly VibeAxis[] = [
     // Every meal but `none` includes breakfast: the share of rates with it against the share without.
     fit: (h) => {
       const rates = h.rooms.flatMap((room) => room.rates)
+      if (rates.length === 0) return 0
       return (2 * rates.filter((rate) => rate.meal === 'none').length) / rates.length - 1
     },
   },

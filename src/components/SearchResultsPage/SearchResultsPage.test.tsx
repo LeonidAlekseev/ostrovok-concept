@@ -672,7 +672,7 @@ describe('SearchResultsPage compact bar', () => {
     expect(button.textContent).toBe('4')
   })
 
-  it('applies filters at once in the bottom sheet, sorting first, closes with "Показать N отелей", and sorts from it', async () => {
+  it('applies filters at once in the bottom sheet, sorting first, closes with "Показать N вариантов", and sorts from it', async () => {
     const user = userEvent.setup()
     open(PRAGUE)
     await results()
@@ -689,8 +689,8 @@ describe('SearchResultsPage compact bar', () => {
     // The page behind the modal sheet is hidden from assistive technology.
     const total = screen.queryAllByRole('article', { hidden: true }).length
     expect(total).toBeGreaterThan(0)
-    const show = within(dialog).getByRole('button', { name: /^Показать \d+ отел/ })
-    expect(show.textContent).toBe(`Показать ${total} ${total === 1 ? 'отель' : total < 5 ? 'отеля' : 'отелей'}`)
+    const show = within(dialog).getByRole('button', { name: /^Показать \d+ вариант/ })
+    expect(show.textContent).toBe(`Показать ${total} ${total === 1 ? 'вариант' : total < 5 ? 'варианта' : 'вариантов'}`)
 
     await user.click(show)
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
@@ -1023,7 +1023,7 @@ describe('SearchResultsPage map groups', () => {
     const cheapest = formatPrice(Math.min(...all.map((i) => i.price)))
     const count = all.length
     expect(group.getAttribute('aria-label')).toBe(
-      `${countRu(count, ['отель', 'отеля', 'отелей'])}, от ${cheapest}, приблизить`,
+      `${countRu(count, ['вариант', 'варианта', 'вариантов'])}, от ${cheapest}, приблизить`,
     )
     expect(group.textContent).toBe(`${count} от ${cheapest}`)
     expect(markerButtons()).toHaveLength(0)

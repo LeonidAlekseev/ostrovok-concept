@@ -33,7 +33,6 @@ import {
   newId,
   saveGuestChats,
   shownHotels,
-  type Attachment,
   type Chat,
   type ChatMessage,
 } from '@/lib/assistantChats'
@@ -48,8 +47,10 @@ import {
   photoPaths,
   saveRemoteChat,
   signedPhotoUrls,
+  SIGNED_URL_REFRESH_MS,
   uploadPhotos,
 } from '@/lib/assistantChatsRemote'
+import type { PhotoUrl } from './ChatPhotos'
 import type { HotelSummary } from '@/lib/catalog'
 import { todayIso } from '@/lib/dates'
 import type { OptimizedPhoto } from '@/lib/imageOptimize'
@@ -155,7 +156,7 @@ export interface Chats {
   /** Resolves once the changes so far are saved (in the account: written to Supabase), e.g. before opening a chat elsewhere. */
   flush: () => Promise<void>
   /** What shows a photo of a message: the shared link, the signed link of Storage or the preview; none reads «Фото». */
-  photoUrl: (attachment: Attachment) => string | undefined
+  photoUrl: PhotoUrl
   /** The photos did not reach the account: the honest line under the composer. */
   photoError: string | null
 }
@@ -287,6 +288,20 @@ export function useChats(
       .then((urls) => setSigned((before) => new Map([...before, ...urls])))
       .catch((error: unknown) => console.warn(`chats: no links to the photos (${reason(error)})`))
   }, [chats, mode])
+
+  // The links expire: a chat left open asks for new ones before that.
+  useEffect(() => {
+    if (mode.kind !== 'remote') return
+    const timer = setInterval(() => {
+      const client = getBrowserClient()
+      const paths = [...new Set(chatsRef.current.flatMap(photoPaths))]
+      if (!client || paths.length === 0) return
+      signedPhotoUrls(client, paths)
+        .then((urls) => setSigned((before) => new Map([...before, ...urls])))
+        .catch((error: unknown) => console.warn(`chats: links to the photos not renewed (${reason(error)})`))
+    }, SIGNED_URL_REFRESH_MS)
+    return () => clearInterval(timer)
+  }, [mode])
 
   /**
    * The photos the route looks at: those of the message just sent, or of the one Эвал asked about. This visit's
@@ -578,7 +593,10 @@ export function useChats(
     remove,
     setBrief,
     flush: () => queue.current,
-    photoUrl: (attachment) => attachment.url ?? (attachment.path && signed.get(attachment.path)) ?? attachment.preview,
+    photoUrl: (attachment, size) => {
+      const stored = attachment.url ?? (attachment.path ? signed.get(attachment.path) : undefined)
+      return size === 'full' ? (stored ?? attachment.preview) : (attachment.preview ?? stored)
+    },
     photoError,
   }
 }

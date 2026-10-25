@@ -301,11 +301,12 @@ export const roomFacts = (room: Pick<Room, 'area' | 'beds' | 'capacity'>): strin
 export const findRoom = (hotel: Hotel, roomId: string) => hotel.rooms.find((r) => r.id === roomId)
 export const findRate = (room: Room, rateId: string) => room.rates.find((r) => r.id === rateId)
 
-/** The hotel's cheapest rate and its room. */
+/** The hotel's cheapest rate and its room. Throws for a hotel with no rate: the catalogue gives every hotel one. */
 export function cheapestRate(hotel: Hotel): { room: Room; rate: Rate } {
-  let best = { room: hotel.rooms[0], rate: hotel.rooms[0].rates[0] }
+  let best: { room: Room; rate: Rate } | undefined
   for (const room of hotel.rooms)
-    for (const rate of room.rates) if (rate.pricePerNight < best.rate.pricePerNight) best = { room, rate }
+    for (const rate of room.rates) if (!best || rate.pricePerNight < best.rate.pricePerNight) best = { room, rate }
+  if (!best) throw new Error(`The hotel ${hotel.id} has no rate`)
   return best
 }
 

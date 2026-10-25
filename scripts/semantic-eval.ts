@@ -7,6 +7,7 @@
 import { registerHooks } from 'node:module'
 import { parseArgs } from 'node:util'
 import { createClient } from '@supabase/supabase-js'
+import type { Database } from '../src/lib/db/database.types.ts'
 import { embed, rerank } from 'ai'
 
 registerHooks({
@@ -39,9 +40,13 @@ function required(name: string): string {
 }
 
 const apiKey = required(NVIDIA_KEY)
-const supabase = createClient(required('NEXT_PUBLIC_SUPABASE_URL'), required('NEXT_PUBLIC_SUPABASE_ANON_KEY'), {
-  auth: { persistSession: false },
-})
+const supabase = createClient<Database>(
+  required('NEXT_PUBLIC_SUPABASE_URL'),
+  required('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
+  {
+    auth: { persistSession: false },
+  },
+)
 const queryModel = embeddingModel(apiKey, options['plain-query'] ? 'passage' : 'query')
 const turn = pacer()
 /** One request to the API and its own time: waits its turn under the limit, a 429 or a 5xx is tried again. */
@@ -55,10 +60,10 @@ const request = <T>(call: () => Promise<T>) =>
     { onRetry: (message) => console.warn(message) },
   )
 
-const read = async <T>(table: string) => {
+const read = async <T>(table: 'destinations' | 'hotels') => {
   const { data, error } = await supabase.from(table).select('data').range(0, 9999)
   if (error) throw new Error(`${table}: ${error.message}`)
-  return (data as { data: T }[]).map((row) => row.data)
+  return (data as unknown as { data: T }[]).map((row) => row.data)
 }
 const destinations = await read<Destination>('destinations')
 const hotels = new Map((await read<Hotel>('hotels')).map((h) => [h.id, h]))

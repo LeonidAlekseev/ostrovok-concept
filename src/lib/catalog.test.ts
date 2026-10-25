@@ -27,6 +27,7 @@ import {
   slugify,
 } from './catalogGenerator'
 import { otaHotelId } from './ota/hotel'
+import { allHotels } from '@/test/catalog'
 import { setProduction } from '@/test/env'
 
 vi.mock('@/lib/env', () => import('@/test/env'))
@@ -48,6 +49,14 @@ describe('stay types', () => {
       expect(ofType(d.id, 'apartments').length, d.id).toBeGreaterThanOrEqual(2)
       expect(ofType(d.id, 'villa').length, d.id).toBeGreaterThanOrEqual(1)
     }
+  })
+
+  it('has no cheapest rate for a hotel with no rooms or rates, and says so', () => {
+    const lantern = getHotel('prague-old-town-lantern')!
+    expect(() => cheapestRate({ ...lantern, rooms: [] })).toThrow(/has no rate/)
+    expect(() => cheapestRate({ ...lantern, rooms: lantern.rooms.map((room) => ({ ...room, rates: [] })) })).toThrow(
+      /has no rate/,
+    )
   })
 
   it('keeps the old hotels as hotels with their prices', () => {
@@ -496,5 +505,12 @@ describe('synthetic hotels', () => {
     setProduction(true)
     expect(hotels.some(isVisibleHotel)).toBe(false)
     expect(isVisibleHotel(real)).toBe(true)
+  })
+
+  it("gives the tests' full catalogue without the hidden hotels (Scenario: Production)", () => {
+    expect(allHotels().length).toBeGreaterThan(0)
+    setProduction(true)
+    expect(allHotels().every(isVisibleHotel)).toBe(true)
+    expect(allHotels().length).toBeLessThan(buildCatalog().length)
   })
 })

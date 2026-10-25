@@ -24,7 +24,7 @@ interface Props {
   priceBounds: [number, number]
 }
 
-/** The filters on narrow screens: a bottom sheet with the sorting first and a pinned "Показать N отелей". */
+/** The filters on narrow screens: a bottom sheet with the sorting first and a pinned "Показать N вариантов". */
 export function FiltersSheet({ open, onOpenChange, filters, onChange, total, priceBounds }: Props) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -43,7 +43,7 @@ export function FiltersSheet({ open, onOpenChange, filters, onChange, total, pri
             </Button>
           )}
           <SheetClose render={<Button className="flex-1" />}>
-            Показать {countRu(total, ['отель', 'отеля', 'отелей'])}
+            Показать {countRu(total, ['вариант', 'варианта', 'вариантов'])}
           </SheetClose>
         </SheetFooter>
       </SheetContent>

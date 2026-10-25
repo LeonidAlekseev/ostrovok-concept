@@ -9,6 +9,7 @@
 import { registerHooks } from 'node:module'
 import { parseArgs } from 'node:util'
 import { createClient } from '@supabase/supabase-js'
+import type { Database } from '../src/lib/db/database.types.ts'
 
 // The app's modules import each other without extensions, as the bundler allows; Node needs `.ts`.
 registerHooks({
@@ -32,6 +33,8 @@ const { values: options } = parseArgs({ options: { 'dry-run': { type: 'boolean',
 const dryRun = options['dry-run']
 
 const PAGE = 1000
+/** A table of the schema, for the helpers that take its name. */
+type Table = keyof Database['public']['Tables']
 const BATCH = 200
 /** `hotel_geo` calls at a time. */
 const PARALLEL = 8
@@ -42,23 +45,28 @@ function required(name: string): string {
   return value
 }
 
-const supabase = createClient(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
+const supabase = createClient<Database>(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-async function readAll<T>(table: string, columns: string, orderBy: string[], filter?: (q: any) => any): Promise<T[]> {
+async function readAll<T>(
+  table: Table | 'hotel_room_views_named',
+  columns: string,
+  orderBy: string[],
+  filter?: (q: any) => any,
+): Promise<T[]> {
   const rows: T[] = []
   for (let from = 0; ; from += PAGE) {
-    let query = orderBy.reduce((q, column) => q.order(column), supabase.from(table).select(columns))
+    let query = orderBy.reduce((q, column) => q.order(column), supabase.from(table as Table).select(columns))
     if (filter) query = filter(query)
     const { data, error } = await query.range(from, from + PAGE - 1)
     if (error) throw new Error(`${table}: ${error.message}`)
-    rows.push(...(data as T[]))
+    rows.push(...(data as unknown as T[]))
     if (data.length < PAGE) return rows
   }
 }
 
-async function write<T extends object>(table: string, keys: (keyof T & string)[], current: T[], next: T[]) {
+async function write<T extends object>(table: Table, keys: (keyof T & string)[], current: T[], next: T[]) {
   const key = (row: T) => keys.map((k) => String(row[k])).join(':')
   const { upsert, remove } = diffRows(current, next, key)
   if (dryRun)
@@ -66,7 +74,8 @@ async function write<T extends object>(table: string, keys: (keyof T & string)[]
   const updatedAt = new Date().toISOString()
   for (let i = 0; i < upsert.length; i += BATCH) {
     const rows = upsert.slice(i, i + BATCH).map((row) => ({ ...row, updated_at: updatedAt }))
-    const { error } = await supabase.from(table).upsert(rows, { onConflict: keys.join(',') })
+    // The rows are built from the table's own columns; the helper takes any table, so the client cannot check them.
+    const { error } = await supabase.from(table).upsert(rows as never, { onConflict: keys.join(',') })
     if (error) throw new Error(`${table}: ${error.message}`)
   }
   for (const row of remove) {
@@ -106,7 +115,7 @@ const views: ViewRow[] = raw
   .flatMap((h) => viewRows(h.master_id, h.room_groups ?? []))
 
 /** The rows already there; a dry run before the migration (no table yet) sees none. */
-async function stored<T>(table: string, columns: string, orderBy: string[]): Promise<T[]> {
+async function stored<T>(table: Table | 'hotel_room_views_named', columns: string, orderBy: string[]): Promise<T[]> {
   try {
     return await readAll<T>(table, columns, orderBy)
   } catch (error) {
