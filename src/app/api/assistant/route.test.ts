@@ -62,7 +62,7 @@ const ask = (text: string, brief = {}) => post({ messages: [{ role: 'user', text
 beforeEach(() => {
   vi.mocked(getVisionModel).mockResolvedValue(undefined)
   vi.spyOn(console, 'warn').mockImplementation(() => {})
-  vi.mocked(semanticSearch).mockResolvedValue(null)
+  vi.mocked(semanticSearch).mockResolvedValue({ status: 'empty' })
   vi.mocked(loadHotelFeatures).mockResolvedValue(new Map())
 })
 afterEach(() => {
@@ -254,14 +254,11 @@ describe('POST /api/assistant', () => {
 describe('POST /api/assistant: the semantic search', () => {
   const complete = { destinationId: 'prague', when: 5, party: 'solo' }
   const hit = (id: string) => ({ id, destinationId: 'prague', score: 0.9 })
+  const found = (...ids: string[]) => ({ status: 'found' as const, hits: ids.map(hit) })
 
   it('adds the hotels found for all the traveller’s words in the plan’s cities once the plan is due', async () => {
     setModel(undefined)
-    vi.mocked(semanticSearch).mockResolvedValue([
-      hit('prague-skyline-hostel'),
-      hit('unknown'),
-      hit('prague-central-hostel'),
-    ])
+    vi.mocked(semanticSearch).mockResolvedValue(found('prague-skyline-hostel', 'unknown', 'prague-central-hostel'))
     const response = await post({
       messages: [
         { role: 'user', text: 'тихий хостел с быстрым Wi‑Fi' },
@@ -462,6 +459,7 @@ describe('POST /api/assistant with photos', () => {
       }) as LanguageModel,
     )
   const hit = (id: string) => ({ id, destinationId: 'prague', score: 0.9 })
+  const found = (...ids: string[]) => ({ status: 'found' as const, hits: ids.map(hit) })
 
   it('asks what to do with photos sent without words (Scenario: Фото без текста)', async () => {
     setModel(undefined)
@@ -479,7 +477,7 @@ describe('POST /api/assistant with photos', () => {
   it('looks for similar hotels by the photo’s description at once (Scenario: Понятный текст)', async () => {
     setModel(undefined)
     sees({ description: 'Номер в старом городе с деревянными балками.', features: ['старый город'] })
-    vi.mocked(semanticSearch).mockResolvedValue([hit('prague-skyline-hostel'), hit('unknown')])
+    vi.mocked(semanticSearch).mockResolvedValue(found('prague-skyline-hostel', 'unknown'))
     const body = await (await withPhotos('найди похожий отель')).json()
     expect(body).toMatchObject({
       brief: {},
@@ -501,31 +499,32 @@ describe('POST /api/assistant with photos', () => {
     setModel(undefined)
     sees({ description: 'Номер с видом на море.', features: ['вид на море'] })
     vi.mocked(semanticSearch)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce([hit('prague-skyline-hostel')])
-    const found = await (await withPhotos('найди похожий')).json()
-    expect(found.matches.map((h: { id: string }) => h.id)).toEqual(['prague-skyline-hostel'])
+      .mockResolvedValueOnce({ status: 'failed', reason: 'timeout' })
+      .mockResolvedValueOnce(found('prague-skyline-hostel'))
+    const found1 = await (await withPhotos('найди похожий')).json()
+    expect(found1.matches.map((h: { id: string }) => h.id)).toEqual(['prague-skyline-hostel'])
+    expect(found1.photo.missed).toBeUndefined()
     const [[first, firstOptions], [retry]] = vi.mocked(semanticSearch).mock.calls
     expect(first).toBe('вид на море. Номер с видом на море')
     expect(retry).toBe('вид на море')
     expect(firstOptions.timeoutMs).toBeLessThanOrEqual(6000)
 
-    // Nothing found at once is not the search failing.
-    vi.mocked(semanticSearch).mockReset().mockResolvedValue(null)
-    const none = await (await withPhotos('найди похожий')).json()
-    expect(none.photo.missed).toBeUndefined()
-    expect(none.steps[0]).toMatchObject({ status: 'done', result: 'похожих не нашёл' })
-
-    // A search that takes its whole time did not answer.
+    // Nothing found is not the search failing, however long it took.
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.mocked(semanticSearch)
       .mockReset()
       .mockImplementation(async (_, { timeoutMs = 0 }) => {
         vi.setSystemTime(Date.now() + timeoutMs)
-        return null
+        return { status: 'empty' }
       })
-    const missed = await (await withPhotos('найди похожий')).json()
+    const none = await (await withPhotos('найди похожий')).json()
     vi.useRealTimers()
+    expect(none.photo.missed).toBeUndefined()
+    expect(none.steps[0]).toMatchObject({ status: 'done', result: 'похожих не нашёл' })
+
+    // A failure, however quick, is the search not answering.
+    vi.mocked(semanticSearch).mockReset().mockResolvedValue({ status: 'failed', reason: 'no-key' })
+    const missed = await (await withPhotos('найди похожий')).json()
     expect(missed.photo).toMatchObject({ action: 'similar', missed: true })
     expect(missed.matches).toBeUndefined()
     expect(missed.steps).toEqual([
