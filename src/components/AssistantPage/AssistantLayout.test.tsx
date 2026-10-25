@@ -249,8 +249,9 @@ describe('the actions under an answer with hotels', () => {
     await waitFor(() => expect(within(log()).getAllByText('Атмосфера поездки')).toHaveLength(2))
     const shown = new Set(plan.options.map((o) => o.hotel?.id))
     const cards = within(log()).getAllByRole('list', { name: 'Отели' }).at(-1)!
-    for (const card of within(cards).getAllByRole('article'))
-      expect([...shown].some((id) => card.querySelector(`#option-${id}`))).toBe(false)
+    const links = (await within(cards).findAllByRole('article')).flatMap((card) => within(card).getAllByRole('link'))
+    expect(links.length).toBeGreaterThan(0)
+    for (const link of links) expect(shown.has(link.getAttribute('href')!.match(/^\/hotels\/([^?]+)/)?.[1])).toBe(false)
   })
 })
 
@@ -260,30 +261,83 @@ describe('the hotel cards of an answer', () => {
   const withParking = lisbonHotels.find((h) => getHotel(h.id)!.amenities.includes('parking'))!
   const without = lisbonHotels.find((h) => !getHotel(h.id)!.amenities.some((a) => a.startsWith('parking')))!
 
-  it('shows the rating, the real features, the price for the stay and «Выбрать»', async () => {
-    const plan = makePlan(lisbonBrief, today, destinations, newHotels, [withParking], {
+  /** The site's hotel card of a hotel, once the hotel has loaded. */
+  const cardOf = async (name: string) => (await within(log()).findByRole('link', { name })).closest('article')!
+  const comment = () => within(log()).getByRole('list', { name: 'Почему эти отели' })
+
+  it('shows the site’s hotel card with the price for the stay, leading to the hotel on the plan’s dates', async () => {
+    const plan = makePlan(lisbonBrief, today, destinations, newHotels, [withParking])
+    renderWith([withPlan('Лиссабон', 5, plan)])
+    const card = await cardOf(withParking.name)
+    expect(within(card).getByRole('group', { name: 'Фото отеля' })).toBeTruthy()
+    expect(within(card).getByText(/Оценка гостей/)).toBeTruthy()
+    expect(card.textContent).toMatch(/за \d+ ноч\S* · 2 гостя/)
+    expect(within(card).getByRole('link', { name: withParking.name }).getAttribute('href')).toContain(
+      `/hotels/${withParking.id}?checkin=${plan.query.checkIn}`,
+    )
+  })
+
+  it('tells why each hotel fits in a message after the cards (Scenario: Комментарий отдельным сообщением)', async () => {
+    const plan = makePlan({ ...lisbonBrief, budget: 1 }, today, destinations, newHotels, [withParking], {
       [withParking.id]: { views: [{ roomName: 'Люкс с видом на море', view: 'sea' }] },
     })
     renderWith([withPlan('Лиссабон', 5, plan)])
-    const card = await within(log()).findByRole('article', { name: withParking.name })
-    expect(await within(card).findByText('Парковка')).toBeTruthy()
-    expect(within(card).getByText('Номера с видом на море')).toBeTruthy()
-    expect(card.textContent).toMatch(/за \d+ ноч\S* · 2 гостя/)
-    expect(
-      within(card)
-        .getByRole('link', { name: `Выбрать «${withParking.name}»` })
-        .getAttribute('href'),
-    ).toContain(`/hotels/${withParking.id}?checkin=${plan.query.checkIn}`)
+    const card = await cardOf(withParking.name)
+    const line = within(await within(log()).findByRole('list', { name: 'Почему эти отели' })).getByRole('listitem')
+    expect(within(line).getByText(withParking.name)).toBeTruthy()
+    expect(await within(line).findByText('Парковка')).toBeTruthy()
+    expect(within(line).getByText('Номера с видом на море')).toBeTruthy()
+    expect(within(line).getByText('выше бюджета')).toBeTruthy()
+    expect(within(card).queryByText(/Парковка|с видом|выше бюджета/)).toBeNull()
+    // The cards, then the word, then the note on the budget.
+    const row = within(log()).getByRole('list', { name: 'Отели' })
+    expect(row.compareDocumentPosition(comment()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(log()).getByText(/В бюджет не уложился/)).toBeTruthy()
   })
 
   it('has no lines of features without data (Scenario: Без свойств)', async () => {
     const plan = makePlan(lisbonBrief, today, destinations, newHotels, [without])
     renderWith([withPlan('Лиссабон', 5, plan)])
-    const card = await within(log()).findByRole('article', { name: without.name })
-    await within(card).findByText(/км от центра/)
-    expect(within(card).queryByText(/Парковка/)).toBeNull()
-    expect(within(card).queryByText(/с видом/)).toBeNull()
-    expect(within(card).getByRole('link', { name: /^Выбрать/ })).toBeTruthy()
+    const card = await cardOf(without.name)
+    expect(within(card).getByText(/км от центра/)).toBeTruthy()
+    expect(within(log()).queryByText(/Парковка/)).toBeNull()
+    expect(within(log()).queryByText(/с видом/)).toBeNull()
+  })
+
+  it('leads a city without a hotel to its search', async () => {
+    const plan = lisbonPlan()
+    const city: Plan = { ...plan, options: [{ ...plan.options[0], hotel: undefined }] }
+    const user = renderWith([withPlan('Лиссабон', 5, city)])
+    await user.click(within(log()).getByRole('button', { name: 'Искать в городе Лиссабон на эти даты' }))
+    expect(push).toHaveBeenCalledWith({ ...plan.query, destination: 'Лиссабон' })
+  })
+})
+
+// assistant-search, Requirement: Карточки и инструменты в ленте чата
+describe('the feed', () => {
+  it('has no avatar beside Eval’s messages', async () => {
+    renderWith([withPlan('Лиссабон', 5, lisbonPlan())])
+    await within(log()).findAllByRole('article')
+    expect(log().querySelector('[data-slot=message-avatar], img[src*="eval"]')).toBeNull()
+  })
+
+  it.each([
+    ['pending', 'Шаг выполняется:', 'Подбираю отели…'],
+    ['done', 'Шаг готово:', 'Подбираю отели — нашёл 3 отеля'],
+    ['failed', 'Шаг не удалось:', 'Подбираю отели — нет ответа'],
+  ] as const)('shows a %s step as a card of the tool with its status', (status, label, title) => {
+    const step = {
+      agent: 'search' as const,
+      title: 'Подбираю отели',
+      result: status === 'done' ? 'нашёл 3 отеля' : 'нет ответа',
+    }
+    const chat = chatOf('Лиссабон', 5, ['Лиссабон вдвоём'])
+    chat.messages.push(message('agent', '', minutesAgo(4), { status, data: { step } }))
+    renderWith([chat])
+    const card = within(log()).getByText(title).closest<HTMLElement>('[data-slot=trace]')!
+    expect(within(card).getByText('Инструмент').className).toMatch(/\buppercase\b/)
+    expect(within(card).getByText(label)).toBeTruthy()
+    expect(card.querySelector('[data-slot=trace-icon]')!.className).toMatch(/\brounded-full\b/)
   })
 })
 
@@ -348,7 +402,7 @@ describe('a shared chat', () => {
     )
     expect(screen.getByRole('heading', { level: 1, name: 'Лиссабон' })).toBeTruthy()
     expect(within(log()).getByText('Записал: Лиссабон.')).toBeTruthy()
-    expect(within(log()).getAllByRole('article').length).toBe(plan.options.length)
+    expect((await within(log()).findAllByRole('article')).length).toBe(plan.options.length)
     expect(screen.queryByLabelText('Опишите поездку')).toBeNull()
     expect(screen.queryByRole('navigation', { name: 'Чаты' })).toBeNull()
     expect(screen.queryByRole('group', { name: 'Что дальше' })).toBeNull()

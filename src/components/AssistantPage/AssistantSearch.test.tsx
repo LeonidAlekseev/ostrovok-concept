@@ -74,6 +74,13 @@ const hotelLinksOnly = () =>
   within(log())
     .queryAllByRole('link')
     .every((link) => /^\/(hotels\/[^/?]+|search)\?/.test(link.getAttribute('href') ?? ''))
+/** The links of the Lisbon hotel cards, once the hotels have loaded. */
+const lisbonHotelLinks = async () =>
+  (await within(log()).findAllByRole('article')).flatMap((card) =>
+    within(card)
+      .getAllByRole('link')
+      .filter((link) => link.getAttribute('href')?.startsWith('/hotels/lisbon-')),
+  )
 const answer = (body: object) => Response.json({ source: 'model', ...body })
 
 /** A reply the test sends when it wants to. */
@@ -302,9 +309,12 @@ describe('AssistantSearch steps of the agents', () => {
 
     await user.type(input(), 'тихо и повыше, Лиссабон в октябре, один{Enter}')
 
-    const option = await within(log()).findByRole('article', { name: lisbon.name }, {})
-    expect(option.textContent).toContain('ночью 45–49 дБ')
-    expect(option.textContent).toContain('здание 12 этажей, 38 м')
+    const why = await within(log()).findByRole('list', { name: 'Почему эти отели' })
+    const line = within(why).getByText(lisbon.name).closest('li')!
+    expect(line.textContent).toContain('ночью 45–49 дБ')
+    expect(line.textContent).toContain('здание 12 этажей, 38 м')
+    const card = (await within(log()).findByRole('link', { name: lisbon.name })).closest('article')!
+    expect(card.textContent).not.toContain('дБ')
   })
 })
 
@@ -315,7 +325,7 @@ describe('AssistantSearch plan', () => {
     const { user } = renderAssistant()
     await user.type(input(), 'Лиссабон в октябре, один{Enter}')
     expect(await within(log()).findByText('Атмосфера поездки', {})).toBeTruthy()
-    expect(within(log()).getAllByRole('button', { name: /Искать в городе Лиссабон/ }).length).toBeGreaterThan(0)
+    expect(await lisbonHotelLinks()).not.toHaveLength(0)
     expect(log().textContent).not.toMatch(/маршрут/i)
     expect(hotelLinksOnly()).toBe(true)
   })
@@ -441,7 +451,7 @@ describe('AssistantSearch after a reload', () => {
     renderAssistant()
 
     expect(await within(log()).findByText('Атмосфера поездки', {})).toBeTruthy()
-    expect(within(log()).getAllByRole('button', { name: /Искать в городе Лиссабон/ }).length).toBeGreaterThan(0)
+    expect(await lisbonHotelLinks()).not.toHaveLength(0)
     expect(screen.queryByText('Воркейшн в Лиссабоне')).toBeNull()
     expect(hotelLinksOnly()).toBe(true)
     expect(window.sessionStorage.getItem(DIALOG_KEY)).toBeNull()
