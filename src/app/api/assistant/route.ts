@@ -171,7 +171,7 @@ async function wishTurn({ messages, brief, today, destinations, deadline, signal
 }
 
 /**
- * What the photos show; `null` without the model or over the limit; `unstable` when the model failed (an error, a
+ * What the photos show; `null` without the model or the time for it; `limited` over the limit; `unstable` when the model failed (an error, a
  * timeout, an answer not in Russian): the provider now and then answers 500 or stalls, so the client asks again.
  */
 async function look(
@@ -179,9 +179,10 @@ async function look(
   ip: string,
   deadline: number,
   signal: AbortSignal,
-): Promise<PhotoSight | 'unstable' | null> {
+): Promise<PhotoSight | 'limited' | 'unstable' | null> {
   const timeoutMs = deadline - Date.now() - MIN_VISION_MS
-  if (timeoutMs < MIN_VISION_MS || !allowVisionRequest(ip)) return null
+  if (timeoutMs < MIN_VISION_MS) return null
+  if (!allowVisionRequest(ip)) return 'limited'
   const model = await getVisionModel()
   if (!model) return null
   try {
@@ -262,7 +263,7 @@ async function photoTurn(photos: readonly string[], ip: string, context: WishCon
   if (intent === 'unclear') return { brief, source: 'rules', photo: { action: 'ask' } }
   const sight = await look(photos, ip, deadline, signal)
   if (!sight) return { brief, source: 'rules', photo: { action: 'unseen' } }
-  if (sight === 'unstable') return { brief, source: 'rules', photo: { action: 'unstable' } }
+  if (sight === 'limited' || sight === 'unstable') return { brief, source: 'rules', photo: { action: sight } }
   // Nothing on the photo to choose a hotel by: no search and no wish of it, Эвал asks for words.
   if (sight.unusable) return { brief, source: 'model', photo: { action: 'unusable', seen: sight.description } }
   if (intent === 'similar') return similarTurn(sight, context)

@@ -659,24 +659,23 @@ export const PHOTO_UNUSABLE =
 /** What Эвал says when the search for similar hotels did not answer in time. */
 export const PHOTO_MISSED =
   'Поиск похожих отелей сейчас не ответил — попробуйте ещё раз чуть позже или опишите словами, что для вас важно.'
-/** What Эвал says when the model that sees photos is unavailable (no key, the limit). */
-export const PHOTO_UNSEEN =
-  'Не смог рассмотреть фото. Опишите словами, что на нём важно — вид, стиль, место, — и я подберу.'
+/** What Эвал says when the model that sees photos does not answer: no key, no network, every retry failed. */
+export const PHOTO_UNSEEN = 'Провайдер распознавания фото не отвечает. Повторите позже.'
+/** What Эвал says over the limit of requests to the model that sees photos (or of the route). */
+export const PHOTO_LIMITED = 'Превышен лимит запросов к модели распознавания фото. Повторите позже.'
 /** The step Эвал shows while it asks the failed model that sees photos again. */
 export const PHOTO_RETRY_STEP = 'Нестабильное подключение к провайдеру, пробую ещё раз'
-/** What Эвал says when the model that sees photos failed every try. */
-export const PHOTO_UNSTABLE =
-  'Провайдер распознавания фото сейчас работает нестабильно. Попробуйте отправить фото ещё раз чуть позже или опишите словами, что на нём важно — вид, стиль, место.'
 
 /**
  * What came of the photos: `ask` — the message does not say what to do with them (`PHOTO_QUESTION`); `similar` —
  * the hotels like the photo are the `matches`; `refine` — what the photo shows went into the brief; `unseen` — the
- * photos could not be looked at; `unstable` — the model that sees them failed, the client asks again; `unusable` —
+ * provider of the model that sees photos does not answer; `limited` — over the limit of requests to it; `unstable` —
+ * the model failed, the client asks again; `unusable` —
  * they show nothing a hotel is chosen by. `seen` is what the model saw, in Russian; `like` — what the hotels are like it in
  * («вид на море, бассейн»).
  */
 export interface PhotoAnswer {
-  action: 'ask' | 'similar' | 'refine' | 'unseen' | 'unstable' | 'unusable'
+  action: 'ask' | 'similar' | 'refine' | 'unseen' | 'limited' | 'unstable' | 'unusable'
   seen?: string
   like?: string
   /** `similar`: the search by meaning did not answer in time, so no hotels were looked for. */
@@ -736,7 +735,15 @@ const isStep = (value: unknown): value is TurnStep =>
   ['search', 'features'].includes((value as TurnStep).agent) &&
   typeof (value as TurnStep).title === 'string' &&
   ['done', 'failed'].includes((value as TurnStep).status)
-const PHOTO_ACTIONS: readonly PhotoAnswer['action'][] = ['ask', 'similar', 'refine', 'unseen', 'unstable', 'unusable']
+const PHOTO_ACTIONS: readonly PhotoAnswer['action'][] = [
+  'ask',
+  'similar',
+  'refine',
+  'unseen',
+  'limited',
+  'unstable',
+  'unusable',
+]
 const parsePhoto = (value: unknown): PhotoAnswer | undefined => {
   if (typeof value !== 'object' || value === null) return undefined
   const { action, seen, like, missed } = value as Record<string, unknown>
@@ -776,6 +783,7 @@ export async function askAssistant(
   // No photos, no field: the body stays as small as before.
   const body: AssistantRequest = { ...request, messages, photos: photos.length > 0 ? photos : undefined }
   const timeout = AbortSignal.timeout(photos.length > 0 ? PHOTO_TIMEOUT_MS : ASSISTANT_TIMEOUT_MS)
+  let limited = false
   try {
     const response = await fetch('/api/assistant', {
       method: 'POST',
@@ -797,6 +805,7 @@ export async function askAssistant(
         ...(parsePhoto(data.photo) && { photo: parsePhoto(data.photo) }),
       }
     }
+    limited = response.status === 429
   } catch {
     // Falls through to the rules below.
   }
@@ -804,6 +813,7 @@ export async function askAssistant(
   if (request.brief.hotelId) return { brief: request.brief, reply: HOTEL_UNAVAILABLE, source: 'rules' }
   const input = request.messages.at(-1)?.text ?? ''
   const brief = mergeBrief(request.brief, input, asked, destinations)
-  // The rules cannot see photos: Эвал says so instead of pretending.
-  return { brief, source: 'rules', ...(photos.length > 0 && { photo: { action: 'unseen' as const } }) }
+  // The rules cannot see photos: Эвал says why instead of pretending.
+  const photo: PhotoAnswer = { action: limited ? 'limited' : 'unseen' }
+  return { brief, source: 'rules', ...(photos.length > 0 && { photo }) }
 }

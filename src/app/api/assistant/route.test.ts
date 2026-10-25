@@ -612,7 +612,7 @@ describe('POST /api/assistant with photos', () => {
     for (let i = 0; i < 7; i++)
       answers.push((await (await withPhotos('найди похожий', [photo], {}, '10.9.9.9')).json()).photo)
     expect(answers.slice(0, 6).every((p) => p.action === 'similar')).toBe(true)
-    expect(answers[6]).toEqual({ action: 'unseen' })
+    expect(answers[6]).toEqual({ action: 'limited' })
   })
 
   it('takes at most four optimised photos', async () => {
