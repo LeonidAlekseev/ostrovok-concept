@@ -17,6 +17,6 @@
 
 ## 4. Проверки
 
-- [ ] 4.1 Визуально 360, 390, 768, 1024, 1440 px; скриншоты вне репозитория.
-- [ ] 4.2 `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check`, `npm run build` на переднем плане.
-- [ ] 4.3 `openspec validate assistant-attachments --strict`, `openspec archive assistant-attachments --yes`, `openspec validate --all --strict`.
+- [x] 4.1 Визуально 360, 390, 768, 1024, 1440 px; скриншоты вне репозитория.
+- [x] 4.2 `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check`, `npm run build` на переднем плане.
+- [x] 4.3 `openspec validate assistant-attachments --strict`, `openspec archive assistant-attachments --yes`, `openspec validate --all --strict`.
