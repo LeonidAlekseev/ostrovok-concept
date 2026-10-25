@@ -57,7 +57,7 @@ export function HotelPage({ hotel, titleId, stay }: Props) {
             <div className="flex min-w-0 flex-col gap-6">
               <HotelHeader hotel={hotel} titleId={titleId} />
               <Gallery hotel={hotel} />
-              <HotelTabs hotel={hotel} className={cn(!inDialog && 'max-lg:top-14')} />
+              <HotelTabs hotel={hotel} inDialog={inDialog} className={cn(!inDialog && 'max-lg:top-14')} />
               <div className={sectionGap}>
                 <AboutHotel hotel={hotel}>
                   <WhyGuests hotel={hotel} className={cn(card, !inDialog && 'lg:hidden')} />

@@ -573,3 +573,19 @@ describe('HotelPage generated', () => {
     expect(screen.queryByText('generated')).toBeNull()
   })
 })
+
+// hotel-page, Requirement: Вкладки страницы отеля
+describe('HotelTabs', () => {
+  it('runs to the phone edges on the page and in the dialog, and leaves lg alone (Scenario: Вкладки на телефоне)', () => {
+    const { unmount } = render(<HotelPage hotel={hotel} />)
+    const pageNav = screen.getByRole('navigation', { name: 'Разделы отеля' })
+    expect(pageNav.className).toContain('max-lg:-mx-(--page-x)')
+    expect(pageNav.querySelector('ul')!.className).toContain('max-lg:px-(--page-x)')
+    unmount()
+
+    render(<HotelPage hotel={hotel} titleId="t" />)
+    const dialogNav = screen.getByRole('navigation', { name: 'Разделы отеля' })
+    expect(dialogNav.className).toContain('max-lg:-mx-4')
+    expect(dialogNav.querySelector('ul')!.className).toContain('max-lg:px-4')
+  })
+})
