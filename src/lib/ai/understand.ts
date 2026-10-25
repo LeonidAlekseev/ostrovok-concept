@@ -16,6 +16,7 @@ import {
 } from '../assistant'
 import { addDays, nightsBetween, type IsoDate } from '../dates'
 import { VIEW_LABEL } from '../features'
+import { isRussian } from './hotelAnswer'
 
 /** The text chain's time (src/lib/ai/model.ts): after this the route answers with the rules. */
 export const MODEL_TIMEOUT_MS = 8000
@@ -80,9 +81,6 @@ function instructions(brief: Brief, today: IsoDate, destinations: readonly Desti
   ].join('\n')
 }
 
-/** A letter outside Cyrillic. */
-export const OTHER_SCRIPT = /(?!\p{Script=Cyrillic})\p{L}/u
-
 /**
  * Without reasoning the model fills fields the traveller never mentioned, and then the assistant skips its
  * questions. The theme and the budget are taken as they are (that is what free phrases are for); a city only
@@ -138,7 +136,7 @@ export async function understandWish(
   })
   const month = Number(output.when)
   const when = Number.isInteger(month) && month >= 1 && month <= 12 ? month - 1 : output.when
-  // A remark with letters of other scripts (the model slips into Chinese or Korean) is dropped whole.
+  // A remark that is not mainly Russian (the model slips into English, Chinese or Korean) is dropped whole.
   const reply = output.reply?.trim().slice(0, 200)
   const parsed = normalizeBrief({ ...output, when }, destinations)
   const input = messages.at(-1)?.text ?? ''
@@ -152,5 +150,5 @@ export async function understandWish(
     if (named && 'dates' in named) Object.assign(parsed, briefWithStay(named.dates))
     else if (named) parsed.datesRejected = true
   }
-  return { parsed, reply: reply && !OTHER_SCRIPT.test(reply) ? reply : undefined }
+  return { parsed, reply: reply && isRussian(reply) ? reply : undefined }
 }

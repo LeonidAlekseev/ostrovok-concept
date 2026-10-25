@@ -6,6 +6,7 @@
 import { registerHooks } from 'node:module'
 import { parseArgs } from 'node:util'
 import { createClient } from '@supabase/supabase-js'
+import type { Database } from '../src/lib/db/database.types.ts'
 
 // The app's modules import each other without extensions, as the bundler allows; Node needs `.ts`.
 registerHooks({
@@ -25,6 +26,8 @@ const { buildCatalog } = await import('../src/lib/catalogGenerator.ts')
 const { values: options } = parseArgs({ options: { revalidate: { type: 'string' } } })
 
 const BATCH = 100
+/** A table of the schema, for the helpers that take its name. */
+type Table = keyof Database['public']['Tables']
 const DEMO_NAME = 'Демо-путешественник'
 
 function required(name: string): string {
@@ -33,13 +36,13 @@ function required(name: string): string {
   return value
 }
 
-const supabase = createClient(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
+const supabase = createClient<Database>(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-async function upsert(table: string, rows: Record<string, unknown>[]) {
+async function upsert(table: Table, rows: Record<string, unknown>[]) {
   for (let i = 0; i < rows.length; i += BATCH) {
-    const { error } = await supabase.from(table).upsert(rows.slice(i, i + BATCH), { onConflict: 'id' })
+    const { error } = await supabase.from(table).upsert(rows.slice(i, i + BATCH) as never, { onConflict: 'id' })
     if (error) throw new Error(`${table}: ${error.message}`)
   }
   const { count, error } = await supabase.from(table).select('id', { count: 'exact', head: true })

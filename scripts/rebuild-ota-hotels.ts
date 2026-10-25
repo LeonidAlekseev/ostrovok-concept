@@ -8,6 +8,7 @@
 import { isDeepStrictEqual, parseArgs } from 'node:util'
 import { registerHooks } from 'node:module'
 import { createClient } from '@supabase/supabase-js'
+import type { Database } from '../src/lib/db/database.types.ts'
 
 // The app's modules import each other without extensions, as the bundler allows; Node needs `.ts`.
 registerHooks({
@@ -28,6 +29,8 @@ const { otaHotelSchema, otaMapHotelSchema } = await import('../src/lib/ota/searc
 const DESTINATION_ID = 'valencia'
 // Rows of jsonb a request: small enough for the database's short statement timeout.
 const BATCH = 50
+/** A table of the schema, for the helpers that take its name. */
+type Table = keyof Database['public']['Tables']
 
 const { values } = parseArgs({ options: { 'dry-run': { type: 'boolean', default: false } } })
 const dryRun = values['dry-run']
@@ -38,12 +41,12 @@ function required(name: string): string {
   return value
 }
 
-const supabase = createClient(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
+const supabase = createClient<Database>(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
 /** Every row of a table, a page at a time, in the order of `key`. */
-async function readAll<Row>(table: string, columns: string, key: string): Promise<Row[]> {
+async function readAll<Row>(table: Table, columns: string, key: string): Promise<Row[]> {
   const rows: Row[] = []
   for (let from = 0; ; from += BATCH) {
     const { data, error } = await supabase
@@ -136,7 +139,7 @@ if (dryRun) {
       workspace: hotel.workspace,
       lat: hotel.lat,
       lon: hotel.lon,
-      data: hotel,
+      data: hotel as unknown as NonNullable<Database['public']['Tables']['hotels']['Insert']['data']>,
       updated_at: updatedAt,
     }))
     const { error } = await supabase.from('hotels').upsert(rows, { onConflict: 'id' })

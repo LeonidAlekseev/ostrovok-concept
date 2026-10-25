@@ -106,3 +106,15 @@ describe('understandWish: named days', () => {
     expect(parsed).toEqual({ destinationId: 'valencia', party: 'couple' })
   })
 })
+
+describe('understandWish: the remark', () => {
+  it('keeps a Russian remark with a Latin name', async () => {
+    const { reply } = await read('Валенсия', { reply: 'Записал, Hotel Palace — хороший выбор!' })
+    expect(reply).toBe('Записал, Hotel Palace — хороший выбор!')
+  })
+
+  it('drops a remark in English or in another script', async () => {
+    expect((await read('Валенсия', { reply: 'Got it, noted!' })).reply).toBeUndefined()
+    expect((await read('Валенсия', { reply: 'Записал 好的' })).reply).toBeUndefined()
+  })
+})

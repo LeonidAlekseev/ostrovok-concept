@@ -7,6 +7,7 @@
 import { createHash } from 'node:crypto'
 import { registerHooks } from 'node:module'
 import { createClient } from '@supabase/supabase-js'
+import type { Database } from '../src/lib/db/database.types.ts'
 import { embedMany } from 'ai'
 
 // The app's modules import each other without extensions, as the bundler allows; Node needs `.ts`.
@@ -34,6 +35,8 @@ type RoomViewRow = import('../src/lib/features.ts').RoomViewRowRead
 
 const BATCH = 32
 const PAGE = 1000
+/** A table of the schema, for the helpers that take its name. */
+type Table = keyof Database['public']['Tables']
 
 function required(name: string): string {
   const value = process.env[name]
@@ -41,22 +44,26 @@ function required(name: string): string {
   return value
 }
 
-const supabase = createClient(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
+const supabase = createClient<Database>(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 const model = embeddingModel(required(NVIDIA_KEY), 'passage')
 const turn = pacer()
 
 /** Every row of `table`, page by page; `null` when the table does not exist yet. */
-async function readAll<T>(table: string, columns: string, orderBy = ['id']): Promise<T[] | null> {
+async function readAll<T>(
+  table: Table | 'hotel_room_views_named',
+  columns: string,
+  orderBy = ['id'],
+): Promise<T[] | null> {
   const rows: T[] = []
   for (let from = 0; ; from += PAGE) {
-    const query = orderBy.reduce((q, column) => q.order(column), supabase.from(table).select(columns))
+    const query = orderBy.reduce((q, column) => q.order(column), supabase.from(table as Table).select(columns))
     const { data, error } = await query.range(from, from + PAGE - 1)
     // PGRST205: no such table in the schema cache.
     if (error?.code === 'PGRST205' || error?.code === '42P01') return null
     if (error) throw new Error(`${table}: ${error.message}`)
-    rows.push(...(data as T[]))
+    rows.push(...(data as unknown as T[]))
     if (data.length < PAGE) return rows
   }
 }

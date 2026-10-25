@@ -5,8 +5,11 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import type { Attachment } from '../../lib/assistantChats'
 import type { OptimizedPhoto } from '../../lib/imageOptimize'
 
-/** What shows a photo of a message; a shared chat has only the public links and the previews. */
-export type PhotoUrl = (attachment: Attachment) => string | undefined
+/**
+ * What shows a photo of a message: by default a thumbnail (the preview is enough), `'full'` for the large view (the
+ * photo itself, the preview only while it is the only copy). A shared chat has only the public links and the previews.
+ */
+export type PhotoUrl = (attachment: Attachment, size?: 'full') => string | undefined
 
 const tileClass =
   'relative block size-[clamp(72px,20vw,112px)] flex-none overflow-hidden rounded-2xl bg-muted shadow-[0_1px_3px_color-mix(in_srgb,var(--shadow-color)_10%,transparent)]'
@@ -17,7 +20,7 @@ const tileClass =
  */
 export function MessagePhotos({ attachments, photoUrl }: { attachments: readonly Attachment[]; photoUrl: PhotoUrl }) {
   const [open, setOpen] = useState<number | null>(null)
-  const shown = open === null ? undefined : photoUrl(attachments[open])
+  const shown = open === null ? undefined : photoUrl(attachments[open], 'full')
   return (
     <>
       <ul aria-label="Фото" className="flex flex-wrap justify-end gap-1.5">

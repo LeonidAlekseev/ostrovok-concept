@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CHATS_KEY, newChat, type Chat } from '../../lib/assistantChats'
+import { SIGNED_URL_REFRESH_MS } from '../../lib/assistantChatsRemote'
 import { newHotels } from '../../lib/catalogGenerator'
 import { catalogFetch } from '../../test/catalog'
 import { AssistantSearch } from './AssistantSearch'
@@ -193,6 +194,39 @@ describe('the photos of a message', () => {
     await user.click(await within(log()).findByRole('button', { name: 'Открыть фото 1' }))
     const dialog = await screen.findByRole('dialog', { name: 'Фото 1' })
     expect(within(dialog).getByRole('img').getAttribute('src')).toBe(`data:image/webp;base64,${btoa('small-a.jpg')}`)
+  })
+
+  it('opens the full photo large while the thumbnail stays the preview', async () => {
+    const chat: Chat = {
+      ...newChat('2026-10-25T10:00:00.000Z'),
+      messages: [
+        {
+          id: crypto.randomUUID(),
+          role: 'user',
+          status: 'done',
+          text: '',
+          data: {
+            attachments: [
+              {
+                preview: 'data:image/webp;base64,c21hbGw=',
+                url: 'https://cdn.example/full.webp',
+                width: 1600,
+                height: 1200,
+              },
+            ],
+          },
+          createdAt: '2026-10-25T10:00:00.000Z',
+        },
+      ],
+    }
+    window.localStorage.setItem(CHATS_KEY, JSON.stringify([chat]))
+    window.history.replaceState(null, '', `/assistant/${chat.id}`)
+    const { user } = renderAssistant()
+    const tile = await screen.findByRole('button', { name: 'Открыть фото 1' })
+    expect(tile.querySelector('img')?.getAttribute('src')).toBe('data:image/webp;base64,c21hbGw=')
+    await user.click(tile)
+    const dialog = await screen.findByRole('dialog', { name: 'Фото 1' })
+    expect(within(dialog).getByRole('img').getAttribute('src')).toBe('https://cdn.example/full.webp')
   })
 
   it('reads «Фото» for a photo whose file is gone', async () => {
@@ -407,22 +441,22 @@ describe('a signed-in user’s photos', () => {
       await downloaded
       return { data: new Blob(['photo'], { type: 'image/webp' }), error: null }
     })
+    let links = 0
+    const createSignedUrls = vi.fn(async (paths: string[]) => {
+      links += 1
+      return {
+        data: paths.map((p) => ({ path: p, signedUrl: `https://cdn.example/${p}?v=${links}`, error: null })),
+        error: null,
+      }
+    })
     supabase.client = {
       auth: { getSession: async () => ({ data: { session: { user: { id: userId, email: 'a@b.c' } } } }) },
       from: (table: string) => query({ data: table === 'assistant_chats' ? [row] : null, error: null }),
-      storage: {
-        from: () => ({
-          download,
-          createSignedUrls: async (paths: string[]) => ({
-            data: paths.map((p) => ({ path: p, signedUrl: `https://cdn.example/${p}`, error: null })),
-            error: null,
-          }),
-        }),
-      },
+      storage: { from: () => ({ download, createSignedUrls }) },
     }
     fetchMock.mockResolvedValue(answer({ brief: {}, photo: { action: 'ask' } }))
     window.history.replaceState(null, '', `/assistant/${chatId}`)
-    return { download, release: () => release(), path }
+    return { download, release: () => release(), path, createSignedUrls }
   }
 
   it('asks a pending answer with photos in Storage once after a reload', async () => {
@@ -440,7 +474,28 @@ describe('a signed-in user’s photos', () => {
     expect(bodyOf(0).photos).toEqual([`data:image/webp;base64,${btoa('photo')}`])
     expect(
       within(log()).getByRole('button', { name: 'Открыть фото 1' }).querySelector('img')?.getAttribute('src'),
-    ).toBe(`https://cdn.example/${path}`)
+    ).toBe(`https://cdn.example/${path}?v=1`)
+  })
+
+  it('asks for new links before the old ones expire and shows the photo with them', async () => {
+    const { release, path, createSignedUrls } = signedIn()
+    // The page's timer for the links: run by hand instead of waiting for it.
+    const timers = new Map<number, () => void>()
+    const real = window.setInterval.bind(window)
+    vi.spyOn(window, 'setInterval').mockImplementation(((handler: () => void, delay?: number) => {
+      if (delay !== SIGNED_URL_REFRESH_MS) return real(handler, delay)
+      timers.set(timers.size + 1, handler)
+      return timers.size
+    }) as typeof window.setInterval)
+    renderAssistant()
+    release()
+    const tile = async () => (await within(log()).findByRole('button', { name: 'Открыть фото 1' })).querySelector('img')
+    await waitFor(async () => expect((await tile())?.getAttribute('src')).toBe(`https://cdn.example/${path}?v=1`))
+    expect(createSignedUrls).toHaveBeenCalledTimes(1)
+    expect(timers.size).toBe(1)
+    await act(async () => [...timers.values()].forEach((run) => run()))
+    await waitFor(async () => expect((await tile())?.getAttribute('src')).toBe(`https://cdn.example/${path}?v=2`))
+    expect(createSignedUrls).toHaveBeenCalledTimes(2)
   })
 
   it('starts no second turn when the page mounts again while the photos load', async () => {

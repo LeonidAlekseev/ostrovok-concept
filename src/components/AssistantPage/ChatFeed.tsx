@@ -52,7 +52,8 @@ const timeClass = 'px-1 text-xs/[normal] text-muted-foreground'
 export type ChooseSearch = HotelSearch['searchFor']
 
 /** A shared chat has the public links of its photos and the previews that never reached Storage. */
-const sharedPhotoUrl: PhotoUrl = (attachment) => attachment.url ?? attachment.preview
+const sharedPhotoUrl: PhotoUrl = (attachment, size) =>
+  size === 'full' ? (attachment.url ?? attachment.preview) : (attachment.preview ?? attachment.url)
 
 interface FeedProps {
   chatId: string
