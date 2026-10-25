@@ -1,23 +1,35 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useId, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from 'react'
-import { CalendarDays, ChevronRight, MapPin, Mic, RefreshCw, SendHorizontal, SlidersHorizontal } from 'lucide-react'
+import {
+  CalendarDays,
+  ChevronRight,
+  MapPin,
+  Mic,
+  Paperclip,
+  RefreshCw,
+  SendHorizontal,
+  SlidersHorizontal,
+} from 'lucide-react'
 import { cn } from 'cn'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '@/components/ui/input-group'
 import { useToday } from '@/hooks/useToday'
 import type { HotelSummary } from '@/lib/catalog'
-import { MAX_MESSAGE_LENGTH, presetChips, type Plan } from '../../lib/assistant'
+import { MAX_MESSAGE_LENGTH, MAX_PHOTOS, presetChips, type Plan } from '../../lib/assistant'
 import { lastPlan, planMapHref, recentRequests, tripLine, tripParams } from '../../lib/assistantChatList'
 import { isPending } from '../../lib/assistantChats'
 import { todayIso } from '../../lib/dates'
+import { PHOTO_TYPES } from '../../lib/imageOptimize'
 import { useDestinations } from '../Catalog/useDestinations'
 import { glassPanel } from '../SearchPanel/glass'
 import { ChatHeader } from './ChatHeader'
 import { ChatList } from './ChatList'
+import { AttachedPhotos } from './ChatPhotos'
 import { Feed, type ChooseSearch } from './ChatFeed'
 import { TripDialog, TripPanel } from './TripPanel'
 import { backToList, goToChat, useChatPath } from './useChatPath'
+import { useAttachPhotos } from './useAttachPhotos'
 import { useChats } from './useChats'
 import { useSpeech } from './useSpeech'
 
@@ -47,12 +59,16 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
   const destinations = useDestinations()
   const today = useToday()
   const pathId = useChatPath()
-  const { chats, active, ready, signedIn, send, retry, rename, remove, setBrief } = useChats(
+  const { chats, active, ready, signedIn, send, retry, rename, remove, setBrief, photoUrl, photoError } = useChats(
     destinations,
     newHotels,
     pathId,
   )
   const [text, setText] = useState('')
+  const attach = useAttachPhotos()
+  const fileRef = useRef<HTMLInputElement>(null)
+  // A guest who reaches for the paperclip learns that a chat with photos is kept only after signing in.
+  const [guestWarned, setGuestWarned] = useState(false)
   const [tripOpen, setTripOpen] = useState(false)
   const inputId = useId()
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -83,16 +99,27 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
     setText('')
   }
 
+  /** The field's message: its text and the photos attached, either of them may be missing. */
+  const submitField = () => {
+    const photos = attach.photos
+    if (photos.length === 0) return submit(text)
+    if (!ready || thinking || attach.busy) return
+    if (pathId !== active.id) goToChat(active.id)
+    send(text, { photos })
+    setText('')
+    attach.clear()
+  }
+
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
-    submit(text)
+    submitField()
   }
 
   // Enter sends, Shift+Enter breaks the line; an IME composition is never cut short.
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault()
-      submit(text)
+      submitField()
     }
   }
 
@@ -232,6 +259,7 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
           <Feed
             chatId={active.id}
             messages={active.messages}
+            photoUrl={photoUrl}
             onChoose={onChoose}
             onRetry={(messageId) => retry(active.id, messageId)}
             planActions={planActions}
@@ -301,6 +329,7 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
         )}
 
         <form className="flex-none" onSubmit={onSubmit}>
+          <AttachedPhotos photos={attach.photos} onRemove={attach.remove} />
           <InputGroup
             className={`h-auto items-end gap-2 rounded-[24px] border-0 p-1.5 pl-4 ${glassField} bg-(--decor-light)/90 transition-shadow duration-200 has-[[data-slot=input-group-control]:focus-visible]:ring-0 has-[[data-slot=input-group-control]:focus-visible]:shadow-[inset_0_0_0_2px_var(--ring),0_0_0_4px_color-mix(in_srgb,var(--ring)_25%,transparent)]`}
           >
@@ -325,6 +354,33 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
               onKeyDown={onKeyDown}
             />
             <InputGroupAddon align="inline-end" className="gap-1.5 p-0">
+              <input
+                ref={fileRef}
+                type="file"
+                accept={PHOTO_TYPES.join(',')}
+                multiple
+                hidden
+                aria-label="Выбрать фото"
+                onChange={(e) => {
+                  const files = [...(e.target.files ?? [])]
+                  // The same file chosen again is a new choice.
+                  e.target.value = ''
+                  void attach.add(files)
+                }}
+              />
+              <InputGroupButton
+                type="button"
+                variant="ghost"
+                className="size-11 flex-none rounded-full p-0 text-foreground"
+                aria-label={`Приложить фото, до ${MAX_PHOTOS}`}
+                disabled={!ready || attach.busy}
+                onClick={() => {
+                  if (!signedIn) setGuestWarned(true)
+                  fileRef.current?.click()
+                }}
+              >
+                <Paperclip className="size-5" aria-hidden />
+              </InputGroupButton>
               {speech.supported && (
                 <InputGroupButton
                   type="button"
@@ -342,7 +398,7 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
                 variant="default"
                 className="size-11 flex-none rounded-full bg-(image:--decor-assistant-send) p-0 shadow-(--decor-assistant-send-glow) disabled:opacity-60"
                 aria-label="Отправить"
-                disabled={!text.trim() || thinking || !ready}
+                disabled={(!text.trim() && attach.photos.length === 0) || attach.busy || thinking || !ready}
               >
                 <SendHorizontal className="size-5" aria-hidden />
               </InputGroupButton>
@@ -351,6 +407,27 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
           {speech.error && (
             <p className="mt-1.5 px-2 text-sm text-destructive" role="alert">
               {speech.error}
+            </p>
+          )}
+          {(attach.error || photoError) && (
+            <p className="mt-1.5 px-2 text-sm text-destructive" role="alert">
+              {attach.error ?? photoError}
+            </p>
+          )}
+          {attach.photos.length > 0 && !attach.error && (
+            <p className="mt-1.5 px-2 text-xs text-muted-foreground">
+              {attach.photos.length} из {MAX_PHOTOS} фото · JPEG, PNG или WebP до 10 МБ
+            </p>
+          )}
+          {!signedIn && ready && (guestWarned || attach.photos.length > 0) && (
+            <p className="mt-1.5 px-2 text-sm text-(--decor-assistant-text-2)" role="status">
+              Чат с фото сохранится, только если вы войдёте.{' '}
+              <Link
+                href="/login?next=/assistant"
+                className="font-medium text-primary underline-offset-2 hover:underline"
+              >
+                Войти
+              </Link>
             </p>
           )}
         </form>

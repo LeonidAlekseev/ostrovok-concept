@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { newChat, type Chat, type ChatMessage } from './assistantChats'
 import {
+  SHARED_PHOTO_BUCKET,
   SHARE_ERROR,
   isShareId,
   loadSharedChat,
@@ -8,7 +9,10 @@ import {
   shareChat,
   shareHref,
   snapshotOf,
+  type ShareSnapshot,
 } from './assistantShare'
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 const message = (role: ChatMessage['role'], text: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({
   id: crypto.randomUUID(),
@@ -59,8 +63,65 @@ describe('a shared chat', () => {
     const c = client({ data: { id }, error: null })
     expect(await shareChat(c as never, chat)).toBe(id)
     expect(c.from).toHaveBeenCalledWith('assistant_chat_shares')
-    expect(c.insert).toHaveBeenCalledWith({ title: 'Тихий отель', snapshot: snapshotOf(chat) })
+    // The id of the snapshot is made in the browser: its photos are copied under it first.
+    expect(c.insert).toHaveBeenCalledWith({
+      id: expect.stringMatching(UUID),
+      title: 'Тихий отель',
+      snapshot: snapshotOf(chat),
+    })
     expect(shareHref(id)).toBe(`/assistant/shared/${id}`)
+  })
+
+  // assistant-search, Requirement: Хранение фото
+  it('copies the photos to the public bucket under the snapshot’s id (Scenario: Снимок по ссылке)', async () => {
+    const userId = '11111111-1111-4111-8111-111111111111'
+    const path = `${userId}/${chat.id}/22222222-2222-4222-8222-222222222222/0.webp`
+    const withPhotos: Chat = {
+      ...chat,
+      messages: [
+        message('user', '', { data: { attachments: [{ path, width: 1600, height: 1200 }] } }),
+        message('user', '', {
+          data: { attachments: [{ preview: 'data:image/webp;base64,AAAA', width: 320, height: 240 }] },
+        }),
+        ...chat.messages,
+      ],
+    }
+    const copy = vi.fn(async () => ({ data: { path: 'x' }, error: null }))
+    const getPublicUrl = vi.fn((to: string) => ({ data: { publicUrl: `https://cdn.example/${to}` } }))
+    const c = {
+      ...client({ data: { id: 'ignored' }, error: null }),
+      auth: { getSession: async () => ({ data: { session: { user: { id: userId } } } }) },
+      storage: { from: vi.fn(() => ({ copy, getPublicUrl })) },
+    }
+    await shareChat(c as never, withPhotos)
+    const [{ id, snapshot }] = c.insert.mock.calls[0] as unknown as [{ id: string; snapshot: ShareSnapshot }]
+    expect(copy).toHaveBeenCalledWith(path, `${userId}/${id}/0.webp`, { destinationBucket: SHARED_PHOTO_BUCKET })
+    expect(c.storage.from).toHaveBeenCalledWith('assistant-attachments')
+    expect(snapshot.messages[0].data.attachments).toEqual([
+      { width: 1600, height: 1200, url: `https://cdn.example/${userId}/${id}/0.webp` },
+    ])
+    // A preview that never reached Storage stays as it is.
+    expect(snapshot.messages[1].data.attachments).toEqual([
+      { width: 320, height: 240, preview: 'data:image/webp;base64,AAAA' },
+    ])
+  })
+
+  it('keeps a photo that was not copied as «Фото»', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const userId = '11111111-1111-4111-8111-111111111111'
+    const path = `${userId}/${chat.id}/22222222-2222-4222-8222-222222222222/0.webp`
+    const c = {
+      ...client({ data: { id: 'x' }, error: null }),
+      auth: { getSession: async () => ({ data: { session: { user: { id: userId } } } }) },
+      storage: { from: () => ({ copy: async () => ({ data: null, error: { message: 'Bucket not found' } }) }) },
+    }
+    await shareChat(c as never, {
+      ...chat,
+      messages: [message('user', 'вот', { data: { attachments: [{ path, width: 8, height: 6 }] } })],
+    })
+    const [{ snapshot }] = c.insert.mock.calls[0] as unknown as [{ snapshot: ShareSnapshot }]
+    expect(snapshot.messages[0].data.attachments).toEqual([{ width: 8, height: 6 }])
+    warn.mockRestore()
   })
 
   it('fails with a plain message while the table is missing', async () => {

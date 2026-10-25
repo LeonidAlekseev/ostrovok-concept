@@ -11,6 +11,11 @@ import {
   missingNote,
   nextQuestion,
   planCities,
+  PHOTO_QUESTION,
+  PHOTO_TEXT,
+  PHOTO_MISSED,
+  PHOTO_UNSEEN,
+  PHOTO_UNUSABLE,
   type AssistantResponse,
   type Brief,
   type Question,
@@ -19,27 +24,43 @@ import {
 import {
   chatTitle,
   dialogOf,
+  lastPhotoMessage,
   loadGuestChats,
   newChat,
   newId,
   saveGuestChats,
   shownHotels,
+  type Attachment,
   type Chat,
   type ChatMessage,
 } from '@/lib/assistantChats'
-import { deleteRemoteChat, deleteRemoteMessages, loadRemoteChats, saveRemoteChat } from '@/lib/assistantChatsRemote'
+import {
+  PHOTO_SAVE_ERROR,
+  deleteRemoteChat,
+  deleteRemoteMessages,
+  deleteRemotePhotos,
+  downloadPhotos,
+  loadRemoteChats,
+  moveGuestPhotos,
+  photoPaths,
+  saveRemoteChat,
+  signedPhotoUrls,
+  uploadPhotos,
+} from '@/lib/assistantChatsRemote'
 import type { HotelSummary } from '@/lib/catalog'
 import { todayIso } from '@/lib/dates'
+import type { OptimizedPhoto } from '@/lib/imageOptimize'
 import { getBrowserClient } from '@/lib/supabase/client'
 
 /** The shortest pause before the assistant replies, so the answer reads as a reply rather than an echo. */
 export const THINK_MS = 650
 
 /** Where the chats live: not known yet, the browser (a guest) or Supabase (a signed-in user). */
-type Mode = { kind: 'loading' } | { kind: 'guest' } | { kind: 'remote'; email: string }
+type Mode = { kind: 'loading' } | { kind: 'guest' } | { kind: 'remote'; email: string; userId: string }
 
 const later = (iso: string, ms: number) => new Date(Date.parse(iso) + ms).toISOString()
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const reason = (error: unknown) => (error instanceof Error ? error.message.slice(0, 200) : 'error')
 
 /** The first step the turn will show, while the answer is on its way: only when the plan is surely due. */
 const SEARCH_STEP = { agent: 'search', title: 'Подбираю отели по вашему описанию' } as const
@@ -52,23 +73,45 @@ export function compose(
   /** The hotels the chat has shown, for «Другие варианты». */
   exclude?: ReadonlySet<string>,
 ): { brief: Brief; question: Question | null; text: string; data: ChatMessage['data'] } {
-  const { brief, reply: remark, matches, features, missing = [] } = response
+  const { brief, reply: remark, matches, features, missing = [], photo } = response
   const today = todayIso()
   // A chat about a hotel: the answer is the text, the model's general knowledge goes apart; no questions, no plan.
   if (brief.hotelId) {
     const { unverified } = response
     return { brief, question: null, text: remark ?? HOTEL_UNAVAILABLE, data: unverified ? { unverified } : {} }
   }
+  // The photos: Эвал asks what to do with them, or says it could not look at them.
+  if (photo?.action === 'ask') return { brief, question: PHOTO_QUESTION, text: PHOTO_QUESTION.text, data: {} }
+  if (photo?.action === 'unseen') return { brief, question: null, text: PHOTO_UNSEEN, data: {} }
+  const seen = photo?.seen ? `Вижу на фото: ${photo.seen.replace(/[.!]?$/, '.')}` : ''
+  if (photo?.action === 'unusable') return { brief, question: null, text: `${seen} ${PHOTO_UNUSABLE}`.trim(), data: {} }
+  if (photo?.action === 'similar') {
+    if (photo.missed) return { brief, question: null, text: `${seen} ${PHOTO_MISSED}`.trim(), data: {} }
+    if (!matches?.length)
+      return {
+        brief,
+        question: null,
+        text: `${seen} Похожих отелей по этому описанию не нашёл — опишите словами, что для вас важно.`.trim(),
+        data: {},
+      }
+    // The hotels like the photo lead the plan, in the city of the best of them unless the chat has its own.
+    const scope = { ...brief, destinationId: brief.destinationId ?? matches[0].destinationId }
+    const plan = makePlan(scope, today, destinations, newHotels, matches, features, exclude)
+    const like = photo.like ? `Похоже: ${photo.like}` : 'Похоже на ваше фото'
+    plan.options = plan.options.map((o) => (o.hotel ? { ...o, reasons: [like, ...(o.reasons ?? [])] } : o))
+    return { brief, question: null, text: `${seen} Нашёл похожие отели.`.trim(), data: { plan } }
+  }
   const question = nextQuestion(brief, today, destinations)
   const understood = describeBrief(brief, destinations)
   if (question) {
     // The model's remark fills in only when nothing is understood yet, so answers keep "Записал: …".
     const lead = understood ? `Записал: ${understood}.` : remark
-    return { brief, question, text: lead ? `${lead} ${question.text}` : question.text, data: {} }
+    const text = lead ? `${lead} ${question.text}` : question.text
+    return { brief, question, text: seen ? `${seen} ${text}` : text, data: {} }
   }
   const plan = makePlan(brief, today, destinations, newHotels, matches, features, exclude)
   const note = missingNote(missing, planCities(brief, today, destinations))
-  const text = [understood && `Записал: ${understood}.`, note].filter(Boolean).join(' ')
+  const text = [seen, understood && `Записал: ${understood}.`, note].filter(Boolean).join(' ')
   return { brief, question, text, data: { plan } }
 }
 
@@ -87,8 +130,11 @@ export interface Chats {
   ready: boolean
   /** Signed in: the chats live in Supabase and can be shared. */
   signedIn: boolean
-  /** Sends the traveller's text in the open chat; `more` asks for the hotels the chat has not shown yet. */
-  send: (text: string, options?: { more?: boolean }) => void
+  /**
+   * Sends the traveller's text in the open chat; `more` asks for the hotels the chat has not shown yet. With
+   * `photos` the text may be empty.
+   */
+  send: (text: string, options?: { more?: boolean; photos?: readonly OptimizedPhoto[] }) => void
   /** Asks the failed answer again. */
   retry: (chatId: string, messageId: string) => void
   rename: (chatId: string, title: string) => void
@@ -98,6 +144,10 @@ export interface Chats {
   setBrief: (chatId: string, brief: Brief) => void
   /** Resolves once the changes so far are saved (in the account: written to Supabase), e.g. before opening a chat elsewhere. */
   flush: () => Promise<void>
+  /** What shows a photo of a message: the shared link, the signed link of Storage or the preview; none reads «Фото». */
+  photoUrl: (attachment: Attachment) => string | undefined
+  /** The photos did not reach the account: the honest line under the composer. */
+  photoError: string | null
 }
 
 /**
@@ -126,6 +176,12 @@ export function useChats(
   /** What Supabase already has of each chat, to write only the changed ones. */
   const saved = useRef(new Map<string, Chat>())
   const queue = useRef(Promise.resolve())
+  /** The photos of 1600 px of the messages sent in this visit, for the route; the chats keep only the previews. */
+  const photos = useRef(new Map<string, string[]>())
+  /** The signed links of the photos in Storage, by path; the paths asked once are not asked again. */
+  const [signed, setSigned] = useState<ReadonlyMap<string, string>>(new Map())
+  const asked = useRef(new Set<string>())
+  const [photoError, setPhotoError] = useState<string | null>(null)
 
   useEffect(() => {
     chatsRef.current = chats
@@ -147,10 +203,10 @@ export function useChats(
       const user = data.session?.user
       if (cancelled) return
       if (!user) return guestMode()
-      // The guest's chats move to the account, then leave the browser.
+      // The guest's chats move to the account with the previews of their photos, then leave the browser.
       const guest = loadGuestChats()
       try {
-        for (const chat of guest) await saveRemoteChat(client, chat)
+        for (const chat of guest) await saveRemoteChat(client, await moveGuestPhotos(client, user.id, chat))
         if (guest.length) saveGuestChats([])
         const remote = await loadRemoteChats(client)
         if (cancelled) return
@@ -162,7 +218,7 @@ export function useChats(
         if (cancelled) return
         setChats(guest)
       }
-      setMode({ kind: 'remote', email: user.email ?? '' })
+      setMode({ kind: 'remote', email: user.email ?? '', userId: user.id })
     }
     // Without Supabase every visitor is a guest, from the first render on.
     const client = getBrowserClient()
@@ -210,6 +266,43 @@ export function useChats(
     setChats((list) => list.map((chat) => (chat.id === chatId ? change(chat) : chat)))
   }, [])
 
+  // The photos in Storage are shown by signed links, asked once per path.
+  useEffect(() => {
+    if (mode.kind !== 'remote') return
+    const client = getBrowserClient()
+    const paths = [...new Set(chats.flatMap(photoPaths))].filter((path) => !asked.current.has(path))
+    if (!client || paths.length === 0) return
+    for (const path of paths) asked.current.add(path)
+    signedPhotoUrls(client, paths)
+      .then((urls) => setSigned((before) => new Map([...before, ...urls])))
+      .catch((error: unknown) => console.warn(`chats: no links to the photos (${reason(error)})`))
+  }, [chats, mode])
+
+  /**
+   * The photos the route looks at: those of the message just sent, or of the one Эвал asked about. This visit's
+   * photos of 1600 px; after a reload the ones in Storage, else the previews.
+   */
+  const requestPhotos = useCallback(
+    (chat: Chat, before: string): string[] | Promise<string[] | undefined> | undefined => {
+      const earlier = { ...chat, messages: chat.messages.filter((m) => m.createdAt < before) }
+      const message = lastPhotoMessage(earlier)
+      const newest = earlier.messages.findLast((m) => m.role === 'user')
+      if (!message || (message !== newest && chat.question?.id !== 'photo')) return undefined
+      const kept = photos.current.get(message.id)
+      if (kept) return kept
+      const attachments = message.data.attachments ?? []
+      const previews = attachments.flatMap((a) => a.preview ?? [])
+      const fallback = previews.length > 0 ? previews : undefined
+      const client = getBrowserClient()
+      if (!client || !attachments.every((a) => a.path)) return fallback
+      return downloadPhotos(client, photoPaths({ ...chat, messages: [message] })).catch((error: unknown) => {
+        console.warn(`chats: photos not loaded (${reason(error)})`)
+        return fallback
+      })
+    },
+    [],
+  )
+
   /** Eval's answer to the chat's pending message: its steps, then the text and the plan. */
   const runTurn = useCallback(
     async (chatId: string, pendingId: string) => {
@@ -222,10 +315,14 @@ export function useChats(
 
       const history = dialogOf({ ...chat, messages: chat.messages.filter((m) => m.createdAt < pending.createdAt) })
       const input = history.at(-1)?.text ?? ''
-      const asked = chat.question?.id ?? null
+      // The question about photos is not a part of the brief.
+      const question = chat.question?.id === 'photo' ? null : (chat.question?.id ?? null)
       const today = todayIso()
+      // The photos of the turn; the ones kept in Storage come later, after the turn's state is set.
+      const found = requestPhotos(chat, pending.createdAt)
       // The plan is surely due when the rules alone complete the brief: its first step shows while Эвал works.
-      const planDue = !chat.brief.hotelId && !nextQuestion(mergeBrief(chat.brief, input, asked, destinations), today)
+      const planDue =
+        !found && !chat.brief.hotelId && !nextQuestion(mergeBrief(chat.brief, input, question, destinations), today)
       const stepId = newId()
       update(chatId, (c) => ({
         ...c,
@@ -248,8 +345,16 @@ export function useChats(
       }))
 
       try {
+        // Only the photos in Storage are waited for: the turn is already marked in flight, so no other one starts.
+        const sent = found instanceof Promise ? await found : found
+        if (controller.signal.aborted) return
         const [response] = await Promise.all([
-          askAssistant({ messages: history, brief: chat.brief }, asked, destinations, controller.signal),
+          askAssistant(
+            { messages: history, brief: chat.brief, ...(sent && { photos: sent }) },
+            question,
+            destinations,
+            controller.signal,
+          ),
           delay(THINK_MS),
         ])
         if (controller.signal.aborted) return
@@ -268,7 +373,7 @@ export function useChats(
     },
     // `finish` reads only refs and stable callbacks.
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-    [destinations, newHotels, update],
+    [destinations, newHotels, update, requestPhotos],
   )
 
   function finish(chatId: string, pendingId: string, response: AssistantResponse) {
@@ -323,18 +428,29 @@ export function useChats(
     update(listed.id, (chat) => ({ ...chat, unread: false }))
   }, [listed, update])
 
-  const send = (raw: string, options: { more?: boolean } = {}) => {
+  const send = (raw: string, options: { more?: boolean; photos?: readonly OptimizedPhoto[] } = {}) => {
     const text = raw.trim()
-    if (!text || active.messages.some((m) => m.status === 'pending')) return
+    const sent = options.photos ?? []
+    if ((!text && sent.length === 0) || active.messages.some((m) => m.status === 'pending')) return
     const now = new Date().toISOString()
     const user: ChatMessage = {
       id: newId(),
       role: 'user',
       status: 'done',
       text,
-      data: options.more ? { more: true } : {},
+      data: {
+        ...(options.more && { more: true as const }),
+        ...(sent.length > 0 && {
+          attachments: sent.map(({ preview, width, height }) => ({ preview, width, height })),
+        }),
+      },
       createdAt: now,
     }
+    if (sent.length > 0)
+      photos.current.set(
+        user.id,
+        sent.map((p) => p.photo),
+      )
     const pending: ChatMessage = {
       id: newId(),
       role: 'assistant',
@@ -347,7 +463,7 @@ export function useChats(
     const about = hotel && (!active.brief.hotelId || active.brief.hotelId === hotel.id)
     const chat: Chat = {
       ...active,
-      title: active.title || (about && hotel ? chatTitle(hotel.name) : chatTitle(text)),
+      title: active.title || (about && hotel ? chatTitle(hotel.name) : chatTitle(text || PHOTO_TEXT)),
       brief:
         about && hotel
           ? { ...active.brief, hotelId: hotel.id, ...(hotel.dates && briefWithStay(hotel.dates)) }
@@ -359,6 +475,27 @@ export function useChats(
     setChats((list) => [chat, ...list.filter((c) => c.id !== chat.id)])
     if (!listed) setDraft(newChat())
     // The turn starts from the effect above, once the chat is in the list.
+    if (sent.length > 0) savePhotos(chat.id, user)
+  }
+
+  /** A signed-in user's photos go to Storage; the message gets their paths, the preview stays in memory. */
+  const savePhotos = (chatId: string, message: ChatMessage) => {
+    const current = modeRef.current
+    const client = getBrowserClient()
+    const full = photos.current.get(message.id)
+    if (current.kind !== 'remote' || !client || !full) return
+    setPhotoError(null)
+    uploadPhotos(client, current.userId, chatId, message, full)
+      .then((attachments) =>
+        update(chatId, (chat) => ({
+          ...chat,
+          messages: chat.messages.map((m) => (m.id === message.id ? { ...m, data: { ...m.data, attachments } } : m)),
+        })),
+      )
+      .catch((error: unknown) => {
+        console.warn(`chats: photos not saved (${reason(error)})`)
+        setPhotoError(PHOTO_SAVE_ERROR)
+      })
   }
 
   const retry = (chatId: string, messageId: string) =>
@@ -375,12 +512,20 @@ export function useChats(
   const remove = (chatId: string) => {
     inflight.current.get(chatId)?.abort()
     inflight.current.delete(chatId)
+    const removed = chatsRef.current.find((c) => c.id === chatId)
     setChats((list) => list.filter((c) => c.id !== chatId))
     if (modeRef.current.kind !== 'remote') return
     const client = getBrowserClient()
     if (!client) return
     saved.current.delete(chatId)
+    // The photos go first; a failure to delete them does not keep the chat.
+    const paths = removed ? photoPaths(removed) : []
     queue.current = queue.current
+      .then(() =>
+        deleteRemotePhotos(client, paths).catch((error: unknown) => {
+          console.warn(`chats: photos not deleted (${reason(error)})`)
+        }),
+      )
       .then(() => deleteRemoteChat(client, chatId))
       .catch((error: unknown) => {
         console.warn(`chats: not deleted (${error instanceof Error ? error.message.slice(0, 200) : 'error'})`)
@@ -409,5 +554,7 @@ export function useChats(
     remove,
     setBrief,
     flush: () => queue.current,
+    photoUrl: (attachment) => attachment.url ?? (attachment.path && signed.get(attachment.path)) ?? attachment.preview,
+    photoError,
   }
 }
