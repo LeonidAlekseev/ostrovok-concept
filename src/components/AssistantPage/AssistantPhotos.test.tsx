@@ -6,6 +6,7 @@ import { newHotels } from '../../lib/catalogGenerator'
 import { catalogFetch } from '../../test/catalog'
 import { AssistantSearch } from './AssistantSearch'
 import { SharedChat } from './SharedChat'
+import { PHOTO_RETRY_MS } from './useChats'
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
@@ -32,7 +33,12 @@ const THINK_MS = 650
 beforeEach(() => {
   const realSetTimeout = globalThis.setTimeout
   vi.spyOn(globalThis, 'setTimeout').mockImplementation(((handler: TimerHandler, ms?: number, ...args: unknown[]) =>
-    realSetTimeout(handler, ms === THINK_MS ? 0 : ms, ...args)) as typeof setTimeout)
+    realSetTimeout(
+      handler,
+      // The retry of the photos waits a little: its step shows meanwhile.
+      ms === THINK_MS ? 0 : (PHOTO_RETRY_MS as readonly number[]).includes(ms ?? 0) ? 50 : ms,
+      ...args,
+    )) as typeof setTimeout)
 })
 
 afterEach(() => {
@@ -90,9 +96,49 @@ describe('the photos of a message', () => {
     const { user } = renderAssistant()
     await user.upload(picker(), photo('a.jpg'))
     await user.type(input(), 'найди похожий{Enter}')
-    expect(await within(log()).findByText(/Не смог рассмотреть фото/)).toBeTruthy()
+    expect(await within(log()).findByText('Провайдер распознавания фото не отвечает. Повторите позже.')).toBeTruthy()
     expect(bodyOf(0).messages).toEqual([{ role: 'user', text: 'найди похожий' }])
     expect(bodyOf(0).photos).toHaveLength(1)
+  })
+
+  it('says the provider is unstable and asks again (Scenario: Провайдер ответил со второго раза)', async () => {
+    fetchMock
+      .mockResolvedValueOnce(answer({ brief: {}, photo: { action: 'unstable' } }))
+      .mockResolvedValueOnce(answer({ brief: {}, photo: { action: 'unusable', seen: 'Только цветные полосы' } }))
+    const { user } = renderAssistant()
+    await user.upload(picker(), photo('a.jpg'))
+    await user.type(input(), 'найди похожий{Enter}')
+    expect(await within(log()).findByText('Нестабильное подключение к провайдеру, пробую ещё раз…')).toBeTruthy()
+    expect(await within(log()).findByText(/^Вижу на фото: Только цветные полосы\./)).toBeTruthy()
+    expect(within(log()).queryByText(/Нестабильное подключение/)).toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(bodyOf(1)).toEqual(bodyOf(0))
+  })
+
+  it('gives up after three retries (Scenario: Провайдер не ответил)', async () => {
+    fetchMock.mockImplementation(async () => answer({ brief: {}, photo: { action: 'unstable' } }))
+    const { user } = renderAssistant()
+    await user.upload(picker(), photo('a.jpg'))
+    await user.type(input(), 'найди похожий{Enter}')
+    expect(await within(log()).findByText('Провайдер распознавания фото не отвечает. Повторите позже.')).toBeTruthy()
+    expect(fetchMock).toHaveBeenCalledTimes(1 + PHOTO_RETRY_MS.length)
+    expect(within(log()).queryByText(/Нестабильное подключение/)).toBeNull()
+  })
+
+  it('says the limit is over without retries (Scenario: Лимит запросов к модели фото)', async () => {
+    fetchMock
+      .mockResolvedValueOnce(answer({ brief: {}, photo: { action: 'limited' } }))
+      .mockResolvedValueOnce(Response.json({ error: 'Too many requests' }, { status: 429 }))
+    const { user } = renderAssistant()
+    await user.upload(picker(), photo('a.jpg'))
+    await user.type(input(), 'найди похожий{Enter}')
+    const limit = 'Превышен лимит запросов к модели распознавания фото. Повторите позже.'
+    expect(await within(log()).findByText(limit)).toBeTruthy()
+    // The route's own limit reads the same.
+    await user.upload(picker(), photo('b.jpg'))
+    await user.type(input(), 'найди похожий{Enter}')
+    await waitFor(() => expect(within(log()).getAllByText(limit)).toHaveLength(2))
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('takes no fifth photo and says why (Scenario: Пятое фото)', async () => {
