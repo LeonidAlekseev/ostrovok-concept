@@ -1,16 +1,6 @@
-import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useId, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from 'react'
-import {
-  CalendarDays,
-  ChevronRight,
-  MapPin,
-  Mic,
-  Paperclip,
-  RefreshCw,
-  SendHorizontal,
-  SlidersHorizontal,
-} from 'lucide-react'
+import { CalendarDays, MapPin, Paperclip, RefreshCw, SendHorizontal, SlidersHorizontal } from 'lucide-react'
 import { cn } from 'cn'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '@/components/ui/input-group'
@@ -22,8 +12,7 @@ import { isPending } from '../../lib/assistantChats'
 import { todayIso } from '../../lib/dates'
 import { PHOTO_TYPES } from '../../lib/imageOptimize'
 import { useDestinations } from '../Catalog/useDestinations'
-import { glassPanel } from '../SearchPanel/glass'
-import { ChatHeader } from './ChatHeader'
+import { ChatHeader, NewChatHeader } from './ChatHeader'
 import { ChatList } from './ChatList'
 import { AttachedPhotos } from './ChatPhotos'
 import { Feed, type ChooseSearch } from './ChatFeed'
@@ -31,7 +20,6 @@ import { TripDialog, TripPanel } from './TripPanel'
 import { backToList, goToChat, useChatPath } from './useChatPath'
 import { useAttachPhotos } from './useAttachPhotos'
 import { useChats } from './useChats'
-import { useSpeech } from './useSpeech'
 
 interface Props {
   /** The "recently added" hotels the plan's options suggest. */
@@ -39,15 +27,11 @@ interface Props {
   onChoose: ChooseSearch
 }
 
-/** Light glass over the window's glass: the composer and the quick replies. */
-const glassField =
-  'bg-(--glass-field) shadow-[inset_0_0_0_1.5px_color-mix(in_srgb,var(--decor-light)_75%,transparent)] [backdrop-filter:blur(12px)]'
-/** The bubble of the opening line, its tail at the lower left pointing at Eval. */
-const bubbleClass = [
-  'relative min-w-0 flex-1 rounded-[clamp(18px,4.6vw,32px)] bg-(--glass-plaque) px-[clamp(14px,3.6vw,34px)] py-[clamp(12px,3vw,26px)]',
-  'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--decor-light)_85%,transparent),0_8px_24px_color-mix(in_srgb,var(--decor-assistant-glow)_18%,transparent)]',
-  "before:absolute before:right-[calc(100%_-_1px)] before:bottom-[24%] before:h-[clamp(12px,3vw,22px)] before:w-[clamp(8px,2.2vw,16px)] before:bg-(--glass-plaque) before:[clip-path:polygon(100%_0,100%_100%,0_100%)] before:content-['']",
-].join(' ')
+/** The solid white panels of the page: the list, the chat. */
+const panelClass =
+  'rounded-[28px] bg-(--decor-light) shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border)_70%,transparent)]'
+/** The composer and the quick replies: solid fields on the white panel. */
+const fieldClass = 'bg-muted'
 const actionClass = `h-9 flex-none gap-1.5 bg-(--decor-light) px-3 text-sm font-medium text-foreground shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border)_70%,transparent)] hover:text-primary [&_svg]:text-primary`
 
 /**
@@ -143,7 +127,6 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
     goToChat(next?.id ?? null, { replace: true })
   }
 
-  const speech = useSpeech((words) => setText((value) => (value.trim() ? `${value.trimEnd()} ${words}` : words)))
   const viewport = useVisualViewportHeight()
 
   const planActions = (shown: Plan) => {
@@ -197,7 +180,7 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
   return (
     <div
       data-assistant-app={screen}
-      className="grid min-h-0 flex-1 gap-4 [--glass-field:color-mix(in_srgb,var(--decor-light)_60%,transparent)] [--glass-plaque:color-mix(in_srgb,var(--decor-light)_72%,transparent)] max-lg:data-[assistant-app=chat]:h-(--chat-screen,100dvh) grid-cols-[minmax(0,1fr)] lg:h-full lg:grid-cols-[clamp(228px,19vw,290px)_minmax(0,1fr)_clamp(240px,21vw,320px)] xl:gap-5"
+      className="grid min-h-0 flex-1 gap-4 max-lg:data-[assistant-app=chat]:h-(--chat-screen,100dvh) grid-cols-[minmax(0,1fr)] lg:h-full lg:grid-cols-[clamp(228px,19vw,290px)_minmax(0,1fr)_clamp(240px,21vw,320px)] xl:gap-5"
       // The phone's keyboard is open: the chat fits above it.
       style={viewport && screen === 'chat' ? ({ '--chat-screen': `${viewport}px` } as CSSProperties) : undefined}
     >
@@ -210,12 +193,12 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
         onNew={fresh}
         onRename={rename}
         onDelete={removeChat}
-        className={`${glassPanel} rounded-[28px] p-3 lg:p-4 ${screen === 'chat' ? 'max-lg:hidden' : ''}`}
+        className={`${panelClass} p-3 lg:p-4 ${screen === 'chat' ? 'max-lg:hidden' : ''}`}
       />
 
       <section
         aria-label="Чат с Эвалом"
-        className={`${glassPanel} flex min-h-0 min-w-0 flex-col gap-3 p-[clamp(12px,3vw,20px)] max-lg:pt-[max(12px,env(safe-area-inset-top))] max-lg:pb-[max(12px,env(safe-area-inset-bottom))] lg:rounded-[28px] ${screen === 'list' ? 'max-lg:hidden' : ''}`}
+        className={`${panelClass} flex min-h-0 min-w-0 flex-col gap-3 p-[clamp(12px,3vw,20px)] max-lg:pt-[max(12px,env(safe-area-inset-top))] max-lg:pb-[max(12px,env(safe-area-inset-bottom))] lg:rounded-[28px] ${screen === 'list' ? 'max-lg:hidden' : ''}`}
       >
         {started ? (
           <ChatHeader
@@ -228,34 +211,14 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
             onDelete={() => removeChat(active.id)}
           />
         ) : (
-          <div className="flex flex-col gap-3">
-            {chats.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="-ml-2 self-start lg:hidden"
-                aria-label="Назад к чатам"
-                onClick={backToList}
-              >
-                <ChevronRight className="size-5 rotate-180" aria-hidden />
-                Чаты
-              </Button>
-            )}
-            <div className="flex items-center gap-[clamp(14px,4vw,30px)] lg:mt-[clamp(8px,6vh,64px)]">
-              <EvalPortrait />
-              {/* The reply bubble: its tail points at Eval. */}
-              <div className={bubbleClass}>
-                <h2 className="text-(length:--text-heading) leading-[1.2] font-bold tracking-[-0.01em]">
-                  О каком путешествии вы мечтаете?{' '}
-                  <span className="whitespace-nowrap" aria-hidden>
-                    🌴
-                  </span>
-                </h2>
-                <p className="mt-[clamp(4px,1.2vw,10px)] text-[clamp(14px,3.7vw,20px)] leading-[1.4] text-(--decor-assistant-text-2)">
-                  Я подберу идеальное жильё, направление и лучшие варианты для вашего отдыха <span aria-hidden>✨</span>
-                </p>
-              </div>
-            </div>
+          <NewChatHeader canGoBack={chats.length > 0} onBack={backToList} />
+        )}
+
+        {!started && (
+          /* Eval's greeting: a grey cloud. */
+          <div className="max-w-[min(100%,34rem)] self-start rounded-3xl rounded-tl-md bg-muted px-4 py-3 text-base/[1.45] text-foreground">
+            О каком путешествии вы мечтаете? <span aria-hidden>🌴</span> Я подберу идеальное жильё, направление и лучшие
+            варианты для вашего отдыха <span aria-hidden>✨</span>
           </div>
         )}
 
@@ -282,7 +245,7 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
                 <Button
                   variant="secondary"
                   shape="pill"
-                  className={`h-10 px-4 text-[15px] font-normal text-foreground ${glassField} hover:bg-(--decor-light)`}
+                  className={`h-10 px-4 text-[15px] font-normal text-foreground ${fieldClass} hover:bg-secondary`}
                   onClick={() => submit(label)}
                   disabled={thinking || !ready}
                 >
@@ -294,37 +257,19 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
         ) : (
           !started &&
           presets.length > 0 && (
-            <ul className="grid grid-cols-3 gap-[clamp(8px,2.4vw,22px)]" aria-label="Идеи для поездки">
-              {presets.map(({ emoji, label, photo }) => (
+            <ul className="grid grid-cols-2 gap-2" aria-label="Идеи для поездки">
+              {presets.map(({ emoji, label }) => (
                 <li key={label} className="min-w-0">
                   <button
                     type="button"
-                    className="group flex w-full flex-col overflow-hidden rounded-[clamp(16px,4.4vw,30px)] bg-(--glass-field) text-left shadow-[inset_0_0_0_1.5px_color-mix(in_srgb,var(--decor-light)_80%,transparent),0_6px_20px_color-mix(in_srgb,var(--decor-assistant-glow)_35%,transparent)] transition-[translate,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[inset_0_0_0_1.5px_var(--decor-light),0_10px_26px_color-mix(in_srgb,var(--decor-assistant-glow)_50%,transparent)] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-60"
+                    className="flex h-12 w-full items-center gap-2.5 rounded-2xl bg-muted px-4 text-left text-base font-medium text-foreground transition-colors hover:bg-secondary focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-60"
                     onClick={() => submit(label)}
                     disabled={thinking || !ready}
                   >
-                    <Image
-                      src={photo}
-                      alt=""
-                      width={310}
-                      height={70}
-                      className="h-[clamp(54px,12vw,104px)] w-full object-cover"
-                    />
-                    {/* The glass plaque rises over the bottom of the photo. */}
-                    <span className="relative mx-[clamp(4px,1.2vw,10px)] -mt-[clamp(16px,4.4vw,30px)] mb-[clamp(4px,1.2vw,10px)] flex items-center gap-[clamp(4px,1.4vw,12px)] rounded-full bg-(--glass-plaque) py-[clamp(6px,1.8vw,12px)] pr-[clamp(6px,1.6vw,10px)] pl-[clamp(8px,2.2vw,16px)] shadow-[inset_0_0_0_1px_var(--decor-light)] [backdrop-filter:blur(12px)]">
-                      <span className="text-[clamp(14px,3.4vw,24px)] leading-none" aria-hidden>
-                        {emoji}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-[clamp(13px,3.2vw,18px)] leading-[1.2] font-semibold">
-                        {label}
-                      </span>
-                      <span
-                        className="grid size-[clamp(24px,4vw,32px)] flex-none place-items-center rounded-full bg-(--decor-light) text-(--decor-assistant-text-2) shadow-[0_1px_4px_color-mix(in_srgb,var(--shadow-color)_12%,transparent)] max-sm:hidden"
-                        aria-hidden
-                      >
-                        <ChevronRight className="size-[60%]" />
-                      </span>
+                    <span className="text-xl leading-none" aria-hidden>
+                      {emoji}
                     </span>
+                    <span className="min-w-0 truncate">{label}</span>
                   </button>
                 </li>
               ))}
@@ -335,7 +280,7 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
         <form className="flex-none" onSubmit={onSubmit}>
           <AttachedPhotos photos={attach.photos} onRemove={attach.remove} />
           <InputGroup
-            className={`h-auto items-end gap-2 rounded-[24px] border-0 p-1.5 pl-4 ${glassField} bg-(--decor-light)/90 transition-shadow duration-200 has-[[data-slot=input-group-control]:focus-visible]:ring-0 has-[[data-slot=input-group-control]:focus-visible]:shadow-[inset_0_0_0_2px_var(--ring),0_0_0_4px_color-mix(in_srgb,var(--ring)_25%,transparent)]`}
+            className={`h-auto items-end gap-2 rounded-[28px] border-0 p-1.5 pl-4 ${fieldClass} has-disabled:bg-muted has-disabled:opacity-100 transition-shadow duration-200 has-[[data-slot=input-group-control]:focus-visible]:ring-0 has-[[data-slot=input-group-control]:focus-visible]:shadow-[inset_0_0_0_2px_var(--ring),0_0_0_4px_color-mix(in_srgb,var(--ring)_25%,transparent)]`}
           >
             <label htmlFor={inputId} className="sr-only">
               Опишите поездку
@@ -349,15 +294,11 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
               value={text}
               enterKeyHint="send"
               maxLength={MAX_MESSAGE_LENGTH}
-              placeholder={
-                started
-                  ? 'Ответьте или уточните пожелания…'
-                  : 'Например: «Хочу на море в октябре, спокойный отдых, с ребёнком»'
-              }
+              placeholder="Напишите, что ищете…"
               onChange={(e) => setText(e.target.value)}
               onKeyDown={onKeyDown}
             />
-            <InputGroupAddon align="inline-end" className="gap-1.5 p-0">
+            <InputGroupAddon align="inline-end" className="flex-col gap-1 p-0">
               <input
                 ref={fileRef}
                 type="file"
@@ -373,9 +314,18 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
                 }}
               />
               <InputGroupButton
+                type="submit"
+                variant="default"
+                className="size-11 flex-none rounded-full bg-primary p-0 text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+                aria-label="Отправить"
+                disabled={(!text.trim() && attach.photos.length === 0) || attach.busy || thinking || !ready}
+              >
+                <SendHorizontal className="size-5" aria-hidden />
+              </InputGroupButton>
+              <InputGroupButton
                 type="button"
                 variant="ghost"
-                className="size-11 flex-none rounded-full p-0 text-foreground"
+                className="size-9 flex-none rounded-full p-0 text-foreground"
                 aria-label={`Приложить фото, до ${MAX_PHOTOS}`}
                 disabled={!ready || attach.busy}
                 onClick={() => {
@@ -385,34 +335,8 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
               >
                 <Paperclip className="size-5" aria-hidden />
               </InputGroupButton>
-              {speech.supported && (
-                <InputGroupButton
-                  type="button"
-                  variant="ghost"
-                  className="size-11 flex-none rounded-full p-0 text-foreground aria-pressed:bg-destructive/10 aria-pressed:text-destructive"
-                  aria-label={speech.listening ? 'Остановить диктовку' : 'Надиктовать сообщение'}
-                  aria-pressed={speech.listening}
-                  onClick={speech.toggle}
-                >
-                  <Mic className={`size-5 ${speech.listening ? 'motion-safe:animate-pulse' : ''}`} aria-hidden />
-                </InputGroupButton>
-              )}
-              <InputGroupButton
-                type="submit"
-                variant="default"
-                className="size-11 flex-none rounded-full bg-(image:--decor-assistant-send) p-0 shadow-(--decor-assistant-send-glow) disabled:opacity-60"
-                aria-label="Отправить"
-                disabled={(!text.trim() && attach.photos.length === 0) || attach.busy || thinking || !ready}
-              >
-                <SendHorizontal className="size-5" aria-hidden />
-              </InputGroupButton>
             </InputGroupAddon>
           </InputGroup>
-          {speech.error && (
-            <p className="mt-1.5 px-2 text-sm text-destructive" role="alert">
-              {speech.error}
-            </p>
-          )}
           {(attach.error || photoError) && (
             <p className="mt-1.5 px-2 text-sm text-destructive" role="alert">
               {attach.error ?? photoError}
@@ -482,25 +406,4 @@ function useVisualViewportHeight(): number | undefined {
     return () => viewport.removeEventListener('resize', onResize)
   }, [])
   return height
-}
-
-/** Eval's portrait over the start of a chat: a glowing rim behind the cut-out picture and sparkles. */
-function EvalPortrait() {
-  return (
-    <div className="relative isolate size-[clamp(64px,14vw,140px)] flex-none">
-      {/* The rim sits behind the picture: the palm and the hat stick out of its circle. */}
-      <span
-        className="absolute inset-[5%] -z-10 rounded-full shadow-[0_0_0_clamp(2px,0.5vw,4px)_color-mix(in_srgb,var(--decor-light)_85%,transparent),0_0_clamp(12px,3.4vw,34px)_color-mix(in_srgb,var(--decor-assistant-glow)_80%,transparent)]"
-        aria-hidden
-      />
-      <Image src="/assistant/eval.webp" alt="Эвал" width={256} height={256} preload className="size-full" />
-      <span
-        className="pointer-events-none absolute -top-[10%] -left-[8%] text-(--decor-gold) drop-shadow-[0_0_6px_color-mix(in_srgb,var(--decor-star)_70%,transparent)] motion-safe:animate-pulse"
-        aria-hidden
-      >
-        <span className="block text-[clamp(16px,4.4vw,34px)] leading-none">✦</span>
-        <span className="-mt-[0.2em] -ml-[0.5em] block text-[clamp(9px,2.4vw,18px)] leading-none">✦</span>
-      </span>
-    </div>
-  )
 }

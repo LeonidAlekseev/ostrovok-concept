@@ -342,7 +342,7 @@ describe('AssistantSearch chats', () => {
     await user.click(newChatButton())
 
     expect(screen.queryByRole('log', { name: 'Диалог с Эвалом' })).toBeNull()
-    expect(screen.getByRole('heading', { name: /О каком путешествии вы мечтаете/ })).toBeTruthy()
+    expect(screen.getByText(/О каком путешествии вы мечтаете/)).toBeTruthy()
     const previous = within(chatList()).getByRole('button', { name: /^(?!Действия).*(?:к морю)/ })
     await user.click(previous)
     expect(await inLog('Записал: море. Когда планируете поехать?')).toBeTruthy()
@@ -479,7 +479,7 @@ describe('AssistantSearch after a reload', () => {
     storage.setItem(key, raw)
     renderAssistant()
     expect(screen.queryByRole('log', { name: 'Диалог с Эвалом' })).toBeNull()
-    expect(screen.getByText('О каком путешествии вы мечтаете?')).toBeTruthy()
+    expect(screen.getByText(/О каком путешествии вы мечтаете/)).toBeTruthy()
   })
 })
 
@@ -490,17 +490,35 @@ describe('AssistantSearch start screen', () => {
     expect(screen.getByAltText('Эвал')).toBeTruthy()
   })
 
-  it('opens with the reply bubble, the example and three photo cards', () => {
+  it('opens with the greeting cloud, the example and five chips', () => {
     renderAssistant()
-    expect(screen.getByRole('heading', { name: 'О каком путешествии вы мечтаете?' })).toBeTruthy()
-    expect(screen.getByText('Я подберу идеальное жильё, направление и лучшие варианты для вашего отдыха')).toBeTruthy()
-    expect(screen.getByPlaceholderText('Например: «Хочу на море в октябре, спокойный отдых, с ребёнком»')).toBeTruthy()
+    expect(
+      screen.getByText(
+        /О каком путешествии вы мечтаете\?.*Я подберу идеальное жильё, направление и лучшие варианты для вашего отдыха/,
+      ),
+    ).toBeTruthy()
+    expect(screen.getByPlaceholderText('Напишите, что ищете…')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Новый чат' })).toBeTruthy()
+    expect(screen.getByText('Ассистент Эвал')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Поделиться' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Действия с чатом' })).toBeNull()
     const ideas = screen.getByRole('list', { name: 'Идеи для поездки' })
     expect(
       within(ideas)
         .getAllByRole('button')
         .map((button) => button.textContent),
-    ).toEqual(['🌴На море', '⛰️В горы', '🏛️Города'])
+    ).toEqual(['🏖️На море', '⛰️В горы', '🏙️В город', '👨‍👩‍👧С детьми', '✈️Куда угодно'])
+  })
+
+  it('shows the chat’s title, «Поделиться» and the menu after the first message (Scenario: Первое сообщение)', async () => {
+    fetchMock.mockResolvedValue(answer({ brief: { vibe: 'mountains' } }))
+    const { user } = renderAssistant()
+
+    await user.click(screen.getByRole('button', { name: 'В горы' }))
+
+    expect(await screen.findByRole('button', { name: 'Поделиться' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Действия с чатом' })).toBeTruthy()
+    expect(screen.queryByText('Ассистент Эвал')).toBeNull()
   })
 
   it('sends the card’s label as the traveller’s message (Scenario: Чип отправляет текст)', async () => {

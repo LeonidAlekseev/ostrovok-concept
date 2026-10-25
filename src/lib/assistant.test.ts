@@ -332,9 +332,28 @@ describe('the presets of Eval', () => {
 
   it('offers only the themes with a city shown in the season (Scenario: Пресеты без видимых городов)', () => {
     // Production shows Valencia only: no mountains; the sea only outside winter.
-    expect(presetChips(valencia, '2026-06-01').map((c) => c.label)).toEqual(['На море', 'Города'])
-    expect(presetChips(valencia, '2026-11-20').map((c) => c.label)).toEqual(['Города'])
-    expect(presetChips(destinations, '2026-11-20').map((c) => c.label)).toEqual(['На море', 'В горы', 'Города'])
+    expect(presetChips(valencia, '2026-06-01').map((c) => c.label)).toEqual([
+      'На море',
+      'В город',
+      'С детьми',
+      'Куда угодно',
+    ])
+    expect(presetChips(valencia, '2026-11-20').map((c) => c.label)).toEqual(['В город', 'С детьми', 'Куда угодно'])
+    expect(presetChips(destinations, '2026-11-20').map((c) => c.label)).toEqual([
+      'На море',
+      'В горы',
+      'В город',
+      'С детьми',
+      'Куда угодно',
+    ])
+  })
+
+  it('hands the theme to Eval on «Куда угодно» and asks the party on «С детьми» (Scenario: Куда угодно)', () => {
+    expect(mergeBrief({}, 'Куда угодно', null, destinations).vibe).toBe('any')
+    expect(mergeBrief({}, 'В город', null, destinations).vibe).toBe('europe')
+    const kids = mergeBrief({}, 'С детьми', null, destinations)
+    expect(kids.party).toBe('family')
+    expect(kids.vibe).toBeUndefined()
   })
 
   it('leaves out the quick replies without a city', () => {
