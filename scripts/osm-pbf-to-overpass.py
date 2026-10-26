@@ -4,14 +4,13 @@
 # ///
 """Turns an OSM extract into an Overpass JSON answer for `npm run db:osm-places -- --file`, when Overpass is down.
 
-Usage, from the repository root:
-    uv run scripts/osm-pbf-to-overpass.py <valencia-latest.osm.pbf> <out.json>
+Usage, from the repository root (scripts/load-city-places.ts runs it for a city):
+    uv run scripts/osm-pbf-to-overpass.py <extract.osm.pbf> <out.json> <south,west,north,east>
 
-Source (kept outside git, deleted after the load): the Geofabrik extract of the Comunitat Valenciana,
+Source (kept outside git, deleted after the load): a Geofabrik extract of the region of the city, e.g.
 https://download.geofabrik.de/europe/spain/valencia-latest.osm.pbf (© OpenStreetMap contributors, ODbL 1.0).
 
-Keeps the elements of the loader's rectangle (src/lib/geo/distance.ts `VALENCIA_BBOX`) whose tags may be of a
-category of src/lib/geo/categories.ts — a loose filter, the loader classifies them itself. As Overpass gives them:
+Keeps the elements of the rectangle whose tags may be of a category of src/lib/geo/categories.ts — a loose filter, the loader classifies them itself. As Overpass gives them:
 nodes with `lat`/`lon`, the ways of the shape categories (beaches, the coast, parks) with `geometry`, the other ways
 and the multipolygon relations with `center` (the middle of their bounding box). Node locations are kept in a file
 next to the output, not in memory, and removed at the end.
@@ -22,8 +21,6 @@ import os
 import sys
 
 import osmium
-
-SOUTH, WEST, NORTH, EAST = 39.27, -0.53, 39.58, -0.27
 
 # A superset of the categories' tags: the loader's `categorize` decides.
 TAGS = {
@@ -36,7 +33,7 @@ TAGS = {
     'natural': {'beach', 'coastline'},
     'leisure': {'park'},
     'tourism': {'attraction', 'viewpoint', 'museum'},
-    'place': {'city'},
+    'place': {'city', 'town'},
 }
 SHAPES = {('natural', 'beach'), ('natural', 'coastline'), ('leisure', 'park')}
 
@@ -49,8 +46,19 @@ def is_shape(tags):
     return any(tags.get(key) == value for key, value in SHAPES)
 
 
+BOX = None  # (south, west, north, east), from the arguments
+
+
 def inside(lat, lon):
-    return SOUTH <= lat <= NORTH and WEST <= lon <= EAST
+    south, west, north, east = BOX
+    return south <= lat <= north and west <= lon <= east
+
+
+def parse_bbox(text):
+    parts = [float(p) for p in text.split(',')]
+    if len(parts) != 4 or parts[0] >= parts[2] or parts[1] >= parts[3]:
+        sys.exit(f'the rectangle must be south,west,north,east with south < north and west < east, got {text}')
+    return tuple(parts)
 
 
 def tag_dict(tags):
@@ -113,9 +121,11 @@ class Elements(osmium.SimpleHandler):
 
 
 def main():
-    if len(sys.argv) != 3:
-        sys.exit('usage: uv run scripts/osm-pbf-to-overpass.py <extract.osm.pbf> <out.json>')
+    global BOX
+    if len(sys.argv) != 4:
+        sys.exit('usage: uv run scripts/osm-pbf-to-overpass.py <extract.osm.pbf> <out.json> <south,west,north,east>')
     source, target = sys.argv[1], sys.argv[2]
+    BOX = parse_bbox(sys.argv[3])
     relations = Relations()
     relations.apply_file(source)
     index = os.path.join(os.path.dirname(os.path.abspath(target)), 'nodes.idx')

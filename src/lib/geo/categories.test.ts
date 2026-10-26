@@ -24,6 +24,13 @@ describe('the categories', () => {
     expect(categorize({ amenity: 'restaurant', tourism: 'attraction' })).toEqual(['restaurant', 'attraction'])
   })
 
+  it('takes a named city or town as a centre', () => {
+    expect(categorize({ place: 'city', name: 'València' })).toEqual(['centre'])
+    expect(categorize({ place: 'town', name: 'Burjassot' })).toEqual(['centre'])
+    expect(categorize({ place: 'town' })).toEqual([])
+    expect(categorize({ place: 'village', name: 'El Palmar' })).toEqual([])
+  })
+
   it('gives none for other tags', () => {
     expect(categorize({ shop: 'bakery' })).toEqual([])
     expect(categorize({})).toEqual([])

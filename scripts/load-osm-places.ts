@@ -1,10 +1,14 @@
-// Loads the places of OpenStreetMap of Valencia into `osm_places` (supabase/migrations/20261026130000_osm_places.sql)
-// and records the rectangle with its categories in `osm_place_areas`, so the server answers them from the cache.
-//   npm run db:osm-places                          Overpass, a query per group of categories
-//   npm run db:osm-places -- --file <answer.json>   an Overpass JSON answer saved before, e.g. made from the Geofabrik
-//                                                  extract by scripts/osm-pbf-to-overpass.py when Overpass is down
-//   npm run db:osm-places -- --dry-run              counts only, writes nothing
-// Upserts, so a second run updates the same rows; nothing is deleted. Needs NEXT_PUBLIC_SUPABASE_URL and
+// Loads the places of OpenStreetMap of a city's rectangle into `osm_places`
+// (supabase/migrations/20261026130000_osm_places.sql) and records the rectangle with its categories in
+// `osm_place_areas`, so the server answers them from the cache. The whole run for a city, from the download of the
+// extract to the check, is scripts/load-city-places.ts; this is its loading step.
+//   npm run db:osm-places -- --bbox <s,w,n,e> [--centre <lat,lon>]               Overpass, a query per group
+//   npm run db:osm-places -- --bbox <s,w,n,e> --file <answer.json>               an Overpass JSON answer saved before
+//                                                  (scripts/osm-pbf-to-overpass.py makes one from a Geofabrik extract)
+//   … --dry-run      counts only, writes nothing
+//   … --retries <n>  tries of an Overpass group after a refusal (default 4)
+// `--centre` keeps the `centre` category on the town node nearest to it only. Upserts, so a second run updates the
+// same rows and records the rectangle once; nothing is deleted. Needs NEXT_PUBLIC_SUPABASE_URL and
 // SUPABASE_SERVICE_ROLE_KEY; prints counts, never the keys. The places are © OpenStreetMap contributors, ODbL 1.0.
 import { readFile } from 'node:fs/promises'
 import { registerHooks } from 'node:module'
@@ -25,7 +29,7 @@ registerHooks({
 })
 
 const { PLACE_CATEGORIES } = await import('../src/lib/geo/categories.ts')
-const { VALENCIA_BBOX } = await import('../src/lib/geo/distance.ts')
+const { bboxPolygon, formatBbox, keepOneCentre, parseBbox, parseLatLon } = await import('../src/lib/geo/cityLoad.ts')
 const { RateGate } = await import('../src/lib/geo/limits.ts')
 const { overpassPlaces, parseOverpass } = await import('../src/lib/geo/overpass.ts')
 const { saveRows } = await import('../src/lib/geo/save.ts')
@@ -47,13 +51,39 @@ const QUERY_TIMEOUT_MS = 180_000
 const BACKOFF_S = [30, 60, 120, 240]
 const PAUSE_MS = 10_000
 
-const { values } = parseArgs({ options: { file: { type: 'string' }, 'dry-run': { type: 'boolean' } } })
+const { values } = parseArgs({
+  options: {
+    bbox: { type: 'string' },
+    centre: { type: 'string' },
+    file: { type: 'string' },
+    retries: { type: 'string', default: String(BACKOFF_S.length) },
+    'dry-run': { type: 'boolean' },
+  },
+})
+
+function fail(message: string): never {
+  console.error(`load-osm-places: ${message}`)
+  process.exit(1)
+}
 
 function required(name: string): string {
   const value = process.env[name]
-  if (!value) throw new Error(`${name} is not set: run npm run secrets:reveal`)
+  if (!value) fail(`${name} is not set: run npm run secrets:reveal`)
   return value
 }
+
+if (!values.bbox) fail('--bbox south,west,north,east is required (see scripts/load-city-places.ts)')
+let bbox: ReturnType<typeof parseBbox>
+let centre: ReturnType<typeof parseLatLon> | undefined
+try {
+  bbox = parseBbox(values.bbox)
+  centre = values.centre ? parseLatLon(values.centre) : undefined
+} catch (error) {
+  fail((error as Error).message)
+}
+const retries = Number(values.retries)
+if (!Number.isInteger(retries) || retries < 0 || retries > BACKOFF_S.length)
+  fail(`--retries must be 0…${BACKOFF_S.length}, got ${values.retries}`)
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -63,15 +93,14 @@ async function fromOverpass(): Promise<Rows> {
   for (const group of GROUPS) {
     for (let attempt = 0; ; attempt++) {
       const budget = { deadline: Date.now() + QUERY_TIMEOUT_MS + 5000 }
-      const result = await overpassPlaces(group, { bbox: VALENCIA_BBOX }, { budget, gate, timeoutMs: QUERY_TIMEOUT_MS })
+      const result = await overpassPlaces(group, { bbox }, { budget, gate, timeoutMs: QUERY_TIMEOUT_MS })
       if (result.ok) {
         console.log(`overpass ${group.join(',')}: ${result.value.length} elements`)
         rows.push(...result.value)
         break
       }
       const wait = result.reason === 'limited' ? result.retryAfterS : BACKOFF_S[attempt]
-      if (wait === undefined || attempt >= BACKOFF_S.length)
-        throw new Error(`overpass ${group.join(',')}: ${result.message}`)
+      if (attempt >= retries || wait === undefined) fail(`overpass ${group.join(',')}: ${result.message}`)
       console.log(`overpass ${group.join(',')}: ${result.message} — again in ${wait} s`)
       await sleep(wait * 1000)
     }
@@ -82,39 +111,57 @@ async function fromOverpass(): Promise<Rows> {
 }
 
 async function fromFile(path: string): Promise<Rows> {
-  const result = parseOverpass(JSON.parse(await readFile(path, 'utf8')))
-  if (!result.ok) throw new Error(`${path}: ${result.message}`)
+  const text = await readFile(path, 'utf8').catch((error: Error) => fail(`${path}: ${error.message}`))
+  const result = parseOverpass(JSON.parse(text))
+  if (!result.ok) fail(`${path}: ${result.message}`)
   return result.value
 }
 
-const rows = values.file ? await fromFile(values.file) : await fromOverpass()
-const counts = Object.fromEntries(PLACE_CATEGORIES.map((c) => [c, rows.filter((r) => r.categories.includes(c)).length]))
-console.log(`places: ${rows.length}`)
-for (const [category, count] of Object.entries(counts)) console.log(`  ${category}: ${count}`)
+const countBy = (rows: Rows) =>
+  Object.fromEntries(PLACE_CATEGORIES.map((c) => [c, rows.filter((r) => r.categories.includes(c)).length]))
+
+const rows = keepOneCentre(values.file ? await fromFile(values.file) : await fromOverpass(), centre)
+console.log(`rectangle ${formatBbox(bbox)}: ${rows.length} places`)
+for (const [category, count] of Object.entries(countBy(rows))) console.log(`  ${category}: ${count}`)
 if (values['dry-run']) process.exit(0)
 
 const supabase = createClient<Database>(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
   auth: { persistSession: false, autoRefreshToken: false },
 })
-if (!(await saveRows(supabase, rows, 'preload'))) throw new Error('osm_places: the upsert failed')
+if (!(await saveRows(supabase, rows, 'preload'))) fail('osm_places: the upsert failed')
 
-// The rectangle once: a second run finds it and adds none.
-const { south, west, north, east } = VALENCIA_BBOX
-const area = `SRID=4326;POLYGON((${west} ${south},${east} ${south},${east} ${north},${west} ${north},${west} ${south}))`
+// The rectangle once: a second run finds the same polygon with all the categories and adds none.
+const area = bboxPolygon(bbox)
 const { data: areas, error: areasError } = await supabase
   .from('osm_place_areas')
   .select('id, categories')
   .eq('origin', 'preload')
-if (areasError) throw new Error(`osm_place_areas: ${areasError.message}`)
+  .eq('area', area)
+if (areasError) fail(`osm_place_areas: ${areasError.message}`)
 const loaded = areas.some((a) => PLACE_CATEGORIES.every((c) => a.categories.includes(c)))
 if (!loaded) {
   const { error } = await supabase
     .from('osm_place_areas')
     .insert({ categories: [...PLACE_CATEGORIES], area, origin: 'preload' })
-  if (error) throw new Error(`osm_place_areas: ${error.message}`)
+  if (error) fail(`osm_place_areas: ${error.message}`)
+}
+
+// The check: what the table now holds in the rectangle, per category.
+console.log(`osm_places: ${rows.length} upserted; area ${loaded ? 'already recorded' : 'recorded'}; in the rectangle:`)
+let total = 0
+for (const category of PLACE_CATEGORIES) {
+  const { count, error } = await supabase
+    .from('osm_places')
+    .select('osm_id', { count: 'exact', head: true })
+    .contains('categories', [category])
+    .gte('lat', bbox.south)
+    .lte('lat', bbox.north)
+    .gte('lon', bbox.west)
+    .lte('lon', bbox.east)
+  if (error) fail(`osm_places: ${error.message}`)
+  total += count ?? 0
+  console.log(`  ${category}: ${count}`)
 }
 const { count, error } = await supabase.from('osm_places').select('osm_id', { count: 'exact', head: true })
-if (error) throw new Error(`osm_places: ${error.message}`)
-console.log(
-  `osm_places: ${rows.length} upserted, ${count} in the table; area ${loaded ? 'already recorded' : 'recorded'}`,
-)
+if (error) fail(`osm_places: ${error.message}`)
+console.log(`osm_places: ${count} in the table (category hits in the rectangle: ${total})`)

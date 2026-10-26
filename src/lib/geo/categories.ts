@@ -136,8 +136,9 @@ export const CATEGORY: Record<PlaceCategory, CategoryDef> = {
   museum: { label: 'музей', selectors: [nwr('tourism', 'museum')], matches: is('tourism', 'museum') },
   centre: {
     label: 'центр города',
-    selectors: [{ type: 'node', filter: '["place"="city"]' }],
-    matches: is('place', 'city'),
+    // A town is the centre of its own; the loader keeps the one nearest to the city's centre (keepOneCentre).
+    selectors: [{ type: 'node', filter: '["place"~"^(city|town)$"]' }],
+    matches: (tags) => is('place', 'city', 'town')(tags) && tags.name !== undefined,
   },
 }
 
