@@ -35,7 +35,6 @@ const HEAVY = 20_000
 // The assistant "thinks" for 650 ms before it answers: the tests do not wait for it in real time.
 const THINK_MS = 650
 beforeEach(() => {
-  ;(globalThis as unknown as { __diag?: string[] }).__diag = []
   const realSetTimeout = globalThis.setTimeout
   vi.spyOn(globalThis, 'setTimeout').mockImplementation(((handler: TimerHandler, ms?: number, ...args: unknown[]) =>
     realSetTimeout(handler, ms === THINK_MS ? 0 : ms, ...args)) as typeof setTimeout)
@@ -96,7 +95,7 @@ const storedChats = () =>
     })),
     null,
     1,
-  ) + `\nDIAG:\n${((globalThis as unknown as { __diag?: string[] }).__diag ?? []).join('\n---\n')}`
+  )
 /** The newest chat is open and empty: Эвал's greeting, no log. */
 const emptyChatOpen = async () => {
   expect(await screen.findByText(/О каком путешествии вы мечтаете/)).toBeTruthy()
