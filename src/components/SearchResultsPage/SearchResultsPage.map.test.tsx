@@ -13,6 +13,8 @@ import {
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import type { MapLibreMap } from 'maplibre-gl'
+import { silenceSourceAttribution } from './mapSetup'
 import { fullHotelsIn } from '../../lib/catalogGenerator'
 import { countRu, formatPrice } from '../../lib/format'
 import { applyFilters, NO_FILTERS } from '../../lib/results'
@@ -74,6 +76,30 @@ describe('SearchResultsPage map attribution', () => {
     expect(attribution().classList.contains('maplibregl-compact-show')).toBe(true)
     await act(() => vi.advanceTimersByTimeAsync(1000))
     expect(attribution().classList.contains('maplibregl-compact-show')).toBe(false)
+  })
+
+  it('credits only "© OpenStreetMap" with a link to its copyright, and strips the credits of the style sources', async () => {
+    open(PRAGUE, { desktop: true })
+    await results()
+    await markers()
+
+    const link = within(attribution()).getByRole('link', { name: '© OpenStreetMap' })
+    expect(link.getAttribute('href')).toBe('https://www.openstreetmap.org/copyright')
+    expect(link.getAttribute('target')).toBe('_blank')
+    expect(link.getAttribute('rel')).toBe('noopener')
+    expect(attribution().querySelectorAll('a')).toHaveLength(1)
+    expect(attribution().textContent).toBe('© OpenStreetMap')
+  })
+
+  it('makes the sources of the style ignore the credit their TileJSON brings', () => {
+    const source = { attribution: undefined as string | undefined }
+    const map = {
+      getStyle: () => ({ sources: { openmaptiles: {} } }),
+      getSource: () => source,
+    } as unknown as MapLibreMap
+    silenceSourceAttribution(map)
+    source.attribution = 'OpenFreeMap © OpenMapTiles'
+    expect(source.attribution).toBeUndefined()
   })
 
   it('folds the attribution on the first interaction with the map, and the "i" shows it again', async () => {
