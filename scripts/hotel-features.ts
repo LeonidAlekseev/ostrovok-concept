@@ -1,4 +1,5 @@
-// Derives the hotels' features for Эвал: the building and the noise at each real hotel (`public.hotel_geo`) into
+// Derives the hotels' features for Эвал: the building and the noise at each real hotel (`public.hotel_geo`), with
+// their provenance (the datasets, the sources and the bounds of the height and the floors), into
 // `hotel_features`, the views of its room groups, one per `room_group_id` (the names of `ota_hotels.static_vm.room_groups`) into
 // `hotel_room_views`. Copies no raw data: only the derived values and the reference to the source.
 //   npm run db:features [-- --dry-run]   (Node runs the TypeScript itself; the keys come from .env.local)
@@ -125,7 +126,9 @@ async function stored<T>(table: Table | 'hotel_room_views_named', columns: strin
 }
 
 const FEATURE_COLUMNS =
-  'hotel_id, building_id, height_m, floors, lden_min, lden_max, lden_source, lnight_min, lnight_max, lnight_source'
+  'hotel_id, building_id, height_m, floors, lden_min, lden_max, lden_source, lnight_min, lnight_max, lnight_source, ' +
+  'building_dataset, geometry_source, height_source, height_lower_m, height_upper_m, floors_source, floors_lower, ' +
+  'floors_upper, noise_dataset'
 await write<FeatureRow>(
   'hotel_features',
   ['hotel_id'],
