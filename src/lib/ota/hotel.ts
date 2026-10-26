@@ -13,15 +13,24 @@ import {
   type Room,
   type StayType,
 } from '../catalog'
-import { generateHotel, workTraits } from '../catalogGenerator'
+import { generateHotel } from '../catalogGenerator'
 import type { OtaHotel, OtaMapHotel, OtaRate, OtaSearch } from './search'
 
 /**
  * A hotel of an Ostrovok search as a catalogue `Hotel`: the name, the address, the place, the stars, the
- * rating, the price, the photos, the amenities, the room with its rate and the review count are real; what the
- * search does not have (the description, the Wi‑Fi) the catalogue generator fills in. The reviews, the section
- * scores and the guests' photos are never generated: a real hotel shows only what Ostrovok has.
+ * rating, the price, the photos, the amenities, the room with its rate and the review count are real; the
+ * description, the check-in and check-out times and the workspace come from the hotel's Ostrovok page
+ * (`OtaPageFields`, src/lib/ota/page.ts). The Wi‑Fi speed is unknown (`null`): neither has it. The reviews, the
+ * section scores and the guests' photos are never generated; the page's are `HotelDetails`, read apart.
  */
+
+/** What the hotel's Ostrovok page gives its catalogue row. */
+export interface OtaPageFields {
+  description: string
+  checkIn: string | null
+  checkOut: string | null
+  workspace: boolean
+}
 
 /** The search's stay: its check-in (an instant) and its length, which the prices of the search are for. */
 export interface OtaStay {
@@ -148,8 +157,18 @@ function pinRoom(raw: OtaHotel, priceFrom: number): Room {
   }
 }
 
-/** The hotel of the search in the destination; `pin` is its map pin, the price of a hotel without rates. */
-export function otaHotel(raw: OtaHotel, destinationId: string, stay: OtaStay, pin?: OtaMapHotel): Hotel {
+/**
+ * The hotel of the search in the destination; `pin` is its map pin, the price of a hotel without rates; `page` the
+ * fields of its Ostrovok page. Without the page the description is empty and the times are the generator's, until
+ * `npm run db:load:ota-pages` and `npm run db:rebuild:ota`.
+ */
+export function otaHotel(
+  raw: OtaHotel,
+  destinationId: string,
+  stay: OtaStay,
+  pin?: OtaMapHotel,
+  page?: OtaPageFields,
+): Hotel {
   const vm = raw.static_vm
   const id = otaHotelId(raw.master_id)
   const stayType = STAY_TYPE_OF_KIND[vm.kind] ?? 'hotel'
@@ -167,7 +186,8 @@ export function otaHotel(raw: OtaHotel, destinationId: string, stay: OtaStay, pi
     rating,
     reviewCount: rating > 0 ? (vm.rating.count ?? 0) : 0,
     priceFrom,
-    ...workTraits(id, stayType),
+    wifiMbps: null,
+    workspace: page?.workspace ?? false,
     isNew: false,
   }
   const subway = vm.nearest_subways.toSorted((a, b) => a.distance - b.distance)[0]
@@ -192,6 +212,14 @@ export function otaHotel(raw: OtaHotel, destinationId: string, stay: OtaStay, pi
     rooms: rooms ?? [pinRoom(raw, priceFrom)],
   })
   // Ostrovok's rating and review count are real; the reviews, the scores of the sections and the guests' photos
-  // are not in the search, and the generator's would be made up.
-  return { ...hotel, sectionScores: [], reviews: [], guestPhotos: [] }
+  // are not in the search, and the generator's would be made up: the page's are the hotel's details.
+  return {
+    ...hotel,
+    description: page?.description ?? '',
+    checkInTime: page?.checkIn ?? hotel.checkInTime,
+    checkOutTime: page?.checkOut ?? hotel.checkOutTime,
+    sectionScores: [],
+    reviews: [],
+    guestPhotos: [],
+  }
 }

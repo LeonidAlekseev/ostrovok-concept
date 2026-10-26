@@ -188,8 +188,8 @@ describe('applyFilters', () => {
     expect(work.every((i) => i.hotel.workspace)).toBe(true)
     const fast = applyFilters(prague, filters({ wifiMin: 200 }))
     expect(fast.length).toBeGreaterThan(0)
-    expect(fast.every((i) => i.hotel.wifiMbps >= 200)).toBe(true)
-    expect(fast.length).toBe(prague.filter((h) => h.wifiMbps >= 200).length)
+    expect(fast.every((i) => i.hotel.wifiMbps! >= 200)).toBe(true)
+    expect(fast.length).toBe(prague.filter((h) => h.wifiMbps! >= 200).length)
   })
 
   it('keeps only the hotels with every chosen amenity', () => {

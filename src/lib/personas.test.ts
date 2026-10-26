@@ -26,7 +26,7 @@ describe('personaHotels', () => {
     // Scenario: Смена персоны
     const workation = personaHotels(hotels, 'workation')
     expect(workation.every((h) => h.workspace)).toBe(true)
-    expect(workation[0].wifiMbps).toBe(Math.max(...hotels.filter((h) => h.workspace).map((h) => h.wifiMbps)))
+    expect(workation[0].wifiMbps).toBe(Math.max(...hotels.filter((h) => h.workspace).map((h) => h.wifiMbps ?? 0)))
 
     const culture = personaHotels(hotels, 'culture')
     expect(culture.every((h) => h.rating >= 8)).toBe(true)

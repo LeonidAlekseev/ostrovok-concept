@@ -2,12 +2,61 @@ import { MockLanguageModelV4 } from 'ai/test'
 import { describe, expect, it } from 'vitest'
 import { getHotel } from '../catalogGenerator'
 import type { Hotel } from '../catalog'
+import type { HotelDetails } from '../hotelDetails'
 import { answerWithModel, hotelFacts, isRussian, NO_NEARBY_DATA, ruleAnswer } from './hotelAnswer'
 
 const base = getHotel('prague-old-town-lantern')!
 const hotel: Hotel = { ...base, amenities: ['wifi', 'parking', 'pets'] }
 const bare: Hotel = { ...base, amenities: ['wifi'] }
 const dates = { checkIn: '2026-11-10', checkOut: '2026-11-12' } as const
+
+/** What a real hotel's Ostrovok page gives. */
+const details: HotelDetails = {
+  description: [],
+  amenityGroups: [{ name: 'Парковка', slug: 'has_parking', amenities: ['Парковка рядом с отелем'] }],
+  policies: [
+    { label: 'Парковка рядом с отелем', value: '22 € за машину в сутки' },
+    { label: 'Размещение с питомцами', value: '15 € за питомца за проживание' },
+  ],
+  notes: null,
+  facts: { rooms: 140, roomFloors: 6, yearBuilt: null, yearRenovated: null, electricity: null },
+  building: { floors: 19, heightM: 60, estimated: true },
+  scores: [{ source: 'tripadvisor', rating: 4.5, scale: 5, reviewCount: 1327, sections: [] }],
+  reviews: [
+    {
+      id: 'r',
+      author: 'Анна',
+      date: '2022-08-06',
+      score: 8,
+      text: 'Номер с видом на море.',
+      source: 'tripadvisor',
+      helpful: 0,
+    },
+  ],
+  nearby: [
+    {
+      id: 1,
+      name: 'Фира Валенсия',
+      kind: 'Станция',
+      distanceM: 135,
+      bearingDeg: 10,
+      lat: 39.5,
+      lon: -0.42,
+      transport: true,
+    },
+    {
+      id: 2,
+      name: 'Зоопарк Биопарк',
+      kind: 'Зоопарк или аквариум',
+      distanceM: 3165,
+      bearingDeg: 120,
+      lat: 39.47,
+      lon: -0.4,
+      transport: false,
+    },
+  ],
+  viewQuotes: [{ reviewId: 'r', source: 'tripadvisor', author: 'Анна', text: 'Номер с видом на море.' }],
+}
 
 const usage = {
   inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
@@ -52,6 +101,27 @@ describe('ruleAnswer', () => {
     expect(answer).toMatch(/до центра [\d,]+ км/)
   })
 
+  it('names Ostrovok’s places nearby with their distances when the hotel’s page has them', () => {
+    const { answer, unverified } = ruleAnswer('Что рядом с отелем?', hotel, undefined, details)
+    expect(answer).toBe(
+      'Рядом с отелем, по данным Островка:\n• Фира Валенсия (станция) — 140 м\n• Зоопарк Биопарк (зоопарк или аквариум) — 3,2 км',
+    )
+    expect(answer).not.toContain(NO_NEARBY_DATA)
+    expect(unverified).toBeUndefined()
+  })
+
+  it('adds the page’s prices of the parking and of the pets', () => {
+    expect(ruleAnswer('Есть ли парковка?', hotel, undefined, details).answer).toMatch(
+      /^Да: парковка.* Парковка рядом с отелем: 22 € за машину в сутки\.$/,
+    )
+    expect(ruleAnswer('Есть ли парковка?', bare, undefined, details).answer).toBe(
+      'По данным отеля: Парковка рядом с отелем: 22 € за машину в сутки.',
+    )
+    expect(ruleAnswer('Можно с питомцами?', hotel, undefined, details).answer).toMatch(
+      /Размещение с питомцами: 15 € за питомца за проживание\.$/,
+    )
+  })
+
   it('refuses any other question', () => {
     expect(ruleAnswer('Расскажи анекдот', hotel).answer).toBe('Сейчас не могу ответить. Попробуйте позже.')
   })
@@ -65,6 +135,25 @@ describe('hotelFacts', () => {
     expect(facts).toContain('2026-11-10 — 2026-11-12')
     expect(facts).toContain('Данных о местах рядом')
     expect(hotelFacts(hotel)).toContain('Даты не выбраны')
+  })
+
+  it('carries the page: the places, the fees, the floors of the rooms apart from the building’s, the view quotes', () => {
+    const facts = hotelFacts({ ...hotel, wifiMbps: null }, undefined, { floors: 19, views: [] }, details)
+    expect(facts).toContain('Места рядом (по данным Островка, расстояние от отеля):\n- Фира Валенсия (станция) — 140 м')
+    expect(facts).toContain('- Парковка рядом с отелем: 22 € за машину в сутки')
+    expect(facts).toContain('Этажей в здании (EUBUCCO): 19')
+    expect(facts).toContain('Номера занимают 6 этажей (по данным отеля)')
+    expect(facts).not.toContain('В здании 19 этажей')
+    expect(facts).toContain('- «Номер с видом на море.» (TripAdvisor)')
+    expect(facts).toContain('Скорость Wi‑Fi неизвестна')
+    expect(facts).not.toContain('Данных о местах рядом')
+  })
+
+  it('says there are no reliable data of a doubtful building, and gives none of its floors', () => {
+    const facts = hotelFacts(hotel, undefined, { views: [], buildingDoubtful: true }, details)
+    expect(facts).toContain('Этажность и высота здания: надёжных данных по зданию нет')
+    expect(facts).not.toContain('Этажей в здании')
+    expect(facts).toContain('Номера занимают 6 этажей (по данным отеля)')
   })
 })
 

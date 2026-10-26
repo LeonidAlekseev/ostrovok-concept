@@ -18,7 +18,7 @@ export const PERSONA_HOTELS = 6
 const RULES: Record<Persona, { fits: (h: Hotel) => boolean; order: (a: Hotel, b: Hotel) => number }> = {
   student: { fits: (h) => h.rating >= 7, order: (a, b) => a.priceFrom - b.priceFrom },
   luxury: { fits: (h) => h.stayType === 'hotel' && h.stars === 5, order: (a, b) => b.rating - a.rating },
-  workation: { fits: (h) => h.workspace, order: (a, b) => b.wifiMbps - a.wifiMbps },
+  workation: { fits: (h) => h.workspace, order: (a, b) => (b.wifiMbps ?? 0) - (a.wifiMbps ?? 0) },
   culture: { fits: (h) => h.rating >= 8, order: (a, b) => a.distanceKm - b.distanceKm },
 }
 

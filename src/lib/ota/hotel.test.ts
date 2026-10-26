@@ -76,7 +76,26 @@ describe('otaHotel', () => {
       amenities: ['wifi', 'air-conditioning', 'parking'],
       isNew: false,
     })
-    expect(hotel.description).toMatch(/^Отель Malcom and Barret — 3-звёздочный отель в 2,2 км от центра Валенсии\./)
+    // Without the hotel's page nothing is generated in place of its description, and the Wi‑Fi speed is unknown.
+    expect(hotel.description).toBe('')
+    expect(hotel.wifiMbps).toBeNull()
+    expect(hotel.workspace).toBe(false)
+  })
+
+  it("takes the description, the times and the workspace of the hotel's page", () => {
+    const hotel = otaHotel(raw(), 'valencia', STAY, undefined, {
+      description: 'Отель у парка.\n\nЕсть бассейн.',
+      checkIn: '15:00',
+      checkOut: '11:00',
+      workspace: true,
+    })
+    expect(hotel).toMatchObject({
+      description: 'Отель у парка.\n\nЕсть бассейн.',
+      checkInTime: '15:00',
+      checkOutTime: '11:00',
+      workspace: true,
+      wifiMbps: null,
+    })
   })
 
   it('has no generated reviews, section scores or guest photos, rated or not', () => {
@@ -104,7 +123,6 @@ describe('otaHotel', () => {
     const unrated = otaHotel(raw({ star_rating: undefined }), 'valencia', STAY)
     expect(unrated.stars).toBe(0)
     expect(hasStars(unrated)).toBe(false)
-    expect(unrated.description).toMatch(/— отель в /)
   })
 
   it.each([

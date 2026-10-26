@@ -53,7 +53,8 @@ export type ReviewOrder = keyof typeof REVIEW_ORDERS
 
 type Sortable = Pick<Review, 'id' | 'date' | 'score' | 'helpful'>
 
-const newestFirst = (a: Sortable, b: Sortable) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id)
+// The undated reviews after the dated ones.
+const newestFirst = (a: Sortable, b: Sortable) => (b.date ?? '').localeCompare(a.date ?? '') || a.id.localeCompare(b.id)
 
 const ORDER_COMPARE: Record<ReviewOrder, (a: Sortable, b: Sortable) => number> = {
   helpful: (a, b) => b.helpful - a.helpful || newestFirst(a, b),

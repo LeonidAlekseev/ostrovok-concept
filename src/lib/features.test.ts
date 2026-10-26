@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  isDoubtfulBuilding,
+  withoutDoubtfulBuildings,
   bandLabel,
   featureLines,
   featureReasons,
@@ -133,5 +135,33 @@ describe('featuresOf', () => {
       views: [{ roomName: 'Люкс с видом на море', view: 'sea' }],
     })
     expect(map.get('ota-2')).toEqual({ views: [{ roomName: 'Номер с видом на город', view: 'city' }] })
+  })
+})
+
+describe('withoutDoubtfulBuildings', () => {
+  it('doubts a building lower than the floors the rooms take', () => {
+    expect(isDoubtfulBuilding(3, 12)).toBe(true)
+    expect(isDoubtfulBuilding(19, 6)).toBe(false)
+    expect(isDoubtfulBuilding(6, 6)).toBe(false)
+    expect(isDoubtfulBuilding(3, null)).toBe(false)
+    expect(isDoubtfulBuilding(undefined, 12)).toBe(false)
+  })
+
+  it('drops the floors and the height of a doubtful building, keeps the noise and the views', () => {
+    const features = new Map([
+      ['ota-1', { floors: 3, heightM: 10, lnight: { max: 39 }, views: [] }],
+      ['ota-2', { floors: 19, heightM: 60, views: [] }],
+      ['ota-3', { floors: 5, views: [] }],
+    ])
+    const checked = withoutDoubtfulBuildings(
+      features,
+      new Map([
+        ['ota-1', 12],
+        ['ota-2', 6],
+      ]),
+    )
+    expect(checked.get('ota-1')).toEqual({ lnight: { max: 39 }, views: [], buildingDoubtful: true })
+    expect(checked.get('ota-2')).toEqual({ floors: 19, heightM: 60, views: [] })
+    expect(checked.get('ota-3')).toEqual({ floors: 5, views: [] })
   })
 })

@@ -524,7 +524,7 @@ export type Database = {
           stars: number
           stay_type: string
           updated_at: string
-          wifi_mbps: number
+          wifi_mbps: number | null
           workspace: boolean
         }
         ComputedFields: never
@@ -540,7 +540,7 @@ export type Database = {
           stars: number
           stay_type?: string
           updated_at?: string
-          wifi_mbps?: number
+          wifi_mbps?: number | null
           workspace?: boolean
         }
         Update: {
@@ -555,7 +555,7 @@ export type Database = {
           stars?: number
           stay_type?: string
           updated_at?: string
-          wifi_mbps?: number
+          wifi_mbps?: number | null
           workspace?: boolean
         }
         Relationships: [
@@ -636,6 +636,89 @@ export type Database = {
         }
         Relationships: []
       }
+      ota_hotel_pages: {
+        Row: {
+          hotel: NonNullable<Json>
+          master_id: number
+          reviews: NonNullable<Json>
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          hotel: NonNullable<Json>
+          master_id: number
+          reviews?: NonNullable<Json>
+          updated_at?: string
+        }
+        Update: {
+          hotel?: NonNullable<Json>
+          master_id?: number
+          reviews?: NonNullable<Json>
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'ota_hotel_pages_master_id_fkey'
+            columns: ['master_id']
+            isOneToOne: true
+            referencedRelation: 'ota_hotels'
+            referencedColumns: ['master_id']
+          },
+        ]
+      }
+      ota_hotel_pois: {
+        Row: {
+          distance_m: number
+          is_nearby: boolean
+          is_top_poi: boolean
+          is_transport_hub: boolean
+          master_id: number
+          region_id: number
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          distance_m: number
+          is_nearby: boolean
+          is_top_poi: boolean
+          is_transport_hub: boolean
+          master_id: number
+          region_id: number
+          updated_at?: string
+        }
+        Update: {
+          distance_m?: number
+          is_nearby?: boolean
+          is_top_poi?: boolean
+          is_transport_hub?: boolean
+          master_id?: number
+          region_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'ota_hotel_pois_master_id_fkey'
+            columns: ['master_id']
+            isOneToOne: false
+            referencedRelation: 'ota_hotels'
+            referencedColumns: ['master_id']
+          },
+          {
+            foreignKeyName: 'ota_hotel_pois_region_id_fkey'
+            columns: ['region_id']
+            isOneToOne: false
+            referencedRelation: 'ota_hotel_places'
+            referencedColumns: ['region_id']
+          },
+          {
+            foreignKeyName: 'ota_hotel_pois_region_id_fkey'
+            columns: ['region_id']
+            isOneToOne: false
+            referencedRelation: 'ota_pois'
+            referencedColumns: ['region_id']
+          },
+        ]
+      }
       ota_hotels: {
         Row: {
           lat: number
@@ -672,6 +755,71 @@ export type Database = {
           ota_hotel_id?: string
           rates?: NonNullable<Json>
           static_vm?: NonNullable<Json>
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ota_pois: {
+        Row: {
+          catalog_slug: string | null
+          genitive: string | null
+          geom: unknown
+          locative_in: string | null
+          name: string
+          name_en: string
+          region_id: number
+          subtype: string
+          type: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          catalog_slug?: string | null
+          genitive?: string | null
+          geom: unknown
+          locative_in?: string | null
+          name: string
+          name_en: string
+          region_id: number
+          subtype: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          catalog_slug?: string | null
+          genitive?: string | null
+          geom?: unknown
+          locative_in?: string | null
+          name?: string
+          name_en?: string
+          region_id?: number
+          subtype?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ota_rate_spec_tags: {
+        Row: {
+          adj_kind: string
+          name: string
+          priority: number
+          translation: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          adj_kind: string
+          name: string
+          priority: number
+          translation: string
+          updated_at?: string
+        }
+        Update: {
+          adj_kind?: string
+          name?: string
+          priority?: number
+          translation?: string
           updated_at?: string
         }
         Relationships: []
@@ -754,6 +902,35 @@ export type Database = {
             isOneToOne: false
             referencedRelation: 'hotels'
             referencedColumns: ['id']
+          },
+        ]
+      }
+      ota_hotel_places: {
+        Row: {
+          bearing_deg: number | null
+          distance_m: number | null
+          hotel_id: string | null
+          is_nearby: boolean | null
+          is_top_poi: boolean | null
+          is_transport_hub: boolean | null
+          lat: number | null
+          lon: number | null
+          master_id: number | null
+          name: string | null
+          name_en: string | null
+          region_id: number | null
+          straight_m: number | null
+          subtype: string | null
+          type: string | null
+        }
+        ComputedFields: never
+        Relationships: [
+          {
+            foreignKeyName: 'ota_hotel_pois_master_id_fkey'
+            columns: ['master_id']
+            isOneToOne: false
+            referencedRelation: 'ota_hotels'
+            referencedColumns: ['master_id']
           },
         ]
       }

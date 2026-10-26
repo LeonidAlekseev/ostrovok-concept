@@ -278,7 +278,8 @@ export function applyFilters(hotels: Hotel[], f: Filters, stay: Stay | null = nu
     if (f.types.length && !f.types.includes(hotel.stayType)) continue
     if (f.stars.length && !(hasStars(hotel) && f.stars.includes(hotel.stars))) continue
     if (f.workspace && !hotel.workspace) continue
-    if (f.wifiMin !== null && hotel.wifiMbps < f.wifiMin) continue
+    // An unknown speed does not meet a minimum.
+    if (f.wifiMin !== null && (hotel.wifiMbps ?? 0) < f.wifiMin) continue
     if (f.ratingMin !== null && hotel.rating < f.ratingMin) continue
     if (f.ratingMax !== null && hotel.rating > f.ratingMax) continue
     if (!f.amenities.every((a) => hotel.amenities.includes(a))) continue
