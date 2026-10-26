@@ -174,70 +174,221 @@ export type Database = {
       geo_buildings: {
         Row: {
           construction_year: number | null
+          construction_year_confidence_lower: number | null
+          construction_year_confidence_upper: number | null
+          construction_year_source: string | null
+          construction_year_source_ids: string[] | null
+          dataset: string | null
           floors: number | null
+          floors_confidence_lower: number | null
+          floors_confidence_upper: number | null
+          floors_source: string | null
+          floors_source_ids: string[] | null
           geom: unknown
+          geometry_source: string | null
+          geometry_source_id: string | null
           height: number | null
+          height_confidence_lower: number | null
+          height_confidence_upper: number | null
+          height_source: string | null
+          height_source_ids: string[] | null
           id: string
+          made_valid: boolean
+          region_id: string | null
           subtype: string | null
+          subtype_confidence: number | null
+          subtype_raw: string | null
+          subtype_source: string | null
+          subtype_source_ids: string[] | null
           type: string | null
+          type_confidence: number | null
+          type_source: string | null
+          type_source_ids: string[] | null
         }
         ComputedFields: never
         Insert: {
           construction_year?: number | null
+          construction_year_confidence_lower?: number | null
+          construction_year_confidence_upper?: number | null
+          construction_year_source?: string | null
+          construction_year_source_ids?: string[] | null
+          dataset?: string | null
           floors?: number | null
+          floors_confidence_lower?: number | null
+          floors_confidence_upper?: number | null
+          floors_source?: string | null
+          floors_source_ids?: string[] | null
           geom: unknown
+          geometry_source?: string | null
+          geometry_source_id?: string | null
           height?: number | null
+          height_confidence_lower?: number | null
+          height_confidence_upper?: number | null
+          height_source?: string | null
+          height_source_ids?: string[] | null
           id: string
+          made_valid?: boolean
+          region_id?: string | null
           subtype?: string | null
+          subtype_confidence?: number | null
+          subtype_raw?: string | null
+          subtype_source?: string | null
+          subtype_source_ids?: string[] | null
           type?: string | null
+          type_confidence?: number | null
+          type_source?: string | null
+          type_source_ids?: string[] | null
         }
         Update: {
           construction_year?: number | null
+          construction_year_confidence_lower?: number | null
+          construction_year_confidence_upper?: number | null
+          construction_year_source?: string | null
+          construction_year_source_ids?: string[] | null
+          dataset?: string | null
           floors?: number | null
+          floors_confidence_lower?: number | null
+          floors_confidence_upper?: number | null
+          floors_source?: string | null
+          floors_source_ids?: string[] | null
           geom?: unknown
+          geometry_source?: string | null
+          geometry_source_id?: string | null
           height?: number | null
+          height_confidence_lower?: number | null
+          height_confidence_upper?: number | null
+          height_source?: string | null
+          height_source_ids?: string[] | null
           id?: string
+          made_valid?: boolean
+          region_id?: string | null
           subtype?: string | null
+          subtype_confidence?: number | null
+          subtype_raw?: string | null
+          subtype_source?: string | null
+          subtype_source_ids?: string[] | null
           type?: string | null
+          type_confidence?: number | null
+          type_source?: string | null
+          type_source_ids?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'geo_buildings_dataset_fkey'
+            columns: ['dataset']
+            isOneToOne: false
+            referencedRelation: 'geo_datasets'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      geo_datasets: {
+        Row: {
+          extract: string
+          id: string
+          loaded_at: string
+          name: string
+          processing: string
+          url: string
+          version: string
+        }
+        ComputedFields: never
+        Insert: {
+          extract: string
+          id: string
+          loaded_at?: string
+          name: string
+          processing: string
+          url: string
+          version: string
+        }
+        Update: {
+          extract?: string
+          id?: string
+          loaded_at?: string
+          name?: string
+          processing?: string
+          url?: string
+          version?: string
         }
         Relationships: []
       }
       geo_noise: {
         Row: {
+          band_db: number | null
           category: string
+          dataset: string | null
           db_max: number | null
           db_min: number | null
           geom: unknown
+          geom_correction: boolean | null
+          geometry_error_description: string | null
           id: number
           indicator: string
+          made_valid: boolean
+          reportnet_file_id: number | null
           source: string
+          source_feature_id: number | null
+          source_identifier: string | null
         }
         ComputedFields: never
         Insert: {
+          band_db?: never
           category: string
+          dataset?: string | null
           db_max?: number | null
           db_min?: number | null
           geom: unknown
+          geom_correction?: boolean | null
+          geometry_error_description?: string | null
           id?: never
           indicator: string
+          made_valid?: boolean
+          reportnet_file_id?: number | null
           source: string
+          source_feature_id?: number | null
+          source_identifier?: string | null
         }
         Update: {
+          band_db?: never
           category?: string
+          dataset?: string | null
           db_max?: number | null
           db_min?: number | null
           geom?: unknown
+          geom_correction?: boolean | null
+          geometry_error_description?: string | null
           id?: never
           indicator?: string
+          made_valid?: boolean
+          reportnet_file_id?: number | null
           source?: string
+          source_feature_id?: number | null
+          source_identifier?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'geo_noise_dataset_fkey'
+            columns: ['dataset']
+            isOneToOne: false
+            referencedRelation: 'geo_datasets'
+            referencedColumns: ['id']
+          },
+        ]
       }
       hotel_features: {
         Row: {
+          building_dataset: string | null
           building_id: string | null
           floors: number | null
+          floors_lower: number | null
+          floors_source: string | null
+          floors_upper: number | null
+          geometry_source: string | null
+          height_lower_m: number | null
           height_m: number | null
+          height_source: string | null
+          height_upper_m: number | null
           hotel_id: string
           lden_max: number | null
           lden_min: number | null
@@ -245,13 +396,22 @@ export type Database = {
           lnight_max: number | null
           lnight_min: number | null
           lnight_source: string | null
+          noise_dataset: string | null
           updated_at: string
         }
         ComputedFields: never
         Insert: {
+          building_dataset?: string | null
           building_id?: string | null
           floors?: number | null
+          floors_lower?: number | null
+          floors_source?: string | null
+          floors_upper?: number | null
+          geometry_source?: string | null
+          height_lower_m?: number | null
           height_m?: number | null
+          height_source?: string | null
+          height_upper_m?: number | null
           hotel_id: string
           lden_max?: number | null
           lden_min?: number | null
@@ -259,12 +419,21 @@ export type Database = {
           lnight_max?: number | null
           lnight_min?: number | null
           lnight_source?: string | null
+          noise_dataset?: string | null
           updated_at?: string
         }
         Update: {
+          building_dataset?: string | null
           building_id?: string | null
           floors?: number | null
+          floors_lower?: number | null
+          floors_source?: string | null
+          floors_upper?: number | null
+          geometry_source?: string | null
+          height_lower_m?: number | null
           height_m?: number | null
+          height_source?: string | null
+          height_upper_m?: number | null
           hotel_id?: string
           lden_max?: number | null
           lden_min?: number | null
@@ -272,14 +441,29 @@ export type Database = {
           lnight_max?: number | null
           lnight_min?: number | null
           lnight_source?: string | null
+          noise_dataset?: string | null
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: 'hotel_features_building_dataset_fkey'
+            columns: ['building_dataset']
+            isOneToOne: false
+            referencedRelation: 'geo_datasets'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'hotel_features_hotel_id_fkey'
             columns: ['hotel_id']
             isOneToOne: true
             referencedRelation: 'hotels'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'hotel_features_noise_dataset_fkey'
+            columns: ['noise_dataset']
+            isOneToOne: false
+            referencedRelation: 'geo_datasets'
             referencedColumns: ['id']
           },
         ]
@@ -512,11 +696,12 @@ export type Database = {
         Returns: {
           created_at: string
           id: string
-          snapshot: NonNullable<Json>
+          snapshot: Json
           title: string
         }[]
       }
       hotel_geo: { Args: { lat: number; lon: number }; Returns: Json }
+      hotel_geo_features: { Args: { lat: number; lon: number; radius_m?: number }; Returns: Json }
       match_embeddings: {
         Args: { destination_ids?: string[]; match_count?: number; match_kind: string; query_embedding: unknown }
         Returns: {
@@ -526,10 +711,7 @@ export type Database = {
           similarity: number
         }[]
       }
-      rate_limit_hit: {
-        Args: { hit_key: string; hit_limit: number; window_seconds: number }
-        Returns: boolean
-      }
+      rate_limit_hit: { Args: { hit_key: string; hit_limit: number; window_seconds: number }; Returns: boolean }
       similar_hotels: {
         Args: { hotel_id: string; match_count?: number; profile_ids?: string[] }
         Returns: {
