@@ -92,13 +92,23 @@ describe('HotelTile text and prices', () => {
     render(<HotelTile hotel={hotel} href={`/hotels/${hotel.id}`} />)
     const card = screen.getByRole('article')
     expect(within(card).getByRole('link', { name: hotel.name }).getAttribute('href')).toBe(`/hotels/${hotel.id}`)
-    const heading = within(card).getByRole('heading', { level: 3, name: hotel.name })
-    expect(heading.nextElementSibling?.textContent).toBe(`${formatDecimal(hotel.distanceKm)} км от центра Праги`)
+    expect(within(card).getByText(`${formatDecimal(hotel.distanceKm)} км от центра Праги`)).toBeDefined()
 
     expect(within(card).getByText(formatPrice(hotel.priceFrom), exact)).toBeDefined()
     expect(within(card).getByText(formatPrice(Math.round(hotel.priceFrom * 0.9)), exact)).toBeDefined()
     expect(within(card).getByRole('img', { name: 'GURU' })).toBeDefined()
     expect(card.textContent).not.toMatch(/(^|\s)от \d|за ночь|за \d+ ноч/)
+  })
+
+  it('drops the city from the visible distance on a narrow card, but reads it to screen readers', () => {
+    render(<HotelTile hotel={hotel} href="/" />)
+    const card = screen.getByRole('article')
+    const full = within(card).getByText(`${formatDecimal(hotel.distanceKm)} км от центра Праги`)
+    expect(full.className).toMatch(/\bsr-only\b/)
+    const visible = full.previousElementSibling!
+    expect(visible.getAttribute('aria-hidden')).toBe('true')
+    expect(visible.querySelector('span')!.className).toMatch(/\bhidden @\[281px\]:inline\b/)
+    expect(visible.querySelector('span')!.textContent).toBe(' Праги')
   })
 
   it('prices a given price', () => {
@@ -170,8 +180,7 @@ describe('HotelTile plain', () => {
     const card = screen.getByRole('article')
     expect(within(card).queryByText('Апартаменты')).toBeNull()
     expect(within(card).getByRole('link', { name: apartments.name })).toBeDefined()
-    const heading = within(card).getByRole('heading', { level: 3, name: apartments.name })
-    expect(heading.nextElementSibling?.textContent).toBe(`${formatDecimal(apartments.distanceKm)} км от центра Праги`)
+    expect(within(card).getByText(`${formatDecimal(apartments.distanceKm)} км от центра Праги`)).toBeDefined()
     expect(within(card).getByText(formatPrice(apartments.priceFrom), exact)).toBeDefined()
     expect(within(card).getByRole('img', { name: 'GURU' })).toBeDefined()
   })

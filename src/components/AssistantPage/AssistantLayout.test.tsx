@@ -344,7 +344,7 @@ describe('the hotel cards of an answer', () => {
     const plan = makePlan(lisbonBrief, today, destinations, newHotels, [without])
     renderWith([withPlan('Лиссабон', 5, plan)])
     const card = await cardOf(without.name)
-    expect(within(card).getByText(/км от центра/)).toBeTruthy()
+    expect(within(card).getAllByText(/км от центра/).length).toBeGreaterThan(0)
     expect(within(log()).queryByText(/Парковка/)).toBeNull()
     expect(within(log()).queryByText(/с видом/)).toBeNull()
   })

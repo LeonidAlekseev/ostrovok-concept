@@ -109,8 +109,15 @@ export function HotelTile({
               <span aria-hidden>·</span>
             </>
           )}
+          {/* From 281px the city follows the distance; the screen reader always gets the whole text. */}
           <span className="min-w-0 truncate">
-            {formatDecimal(hotel.distanceKm)} км от центра {destination?.genitive}
+            <span aria-hidden>
+              {formatDecimal(hotel.distanceKm)} км от центра
+              <span className="hidden @[281px]:inline"> {destination?.genitive}</span>
+            </span>
+            <span className="sr-only">
+              {formatDecimal(hotel.distanceKm)} км от центра {destination?.genitive}
+            </span>
           </span>
         </p>
         <div className="mt-auto flex flex-col gap-2 pt-2">
