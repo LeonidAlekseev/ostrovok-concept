@@ -88,7 +88,7 @@ vi.mock('maplibre-gl', () => {
   class Map {
     container: HTMLElement
     handlers: Record<string, Handler[]> = {}
-    constructor(options: { container: HTMLElement }) {
+    constructor(options: { container: HTMLElement; attributionControl?: unknown }) {
       this.container = options.container
       mapMock.options.push(options)
       mapMock.last = this
@@ -97,7 +97,11 @@ vi.mock('maplibre-gl', () => {
       const button = document.createElement('summary')
       button.className = 'maplibregl-ctrl-attrib-button'
       button.addEventListener('click', () => attribution.classList.toggle('maplibregl-compact-show'))
-      attribution.append(button)
+      const inner = document.createElement('div')
+      inner.className = 'maplibregl-ctrl-attrib-inner'
+      inner.innerHTML =
+        (options.attributionControl as { customAttribution?: string } | undefined)?.customAttribution ?? ''
+      attribution.append(button, inner)
       this.container.append(attribution)
       setTimeout(() => this.fire(mapMock.fail ? 'error' : 'load'))
     }
