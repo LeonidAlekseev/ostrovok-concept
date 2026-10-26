@@ -470,7 +470,10 @@ describe('AssistantSearch after a reload', () => {
       fetchMock.mockImplementation(async () => answer({ brief: { vibe: 'sea' } }))
       const { user, unmount } = renderAssistant()
       await user.type(input(), 'к морю{Enter}')
-      await inLog(/Когда планируете поехать/)
+      // A duplicate here has flaked in CI: a failure tells which messages the chats hold.
+      await inLog(/Когда планируете поехать/).catch((error: unknown) => {
+        throw new Error(`${error instanceof Error ? error.message : String(error)}\nstored: ${storedChats()}`)
+      })
       await user.click(newChatButton())
       await emptyChatOpen()
       await user.type(input(), 'тихий отель{Enter}')

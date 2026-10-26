@@ -184,6 +184,8 @@ export function useChats(
   const activeRef = useRef(activeId)
   const modeRef = useRef(mode)
   const inflight = useRef(new Map<string, AbortController>())
+  /** The pending messages already answered (or failed) in this visit: a late re-run of the effect must not ask again. */
+  const answered = useRef(new Set<string>())
   /** What Supabase already has of each chat, to write only the changed ones. */
   const saved = useRef(new Map<string, Chat>())
   const queue = useRef(Promise.resolve())
@@ -331,7 +333,7 @@ export function useChats(
   /** Eval's answer to the chat's pending message: its steps, then the text and the plan. */
   const runTurn = useCallback(
     async (chatId: string, pendingId: string) => {
-      if (inflight.current.has(chatId)) return
+      if (inflight.current.has(chatId) || answered.current.has(pendingId)) return
       const chat = chatsRef.current.find((c) => c.id === chatId)
       const pending = chat?.messages.find((m) => m.id === pendingId)
       if (!chat || !pending || pending.status !== 'pending') return
@@ -383,9 +385,11 @@ export function useChats(
         // The route asks the models that see photos in turn itself: one request, its steps tell of a switch.
         const [response] = await Promise.all([ask(), delay(THINK_MS)])
         if (controller.signal.aborted) return
+        answered.current.add(pendingId)
         finish(chatId, pendingId, response)
       } catch {
         if (controller.signal.aborted) return
+        answered.current.add(pendingId)
         update(chatId, (c) => ({
           ...c,
           messages: c.messages
@@ -413,7 +417,7 @@ export function useChats(
     const now = new Date().toISOString()
     update(chatId, (chat) => {
       const pending = chat.messages.find((m) => m.id === pendingId)
-      if (!pending) return chat
+      if (!pending || pending.status !== 'pending') return chat
       // The turn's steps go right before the answer, in their order.
       const stepMessages: ChatMessage[] = steps.map((step, i) => ({
         id: newId(),
@@ -470,7 +474,9 @@ export function useChats(
   const send = (raw: string, options: { more?: boolean; photos?: readonly OptimizedPhoto[] } = {}) => {
     const text = raw.trim()
     const sent = options.photos ?? []
-    if ((!text && sent.length === 0) || active.messages.some((m) => m.status === 'pending')) return
+    // The newest state, not the render's: two calls before a re-render are one message.
+    const current = chatsRef.current.find((c) => c.id === active.id) ?? active
+    if ((!text && sent.length === 0) || current.messages.some((m) => m.status === 'pending')) return
     const now = new Date().toISOString()
     const user: ChatMessage = {
       id: newId(),
@@ -499,18 +505,19 @@ export function useChats(
       createdAt: later(now, 2),
     }
     // A chat about a hotel is named after it, and the page's dates go to the next answer.
-    const about = hotel && (!active.brief.hotelId || active.brief.hotelId === hotel.id)
+    const about = hotel && (!current.brief.hotelId || current.brief.hotelId === hotel.id)
     const chat: Chat = {
-      ...active,
-      title: active.title || (about && hotel ? chatTitle(hotel.name) : chatTitle(text || PHOTO_TEXT)),
+      ...current,
+      title: current.title || (about && hotel ? chatTitle(hotel.name) : chatTitle(text || PHOTO_TEXT)),
       brief:
         about && hotel
-          ? { ...active.brief, hotelId: hotel.id, ...(hotel.dates && briefWithStay(hotel.dates)) }
-          : active.brief,
-      messages: [...active.messages, user, pending],
+          ? { ...current.brief, hotelId: hotel.id, ...(hotel.dates && briefWithStay(hotel.dates)) }
+          : current.brief,
+      messages: [...current.messages, user, pending],
       unread: false,
       updatedAt: now,
     }
+    chatsRef.current = [chat, ...chatsRef.current.filter((c) => c.id !== chat.id)]
     setChats((list) => [chat, ...list.filter((c) => c.id !== chat.id)])
     if (!listed) setDraft(newChat())
     // The turn starts from the effect above, once the chat is in the list.
@@ -537,11 +544,13 @@ export function useChats(
       })
   }
 
-  const retry = (chatId: string, messageId: string) =>
+  const retry = (chatId: string, messageId: string) => {
+    answered.current.delete(messageId)
     update(chatId, (chat) => ({
       ...chat,
       messages: chat.messages.map((m) => (m.id === messageId ? { ...m, status: 'pending', text: '' } : m)),
     }))
+  }
 
   const rename = (chatId: string, raw: string) => {
     const title = chatTitle(raw)
