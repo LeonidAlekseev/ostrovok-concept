@@ -137,7 +137,7 @@ const planInstructions = (hotel: GeoHotel) =>
   ].join(' ')
 
 /** The calls the model chose; throws when it chose none, so the next model of the chain is asked. */
-async function modelPlan(
+export async function modelPlan(
   model: LanguageModel,
   hotel: GeoHotel,
   messages: AssistantRequest['messages'],
