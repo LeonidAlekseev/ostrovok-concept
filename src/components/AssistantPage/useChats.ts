@@ -53,6 +53,7 @@ import {
 import type { PhotoUrl } from './ChatPhotos'
 import type { HotelSummary } from '@/lib/catalog'
 import { todayIso } from '@/lib/dates'
+import { isGeoQuestion } from '@/lib/geo/questions'
 import type { OptimizedPhoto } from '@/lib/imageOptimize'
 import { getBrowserClient } from '@/lib/supabase/client'
 
@@ -68,6 +69,8 @@ const reason = (error: unknown) => (error instanceof Error ? error.message.slice
 
 /** The first step the turn will show, while the answer is on its way: only when the plan is surely due. */
 const SEARCH_STEP = { agent: 'search', title: 'Подбираю отели по вашему описанию' } as const
+/** The step shown while a question about the places near the hotel is answered: the geo steps come with the answer. */
+const GEO_STEP = { agent: 'geo', title: 'Проверяю места рядом с отелем' } as const
 
 /** Eval's answer: the next question with what it has understood, or the plan once nothing is left to ask. */
 export function compose(
@@ -81,8 +84,13 @@ export function compose(
   const today = todayIso()
   // A chat about a hotel: the answer is the text, the model's general knowledge goes apart; no questions, no plan.
   if (brief.hotelId) {
-    const { unverified } = response
-    return { brief, question: null, text: remark ?? HOTEL_UNAVAILABLE, data: unverified ? { unverified } : {} }
+    const { unverified, map } = response
+    return {
+      brief,
+      question: null,
+      text: remark ?? HOTEL_UNAVAILABLE,
+      data: { ...(unverified && { unverified }), ...(map && { map }) },
+    }
   }
   // The photos: Эвал asks what to do with them, or says it could not look at them.
   if (photo?.action === 'ask') return { brief, question: PHOTO_QUESTION, text: PHOTO_QUESTION.text, data: {} }
@@ -350,20 +358,21 @@ export function useChats(
       // The plan is surely due when the rules alone complete the brief: its first step shows while Эвал works.
       const planDue =
         !found && !chat.brief.hotelId && !nextQuestion(mergeBrief(chat.brief, input, question, destinations), today)
+      const waitStep = planDue ? SEARCH_STEP : chat.brief.hotelId && isGeoQuestion(input) ? GEO_STEP : null
       const stepId = newId()
       update(chatId, (c) => ({
         ...c,
         messages: [
           // Steps left pending by an earlier visit go: the turn shows its own.
           ...c.messages.filter((m) => !(m.role === 'agent' && m.status === 'pending')),
-          ...(planDue
+          ...(waitStep
             ? [
                 {
                   id: stepId,
                   role: 'agent',
                   status: 'pending',
                   text: '',
-                  data: { step: SEARCH_STEP },
+                  data: { step: waitStep },
                   createdAt: later(pending.createdAt, -1),
                 } satisfies ChatMessage,
               ]

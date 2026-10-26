@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { firstAnswer } from '@/lib/ai/chain'
+import { geoTurn } from '@/lib/ai/geoTurn'
 import { answerWithModel, ruleAnswer } from '@/lib/ai/hotelAnswer'
 import { getTextModels, getVisionModels } from '@/lib/ai/model'
 import { APICallError } from 'ai'
@@ -40,6 +41,7 @@ import { loadHotelFeatures } from '@/lib/db/features'
 import { loadHotelDetails } from '@/lib/db/hotelDetails'
 import { todayIso, type IsoDate } from '@/lib/dates'
 import type { Hotel } from '@/lib/catalog'
+import { isGeoQuestion } from '@/lib/geo/questions'
 
 const requestSchema = z.object({
   messages: z
@@ -107,6 +109,9 @@ async function planTurn(context: Omit<TurnContext, 'summaries' | 'features'>): P
 /**
  * A question about the hotel the chat is on: the model answers from the hotel's data, with its general knowledge
  * apart; on a missing key, an error or a timeout the rules answer the ready-made questions (src/lib/ai/hotelAnswer.ts).
+ * A question about the places near is the geo steps' (src/lib/ai/geoTurn.ts): the model chooses the calls of the geo
+ * tools, the answer tells what they found — the Ostrovok places of the hotel first, OpenStreetMap besides — with the
+ * steps' lines and the map; a hotel with neither data is answered as before.
  */
 async function hotelTurn(
   hotel: Hotel,
@@ -119,6 +124,24 @@ async function hotelTurn(
 ): Promise<Response> {
   const next: Brief = { ...brief, hotelId: hotel.id, destinationId: hotel.destinationId }
   const [models, details] = await Promise.all([getTextModels(), loadHotelDetails(hotel.id)])
+  const geo = isGeoQuestion(messages[messages.length - 1].text)
+    ? await geoTurn(hotel, messages, {
+        deadline,
+        signal,
+        models,
+        ostrovok: details?.nearby,
+        onError: (id, error) => warn(`${id} did not choose the geo calls`, error),
+      })
+    : null
+  if (geo)
+    return Response.json({
+      brief: next,
+      reply: geo.summary,
+      source: geo.planner,
+      steps: geo.steps,
+      ...(geo.map && { map: geo.map }),
+      ...(geo.modelsDown && { modelsDown: true }),
+    } satisfies AssistantResponse)
   let down = false
   if (models) {
     const features = (await loadHotelFeatures().catch(() => null))?.get(hotel.id)
