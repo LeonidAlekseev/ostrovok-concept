@@ -7,7 +7,7 @@ import { CHATS_KEY, newChat, type Chat, type ChatMessage } from '../../lib/assis
 import { getHotel, hotels, newHotels } from '../../lib/catalogGenerator'
 import { addDays, todayIso } from '../../lib/dates'
 import { catalogFetch } from '../../test/catalog'
-import { setScreen, WIDE } from '../../test/screen'
+import { NARROW, setScreen, WIDE } from '../../test/screen'
 import { AssistantSearch } from './AssistantSearch'
 import { SharedChat } from './SharedChat'
 
@@ -96,6 +96,20 @@ describe('the layout of Eval’s page', () => {
     expect(aside.textContent).not.toMatch(/маршрут|авиабилет|виз/i)
   })
 
+  it('starts a new chat without an address of its own (Scenario: Компьютер)', async () => {
+    const user = renderWith([chatOf('Тихий отель', 5, ['Тихий отель в Лиссабоне'])])
+    await user.click(await within(chatList()).findByRole('button', { name: 'Новый чат' }))
+    expect(window.location.pathname).toBe('/assistant')
+  })
+})
+
+// assistant-search, Requirement: Раскладка страницы Эвала, Scenario: Телефон
+describe('the layout of Eval’s page on a phone', () => {
+  beforeEach(() => {
+    setScreen(NARROW)
+    window.history.replaceState(null, '', '/assistant')
+  })
+
   it('opens a chat at its address and goes back to the list (Scenario: Телефон)', async () => {
     const older = chatOf('Горы', 60, ['В горы'])
     const user = renderWith([chatOf('Море', 5, ['К морю']), older])
@@ -105,6 +119,19 @@ describe('the layout of Eval’s page', () => {
 
     await user.click(screen.getAllByRole('button', { name: 'Назад к чатам' })[0])
     await waitFor(() => expect(window.location.pathname).toBe('/assistant'))
+  })
+
+  it('opens the list at /assistant, not the newest chat, and hides the open chat', () => {
+    renderWith([chatOf('Тихий отель', 5, ['Тихий отель в Лиссабоне'])])
+    expect(window.location.pathname).toBe('/assistant')
+    expect(chatList().className).not.toContain('max-lg:hidden')
+    expect(screen.getByRole('region', { name: 'Чат с Эвалом' }).className).toContain('max-lg:hidden')
+  })
+
+  it('starts a new chat at an address of its own', async () => {
+    const user = renderWith([chatOf('Тихий отель', 5, ['Тихий отель в Лиссабоне'])])
+    await user.click(await within(chatList()).findByRole('button', { name: 'Новый чат' }))
+    expect(window.location.pathname).toMatch(/^\/assistant\/[0-9a-f-]{36}$/)
   })
 })
 

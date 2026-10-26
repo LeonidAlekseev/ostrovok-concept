@@ -7,6 +7,7 @@ import { newHotels } from '@/lib/catalogGenerator'
 import { createHotelFeed, pickOther } from './globeScene'
 import { cardShift, type CardFit } from './cardFit'
 import { Hero } from './Hero'
+import { NARROW, setScreen } from '../../test/screen'
 
 const hotels = newHotels
 const cities = destinations.filter((d) => hotels.some((hotel) => hotel.destinationId === d.id))
@@ -123,7 +124,8 @@ describe('Hero in the browser', () => {
         disconnect() {}
       },
     )
-    window.matchMedia = ((query: string) => ({ matches: reducedMotion, media: query })) as typeof window.matchMedia
+    // The width is a phone's: the card fit (cardShift) then runs as it always did in these tests.
+    setScreen(NARROW, { reducedMotion })
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
     // jsdom has no Web Animations: the card's entrance is a no-op.
     Element.prototype.animate ??= () => ({}) as Animation
