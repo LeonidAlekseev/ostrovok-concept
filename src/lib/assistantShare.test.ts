@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
+import { storageBucket } from '@/test/storageBucket'
 import { newChat, type Chat, type ChatMessage } from './assistantChats'
 import {
   SHARED_PHOTO_BUCKET,
   SHARE_ERROR,
+  UNSHARE_ERROR,
+  deleteShare,
   isShareId,
   loadSharedChat,
   parseSnapshot,
@@ -131,6 +134,39 @@ describe('a shared chat', () => {
     warn.mockRestore()
   })
 
+  it('removes the copied photos when the snapshot is not saved', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const userId = '11111111-1111-4111-8111-111111111111'
+    const path = `${userId}/${chat.id}/22222222-2222-4222-8222-222222222222/0.webp`
+    const shared = storageBucket()
+    const c = {
+      ...client({ data: null, error: { message: 'new row violates check constraint' } }),
+      auth: { getSession: async () => ({ data: { session: { user: { id: userId } } } }) },
+      storage: {
+        from: (bucket: string) =>
+          bucket === SHARED_PHOTO_BUCKET
+            ? { ...shared, getPublicUrl: (to: string) => ({ data: { publicUrl: `https://cdn.example/${to}` } }) }
+            : {
+                copy: async (_: string, to: string) => {
+                  shared.stored.set(to, '2026-10-26T12:00:00.000Z')
+                  return { data: { path: to }, error: null }
+                },
+              },
+      },
+    }
+    await expect(
+      shareChat(c as never, {
+        ...chat,
+        messages: [message('user', 'вот', { data: { attachments: [{ path, width: 8, height: 6 }] } })],
+      }),
+    ).rejects.toThrow(SHARE_ERROR)
+    expect(shared.remove).toHaveBeenCalledWith([
+      expect.stringMatching(new RegExp(`^${userId}/[0-9a-f-]{36}/0\\.webp$`)),
+    ])
+    expect(shared.stored.size).toBe(0)
+    warn.mockRestore()
+  })
+
   it('reads a snapshot by its id; a malformed id is not asked for (Scenario: Просмотр по ссылке)', async () => {
     const id = '0b0c7a1e-6f2b-4b5e-9a37-0c6f1b2d3e4f'
     const row = { id, title: 'Тихий отель', snapshot: snapshotOf(chat), created_at: '2026-10-24T11:00:00.000Z' }
@@ -143,5 +179,63 @@ describe('a shared chat', () => {
     expect(await loadSharedChat(none as never, 'not-an-id')).toBeNull()
     expect(isShareId('not-an-id')).toBe(false)
     expect(none.rpc).toHaveBeenCalledTimes(1)
+  })
+})
+
+// assistant-search, Requirement: Лимит фото
+describe('deleting a shared chat', () => {
+  const userId = '11111111-1111-4111-8111-111111111111'
+  const id = '0b0c7a1e-6f2b-4b5e-9a37-0c6f1b2d3e4f'
+  const kept = '33333333-3333-4333-8333-333333333333'
+  const left = '44444444-4444-4444-8444-444444444444'
+
+  /** The user's snapshots in the table and their photos in the public bucket. */
+  function owner({ deleteError = null as { message: string } | null } = {}) {
+    const rows = new Set([id, kept])
+    const shared = storageBucket({
+      [`${userId}/${id}/0.webp`]: '2026-10-26T11:59:00.000Z',
+      [`${userId}/${id}/1.jpg`]: '2026-10-26T11:59:00.000Z',
+      [`${userId}/${kept}/0.webp`]: '2026-10-20T10:00:00.000Z',
+      // A snapshot deleted by hand long ago: its photos stayed.
+      [`${userId}/${left}/0.webp`]: '2026-10-20T10:00:00.000Z',
+    })
+    const eq = vi.fn(async (_: string, value: string) => {
+      if (!deleteError) rows.delete(value)
+      return { error: deleteError }
+    })
+    const c = {
+      from: vi.fn(() => ({
+        delete: () => ({ eq }),
+        select: async () => ({ data: [...rows].map((r) => ({ id: r })), error: null }),
+      })),
+      auth: { getSession: async () => ({ data: { session: { user: { id: userId } } } }) },
+      storage: { from: vi.fn(() => shared) },
+    }
+    return { c, eq, rows, shared }
+  }
+
+  it('deletes its photos and the ones left by the snapshots deleted before (Scenario: Удаление снимка)', async () => {
+    const { c, eq, rows, shared } = owner()
+    await deleteShare(c as never, id)
+    expect(c.from).toHaveBeenCalledWith('assistant_chat_shares')
+    expect(eq).toHaveBeenCalledWith('id', id)
+    expect([...rows]).toEqual([kept])
+    expect(c.storage.from).toHaveBeenCalledWith(SHARED_PHOTO_BUCKET)
+    expect([...shared.stored.keys()]).toEqual([`${userId}/${kept}/0.webp`])
+  })
+
+  it('keeps the photos when the snapshot is not deleted', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { c, shared } = owner({ deleteError: { message: 'permission denied' } })
+    await expect(deleteShare(c as never, id)).rejects.toThrow(UNSHARE_ERROR)
+    expect(shared.stored.size).toBe(4)
+    expect(shared.remove).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('does not ask for a malformed id', async () => {
+    const { c } = owner()
+    await deleteShare(c as never, 'not-an-id')
+    expect(c.from).not.toHaveBeenCalled()
   })
 })

@@ -4,6 +4,9 @@ import { isBrief } from './assistantDialog'
 import { chatTitle, parseMessage, type Chat, type ChatMessage } from './assistantChats'
 import { PHOTO_BUCKET } from './assistantChatsRemote'
 import type { Database, Json } from './db/database.types'
+import { SHARED_PHOTO_BUCKET, orphanSharedPhotos, removeSharedPhotos, sharePhotoPaths } from './sharedPhotos'
+
+export { SHARED_PHOTO_BUCKET }
 
 /**
  * «Поделиться» a chat with Эвал: a read-only snapshot of it in `assistant_chat_shares`
@@ -11,7 +14,7 @@ import type { Database, Json } from './db/database.types'
  * user shares, with their session (RLS: their own rows); anyone reads one snapshot by id through the
  * `assistant_chat_share` function. Until the migration is applied, sharing fails with `SHARE_ERROR`. The photos of
  * the chat are copied to the public bucket `SHARED_PHOTO_BUCKET` under the snapshot's id, so anyone with the link
- * sees them and deleting the chat leaves them.
+ * sees them; deleting the chat leaves them, deleting the snapshot (`deleteShare`) removes them (src/lib/sharedPhotos.ts).
  */
 
 type Client = SupabaseClient<Database>
@@ -29,6 +32,7 @@ export interface SharedChat extends ShareSnapshot {
 }
 
 export const SHARE_ERROR = 'Не получилось поделиться чатом. Попробуйте ещё раз позже.'
+export const UNSHARE_ERROR = 'Не получилось удалить ссылку на чат. Попробуйте ещё раз позже.'
 
 export const shareHref = (id: string) => `/assistant/shared/${id}`
 
@@ -50,15 +54,18 @@ export function parseSnapshot(value: unknown): ShareSnapshot | null {
   return { title, brief, messages: messages.flatMap((m) => parseMessage(m) ?? []) }
 }
 
-export const SHARED_PHOTO_BUCKET = 'assistant-shared-attachments'
-
 /**
  * The snapshot's photos copied from the private bucket to the public one, at `<user_id>/<share_id>/<n>.webp`, with
- * their public links. A photo that is not copied reads «Фото» in the snapshot; a preview that never reached Storage
- * stays as it is.
+ * their public links and the paths of the copies. A photo that is not copied reads «Фото» in the snapshot; a preview
+ * that never reached Storage stays as it is.
  */
-async function sharePhotos(client: Client, shareId: string, snapshot: ShareSnapshot): Promise<ShareSnapshot> {
-  if (!snapshot.messages.some((m) => m.data.attachments?.some((a) => a.path))) return snapshot
+async function sharePhotos(
+  client: Client,
+  shareId: string,
+  snapshot: ShareSnapshot,
+): Promise<{ snapshot: ShareSnapshot; copied: string[] }> {
+  const copied: string[] = []
+  if (!snapshot.messages.some((m) => m.data.attachments?.some((a) => a.path))) return { snapshot, copied }
   const { data } = await client.auth.getSession()
   const userId = data.session?.user.id
   const own = client.storage.from(PHOTO_BUCKET)
@@ -84,18 +91,29 @@ async function sharePhotos(client: Client, shareId: string, snapshot: ShareSnaps
       if (error) {
         console.warn(`${SHARED_PHOTO_BUCKET}: ${error.message.slice(0, 200)}`)
         copies.push(size)
-      } else copies.push({ ...size, url: client.storage.from(SHARED_PHOTO_BUCKET).getPublicUrl(to).data.publicUrl })
+      } else {
+        copied.push(to)
+        copies.push({ ...size, url: client.storage.from(SHARED_PHOTO_BUCKET).getPublicUrl(to).data.publicUrl })
+      }
     }
     messages.push({ ...message, data: { ...message.data, attachments: copies } })
   }
-  return { ...snapshot, messages }
+  return { snapshot: { ...snapshot, messages }, copied }
+}
+
+/** Removes the photos; a failure is only told, the snapshot's own fate does not wait on them. */
+async function removePhotos(client: Client, paths: readonly string[]) {
+  if (paths.length === 0) return
+  await removeSharedPhotos(client.storage.from(SHARED_PHOTO_BUCKET), paths).catch((error: Error) =>
+    console.warn(error.message),
+  )
 }
 
 /** Saves the snapshot of the chat; the id of the link. Any failure throws `SHARE_ERROR`. */
 export async function shareChat(client: Client, chat: Chat): Promise<string> {
   // The id is made here: the photos are copied under it before the snapshot is written.
   const id = crypto.randomUUID()
-  const snapshot = await sharePhotos(client, id, snapshotOf(chat))
+  const { snapshot, copied } = await sharePhotos(client, id, snapshotOf(chat))
   const { data, error } = await client
     .from('assistant_chat_shares')
     .insert({ id, title: snapshot.title.slice(0, 200), snapshot: snapshot as unknown as NonNullable<Json> })
@@ -103,9 +121,39 @@ export async function shareChat(client: Client, chat: Chat): Promise<string> {
     .single()
   if (error || !data) {
     console.warn(`assistant_chat_shares: ${error?.message.slice(0, 200) ?? 'no row'}`)
+    // No snapshot, no one to see its photos.
+    await removePhotos(client, copied)
     throw new Error(SHARE_ERROR)
   }
   return data.id
+}
+
+/**
+ * Deletes the user's snapshot and then its photos, with the photos the user's earlier snapshots left (deleted by
+ * hand, or their photos failed to go). Throws `UNSHARE_ERROR` when the snapshot is not deleted; the photos that fail
+ * stay for `npm run db:clean:shared-photos`.
+ */
+export async function deleteShare(client: Client, id: string): Promise<void> {
+  if (!isShareId(id)) return
+  const { error } = await client.from('assistant_chat_shares').delete().eq('id', id)
+  if (error) {
+    console.warn(`assistant_chat_shares: ${error.message.slice(0, 200)}`)
+    throw new Error(UNSHARE_ERROR)
+  }
+  const { data } = await client.auth.getSession()
+  const userId = data.session?.user.id
+  if (!userId) return
+  const bucket = client.storage.from(SHARED_PHOTO_BUCKET)
+  const paths = await sharePhotoPaths(bucket, `${userId}/${id}`).catch(() => [])
+  // The other folders go only when the snapshots that remain are known: a folder of a snapshot is never taken.
+  const { data: rows, error: rowsError } = await client.from('assistant_chat_shares').select('id')
+  const orphans = rowsError
+    ? []
+    : await orphanSharedPhotos(bucket, userId, new Set(rows.map((r) => r.id))).catch((e: Error) => {
+        console.warn(e.message)
+        return []
+      })
+  await removePhotos(client, [...new Set([...paths, ...orphans])])
 }
 
 /** The shared chat of the id; `null` for an unknown or malformed id, or when the snapshots are unavailable. */
