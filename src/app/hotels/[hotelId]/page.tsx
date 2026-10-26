@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { HotelPage } from '@/components/HotelPage/HotelPage'
 import { loadHotel, loadHotelSummaries } from '@/lib/db/catalog'
 import { loadHotelDetails } from '@/lib/db/hotelDetails'
+import { loadHotelNoise } from '@/lib/db/noise'
 
 type Props = { params: Promise<{ hotelId: string }> }
 
@@ -20,5 +21,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function Page({ params }: Props) {
   const hotel = await loadHotel((await params).hotelId)
   if (!hotel) notFound()
-  return <HotelPage hotel={hotel} details={await loadHotelDetails(hotel.id)} />
+  const [details, noise] = await Promise.all([loadHotelDetails(hotel.id), loadHotelNoise(hotel)])
+  return <HotelPage hotel={hotel} details={details} noise={noise} />
 }

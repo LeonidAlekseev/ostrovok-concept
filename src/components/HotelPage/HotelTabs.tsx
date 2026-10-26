@@ -8,7 +8,7 @@ import { goToSection } from './goToSection'
 import { formatCount } from './reviewsLabel'
 
 /** The sections of the page in their order, as the tabs name them. */
-const hotelSections = (hotel: Hotel, details: HotelDetails | null | undefined) => [
+const hotelSections = (hotel: Hotel, details: HotelDetails | null | undefined, noise: boolean) => [
   { id: 'overview', label: 'Обзор' },
   { id: 'rooms', label: 'Номера' },
   { id: 'amenities', label: 'Удобства' },
@@ -17,6 +17,7 @@ const hotelSections = (hotel: Hotel, details: HotelDetails | null | undefined) =
     ? [{ id: 'rating', label: `Отзывы (${formatCount(hotel.reviewCount || (details?.reviews.length ?? 0))})` }]
     : []),
   { id: 'location', label: 'Расположение' },
+  ...(noise ? [{ id: 'noise', label: 'Шум' }] : []),
   { id: 'rules', label: 'Правила' },
 ]
 
@@ -31,15 +32,18 @@ const SLACK = 12
 export function HotelTabs({
   hotel,
   details,
+  noise = false,
   className,
   inDialog,
 }: {
   hotel: Hotel
   details?: HotelDetails | null
+  /** The page has «Шум и окружение». */
+  noise?: boolean
   className?: string
   inDialog?: boolean
 }) {
-  const sections = hotelSections(hotel, details)
+  const sections = hotelSections(hotel, details, noise)
   const ids = sections.map((s) => s.id).join(' ')
   const [active, setActive] = useState(sections[0].id)
   const nav = useRef<HTMLElement>(null)
