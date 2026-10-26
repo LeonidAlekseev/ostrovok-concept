@@ -17,6 +17,16 @@ export interface FeatureRow {
   lnight_min: number | null
   lnight_max: number | null
   lnight_source: string | null
+  /** The provenance (`geo_datasets.id`, EUBUCCO's sources and confidence bounds), null where the dataset has none. */
+  building_dataset: string | null
+  geometry_source: string | null
+  height_source: string | null
+  height_lower_m: number | null
+  height_upper_m: number | null
+  floors_source: string | null
+  floors_lower: number | null
+  floors_upper: number | null
+  noise_dataset: string | null
 }
 
 export interface ViewRow {
@@ -28,13 +38,29 @@ export interface ViewRow {
 
 /** What `public.hotel_geo(lat, lon)` answers, the parts read here. */
 export interface HotelGeo {
-  building?: { id?: unknown; height?: unknown; floors?: unknown } | null
-  loudest?: Partial<Record<'Lden' | 'Lnight', { source?: unknown; db_min?: unknown; db_max?: unknown }>> | null
+  building?: {
+    id?: unknown
+    height?: unknown
+    floors?: unknown
+    dataset?: unknown
+    geometry_source?: unknown
+    height_source?: unknown
+    height_confidence_lower?: unknown
+    height_confidence_upper?: unknown
+    floors_source?: unknown
+    floors_confidence_lower?: unknown
+    floors_confidence_upper?: unknown
+  } | null
+  loudest?: Partial<
+    Record<'Lden' | 'Lnight', { source?: unknown; db_min?: unknown; db_max?: unknown; dataset?: unknown }>
+  > | null
 }
 
 const positive = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null)
 const db = (value: unknown) => (typeof value === 'number' && Number.isInteger(value) ? value : null)
 const text = (value: unknown) => (typeof value === 'string' && value ? value : null)
+/** A bound of an estimate: a floor's lower bound may be 0. */
+const bound = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null)
 
 /** The hotel's row, or `null` when `hotel_geo` found neither a building nor noise there (outside Valencia). */
 export function featureRow(hotelId: string, geo: HotelGeo): FeatureRow | null {
@@ -48,6 +74,9 @@ export function featureRow(hotelId: string, geo: HotelGeo): FeatureRow | null {
   }
   const [lden_min, lden_max, lden_source] = noise('Lden')
   const [lnight_min, lnight_max, lnight_source] = noise('Lnight')
+  // The loudest bands of both indicators come from one dataset.
+  const noiseDataset =
+    lden_source || lnight_source ? text(geo.loudest?.Lden?.dataset ?? geo.loudest?.Lnight?.dataset) : null
   const row: FeatureRow = {
     hotel_id: hotelId,
     building_id: building ? text(building.id) : null,
@@ -60,6 +89,15 @@ export function featureRow(hotelId: string, geo: HotelGeo): FeatureRow | null {
     lnight_min: lnight_min as number | null,
     lnight_max: lnight_max as number | null,
     lnight_source: lnight_source as string | null,
+    building_dataset: building ? text(building.dataset) : null,
+    geometry_source: building ? text(building.geometry_source) : null,
+    height_source: building ? text(building.height_source) : null,
+    height_lower_m: building ? bound(building.height_confidence_lower) : null,
+    height_upper_m: building ? bound(building.height_confidence_upper) : null,
+    floors_source: building ? text(building.floors_source) : null,
+    floors_lower: building ? bound(building.floors_confidence_lower) : null,
+    floors_upper: building ? bound(building.floors_confidence_upper) : null,
+    noise_dataset: noiseDataset,
   }
   return row.building_id ||
     row.lden_max !== null ||

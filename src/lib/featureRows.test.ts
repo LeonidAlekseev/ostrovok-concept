@@ -2,15 +2,44 @@ import { describe, expect, it } from 'vitest'
 import { diffRows, featureRow, viewRows, type FeatureRow, type ViewRow } from './featureRows'
 
 const geo = {
-  building: { id: 'b-1', type: 'residential', height: 25.8, floors: 9.6, distance_m: 6.9 },
+  building: {
+    id: 'b-1',
+    type: 'residential',
+    height: 25.8,
+    floors: 9.6,
+    distance_m: 6.9,
+    dataset: 'eubucco-v0.2',
+    geometry_source: 'gov-spain',
+    height_source: 'estimated',
+    height_confidence_lower: 21.1,
+    height_confidence_upper: 30.4,
+    floors_source: 'gov-spain',
+    floors_confidence_lower: null,
+    floors_confidence_upper: null,
+  },
   noise: [],
   loudest: {
-    Lden: { source: 'roadsInAgglomeration', db_min: 65, db_max: 69, category: 'Lden6569' },
-    Lnight: { source: 'roadsInAgglomeration', db_min: null, db_max: 39, category: 'LnightLowerThan40' },
+    Lden: {
+      source: 'roadsInAgglomeration',
+      db_min: 65,
+      db_max: 69,
+      band_db: 5,
+      category: 'Lden6569',
+      dataset: 'eea-noise-end2022-v01_r00',
+    },
+    Lnight: {
+      source: 'roadsInAgglomeration',
+      db_min: null,
+      db_max: 39,
+      band_db: null,
+      category: 'LnightLowerThan40',
+      dataset: 'eea-noise-end2022-v01_r00',
+    },
   },
 }
 
 describe('featureRow', () => {
+  // geo-data, Requirement: Происхождение значений отеля
   it('keeps the derived values and the sources, the floors rounded', () => {
     expect(featureRow('ota-1', geo)).toEqual({
       hotel_id: 'ota-1',
@@ -23,6 +52,29 @@ describe('featureRow', () => {
       lnight_min: null,
       lnight_max: 39,
       lnight_source: 'roadsInAgglomeration',
+      building_dataset: 'eubucco-v0.2',
+      geometry_source: 'gov-spain',
+      height_source: 'estimated',
+      height_lower_m: 21.1,
+      height_upper_m: 30.4,
+      floors_source: 'gov-spain',
+      floors_lower: null,
+      floors_upper: null,
+      noise_dataset: 'eea-noise-end2022-v01_r00',
+    })
+  })
+
+  it('a floor bound of 0 is kept, a negative or missing one is not', () => {
+    const building = {
+      ...geo.building,
+      floors_confidence_lower: 0,
+      floors_confidence_upper: 2.5,
+      height_confidence_lower: -1,
+    }
+    expect(featureRow('ota-1', { ...geo, building })).toMatchObject({
+      floors_lower: 0,
+      floors_upper: 2.5,
+      height_lower_m: null,
     })
   })
 
@@ -34,7 +86,10 @@ describe('featureRow', () => {
     expect(featureRow('ota-3', { building: null, loudest: { Lnight: geo.loudest.Lnight } })).toMatchObject({
       building_id: null,
       floors: null,
+      building_dataset: null,
+      height_source: null,
       lnight_max: 39,
+      noise_dataset: 'eea-noise-end2022-v01_r00',
     })
   })
 })
