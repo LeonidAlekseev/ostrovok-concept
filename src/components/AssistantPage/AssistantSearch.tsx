@@ -27,9 +27,8 @@ interface Props {
   onChoose: ChooseSearch
 }
 
-/** The solid white panels of the page: the list, the chat. */
-const panelClass =
-  'rounded-[28px] bg-(--decor-light) shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border)_70%,transparent)]'
+/** The rounded, outlined panels of the three columns from `lg`; on phones the list lies on the page, the chat fills it. */
+const panelClass = 'lg:rounded-[28px] lg:shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border)_70%,transparent)]'
 /** The composer and the quick replies: solid fields on the white panel. */
 const fieldClass = 'bg-muted'
 const actionClass = `h-9 flex-none gap-1.5 bg-(--decor-light) px-3 text-sm font-medium text-foreground shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border)_70%,transparent)] hover:text-primary [&_svg]:text-primary`
@@ -180,7 +179,7 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
   return (
     <div
       data-assistant-app={screen}
-      className="grid min-h-0 flex-1 gap-4 max-lg:data-[assistant-app=chat]:h-(--chat-screen,100dvh) grid-cols-[minmax(0,1fr)] lg:h-full lg:grid-cols-[clamp(228px,19vw,290px)_minmax(0,1fr)_clamp(240px,21vw,320px)] xl:gap-5"
+      className="grid min-h-0 flex-1 gap-4 max-lg:data-[assistant-app=chat]:h-(--chat-screen,100dvh) max-lg:data-[assistant-app=chat]:flex-none max-lg:data-[assistant-app=chat]:grid-rows-[minmax(0,1fr)] grid-cols-[minmax(0,1fr)] lg:h-full lg:grid-cols-[clamp(228px,19vw,290px)_minmax(0,1fr)_clamp(240px,21vw,320px)] xl:gap-5"
       // The phone's keyboard is open: the chat fits above it.
       style={viewport && screen === 'chat' ? ({ '--chat-screen': `${viewport}px` } as CSSProperties) : undefined}
     >
@@ -193,12 +192,12 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
         onNew={fresh}
         onRename={rename}
         onDelete={removeChat}
-        className={`${panelClass} p-3 lg:p-4 ${screen === 'chat' ? 'max-lg:hidden' : ''}`}
+        className={`${panelClass} max-lg:p-0 lg:bg-(--decor-light) lg:p-4 ${screen === 'chat' ? 'max-lg:hidden' : ''}`}
       />
 
       <section
         aria-label="Чат с Эвалом"
-        className={`${panelClass} flex min-h-0 min-w-0 flex-col gap-3 p-[clamp(12px,3vw,20px)] max-lg:pt-[max(12px,env(safe-area-inset-top))] max-lg:pb-[max(12px,env(safe-area-inset-bottom))] lg:rounded-[28px] ${screen === 'list' ? 'max-lg:hidden' : ''}`}
+        className={`${panelClass} flex min-h-0 min-w-0 flex-col gap-3 bg-(--decor-light) p-[clamp(12px,3vw,20px)] max-lg:pt-[max(12px,env(safe-area-inset-top))] max-lg:pb-[max(12px,env(safe-area-inset-bottom))] ${screen === 'list' ? 'max-lg:hidden' : ''}`}
       >
         {started ? (
           <ChatHeader
