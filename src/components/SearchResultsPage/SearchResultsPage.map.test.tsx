@@ -132,6 +132,23 @@ describe('SearchResultsPage map preview', () => {
     expect(marker.hasAttribute('aria-describedby')).toBe(false)
     focusVisible.mockRestore()
   })
+
+  it('shows no kind of stay on the short card of apartments', async () => {
+    const user = userEvent.setup()
+    open(PRAGUE, { desktop: true })
+    await results()
+    const apartments = fullHotelsIn('prague')
+      .filter((h) => h.stayType === 'apartments')
+      .map((h) => h.name)
+    const marker = (await markers()).find((m) => apartments.includes(m.getAttribute('aria-label')!.split(',')[0]))!
+    expect(marker).toBeDefined()
+
+    await user.hover(marker)
+    const preview = document.getElementById(marker.getAttribute('aria-describedby')!)!
+    expect(within(preview).getByText(marker.getAttribute('aria-label')!.split(',')[0])).toBeDefined()
+    expect(within(preview).queryByText('Апартаменты')).toBeNull()
+    expect(within(preview).queryByRole('img', { name: /звезд|звёзд/ })).toBeNull()
+  })
 })
 
 // search-results-page, Requirement: Карта результатов поиска, Scenario: Группа

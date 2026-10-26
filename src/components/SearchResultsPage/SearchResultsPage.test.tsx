@@ -295,9 +295,16 @@ describe('SearchResultsPage filters', () => {
     await user.click(screen.getByRole('button', { name: 'Хостел' }))
     await user.click(screen.getByRole('button', { name: 'Апартаменты' }))
     expect(window.location.search).toContain('types=hostel%2Capartments')
-    expect(cards().length).toBeGreaterThan(0)
-    // The kind of stay is on the hotel's page only, not on the card.
-    for (const card of cards()) expect(within(card).queryByText(/^(Хостел|Апартаменты)$/)).toBeNull()
+    // The results are the catalogue's hostels and apartments of the city (the first page), by name, not by a label on the card.
+    const expected = applyFilters(fullHotelsIn('prague'), { ...NO_FILTERS, types: ['hostel', 'apartments'] })
+    expect(expected.length).toBeGreaterThan(0)
+    expect(expected.length).toBeLessThan(fullHotelsIn('prague').length)
+    expect(cardNames().sort()).toEqual(
+      expected
+        .slice(0, 12)
+        .map(({ hotel }) => hotel.name)
+        .sort(),
+    )
   })
 
   it('filters by the workspace and the Wi‑Fi speed from', async () => {
