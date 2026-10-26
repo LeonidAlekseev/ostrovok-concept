@@ -325,7 +325,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
 
       {result && (
         <>
-          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_minmax(0,1.25fr)] 3xl:grid-cols-[15rem_minmax(0,1.6fr)_minmax(0,1fr)]">
+          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] min-[1440px]:grid-cols-[15rem_minmax(0,1fr)_minmax(0,1.25fr)] 3xl:grid-cols-[15rem_minmax(0,1.6fr)_minmax(0,1fr)]">
             {desktop && (
               <aside aria-label="Фильтры" className="lg:col-start-1 lg:row-start-1">
                 <FiltersPanel filters={filters} onChange={updateFilters} priceBounds={bounds ?? [0, 0]} />
@@ -335,7 +335,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
             <section
               aria-label="Отели"
               className={cn(
-                'flex flex-col gap-3 lg:col-start-1 lg:row-start-2 xl:col-start-2 xl:row-start-1',
+                'flex flex-col gap-3 lg:col-start-1 lg:row-start-2 min-[1440px]:col-start-2 min-[1440px]:row-start-1',
                 view === 'map' && 'max-lg:hidden',
               )}
             >
@@ -363,7 +363,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
 
             {(desktop || view === 'map') && (
               // `svh`: the phone address bar showing and hiding while scrolling does not resize the map.
-              <div className="h-[70svh] overflow-hidden rounded-2xl shadow-(--shadow-card) lg:sticky lg:top-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-[calc(100svh-2rem)] xl:col-start-3">
+              <div className="h-[70svh] overflow-hidden rounded-2xl shadow-(--shadow-card) lg:sticky lg:top-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-[calc(100svh-2rem)] min-[1440px]:col-start-3">
                 <SearchMap
                   hotels={items}
                   activeId={activeId}
