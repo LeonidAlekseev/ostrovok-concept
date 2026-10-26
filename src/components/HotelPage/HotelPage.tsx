@@ -1,5 +1,6 @@
 import { cn } from 'cn'
-import { isRated, type Hotel } from '@/lib/catalog'
+import type { Hotel } from '@/lib/catalog'
+import { hasGuestReviews, type HotelDetails } from '@/lib/hotelDetails'
 import { AboutHotel, HotelAmenities } from './AboutHotel'
 import { BookingCard } from './BookingCard'
 import { Gallery } from './Gallery'
@@ -16,6 +17,8 @@ import { WhyGuests } from './WhyGuests'
 
 interface Props {
   hotel: Hotel
+  /** What the real hotel's Ostrovok page adds; none for a synthetic hotel or while the dialog reads it. */
+  details?: HotelDetails | null
   /** Inside a dialog: no `main` landmark, and the hotel name is an `h2` with this id to label the dialog. */
   titleId?: string
   /** Dates and guests held by the dialog instead of the address. */
@@ -32,7 +35,7 @@ const card = 'rounded-2xl bg-card p-5 shadow-(--shadow-card)'
  * the compact header shows once the name scrolls away and a button stuck to the bottom opens the booking. The
  * hotel dialog of the search is one column with the booking card and Эвал at its end and nothing stuck to the bottom.
  */
-export function HotelPage({ hotel, titleId, stay }: Props) {
+export function HotelPage({ hotel, details, titleId, stay }: Props) {
   const inDialog = Boolean(titleId)
   // Sections clear the tabs (and on a phone page the compact header) when a tab scrolls to them.
   const sectionGap = cn(
@@ -57,16 +60,21 @@ export function HotelPage({ hotel, titleId, stay }: Props) {
             <div className="flex min-w-0 flex-col gap-6">
               <HotelHeader hotel={hotel} titleId={titleId} />
               <Gallery hotel={hotel} />
-              <HotelTabs hotel={hotel} inDialog={inDialog} className={cn(!inDialog && 'max-lg:top-14')} />
+              <HotelTabs
+                hotel={hotel}
+                details={details}
+                inDialog={inDialog}
+                className={cn(!inDialog && 'max-lg:top-14')}
+              />
               <div className={sectionGap}>
-                <AboutHotel hotel={hotel}>
+                <AboutHotel hotel={hotel} details={details}>
                   <WhyGuests hotel={hotel} className={cn(card, !inDialog && 'lg:hidden')} />
                 </AboutHotel>
                 <HotelRooms hotel={hotel} className="flex flex-col gap-4 outline-none" />
-                <HotelAmenities hotel={hotel} />
-                {isRated(hotel) && <HotelRating hotel={hotel} />}
-                <HotelLocation hotel={hotel} />
-                <HotelRules hotel={hotel} />
+                <HotelAmenities hotel={hotel} details={details} />
+                {hasGuestReviews(hotel, details) && <HotelRating hotel={hotel} details={details} />}
+                <HotelLocation hotel={hotel} details={details} />
+                <HotelRules hotel={hotel} details={details} />
                 {inDialog && (
                   <>
                     <BookingCard hotel={hotel} className={card} />
@@ -80,7 +88,7 @@ export function HotelPage({ hotel, titleId, stay }: Props) {
                 <div className="sticky top-4 flex flex-col gap-4">
                   <BookingCard hotel={hotel} className={card} />
                   <HotelAssistant className={card} />
-                  <LocationCard hotel={hotel} className={card} />
+                  <LocationCard hotel={hotel} details={details} className={card} />
                   <WhyGuests hotel={hotel} className={card} />
                 </div>
               </aside>

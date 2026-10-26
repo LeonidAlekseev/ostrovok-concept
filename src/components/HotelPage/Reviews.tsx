@@ -15,6 +15,7 @@ import { fromIso, monthTitle } from '../../lib/dates'
 import { ratingLabel, REVIEW_ORDERS, sortReviews, type ReviewOrder } from '../../lib/reviews'
 import { DialogButton } from './DialogButton'
 import { PhotoMosaic, type MosaicStart } from './PhotoMosaic'
+import { REVIEW_SOURCE_LABEL } from '../../lib/hotelDetails'
 import { formatCount } from './reviewsLabel'
 import { ScoreBadge } from './ScoreBadge'
 import { useHistoryDialog } from './useHistoryDialog'
@@ -117,11 +118,12 @@ export function ReviewsDialog({ hotel }: Props) {
 }
 
 /**
- * One review: the score and its word, the author and the month, then «Что было хорошо» and «Что было
- * плохо». Text longer than six lines folds, fading at the bottom, under "Развернуть отзыв".
+ * One review: the score and its word, the author, the month (when the source dates it) and a real review's source,
+ * then a real review's title and text, «Что было хорошо» and «Что было плохо». Text longer than six lines folds,
+ * fading at the bottom, under "Развернуть отзыв".
  */
 function ReviewItem({ review }: { review: Review }) {
-  const { author, date, score, pros, cons } = review
+  const { author, date, score, title, text, pros, cons, source } = review
   const bodyId = useId()
   const body = useRef<HTMLDivElement>(null)
   const [expanded, setExpanded] = useState(false)
@@ -145,10 +147,20 @@ function ReviewItem({ review }: { review: Review }) {
         <ScoreBadge score={score} className="size-10 text-base" />
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
           <span className="font-bold">{ratingLabel(score)}</span>
-          <span className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <span>{author}</span>
-            <Separator orientation="vertical" className="h-4 self-center" />
-            <span>{monthTitle.format(fromIso(date))}</span>
+            {date && (
+              <>
+                <Separator orientation="vertical" className="h-4 self-center" />
+                <span>{monthTitle.format(fromIso(date))}</span>
+              </>
+            )}
+            {source && (
+              <>
+                <Separator orientation="vertical" className="h-4 self-center" />
+                <span data-review-source>{REVIEW_SOURCE_LABEL[source]}</span>
+              </>
+            )}
           </span>
         </div>
       </div>
@@ -158,8 +170,14 @@ function ReviewItem({ review }: { review: Review }) {
         data-review-body
         className={cn(!expanded && 'line-clamp-6', !expanded && long && 'mask-b-from-40%')}
       >
-        <h4 className="font-bold text-success-foreground">Что было хорошо</h4>
-        <p>{pros}</p>
+        {title && <h4 className="font-bold">{title}</h4>}
+        {text && <p className="whitespace-pre-line">{text}</p>}
+        {pros && (
+          <>
+            <h4 className={cn('font-bold text-success-foreground', (title || text) && 'mt-2')}>Что было хорошо</h4>
+            <p>{pros}</p>
+          </>
+        )}
         {cons && (
           <>
             <h4 className="mt-2 font-bold text-destructive">Что было плохо</h4>

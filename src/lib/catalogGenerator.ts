@@ -735,7 +735,8 @@ function buildHotel(summary: HotelSummary, real?: RealHotelDetails): Hotel {
     }
   })
     .map(reviewDetails)
-    .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id))
+    // Every generated review has its date.
+    .sort((a, b) => b.date!.localeCompare(a.date!) || a.id.localeCompare(b.id))
 
   const distance = `${(real?.distanceKm ?? distanceKm).toLocaleString('ru-RU')} км`
   const texts =

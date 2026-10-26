@@ -76,7 +76,7 @@ const QUERIES: [query: string, relevant: (h: Hotel) => boolean][] = [
   ['вилла у моря на большую компанию', (h) => sea.has(h.destinationId) && h.stayType === 'villa'],
   [
     'апартаменты для удалённой работы: рабочее место и быстрый интернет',
-    (h) => h.stayType === 'apartments' && h.workspace && h.wifiMbps >= 100,
+    (h) => h.stayType === 'apartments' && h.workspace && (h.wifiMbps ?? 0) >= 100,
   ],
   ['недорогой хостел в Токио', (h) => h.destinationId === 'tokyo' && h.stayType === 'hostel'],
   ['отель со спа и бассейном в Анталье', (h) => h.destinationId === 'antalya' && (has(h, 'spa') || has(h, 'pool'))],

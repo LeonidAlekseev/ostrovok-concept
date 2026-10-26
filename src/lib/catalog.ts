@@ -1,6 +1,7 @@
 import { addDays, type IsoDate } from './dates'
 import { isProduction } from './env'
 import { countRu } from './format'
+import type { ReviewSource } from './hotelDetails'
 
 /**
  * The hotel catalogue's types, labels and helpers. The catalogue itself lives in Supabase and is read by
@@ -212,13 +213,19 @@ export interface Room {
 export interface Review {
   id: string
   author: string
-  date: IsoDate
+  /** `null` for a review of a real hotel its source gives without a date. */
+  date: IsoDate | null
   /** 1…10. */
   score: number
-  /** «Что было хорошо». */
-  pros: string
+  /** «Что было хорошо»: every generated review has it, a real one may have only its `text`. */
+  pros?: string
   /** «Что было плохо»: about half of the reviews have it. */
   cons?: string
+  /** A real review's title and text, as its author wrote them. */
+  title?: string
+  text?: string
+  /** Where a real review comes from; the generated ones have none. */
+  source?: ReviewSource
   /** How many guests found the review useful, 0…60. */
   helpful: number
 }
@@ -239,8 +246,8 @@ export interface HotelSummary {
   reviewCount: number
   /** Cheapest rate per night, ₽. */
   priceFrom: number
-  /** Speed of the Wi‑Fi, Мбит/с. */
-  wifiMbps: number
+  /** Speed of the Wi‑Fi, Мбит/с; `null` for a real hotel, whose speed Ostrovok does not give. */
+  wifiMbps: number | null
   /** There is a place to work. */
   workspace: boolean
   /** One of the hand-picked "recently added" hotels the hero globe spotlights. */
@@ -310,9 +317,9 @@ export function cheapestRate(hotel: Hotel): { room: Room; rate: Rate } {
   return best
 }
 
-/** Wi‑Fi speed and the workspace as the lines of the hotel page's amenities, the Wi‑Fi first. */
+/** Wi‑Fi speed (when known) and the workspace as the lines of the hotel page's amenities, the Wi‑Fi first. */
 export const workLabels = (hotel: Pick<Hotel, 'wifiMbps' | 'workspace'>): string[] => [
-  `Wi‑Fi ${hotel.wifiMbps} Мбит/с`,
+  ...(hotel.wifiMbps !== null ? [`Wi‑Fi ${hotel.wifiMbps} Мбит/с`] : []),
   ...(hotel.workspace ? ['Рабочая зона'] : []),
 ]
 
