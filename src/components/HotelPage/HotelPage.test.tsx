@@ -399,13 +399,17 @@ describe('HotelPage', () => {
     expect(header.textContent).not.toContain('Бесплатная отмена')
   })
 
-  it('names the kind of a stay that is not a hotel, and shows no stars for apartments', () => {
-    const villa = fullHotelsIn('prague').find((h) => h.stayType === 'villa')!
-    render(<HotelPage hotel={villa} />)
+  it.each([
+    ['villa', 'Вилла'],
+    ['apartments', 'Апартаменты'],
+    ['hostel', 'Хостел'],
+  ])('names a %s by its kind in the header, not as a hotel', (type, label) => {
+    const stay = fullHotelsIn('prague').find((h) => h.stayType === type)!
+    render(<HotelPage hotel={stay} />)
     const header = screen.getByRole('heading', { level: 1 }).closest('header')!
-    expect(header.textContent).toContain('Вилла')
+    expect(header.textContent).toContain(label)
     expect(header.textContent).not.toContain('звёздочный')
-    expect(within(header).queryByRole('img')).toBeNull()
+    if (type !== 'hostel') expect(within(header).queryByRole('img')).toBeNull()
   })
 
   // hotel-page, Requirement: Страница отеля

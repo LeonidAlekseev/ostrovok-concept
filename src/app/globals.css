@@ -23,6 +23,7 @@
   --brand-line: #dfe5ee;
   --brand-text: #101828;
   --brand-text-2: #667085;
+  --brand-text-3: #475467;
   --brand-green: #4cc13a;
   --brand-green-soft: #dcf7c4;
   /* Background of the page and the hero; the transparent header shows it too. */
@@ -46,6 +47,8 @@
   --secondary-hover: var(--decor-secondary-hover);
   --muted: var(--brand-gray-bg);
   --muted-foreground: var(--brand-text-2);
+  /* Secondary text on --muted: --muted-foreground is 4.2:1 there, this one is 6.5:1 (WCAG 4.5:1 for text). */
+  --muted-foreground-strong: var(--brand-text-3);
   /* Hover in menus and lists: lime is too loud for it. */
   --accent: var(--brand-blue-soft);
   --accent-foreground: var(--brand-navy);
@@ -338,6 +341,7 @@
   --color-secondary-hover: var(--secondary-hover);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-muted-foreground-strong: var(--muted-foreground-strong);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-brand: var(--brand);

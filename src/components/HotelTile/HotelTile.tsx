@@ -3,7 +3,7 @@ import type { ComponentProps } from 'react'
 import { MapPin } from 'lucide-react'
 import { cn } from 'cn'
 import { Separator } from '@/components/ui/separator'
-import { hasFreeCancellation, STAY_TYPES, TILE_PHOTOS, type TileHotel } from '../../lib/catalog'
+import { hasFreeCancellation, TILE_PHOTOS, type TileHotel } from '../../lib/catalog'
 import { formatDecimal, formatPrice } from '../../lib/format'
 import { guruPrice } from '../../lib/offer'
 import { useDestination } from '../Catalog/useDestinations'
@@ -28,10 +28,10 @@ interface Props extends Omit<ComponentProps<'article'>, 'children'> {
 
 /**
  * The hotel card of the vibe, the stars, favourites and search results: the photo carousel with the free
- * cancellation, the guest rating, the favourite toggle and the stars on it, then the name, the
- * kind of stay if it is not a hotel with the distance to the city centre and the regular and GURU prices.
- * The plain card has the first photo alone and no badges, and no kind of stay. A made-up hotel has the
- * «generated» mark on the photo in both.
+ * cancellation, the guest rating, the favourite toggle and the stars on it, then the name, the distance to
+ * the city centre and the regular and GURU prices. The kind of stay is shown on the hotel's page only.
+ * The plain card has the first photo alone and no badges. A made-up hotel has the «generated» mark on the
+ * photo in both.
  */
 export function HotelTile({
   hotel,
@@ -87,15 +87,6 @@ export function HotelTile({
         </Heading>
         <p className="flex items-center gap-1 text-sm/[normal] text-muted-foreground">
           <MapPin className="size-4 shrink-0" aria-hidden />
-          {!plain && hotel.stayType !== 'hotel' && (
-            <>
-              {/* The kind of stay gives way first on a narrow card: «Апарт…», the distance stays on one line. */}
-              <span className="min-w-[4.5em] shrink-[20] truncate font-semibold text-foreground">
-                {STAY_TYPES[hotel.stayType]}
-              </span>
-              <span aria-hidden>·</span>
-            </>
-          )}
           {/* From 281px the city follows the distance; the screen reader always gets the whole text. */}
           <span className="min-w-0 truncate">
             <span aria-hidden>

@@ -43,7 +43,7 @@ import { MessagePhotos, type PhotoUrl } from './ChatPhotos'
 const agentBubble =
   'max-w-full *:data-[slot=bubble-content]:rounded-[18px_18px_18px_6px] *:data-[slot=bubble-content]:bg-muted *:data-[slot=bubble-content]:px-3.5 *:data-[slot=bubble-content]:py-2.5 *:data-[slot=bubble-content]:text-base'
 /** Secondary text on the grey: the muted grey is 4.2:1 there, this one 6.5:1. */
-const greyMutedText = 'text-[#475467]'
+const greyMutedText = 'text-muted-foreground-strong'
 const userBubble =
   'max-w-[85%] *:data-[slot=bubble-content]:rounded-[18px_18px_6px] *:data-[slot=bubble-content]:px-3.5 *:data-[slot=bubble-content]:py-2.5 *:data-[slot=bubble-content]:text-base'
 const messageTextClass = 'leading-[1.45] whitespace-pre-wrap'
