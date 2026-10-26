@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { addDays, formatLongDate, todayIso } from '../../lib/dates'
+import { setScreen, WIDE } from '../../test/screen'
 import { StarSearch } from './StarSearch'
 import { READING_MS, StarSearchDialog } from './StarSearchDialog'
 import { ZodiacRing } from './ZodiacRing'
@@ -38,7 +39,7 @@ afterEach(() => {
 })
 
 const reduceMotion = () => {
-  window.matchMedia = vi.fn(() => ({ matches: true }) as MediaQueryList)
+  setScreen(WIDE, { reducedMotion: true })
 }
 
 async function fillForm(user: ReturnType<typeof userEvent.setup>) {

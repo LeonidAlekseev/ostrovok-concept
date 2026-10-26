@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, vi } from 'vitest'
 import { nightsBetween } from '../../lib/dates'
+import { NARROW, setScreen, WIDE } from '../../test/screen'
 import { resetSearchView } from './searchView'
 import { SearchResultsPage } from './SearchResultsPage'
 
@@ -182,12 +183,7 @@ export const PRAGUE = `destination=prague&${STAY}`
 
 export function open(search: string, { desktop = false } = {}) {
   window.history.replaceState(null, '', `/search?${search}`)
-  window.matchMedia = ((query: string) => ({
-    matches: desktop,
-    media: query,
-    addEventListener: () => {},
-    removeEventListener: () => {},
-  })) as unknown as typeof window.matchMedia
+  setScreen(desktop ? WIDE : NARROW)
   return render(<SearchResultsPage />)
 }
 
