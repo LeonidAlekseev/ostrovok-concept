@@ -56,6 +56,10 @@ const SearchMap = dynamic(() => import('./SearchMap').catch(() => ({ default: Ma
   loading: () => <div className="size-full animate-pulse bg-muted" aria-hidden />,
 })
 
+/** The title of the blank search; its hotels are those of every destination, see `top`. */
+const TOP_TITLE = 'Лучшие по оценкам гостей'
+const TOP_TARGET: Selection = { kind: 'selection', hotels: [], title: TOP_TITLE }
+
 /** The hotel opened from the map, `?hotel=<id>`: one history entry, so "Назад" closes it. */
 const HOTEL_PARAM = 'hotel'
 
@@ -118,8 +122,22 @@ export function SearchResultsPage() {
   const selection = useMemo(() => parseSelection(new URLSearchParams(request)), [request])
 
   if (!today) return <SearchResultsFallback />
-  // Opened from the menu or the home page: a blank form, its errors only after a submit.
-  if (!request) return <QueryForm query={query} />
+  // Opened from the menu or the home page: a blank form, its errors only after a submit, and the best rated hotels.
+  if (!request) {
+    const filters = parseFilters(params)
+    // The blank search lists the best rated first, unless the address asks for another sorting.
+    const sort = params.get('sort') ? filters.sort : 'rating'
+    return (
+      <Results
+        key="top"
+        query={query}
+        target={TOP_TARGET}
+        initialFilters={{ ...filters, sort }}
+        hotelId={params.get(HOTEL_PARAM)}
+        top
+      />
+    )
+  }
   const errors = validateSearch(query, today, destinations)
   // A selection has its hotels instead of a destination.
   if (selection) delete errors.destination
@@ -164,9 +182,11 @@ interface ResultsProps {
   initialFilters: Filters
   /** The hotel opened from the map; an unknown id is ignored. */
   hotelId: string | null
+  /** A blank search: the visible hotels of every destination under an empty form. */
+  top?: boolean
 }
 
-function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
+function Results({ query, target, initialFilters, hotelId, top = false }: ResultsProps) {
   const params = useSearchParams()
   const router = useRouter()
   const [status, setStatus] = useState<Status>({ state: 'loading' })
@@ -195,9 +215,11 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
   useEffect(() => {
     const controller = new AbortController()
     const hotels = fetchHotels(
-      target.kind === 'selection'
-        ? { ids: target.hotels }
-        : { destinations: targetDestinations(target, destinations).map((d) => d.id) },
+      top
+        ? { destinations: destinations.map((d) => d.id) }
+        : target.kind === 'selection'
+          ? { ids: target.hotels }
+          : { destinations: targetDestinations(target, destinations).map((d) => d.id) },
     )
     runDemoSearch(query, target, hotels, controller.signal).then(
       (result) => setStatus({ state: 'done', result }),
@@ -207,7 +229,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
       },
     )
     return () => controller.abort()
-  }, [query, target, destinations])
+  }, [query, target, destinations, top])
 
   const items = useMemo(() => (result ? applyFilters(result.hotels, filters, query) : []), [result, filters, query])
   const bounds = useMemo(() => (result ? priceBounds(result.hotels, query) : null), [result, query])
@@ -278,7 +300,9 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
   return (
     <main className={pageClass}>
       {/* A selection names its source; a search names its place in the form. */}
-      <h1 className={target.kind === 'selection' ? 'text-title font-bold tracking-[-0.02em]' : 'sr-only'}>{title}</h1>
+      <h1 className={target.kind === 'selection' && !top ? 'text-title font-bold tracking-[-0.02em]' : 'sr-only'}>
+        {top ? 'Поиск отелей' : title}
+      </h1>
       {/* The manual search, filled from the address: a new search changes the address and the results. */}
       <EditSearch query={query} />
       {result && (
@@ -311,6 +335,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
         </div>
       )}
 
+      {top && result && <h2 className="text-title font-bold tracking-[-0.02em]">{TOP_TITLE}</h2>}
       <div aria-live="polite">
         {status.state === 'loading' && <Searching />}
         {status.state === 'error' && <p className="text-sm text-destructive">{status.message}</p>}

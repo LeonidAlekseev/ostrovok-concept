@@ -50,7 +50,6 @@ describe('SearchResultsPage query', () => {
     expect((within(form).getByRole('combobox', { name: 'Направление' }) as HTMLInputElement).value).toBe('')
     expect(screen.queryByText('Укажите, куда вы хотите поехать')).toBeNull()
     expect(screen.queryByText('Проверьте параметры поиска.')).toBeNull()
-    expect(screen.queryByText('Ищем варианты…')).toBeNull()
 
     await user.click(within(form).getByRole('button', { name: /Найти отель/ }))
     expect(screen.getByText('Укажите, куда вы хотите поехать')).toBeDefined()
