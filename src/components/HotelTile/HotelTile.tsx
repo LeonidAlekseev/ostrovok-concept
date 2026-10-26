@@ -103,7 +103,7 @@ export function HotelTile({
           {!plain && hotel.stayType !== 'hotel' && (
             <>
               {/* The kind of stay gives way first on a narrow card: «Апарт…», the distance stays on one line. */}
-              <span className="min-w-0 shrink-[20] truncate font-semibold text-foreground">
+              <span className="min-w-[4.5em] shrink-[20] truncate font-semibold text-foreground">
                 {STAY_TYPES[hotel.stayType]}
               </span>
               <span aria-hidden>·</span>

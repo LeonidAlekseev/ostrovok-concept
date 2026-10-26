@@ -358,6 +358,22 @@ describe('AssistantSearch plan', () => {
     expect(log().textContent).not.toMatch(/маршрут/i)
     expect(hotelLinksOnly()).toBe(true)
   })
+
+  it('asks again for the hotels of the plan after a failed load, instead of keeping the bare cards', async () => {
+    fetchMock.mockResolvedValue(answer({ brief: { destinationId: 'lisbon', when: 9, party: 'solo' } }))
+    let failed = false
+    vi.stubGlobal('fetch', ((input, init) => {
+      if (!String(input).startsWith('/api/hotels')) return fetchMock(input, init)
+      if (failed) return catalogFetch(input)
+      failed = true
+      return Promise.resolve(new Response('{}', { status: 500 }))
+    }) as typeof fetch)
+    const { user } = { user: userEvent.setup(), ...render(view()) }
+    await user.type(input(), 'Лиссабон в октябре, один{Enter}')
+    expect(await within(log()).findByText('Атмосфера поездки', {})).toBeTruthy()
+    await waitFor(async () => expect(await lisbonHotelLinks()).not.toHaveLength(0), { timeout: 8000 })
+    expect(failed).toBe(true)
+  })
 })
 
 // assistant-search, Requirement: История чатов
