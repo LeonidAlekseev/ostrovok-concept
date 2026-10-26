@@ -42,15 +42,15 @@ function Bubble({ message, onRetry }: { message: ChatMessage; onRetry: () => voi
     )
   if (status === 'pending')
     return (
-      <p className="max-w-[85%] self-start rounded-2xl rounded-bl-md bg-secondary px-3 py-2 text-sm/[1.4]">
+      <p className="max-w-[85%] self-start rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-sm/[1.4]">
         <span className="shimmer motion-reduce:shimmer-none">Эвал думает…</span>
       </p>
     )
   return (
     <div className="flex max-w-[92%] flex-col items-start gap-1.5 self-start">
-      <p className="rounded-2xl rounded-bl-md bg-secondary px-3 py-2 text-sm/[1.4] whitespace-pre-wrap">{text}</p>
+      <p className="rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-sm/[1.4] whitespace-pre-wrap">{text}</p>
       {data.unverified && (
-        <div className="rounded-2xl rounded-bl-md bg-secondary px-3 py-2 text-sm/[1.4]">
+        <div className="rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-sm/[1.4]">
           <Badge className="mb-1 bg-card">
             <TriangleAlert aria-hidden />
             Не проверено
@@ -173,7 +173,7 @@ export function HotelAssistant({ className }: { className?: string }) {
           ))}
         </div>
       ) : (
-        <p className="rounded-xl bg-secondary px-3.5 py-3 text-[15px]/[1.45] text-muted-foreground">
+        <p className="rounded-xl bg-muted px-3.5 py-3 text-[15px]/[1.45] text-muted-foreground-strong">
           Привет! Я Эвал. Помогу с выбором номера, расскажу про удобства и отвечу на вопросы об отеле.
         </p>
       )}
@@ -197,7 +197,7 @@ export function HotelAssistant({ className }: { className?: string }) {
 
       <form
         onSubmit={onSubmit}
-        className="flex items-center gap-2 rounded-xl bg-secondary py-1.5 pr-1.5 pl-3 focus-within:ring-3 focus-within:ring-ring/50"
+        className="flex items-center gap-2 rounded-xl bg-muted py-1.5 pr-1.5 pl-3 focus-within:ring-3 focus-within:ring-ring/50"
       >
         <label htmlFor={inputId} className="sr-only">
           Вопрос об отеле
@@ -209,7 +209,7 @@ export function HotelAssistant({ className }: { className?: string }) {
           enterKeyHint="send"
           autoComplete="off"
           placeholder="Задайте любой вопрос…"
-          className="min-w-0 flex-1 bg-transparent py-1.5 text-base outline-none placeholder:text-muted-foreground"
+          className="min-w-0 flex-1 bg-transparent py-1.5 text-base outline-none placeholder:text-muted-foreground-strong"
           onChange={(event) => setText(event.target.value)}
         />
         <Button
