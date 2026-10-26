@@ -100,6 +100,12 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 - `npm run db:features [-- --dry-run]` — `scripts/hotel-features.ts`: свойства настоящих отелей для Эвала — здание и
   шум по `hotel_geo` в `hotel_features`, вид из номеров по названиям групп номеров `ota_hotels` в `hotel_room_views`.
   Сырые данные не копирует, повторный запуск ничего не меняет; `--dry-run` только считает. Затем — `npm run db:embed`.
+- `npm run db:osm-places [-- --file <answer.json>] [-- --dry-run]` — `scripts/load-osm-places.ts`: места OpenStreetMap
+  Валенсии для гео-инструментов Эвала (`src/lib/geo`) — медицина, бары и клубы, еда, супермаркеты, транспорт, пляжи и
+  берег, парки, достопримечательности, центр — в `osm_places` и прямоугольник загрузки в `osm_place_areas`. Без
+  `--file` спрашивает overpass-api.de; когда он перегружен — `uv run scripts/osm-pbf-to-overpass.py
+<valencia-latest.osm.pbf> <answer.json>` из выгрузки Geofabrik и `--file`. Выгрузку и JSON в репозиторий не кладём и
+  удаляем после загрузки. Upsert: повторный запуск обновляет те же строки, ничего не удаляет.
 - `npm run db:embed` — `scripts/embed.ts`: векторы для поиска по смыслу (см. «Поиск по смыслу») по каталогу из базы —
   все отели. В модель уходят только новые и изменённые отели (`content_hash`),
   векторы удалённых объектов стираются; пачки по 32, при 429 и 5xx — повтор с паузой 2, 4, 8… с. Печатает: всего, посчитано,
