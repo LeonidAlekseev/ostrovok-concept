@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { EmbeddingModel } from 'ai'
 import { z } from 'zod'
 import { NVIDIA_BASE_URL, postNvidia } from './nvidia'
@@ -7,10 +8,10 @@ import { NVIDIA_BASE_URL, postNvidia } from './nvidia'
  * `npm run db:embed`, so no `server-only` here: the caller brings the key.
  */
 
-export const EMBEDDING_MODEL = 'nvidia/nemotron-3.5-embed-8b'
+export const EMBEDDING_MODEL = 'nvidia/nemotron-3.5-embed-1b'
 /**
- * The model gives 4096 numbers and HNSW indexes at most 4000, so the first 2048 are kept and normalized again
- * (the model is Matryoshka-trained; the NVIDIA API has no `dimensions`); the table's column is `halfvec(2048)`.
+ * The model gives 2048 numbers, the table's column is `halfvec(2048)` (HNSW indexes at most 4000). `truncate` keeps
+ * the first `EMBEDDING_DIMENSIONS` and normalizes again, so a longer vector (the 4096 of the former 8b model) still fits.
  */
 export const EMBEDDING_DIMENSIONS = 2048
 export const EMBEDDING_URL = `${NVIDIA_BASE_URL}/embeddings`
@@ -60,3 +61,10 @@ export const embeddingModel = (apiKey: string, inputType: 'query' | 'passage'): 
 
 /** A vector as pgvector reads it from PostgREST: `[0.1,0.2,…]`. */
 export const toVector = (embedding: readonly number[]) => `[${embedding.join(',')}]`
+
+/**
+ * What `embeddings.content_hash` holds: the model and the dimensions go in with the text, so a vector made by another
+ * model counts as changed and `npm run db:embed` embeds it again.
+ */
+export const contentHash = (content: string) =>
+  createHash('sha256').update(`${EMBEDDING_MODEL}\n${EMBEDDING_DIMENSIONS}\n${content}`).digest('hex')

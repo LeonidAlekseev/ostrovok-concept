@@ -106,6 +106,10 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
   векторы удалённых объектов стираются; пачки по 32, при 429 и 5xx — повтор с паузой 2, 4, 8… с. Печатает: всего, посчитано,
   без изменений, ошибок, удалено. Запускать после `db:seed`; нужен `NVIDIA_API_KEY`, не больше 40 запросов в минуту (лимит ключа), при 429 — ожидание
   (`Retry-After` или 2, 4, 8… с) и повтор.
+  Модель входит в `content_hash`: после смены модели (`EMBEDDING_MODEL`) первый `npm run db:embed` пересчитывает
+  векторы всех отелей (миграция не нужна; число отелей ÷ 32 запросов, не больше 40 в минуту), повторный — ничего не шлёт
+  в модель. Пока переиндексация не прошла, поиск по смыслу сравнивает вектор запроса со старыми векторами другой
+  модели — запускать её сразу после выкладки.
 
 ## Производительность глобуса
 
@@ -146,11 +150,10 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 ### Поиск по смыслу
 
 `src/lib/ai/semantic.ts` (только сервер): `semanticSearch(текст, { kind, destinationIds, k })` — вектор запроса
-`nvidia/nemotron-3.5-embed-8b` (`input_type: query`), ближайшие объекты в Supabase pgvector
+`nvidia/nemotron-3.5-embed-1b` (`input_type: query`), ближайшие объекты в Supabase pgvector
 (`match_embeddings`, косинус, индекс HNSW), затем реранжирование `nvidia/nemotron-3.5-rerank-8b` (адаптер
-`RerankingModelV4` в `src/lib/ai/rerank.ts`). Модель отдаёт 4096 чисел, а HNSW индексирует не больше 4000, поэтому
-берутся первые 2048 и нормируются заново (модель обучена по Matryoshka, параметра `dimensions` в API NVIDIA нет);
-они хранятся как `halfvec(2048)`. Без ключа, без векторов, при ошибке или через 8 с — `null`, и вызывающий код берёт
+`RerankingModelV4` в `src/lib/ai/rerank.ts`). Модель отдаёт 2048 чисел (HNSW индексирует не больше 4000), они хранятся как `halfvec(2048)`;
+если вектор длиннее, берутся первые 2048 и нормируются заново. Без ключа, без векторов, при ошибке или через 8 с — `null`, и вызывающий код берёт
 прежние правила; упал только реранкер — порядок векторов. Векторы недавних запросов кешируются в памяти процесса.
 Таблица `embeddings` закрыта: читают её только функции `security definer`, пишет сервисный ключ.
 Качество — `node --env-file=.env.local scripts/semantic-eval.ts` (15 запросов, попадания в top-5 до и после
@@ -164,7 +167,7 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 - **Лёгкие текстовые задачи** (помощник, `src/lib/ai/model.ts`, `understand.ts`) — `nvidia/nemotron-3.5-lightning-30b-a3b`
   через OpenAI-совместимый `https://integrate.api.nvidia.com/v1` (`@ai-sdk/openai-compatible`). Рассуждения
   выключены (`reasoning: 'none'` → `reasoning_effort: none`): иначе модель тратит на них время и токены ответа.
-- **Эмбеддинги** — `nvidia/nemotron-3.5-embed-8b` (`/v1/embeddings`, `input_type` query/passage, `truncate: END`).
+- **Эмбеддинги** — `nvidia/nemotron-3.5-embed-1b` (`/v1/embeddings`, `input_type` query/passage, `truncate: END`).
   Свой адаптер в `src/lib/ai/embedding.ts`: провайдер AI SDK не передаёт `input_type`.
 - **Реранк** — `nvidia/nemotron-3.5-rerank-8b`
   (`https://ai.api.nvidia.com/v1/retrieval/nvidia/nemotron-3.5-rerank-8b/reranking`), оценка — логит модели.
