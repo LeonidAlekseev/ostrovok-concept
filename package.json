@@ -9,7 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "oxlint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.scripts.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",

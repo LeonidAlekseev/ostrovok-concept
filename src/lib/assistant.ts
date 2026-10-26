@@ -251,13 +251,13 @@ export function foldBrief(brief: Brief, parsed: Brief, input: string, asked: Que
   return next
 }
 
-/** The quick replies to the question of the theme, each with its theme; «Удиви меня» has none. */
+/** The quick replies to the question of the theme, each with its theme; «Куда угодно» has none. */
 const VIBE_REPLIES: [label: string, vibe: VibeId | null][] = [
   ['На море', 'sea'],
   ['В горы', 'mountains'],
-  ['Города Европы', 'europe'],
+  ['В город', 'europe'],
   ['Романтика', 'romantic'],
-  ['Удиви меня', null],
+  ['Куда угодно', null],
 ]
 
 /**

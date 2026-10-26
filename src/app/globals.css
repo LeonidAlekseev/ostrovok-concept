@@ -139,17 +139,11 @@
     color-mix(in srgb, var(--decor-star-sky) 10%, transparent)
   );
   /* The assistant window: sky-to-mint glass over the globe, an opaque fallback, a darker secondary text that keeps
-     4.5:1 on the light glass, the glow of the avatar and cards, the green spark and the round send button. */
+     4.5:1 on the light glass. */
   --decor-assistant-sky: #63c8f5;
   --decor-assistant-mint: #8fe3b4;
   --decor-assistant-fallback: #d3f0f3;
   --decor-assistant-text-2: #475467;
-  --decor-assistant-glow: #4fc3ff;
-  --decor-assistant-spark: #22c55e;
-  --decor-assistant-send: linear-gradient(145deg, #3db8ff, var(--brand-blue) 75%);
-  --decor-assistant-send-glow:
-    inset 0 1px 0 color-mix(in srgb, var(--brand-white) 45%, transparent),
-    0 8px 22px color-mix(in srgb, #1f8bff 45%, transparent);
   /* Vibe search: the calm blue-lilac and the loud pink-orange sides; white text keeps 3:1 on both. */
   --decor-vibe-calm-from: #3b5bdb;
   --decor-vibe-calm-to: #7048e8;

@@ -357,13 +357,13 @@ describe('the presets of Eval', () => {
   })
 
   it('leaves out the quick replies without a city', () => {
-    expect(nextQuestion({}, '2026-06-01', valencia)?.replies).toEqual(['На море', 'Города Европы', 'Удиви меня'])
+    expect(nextQuestion({}, '2026-06-01', valencia)?.replies).toEqual(['На море', 'В город', 'Куда угодно'])
     expect(nextQuestion({}, '2026-06-01')?.replies).toEqual([
       'На море',
       'В горы',
-      'Города Европы',
+      'В город',
       'Романтика',
-      'Удиви меня',
+      'Куда угодно',
     ])
   })
 })

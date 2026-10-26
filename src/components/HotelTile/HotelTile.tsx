@@ -101,9 +101,17 @@ export function HotelTile({
         <p className="flex items-center gap-1 text-sm/[normal] text-muted-foreground">
           <MapPin className="size-4 shrink-0" aria-hidden />
           {!plain && hotel.stayType !== 'hotel' && (
-            <span className="font-semibold text-foreground">{STAY_TYPES[hotel.stayType]} ·</span>
+            <>
+              {/* The kind of stay gives way first on a narrow card: «Апарт…», the distance stays on one line. */}
+              <span className="min-w-0 shrink-[20] truncate font-semibold text-foreground">
+                {STAY_TYPES[hotel.stayType]}
+              </span>
+              <span aria-hidden>·</span>
+            </>
           )}
-          {formatDecimal(hotel.distanceKm)} км от центра {destination?.genitive}
+          <span className="min-w-0 truncate">
+            {formatDecimal(hotel.distanceKm)} км от центра {destination?.genitive}
+          </span>
         </p>
         <div className="mt-auto flex flex-col gap-2 pt-2">
           <Separator />

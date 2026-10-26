@@ -59,7 +59,7 @@ const readDestinations = cached('destinations', async (): Promise<Destination[]>
       .select('data')
       .order('position', { nullsFirst: false })
       .order('id')
-      .returns<{ data: Destination }[]>(),
+      .overrideTypes<{ data: Destination }[], { merge: false }>(),
   ).map((row) => row.data),
 )
 
@@ -80,7 +80,7 @@ const readHotelSummaries = cached('summaries', async (): Promise<HotelSummary[]>
       .select(SUMMARY)
       .order('position', { nullsFirst: false })
       .order('id')
-      .returns<HotelSummary[]>(),
+      .overrideTypes<HotelSummary[], { merge: false }>(),
   ),
 )
 
@@ -108,7 +108,9 @@ export async function loadNewHotels(): Promise<HotelSummary[]> {
 }
 
 const readHotel = cached('hotel', async (id: string): Promise<Hotel | null> => {
-  const rows = rowsOf(await database().from('hotels').select('data').eq('id', id).returns<{ data: Hotel }[]>())
+  const rows = rowsOf(
+    await database().from('hotels').select('data').eq('id', id).overrideTypes<{ data: Hotel }[], { merge: false }>(),
+  )
   return rows[0]?.data ?? null
 })
 
@@ -119,9 +121,9 @@ export async function loadHotel(id: string): Promise<Hotel | undefined> {
 }
 
 const readHotels = cached('hotels', async (ids: string[]): Promise<Hotel[]> =>
-  rowsOf(await database().from('hotels').select('data').in('id', ids).returns<{ data: Hotel }[]>()).map(
-    (row) => row.data,
-  ),
+  rowsOf(
+    await database().from('hotels').select('data').in('id', ids).overrideTypes<{ data: Hotel }[], { merge: false }>(),
+  ).map((row) => row.data),
 )
 
 /** Full hotels by id, in the order of the ids; unknown ids and the hotels not shown are skipped. */
@@ -141,7 +143,7 @@ const readCityHotels = cached('city', async (destinationId: string): Promise<Hot
       .eq('destination_id', destinationId)
       .order('position', { nullsFirst: false })
       .order('id')
-      .returns<{ data: Hotel }[]>(),
+      .overrideTypes<{ data: Hotel }[], { merge: false }>(),
   ).map((row) => row.data),
 )
 

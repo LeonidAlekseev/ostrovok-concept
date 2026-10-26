@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Fragment, useRef, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   ArrowDown,
   Car,
@@ -244,7 +244,14 @@ interface PlanProps {
  */
 function PlanView({ plan, onChoose }: PlanProps) {
   const ids = plan.options.flatMap((o) => (o.hotel ? [o.hotel.id] : []))
-  const state = useHotels(ids.length > 0 ? { ids } : null)
+  const [attempt, setAttempt] = useState(0)
+  const state = useHotels(ids.length > 0 ? { ids } : null, attempt)
+  // A failed load is asked again, a little later each time, and the cards stay in loading: never the bare ones for good.
+  useEffect(() => {
+    if (state.status !== 'error') return
+    const timer = setTimeout(() => setAttempt((n) => n + 1), Math.min(2000 * (attempt + 1), 10_000))
+    return () => clearTimeout(timer)
+  }, [state.status, attempt])
   const full = new Map(state.status === 'done' ? state.hotels.map((h) => [h.id, h]) : [])
   if (plan.options.length === 0)
     return (
@@ -274,7 +281,7 @@ function PlanView({ plan, onChoose }: PlanProps) {
           </p>
         </BubbleContent>
       </Bubble>
-      <HotelRow plan={plan} full={state.status === 'loading' ? undefined : full} onChoose={onChoose} />
+      <HotelRow plan={plan} full={state.status === 'done' ? full : undefined} onChoose={onChoose} />
       <PlanComment plan={plan} full={full} />
       {plan.overBudget && (
         <p className="px-1 text-sm/[normal] text-muted-foreground">
