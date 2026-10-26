@@ -9,7 +9,8 @@ const badgeVariants = cva(
     variants: {
       variant: {
         secondary: 'bg-secondary text-secondary-foreground',
-        destructive: 'bg-destructive/10 text-destructive',
+        // The text is darkened: plain `destructive` on its 10% tint is 4.15:1, below 4.5:1.
+        destructive: 'bg-destructive/10 text-[color-mix(in_srgb,var(--destructive),black_25%)]',
         success: 'bg-success-soft text-success-foreground',
       },
     },

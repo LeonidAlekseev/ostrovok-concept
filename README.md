@@ -167,15 +167,16 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 Все модели — через API NVIDIA (build.nvidia.com) с одним ключом `NVIDIA_API_KEY` (см. «Ключи API»); лимит ключа —
 40 запросов в минуту, дневного лимита нет. Общий запрос и ошибки — `src/lib/ai/nvidia.ts`.
 
-- **Лёгкие текстовые задачи** (помощник, `src/lib/ai/model.ts`, `understand.ts`) — `nvidia/nemotron-3.5-lightning-30b-a3b`
-  через OpenAI-совместимый `https://integrate.api.nvidia.com/v1` (`@ai-sdk/openai-compatible`). Рассуждения
+- **Текстовые задачи** (помощник, `src/lib/ai/model.ts`, `understand.ts`) — цепочка `nvidia/nemotron-3.5-lightning-30b-a3b`
+  → `nvidia/nemotron-3.5-bolt-e4b` → `minimaxai/minimax-m3.1-flash`: следующая модель отвечает, если предыдущая
+  не уложилась в свой срок или ошиблась. Все — через OpenAI-совместимый `https://integrate.api.nvidia.com/v1` (`@ai-sdk/openai-compatible`). Рассуждения
   выключены (`reasoning: 'none'` → `reasoning_effort: none`): иначе модель тратит на них время и токены ответа.
 - **Эмбеддинги** — `nvidia/nemotron-3.5-embed-1b` (`/v1/embeddings`, `input_type` query/passage, `truncate: END`).
   Свой адаптер в `src/lib/ai/embedding.ts`: провайдер AI SDK не передаёт `input_type`.
 - **Реранк** — `nvidia/nemotron-3.5-rerank-8b`
   (`https://ai.api.nvidia.com/v1/retrieval/nvidia/nemotron-3.5-rerank-8b/reranking`), оценка — логит модели.
-- Сложные мультимодальные задачи — `nvidia/nemotron-3.5-super-vl-120b-a12b`; подключается вместе с первой такой
-  задачей.
+- **Фото** (`src/lib/ai/vision.ts`) — цепочка `nvidia/nemotron-3.5-super-vl-120b-a12b` →
+  `minimaxai/minimax-m3.1-flash`.
 
 Скрипты (`db:embed`, `semantic-eval`) выдерживают 40 запросов в минуту и при 429 ждут (`Retry-After` или 2, 4,
 8… с) и повторяют; приложение при ошибке, лимите или таймауте уходит в запасной путь по правилам.

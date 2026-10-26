@@ -131,10 +131,10 @@ const russian = (value: string | null | undefined, max: number): string | undefi
   return text && isRussian(text) ? text : undefined
 }
 
-/** The base64 and the type of a photo's data URL. */
+/** The base64 and the media type of a photo's data URL. */
 function imagePart(url: string) {
   const [head, data] = url.split(',', 2)
-  return { type: 'image' as const, image: data, mediaType: head.slice('data:'.length, head.indexOf(';')) }
+  return { type: 'file' as const, data, mediaType: head.slice('data:'.length, head.indexOf(';')) }
 }
 
 /**

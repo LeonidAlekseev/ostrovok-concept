@@ -42,7 +42,7 @@ export function HotelDialog({ hotel, stay, onClose }: Props) {
       <DialogContent
         showCloseButton={false}
         aria-labelledby={titleId}
-        className="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl max-sm:inset-0 max-sm:max-h-none max-sm:max-w-none max-sm:translate-0 max-sm:rounded-none"
+        className="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
       >
         {shown && (
           <>

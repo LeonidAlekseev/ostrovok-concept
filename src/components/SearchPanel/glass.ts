@@ -1,7 +1,3 @@
-/* Liquid glass with no backing card: what lies under it shows through, blurred and saturated, tinted sky to mint. */
-const glassFill =
-  '[background:linear-gradient(150deg,color-mix(in_srgb,var(--decor-assistant-sky)_55%,transparent),color-mix(in_srgb,color-mix(in_srgb,var(--decor-assistant-sky),var(--decor-assistant-mint))_45%,transparent)_55%,color-mix(in_srgb,var(--decor-assistant-mint)_55%,transparent))]'
-const glassBlur = '[backdrop-filter:blur(24px)_saturate(170%)]'
 const glassRim =
   'shadow-[inset_0_1px_0_color-mix(in_srgb,var(--decor-light)_90%,transparent),inset_0_0_0_1.5px_color-mix(in_srgb,var(--decor-light)_55%,transparent),inset_0_0_32px_color-mix(in_srgb,var(--decor-light)_30%,transparent),0_20px_50px_color-mix(in_srgb,var(--shadow-color)_14%,transparent),0_2px_6px_color-mix(in_srgb,var(--shadow-color)_4%,transparent)]'
 // Specular highlight along the top-left edge, painted under the content (the panel is a stacking context).
@@ -15,9 +11,6 @@ const searchGlassFill =
   '[background:linear-gradient(150deg,color-mix(in_srgb,var(--decor-assistant-sky)_35%,transparent),color-mix(in_srgb,color-mix(in_srgb,var(--decor-assistant-sky),var(--decor-assistant-mint))_25%,transparent)_15%,color-mix(in_srgb,var(--decor-assistant-mint)_35%,transparent))]'
 const searchGlassBlur = '[backdrop-filter:blur(2px)_saturate(150%)]'
 const glassChrome = `${glassRim} ${glassSheen} ${glassOpaque}`
-
-/** The glass of Eval's window on `/assistant`; the element is `relative isolate`. */
-export const glassPanel = `relative isolate ${glassFill} ${glassBlur} ${glassChrome}`
 
 /** The glass of the search panel on the home page; the element is `relative isolate`. */
 export const searchGlassPanel = `relative isolate ${searchGlassFill} ${searchGlassBlur} ${glassChrome}`

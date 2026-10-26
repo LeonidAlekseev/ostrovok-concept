@@ -35,7 +35,7 @@ vi.mock('@supabase/supabase-js', () => {
       then: (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) =>
         Promise.resolve(db.tables[table] ?? db.result).then(resolve, reject),
     }
-    for (const method of ['select', 'eq', 'in', 'order', 'returns'])
+    for (const method of ['select', 'eq', 'in', 'order', 'overrideTypes'])
       builder[method] = (...args: unknown[]) => {
         db.calls.push([method, ...args])
         return builder

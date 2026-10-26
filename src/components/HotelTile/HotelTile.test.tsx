@@ -61,12 +61,12 @@ describe('HotelTile kind of stay', () => {
   it('labels a hostel with its type and stars, an apartment without stars, and a hotel with neither', () => {
     const find = (type: string) => fullHotelsIn('prague').find((h) => h.stayType === type)!
     const { rerender } = render(<HotelTile hotel={hotel} href="/h" />)
-    expect(screen.queryByText(/^(Отель|Хостел|Апартаменты|Вилла) ·$/)).toBeNull()
+    expect(screen.queryByText(/^(Отель|Хостел|Апартаменты|Вилла)$/)).toBeNull()
     rerender(<HotelTile hotel={find('hostel')} href="/h" />)
-    expect(screen.getByText('Хостел ·')).toBeDefined()
+    expect(screen.getByText('Хостел')).toBeDefined()
     expect(screen.getByRole('img', { name: /звезд|звёзд/ })).toBeDefined()
     rerender(<HotelTile hotel={find('apartments')} href="/h" />)
-    expect(screen.getByText('Апартаменты ·')).toBeDefined()
+    expect(screen.getByText('Апартаменты')).toBeDefined()
     expect(screen.queryByRole('img', { name: /звезд|звёзд/ })).toBeNull()
   })
 })
@@ -168,7 +168,7 @@ describe('HotelTile plain', () => {
     const apartments = fullHotelsIn('prague').find((h) => h.stayType === 'apartments')!
     render(<HotelTile hotel={apartments} href="/" plain />)
     const card = screen.getByRole('article')
-    expect(within(card).queryByText('Апартаменты ·')).toBeNull()
+    expect(within(card).queryByText('Апартаменты')).toBeNull()
     expect(within(card).getByRole('link', { name: apartments.name })).toBeDefined()
     const heading = within(card).getByRole('heading', { level: 3, name: apartments.name })
     expect(heading.nextElementSibling?.textContent).toBe(`${formatDecimal(apartments.distanceKm)} км от центра Праги`)
