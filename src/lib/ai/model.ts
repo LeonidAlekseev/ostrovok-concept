@@ -16,7 +16,7 @@ export interface ChainModel {
  * before failed or stalled, all within the route's 8 s.
  */
 export const TEXT_CHAIN: readonly ChainModel[] = [
-  { id: 'nvidia/nemotron-3.5-lightning-30b-a3b', timeoutMs: 2500 },
+  { id: 'nvidia/nemotron-3.5-lightning-30b-a3b', timeoutMs: 3500 },
   { id: 'nvidia/nemotron-3.5-bolt-e4b', timeoutMs: 3500 },
   { id: 'minimaxai/minimax-m3.1-flash', timeoutMs: 5000 },
 ]
