@@ -2,17 +2,20 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { cn } from 'cn'
-import { isRated, type Hotel } from '@/lib/catalog'
+import type { Hotel } from '@/lib/catalog'
+import { hasGuestReviews, type HotelDetails } from '@/lib/hotelDetails'
 import { goToSection } from './goToSection'
 import { formatCount } from './reviewsLabel'
 
 /** The sections of the page in their order, as the tabs name them. */
-const hotelSections = (hotel: Hotel) => [
+const hotelSections = (hotel: Hotel, details: HotelDetails | null | undefined) => [
   { id: 'overview', label: 'Обзор' },
   { id: 'rooms', label: 'Номера' },
   { id: 'amenities', label: 'Удобства' },
-  // An unrated hotel has no rating section.
-  ...(isRated(hotel) ? [{ id: 'rating', label: `Отзывы (${formatCount(hotel.reviewCount)})` }] : []),
+  // A hotel with neither a rating nor reviews has no rating section; without Ostrovok's total, the page's reviews count.
+  ...(hasGuestReviews(hotel, details)
+    ? [{ id: 'rating', label: `Отзывы (${formatCount(hotel.reviewCount || (details?.reviews.length ?? 0))})` }]
+    : []),
   { id: 'location', label: 'Расположение' },
   { id: 'rules', label: 'Правила' },
 ]
@@ -25,8 +28,18 @@ const SLACK = 12
  * header) or of the hotel dialog. The current one is underlined: the one clicked, then, as the page scrolls,
  * the last section whose top has passed under the tabs.
  */
-export function HotelTabs({ hotel, className, inDialog }: { hotel: Hotel; className?: string; inDialog?: boolean }) {
-  const sections = hotelSections(hotel)
+export function HotelTabs({
+  hotel,
+  details,
+  className,
+  inDialog,
+}: {
+  hotel: Hotel
+  details?: HotelDetails | null
+  className?: string
+  inDialog?: boolean
+}) {
+  const sections = hotelSections(hotel, details)
   const ids = sections.map((s) => s.id).join(' ')
   const [active, setActive] = useState(sections[0].id)
   const nav = useRef<HTMLElement>(null)

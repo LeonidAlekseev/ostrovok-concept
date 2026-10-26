@@ -44,4 +44,27 @@ describe('hotelDocument', () => {
     expect(text).toContain('Шум по карте шума: ночью ниже 40 дБ — тихо ночью.')
     expect(text).toContain('В описаниях номеров отеля есть вид на море.')
   })
+
+  it('takes the places and the amenity groups of a real hotel’s page, and no unknown Wi‑Fi speed', () => {
+    const hotel = { ...hotels.find((h) => h.destinationId === 'lisbon')!, id: 'ota-1', wifiMbps: null, workspace: true }
+    const text = hotelDocument(hotel, city('lisbon'), scale, undefined, {
+      nearby: [
+        {
+          id: 1,
+          name: 'Фира Валенсия',
+          kind: 'Станция',
+          distanceM: 135,
+          bearingDeg: 0,
+          lat: 0,
+          lon: 0,
+          transport: true,
+        },
+      ],
+      amenityGroups: [{ name: 'Общее', slug: 'has_common_info', amenities: ['Лифт', 'Бар'] }],
+    })
+    expect(text).toContain('Рядом: Фира Валенсия (станция, 140 м).')
+    expect(text).toContain('Удобства: Общее: Лифт, Бар.')
+    expect(text).toContain('Есть рабочая зона.')
+    expect(text).not.toMatch(/Мбит/)
+  })
 })

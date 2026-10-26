@@ -74,7 +74,7 @@ describe('stay types', () => {
       const [min, max] = range[h.stayType]
       expect(h.wifiMbps, h.id).toBeGreaterThanOrEqual(min)
       expect(h.wifiMbps, h.id).toBeLessThanOrEqual(max)
-      expect(h.wifiMbps % 10, h.id).toBe(0)
+      expect(h.wifiMbps! % 10, h.id).toBe(0)
       if (h.stayType === 'hostel' || h.stayType === 'villa') expect(h.workspace, h.id).toBe(false)
     }
     for (const type of ['hotel', 'apartments']) {
@@ -218,7 +218,7 @@ describe('review details', () => {
     expect(withCons).toBeGreaterThan(0.4)
     expect(withCons).toBeLessThan(0.6)
     // Some run long enough to fold.
-    expect(reviews.some((r) => r.pros.length > 300)).toBe(true)
+    expect(reviews.some((r) => r.pros!.length > 300)).toBe(true)
   })
 
   it('keeps the scores, dates and authors of the reviews', () => {
@@ -477,7 +477,7 @@ describe('texts by kind of stay', () => {
   it('call only a hotel «отель»', () => {
     for (const hotel of buildCatalog()) {
       if (hotel.stayType === 'hotel') continue
-      const texts = [hotel.description, ...hotel.reviews.flatMap((r) => [r.pros, r.cons ?? ''])]
+      const texts = [hotel.description, ...hotel.reviews.flatMap((r) => [r.pros ?? '', r.cons ?? ''])]
       expect(
         texts.filter((t) => /отел/i.test(t)),
         hotel.id,
