@@ -177,13 +177,29 @@ describe('Gallery carousel', () => {
     expect(screen.queryByRole('list')).toBeNull()
   })
 
-  it('a swipe selects the photo it stops on and updates the counter', () => {
+  it('a swipe selects the photo under the middle of the strip and updates the counter', () => {
     render(<Gallery hotel={hotel} />)
     const row = slides()[0].parentElement!
     Object.defineProperty(row, 'clientWidth', { value: 360, configurable: true })
-    row.scrollLeft = 360
+    Object.defineProperty(row, 'scrollWidth', { value: 5000, configurable: true })
+    slides().forEach((el, i) => {
+      Object.defineProperty(el, 'offsetLeft', { value: i * 300, configurable: true })
+      Object.defineProperty(el, 'offsetWidth', { value: 290, configurable: true })
+    })
+    row.scrollLeft = 300
     fireEvent.scroll(row)
     expect(screen.getByText(`2 / ${hotel.photos.length}`)).toBeDefined()
+  })
+
+  it('is a horizontal strip only, off both screen edges, the photos one height and uncropped', () => {
+    render(<Gallery hotel={hotel} />)
+    const row = slides()[0].parentElement!
+    expect(row.className).toMatch(/\boverflow-x-auto\b/)
+    expect(row.className).toMatch(/\boverflow-y-hidden\b/)
+    expect(row.className).toMatch(/\btouch-pan-x\b.*\btouch-pan-y\b/)
+    expect(row.className).toMatch(/-mx-\(--page-x\)/)
+    expect(slides()[0].className).toMatch(/\bh-full\b/)
+    expect(slides()[0].style.aspectRatio).not.toBe('')
   })
 
   it('a slide opens the mosaic at its photo', async () => {

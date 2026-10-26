@@ -18,13 +18,15 @@ interface Props {
   className?: string
   /** The gallery's size of a real photo; cards and thumbnails get the small one. */
   large?: boolean
+  /** Called with the natural width / height once the real image has loaded. */
+  onRatio?: (ratio: number) => void
 }
 
 /**
  * A hotel photo: a tinted tile with an icon and the caption, and the real image over it when the photo has one.
  * The demo hotels have no images; a real one that fails to load leaves the tile (the image has an empty alt).
  */
-export function PhotoPlaceholder({ photo, kind = 'hotel', className, large = false }: Props) {
+export function PhotoPlaceholder({ photo, kind = 'hotel', className, large = false, onRatio }: Props) {
   const Icon = kind === 'room' ? BedDouble : Building2
   return (
     <span
@@ -48,6 +50,10 @@ export function PhotoPlaceholder({ photo, kind = 'hotel', className, large = fal
           alt=""
           loading="lazy"
           decoding="async"
+          onLoad={(e) => {
+            const { naturalWidth, naturalHeight } = e.currentTarget
+            if (onRatio && naturalWidth && naturalHeight) onRatio(naturalWidth / naturalHeight)
+          }}
           className="absolute inset-0 size-full object-cover"
         />
       )}
