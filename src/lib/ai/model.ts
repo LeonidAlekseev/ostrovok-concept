@@ -1,6 +1,5 @@
 import 'server-only'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
-import { wrapLanguageModel, type LanguageModelMiddleware } from 'ai'
 import { getSecret } from '../secrets'
 import type { ModelLink } from './chain'
 import { NVIDIA_BASE_URL, NVIDIA_KEY } from './nvidia'
@@ -9,13 +8,6 @@ import { NVIDIA_BASE_URL, NVIDIA_KEY } from './nvidia'
 export interface ChainModel {
   id: string
   timeoutMs: number
-  /** The model answers 400 to `reasoning_effort`: the request goes without it. */
-  noReasoning?: true
-}
-
-/** Drops `reasoning_effort` from the requests: `provider-default` sends none. */
-const withoutReasoning: LanguageModelMiddleware = {
-  transformParams: async ({ params }) => ({ ...params, reasoning: 'provider-default' }),
 }
 
 /**
@@ -31,12 +23,11 @@ export const TEXT_CHAIN: readonly ChainModel[] = [
 
 /**
  * The photos of the chat: what is on them, for the search of similar hotels and for the wish. The first answers in
- * 1–12 s and now and then 500; `minimax-m3.1-flash` in 3–12 s; `llama-3.2-11b-vision` takes no `reasoning_effort`.
+ * 1–12 s and now and then 500; `minimax-m3.1-flash` in 3–12 s and takes what the window has left.
  */
 export const VISION_CHAIN: readonly ChainModel[] = [
   { id: 'nvidia/nemotron-3.5-super-vl-120b-a12b', timeoutMs: 10_000 },
-  { id: 'minimaxai/minimax-m3.1-flash', timeoutMs: 10_000 },
-  { id: 'meta/llama-3.2-11b-vision-instruct', timeoutMs: 10_000, noReasoning: true },
+  { id: 'minimaxai/minimax-m3.1-flash', timeoutMs: 12_000 },
 ]
 
 /** The models of `chain` on the NVIDIA API, or `undefined` without `NVIDIA_API_KEY` (the rules take over). */
@@ -50,11 +41,7 @@ async function nvidiaModels(chain: readonly ChainModel[]): Promise<ModelLink[] |
     apiKey,
     supportsStructuredOutputs: true,
   })
-  return chain.map(({ id, timeoutMs, noReasoning }) => ({
-    id,
-    timeoutMs,
-    model: noReasoning ? wrapLanguageModel({ model: provider(id), middleware: withoutReasoning }) : provider(id),
-  }))
+  return chain.map(({ id, timeoutMs }) => ({ id, timeoutMs, model: provider(id) }))
 }
 
 /** The assistant's text models, in order, or `undefined` without `NVIDIA_API_KEY` (the rules take over). */
