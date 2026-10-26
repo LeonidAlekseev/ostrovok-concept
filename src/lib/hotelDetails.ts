@@ -75,6 +75,8 @@ export interface HotelBuilding {
   heightM: number | null
   /** EUBUCCO's source of the floors or of the height: `estimated` when a model estimated them. */
   estimated: boolean
+  /** EUBUCCO's model estimated the height (`height_source` `estimated`), whatever the floors' source. */
+  heightEstimated?: boolean
 }
 
 /** The guests' scores of one source. */

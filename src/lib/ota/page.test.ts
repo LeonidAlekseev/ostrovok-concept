@@ -301,7 +301,15 @@ describe('otaHotelDetails', () => {
 
   it('tells the floors the rooms take from the floors of the building, which are EUBUCCO’s', () => {
     expect(details.facts).toMatchObject({ rooms: 140, roomFloors: 6, yearBuilt: null, yearRenovated: null })
-    expect(details.building).toEqual({ floors: 19, heightM: 60, estimated: true })
+    expect(details.building).toEqual({ floors: 19, heightM: 60, estimated: true, heightEstimated: true })
+    // The cadastre's floors with a model's height: the height alone is an estimate.
+    const cadastre = { floors: 8, height_m: 30.6, floors_source: 'gov-spain', height_source: 'estimated' }
+    expect(otaHotelDetails(storedRow(), places, cadastre).building).toEqual({
+      floors: 8,
+      heightM: 30.6,
+      estimated: false,
+      heightEstimated: true,
+    })
     expect(factLines(details.facts, details.building)).toEqual([
       '140 номеров',
       'Номера занимают 6 этажей (по данным отеля)',

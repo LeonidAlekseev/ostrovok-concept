@@ -1,12 +1,14 @@
 import { cn } from 'cn'
 import type { Hotel } from '@/lib/catalog'
 import { hasGuestReviews, type HotelDetails } from '@/lib/hotelDetails'
+import type { HotelNoise as HotelNoiseData } from '@/lib/noise'
 import { AboutHotel, HotelAmenities } from './AboutHotel'
 import { BookingCard } from './BookingCard'
 import { Gallery } from './Gallery'
 import { HotelAssistant, HotelAssistantProvider } from './HotelAssistant'
 import { HotelHeader } from './HotelHeader'
 import { HotelLocation, LocationCard } from './HotelLocation'
+import { HotelNoise } from './HotelNoise'
 import { HotelRating } from './HotelRating'
 import { HotelRules } from './HotelRules'
 import { HotelRooms, HotelStay, type LocalStay } from './HotelStay'
@@ -19,6 +21,8 @@ interface Props {
   hotel: Hotel
   /** What the real hotel's Ostrovok page adds; none for a synthetic hotel or while the dialog reads it. */
   details?: HotelDetails | null
+  /** «Шум и окружение» of a real hotel; none for a synthetic hotel, in the dialog or when it could not be read. */
+  noise?: HotelNoiseData | null
   /** Inside a dialog: no `main` landmark, and the hotel name is an `h2` with this id to label the dialog. */
   titleId?: string
   /** Dates and guests held by the dialog instead of the address. */
@@ -30,12 +34,12 @@ const card = 'rounded-2xl bg-card p-5 shadow-(--shadow-card)'
 
 /**
  * The hotel, then its photos, the sticky tabs and the sections straight on the page's background: the overview,
- * the rooms with the dates, the amenities, the guests' rating (if any), the location and the rules. From `lg`
- * the booking, Эвал, the location and "Почему гости выбирают нас" stand in a sticky column on the right; below `lg`
+ * the rooms with the dates, the amenities, the guests' rating (if any), the location, the noise (a real hotel's) and
+ * the rules. From `lg` the booking, Эвал, the location and "Почему гости выбирают нас" stand in a sticky column on the right; below `lg`
  * the compact header shows once the name scrolls away and a button stuck to the bottom opens the booking. The
  * hotel dialog of the search is one column with the booking card and Эвал at its end and nothing stuck to the bottom.
  */
-export function HotelPage({ hotel, details, titleId, stay }: Props) {
+export function HotelPage({ hotel, details, noise, titleId, stay }: Props) {
   const inDialog = Boolean(titleId)
   // Sections clear the tabs (and on a phone page the compact header) when a tab scrolls to them.
   const sectionGap = cn(
@@ -63,6 +67,7 @@ export function HotelPage({ hotel, details, titleId, stay }: Props) {
               <HotelTabs
                 hotel={hotel}
                 details={details}
+                noise={Boolean(noise)}
                 inDialog={inDialog}
                 className={cn(!inDialog && 'max-lg:top-14')}
               />
@@ -74,6 +79,7 @@ export function HotelPage({ hotel, details, titleId, stay }: Props) {
                 <HotelAmenities hotel={hotel} details={details} />
                 {hasGuestReviews(hotel, details) && <HotelRating hotel={hotel} details={details} />}
                 <HotelLocation hotel={hotel} details={details} />
+                {noise && <HotelNoise hotel={hotel} noise={noise} building={details?.building} />}
                 <HotelRules hotel={hotel} details={details} />
                 {inDialog && (
                   <>

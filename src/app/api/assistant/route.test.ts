@@ -661,6 +661,16 @@ describe('POST /api/assistant: a question about a hotel', () => {
     expect(geoTurn).not.toHaveBeenCalled()
   })
 
+  // hotel-page, Requirement: Шум и окружение настоящего отеля
+  it('answers «шумно ли рядом» from the noise data, never by the geo steps', async () => {
+    setModel(undefined)
+    const body = await (await aboutHotel('Шумно ли рядом с отелем ночью?')).json()
+    expect(geoTurn).not.toHaveBeenCalled()
+    expect(body).toMatchObject({ reply: 'Сейчас не могу ответить: данных о шуме у этого отеля нет.', source: 'rules' })
+    await aboutHotel('Есть ли рядом бар?')
+    expect(geoTurn).toHaveBeenCalledTimes(1)
+  })
+
   it('says the models are down when none chose the geo calls', async () => {
     setModel(failing('boom'))
     vi.mocked(geoTurn).mockResolvedValue({

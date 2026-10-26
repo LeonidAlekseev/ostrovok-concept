@@ -39,9 +39,10 @@ import type { Destination } from '@/data/destinations'
 import { loadDestinations, loadHotel, loadHotelSummaries } from '@/lib/db/catalog'
 import { loadHotelFeatures } from '@/lib/db/features'
 import { loadHotelDetails } from '@/lib/db/hotelDetails'
+import { loadHotelNoise } from '@/lib/db/noise'
+import { isHotelGeoQuestion } from '@/lib/noise'
 import { todayIso, type IsoDate } from '@/lib/dates'
 import type { Hotel } from '@/lib/catalog'
-import { isGeoQuestion } from '@/lib/geo/questions'
 
 const requestSchema = z.object({
   messages: z
@@ -123,8 +124,12 @@ async function hotelTurn(
   }: { brief: Brief; messages: AssistantRequest['messages']; signal: AbortSignal; deadline: number },
 ): Promise<Response> {
   const next: Brief = { ...brief, hotelId: hotel.id, destinationId: hotel.destinationId }
-  const [models, details] = await Promise.all([getTextModels(), loadHotelDetails(hotel.id)])
-  const geo = isGeoQuestion(messages[messages.length - 1].text)
+  const [models, details, noise] = await Promise.all([
+    getTextModels(),
+    loadHotelDetails(hotel.id),
+    loadHotelNoise(hotel),
+  ])
+  const geo = isHotelGeoQuestion(messages[messages.length - 1].text)
     ? await geoTurn(hotel, messages, {
         deadline,
         signal,
@@ -148,7 +153,7 @@ async function hotelTurn(
     const result = await firstAnswer(
       models,
       (model, timeout) =>
-        answerWithModel(model, { messages }, hotel, { dates: brief.dates, features, details, signal: timeout }),
+        answerWithModel(model, { messages }, hotel, { dates: brief.dates, features, details, noise, signal: timeout }),
       {
         deadline: textDeadline(deadline),
         signal,
@@ -167,7 +172,7 @@ async function hotelTurn(
     down = result.failed.length > 0
     console.warn('assistant: no model answered a hotel question, using the rules')
   }
-  const { answer } = ruleAnswer(messages[messages.length - 1].text, hotel, brief.dates, details)
+  const { answer } = ruleAnswer(messages[messages.length - 1].text, hotel, brief.dates, details, noise)
   return Response.json({
     brief: next,
     reply: answer,

@@ -53,7 +53,7 @@ import {
 import type { PhotoUrl } from './ChatPhotos'
 import type { HotelSummary } from '@/lib/catalog'
 import { todayIso } from '@/lib/dates'
-import { isGeoQuestion } from '@/lib/geo/questions'
+import { isHotelGeoQuestion } from '@/lib/noise'
 import type { OptimizedPhoto } from '@/lib/imageOptimize'
 import { getBrowserClient } from '@/lib/supabase/client'
 
@@ -358,7 +358,7 @@ export function useChats(
       // The plan is surely due when the rules alone complete the brief: its first step shows while Эвал works.
       const planDue =
         !found && !chat.brief.hotelId && !nextQuestion(mergeBrief(chat.brief, input, question, destinations), today)
-      const waitStep = planDue ? SEARCH_STEP : chat.brief.hotelId && isGeoQuestion(input) ? GEO_STEP : null
+      const waitStep = planDue ? SEARCH_STEP : chat.brief.hotelId && isHotelGeoQuestion(input) ? GEO_STEP : null
       const stepId = newId()
       update(chatId, (c) => ({
         ...c,

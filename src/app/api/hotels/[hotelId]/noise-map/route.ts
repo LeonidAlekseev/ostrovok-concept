@@ -1,0 +1,19 @@
+import type { NextRequest } from 'next/server'
+import { isVisibleHotel } from '@/lib/catalog'
+import { loadHotel } from '@/lib/db/catalog'
+import { loadNoiseMap } from '@/lib/db/noise'
+
+/**
+ * The EEA noise contours around a real hotel for the map of «Шум и окружение» (`NoiseMap`, GeoJSON): `{ map: null }`
+ * for a synthetic hotel, an unknown one, a hotel not shown in this environment or a failure.
+ */
+export async function GET(_request: NextRequest, context: { params: Promise<{ hotelId: string }> }) {
+  const { hotelId } = await context.params
+  const hotel = isVisibleHotel({ id: hotelId }) ? await loadHotel(hotelId) : null
+  const map = hotel ? await loadNoiseMap(hotel) : null
+  return Response.json(
+    { map },
+    // A short CDN life: the server cache, unlike the CDN, is dropped by POST /api/revalidate.
+    { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600' } },
+  )
+}

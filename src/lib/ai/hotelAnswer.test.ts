@@ -3,12 +3,20 @@ import { describe, expect, it } from 'vitest'
 import { getHotel } from '../catalogGenerator'
 import type { Hotel } from '../catalog'
 import type { HotelDetails } from '../hotelDetails'
+import { noiseLines, type HotelNoise } from '../noise'
 import { answerWithModel, hotelFacts, isRussian, NO_NEARBY_DATA, ruleAnswer } from './hotelAnswer'
 
 const base = getHotel('prague-old-town-lantern')!
 const hotel: Hotel = { ...base, amenities: ['wifi', 'parking', 'pets'] }
 const bare: Hotel = { ...base, amenities: ['wifi'] }
 const dates = { checkIn: '2026-11-10', checkOut: '2026-11-12' } as const
+
+/** The noise of a hotel on a loud street. */
+const noise: HotelNoise = {
+  sources: [{ source: 'roadsInAgglomeration', lden: { min: 65, max: 69 }, lnight: { min: 55, max: 59 } }],
+  places: [{ category: 'bar', name: 'Homenaje', distanceM: 92, lat: 39.47, lon: -0.376 }],
+  placesCovered: ['bar'],
+}
 
 /** What a real hotel's Ostrovok page gives. */
 const details: HotelDetails = {
@@ -122,6 +130,24 @@ describe('ruleAnswer', () => {
     )
   })
 
+  // hotel-page, Requirement: Шум и окружение настоящего отеля
+  it('answers «шумно ли» with the lines of the page', () => {
+    const { answer } = ruleAnswer('Тут шумно ночью?', hotel, undefined, details, noise)
+    expect(answer).toBe(
+      `О шуме у отеля, по картам шума EEA и OpenStreetMap:\n${noiseLines(noise)
+        .map((line) => `• ${line}`)
+        .join('\n')}`,
+    )
+    expect(answer).toContain('Ночью (Lnight, 23:00–07:00): 55–59 дБ')
+    expect(ruleAnswer('Здесь тихо?', hotel).answer).toBe('Сейчас не могу ответить: данных о шуме у этого отеля нет.')
+  })
+
+  it('says «нет данных EEA», not «тихо», for a hotel outside the noise maps', () => {
+    const { answer } = ruleAnswer('Шумно?', hotel, undefined, null, { sources: [], places: [], placesCovered: [] })
+    expect(answer).toMatch(/Нет данных EEA/)
+    expect(answer).not.toMatch(/тихо/i)
+  })
+
   it('refuses any other question', () => {
     expect(ruleAnswer('Расскажи анекдот', hotel).answer).toBe('Сейчас не могу ответить. Попробуйте позже.')
   })
@@ -147,6 +173,12 @@ describe('hotelFacts', () => {
     expect(facts).toContain('- «Номер с видом на море.» (TripAdvisor)')
     expect(facts).toContain('Скорость Wi‑Fi неизвестна')
     expect(facts).not.toContain('Данных о местах рядом')
+  })
+
+  it('carries the noise lines, or says there are none', () => {
+    const facts = hotelFacts(hotel, undefined, undefined, details, noise)
+    for (const line of noiseLines(noise)) expect(facts).toContain(`- ${line}`)
+    expect(hotelFacts(hotel)).toContain('Данных о шуме у отеля нет.')
   })
 
   it('says there are no reliable data of a doubtful building, and gives none of its floors', () => {

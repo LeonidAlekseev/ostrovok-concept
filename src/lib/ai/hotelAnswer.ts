@@ -7,6 +7,7 @@ import { nightsBetween } from '../dates'
 import type { HotelFeatures } from '../features'
 import { formatDecimal, formatPrice } from '../format'
 import { distanceLabel, factLines, NEARBY_SHOWN, REVIEW_SOURCE_LABEL, type HotelDetails } from '../hotelDetails'
+import { isNoiseQuestion, noiseLines, type HotelNoise } from '../noise'
 import { averageNight, stayTotal } from '../offer'
 import { MODEL_TIMEOUT_MS } from './understand'
 
@@ -14,7 +15,7 @@ import { MODEL_TIMEOUT_MS } from './understand'
  * Эвал's answer to a question about one hotel (`brief.hotelId`): from the hotel's data — the description, the
  * amenities, the distances, the rooms with prices on the chat's dates and, for a real hotel, its Ostrovok page
  * (`HotelDetails`: the places nearby, the paid services, the facts, the scores, the reviews and the guests' words about
- * the view) — and, apart, from the model's general knowledge, which the feed marks «Не проверено». Without the model
+ * the view) and its noise (`HotelNoise`: EEA's bands and OSM's loud places, the lines of the page) — and, apart, from the model's general knowledge, which the feed marks «Не проверено». Without the model
  * the ready-made questions about the rooms, the parking, the pets and the places nearby are answered by rules from
  * the data; anything else is an honest «не могу ответить».
  */
@@ -81,7 +82,13 @@ const placeLine = (place: HotelDetails['nearby'][number]) =>
   `${place.name} (${place.kind.toLocaleLowerCase('ru')}) — ${distanceLabel(place.distanceM)}`
 
 /** The ready-made questions by rules from the hotel's data; none of the model's general knowledge. */
-export function ruleAnswer(text: string, hotel: Hotel, dates?: StayDates, details?: HotelDetails | null): HotelAnswer {
+export function ruleAnswer(
+  text: string,
+  hotel: Hotel,
+  dates?: StayDates,
+  details?: HotelDetails | null,
+  noise?: HotelNoise | null,
+): HotelAnswer {
   const has = (...keys: (keyof typeof AMENITIES)[]) => keys.find((key) => hotel.amenities.includes(key))
   if (PETS.test(text)) {
     const pets = has('pets')
@@ -101,6 +108,14 @@ export function ruleAnswer(text: string, hotel: Hotel, dates?: StayDates, detail
         : fees
           ? `По данным отеля:${fees}`
           : 'В данных отеля парковка не указана. Уточните это у отеля до бронирования.',
+    }
+  }
+  if (isNoiseQuestion(text)) {
+    const lines = noiseLines(noise)
+    return {
+      answer: lines.length
+        ? `О шуме у отеля, по картам шума EEA и OpenStreetMap:\n${lines.map((line) => `• ${line}`).join('\n')}`
+        : 'Сейчас не могу ответить: данных о шуме у этого отеля нет.',
     }
   }
   if (NEARBY.test(text)) {
@@ -170,6 +185,7 @@ export function hotelFacts(
   dates?: StayDates,
   features?: HotelFeatures,
   details?: HotelDetails | null,
+  noise?: HotelNoise | null,
 ): string {
   const nights = dates ? nightsBetween(dates.checkIn, dates.checkOut) : 0
   const amenities = hotel.amenities.map((key) => `${amenityLabel(key)}${paid(key)}`)
@@ -189,6 +205,11 @@ export function hotelFacts(
     features?.buildingDoubtful &&
       'Этажность и высота здания: надёжных данных по зданию нет (здание в EUBUCCO у точки отеля ниже, чем этажи номеров по данным отеля).',
     ...(details ? detailLines(details) : []),
+    noise
+      ? `Шум (только эти данные; «нет данных EEA» не значит «тихо»):\n${noiseLines(noise)
+          .map((line) => `- ${line}`)
+          .join('\n')}`
+      : 'Данных о шуме у отеля нет.',
     dates
       ? `Даты: ${dates.checkIn} — ${dates.checkOut} (${nights} н.)`
       : 'Даты не выбраны: цен на даты нет, можно назвать только «от» за ночь.',
@@ -216,7 +237,13 @@ const answerSchema = z.object({
     .describe('то, чего в данных нет, но что ты знаешь сам (общие знания); null, если добавить нечего'),
 })
 
-function instructions(hotel: Hotel, dates?: StayDates, features?: HotelFeatures, details?: HotelDetails | null) {
+function instructions(
+  hotel: Hotel,
+  dates?: StayDates,
+  features?: HotelFeatures,
+  details?: HotelDetails | null,
+  noise?: HotelNoise | null,
+) {
   return [
     `Ты Эвал, помощник сервиса «О!бъективно» на странице отеля «${hotel.name}». Отвечай по-русски, дружелюбно и коротко.`,
     'Поле answer — ТОЛЬКО то, что есть в данных отеля ниже. Ничего не выдумывай: если в данных ответа нет, так и скажи.',
@@ -226,7 +253,7 @@ function instructions(hotel: Hotel, dates?: StayDates, features?: HotelFeatures,
     'Цены называй только из данных. Отвечай только JSON по схеме: ' + JSON.stringify(z.toJSONSchema(answerSchema)),
     '',
     'Данные отеля:',
-    hotelFacts(hotel, dates, features, details),
+    hotelFacts(hotel, dates, features, details, noise),
   ].join('\n')
 }
 
@@ -260,6 +287,7 @@ export async function answerWithModel(
     dates?: StayDates
     features?: HotelFeatures
     details?: HotelDetails | null
+    noise?: HotelNoise | null
     signal?: AbortSignal
     timeoutMs?: number
   } = {},
@@ -267,7 +295,7 @@ export async function answerWithModel(
   const timeout = AbortSignal.timeout(options.timeoutMs ?? MODEL_TIMEOUT_MS)
   const { output } = await generateText({
     model,
-    instructions: instructions(hotel, options.dates, options.features, options.details),
+    instructions: instructions(hotel, options.dates, options.features, options.details, options.noise),
     messages: messages.map(({ role, text }) => ({ role, content: text.slice(0, MAX_MESSAGE_LENGTH) })),
     output: Output.object({ schema: answerSchema }),
     reasoning: 'none',
