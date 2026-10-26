@@ -310,13 +310,14 @@ describe('the hotel cards of an answer', () => {
   const cardOf = async (name: string) => (await within(log()).findByRole('link', { name })).closest('article')!
   const comment = () => within(log()).getByRole('list', { name: 'Почему эти отели' })
 
-  it('shows the site’s hotel card with the price for the stay, leading to the hotel on the plan’s dates', async () => {
+  it('shows the plain card of the home page, leading to the hotel on the plan’s dates', async () => {
     const plan = makePlan(lisbonBrief, today, destinations, newHotels, [withParking])
     renderWith([withPlan('Лиссабон', 5, plan)])
     const card = await cardOf(withParking.name)
-    expect(within(card).getByRole('group', { name: 'Фото отеля' })).toBeTruthy()
-    expect(within(card).getByText(/Оценка гостей/)).toBeTruthy()
-    expect(card.textContent).toMatch(/за \d+ ноч\S* · 2 гостя/)
+    expect(within(card).queryByRole('group', { name: 'Фото отеля' })).toBeNull()
+    expect(within(card).queryByText(/Оценка гостей/)).toBeNull()
+    expect(card.textContent).toContain('км от центра')
+    expect(card.textContent).not.toMatch(/за \d+ ноч\S* · \d+ гост/)
     expect(within(card).getByRole('link', { name: withParking.name }).getAttribute('href')).toContain(
       `/hotels/${withParking.id}?checkin=${plan.query.checkIn}`,
     )
