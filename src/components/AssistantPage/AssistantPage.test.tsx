@@ -1,12 +1,14 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { newHotels } from '../../lib/catalogGenerator'
+import { setScreen, WIDE } from '../../test/screen'
 import { AssistantPage } from './AssistantPage'
 
 const push = vi.fn()
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
 
+beforeEach(() => setScreen(WIDE))
 afterEach(() => {
   push.mockClear()
   window.sessionStorage.clear()

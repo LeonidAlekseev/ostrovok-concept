@@ -7,6 +7,7 @@ import { CHATS_KEY, newChat, type Chat, type ChatMessage } from '../../lib/assis
 import { getHotel, hotels, newHotels } from '../../lib/catalogGenerator'
 import { addDays, todayIso } from '../../lib/dates'
 import { catalogFetch } from '../../test/catalog'
+import { setScreen, WIDE } from '../../test/screen'
 import { AssistantSearch } from './AssistantSearch'
 import { SharedChat } from './SharedChat'
 
@@ -16,6 +17,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
 const fetchMock = vi.fn<typeof fetch>()
 const THINK_MS = 650
 beforeEach(() => {
+  setScreen(WIDE)
   const realSetTimeout = globalThis.setTimeout
   vi.spyOn(globalThis, 'setTimeout').mockImplementation(((handler: TimerHandler, ms?: number, ...args: unknown[]) =>
     realSetTimeout(handler, ms === THINK_MS ? 0 : ms, ...args)) as typeof setTimeout)
