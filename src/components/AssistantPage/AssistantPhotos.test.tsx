@@ -5,6 +5,7 @@ import { CHATS_KEY, newChat, type Chat } from '../../lib/assistantChats'
 import { SIGNED_URL_REFRESH_MS } from '../../lib/assistantChatsRemote'
 import { newHotels } from '../../lib/catalogGenerator'
 import { catalogFetch } from '../../test/catalog'
+import { setScreen, WIDE } from '../../test/screen'
 import { AssistantSearch } from './AssistantSearch'
 import { SharedChat } from './SharedChat'
 
@@ -34,6 +35,7 @@ const THINK_MS = 650
 // so the default 5 s is not enough there.
 const HEAVY = 20_000
 beforeEach(() => {
+  setScreen(WIDE)
   const realSetTimeout = globalThis.setTimeout
   vi.spyOn(globalThis, 'setTimeout').mockImplementation(((handler: TimerHandler, ms?: number, ...args: unknown[]) =>
     realSetTimeout(handler, ms === THINK_MS ? 0 : ms, ...args)) as typeof setTimeout)

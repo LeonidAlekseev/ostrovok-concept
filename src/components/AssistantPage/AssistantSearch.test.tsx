@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { destinations } from '../../data/destinations'
@@ -8,6 +8,7 @@ import { newHotels } from '../../lib/catalogGenerator'
 import { DIALOG_KEY } from '../../lib/assistantDialog'
 import { todayIso } from '../../lib/dates'
 import { catalogFetch } from '../../test/catalog'
+import { setScreen, WIDE } from '../../test/screen'
 import { AssistantSearch } from './AssistantSearch'
 
 const fetchMock = vi.fn<typeof fetch>()
@@ -35,15 +36,13 @@ const HEAVY = 20_000
 // The assistant "thinks" for 650 ms before it answers: the tests do not wait for it in real time.
 const THINK_MS = 650
 beforeEach(() => {
+  setScreen(WIDE)
   const realSetTimeout = globalThis.setTimeout
   vi.spyOn(globalThis, 'setTimeout').mockImplementation(((handler: TimerHandler, ms?: number, ...args: unknown[]) =>
     realSetTimeout(handler, ms === THINK_MS ? 0 : ms, ...args)) as typeof setTimeout)
 })
 
 afterEach(() => {
-  // Unmounted first: the hooks of this file run before the cleanup of src/test/setup.ts, and an unmount runs the
-  // effects still pending, so a chat saved by them would outlive the cleared storage and open in the next test.
-  cleanup()
   vi.restoreAllMocks()
   window.sessionStorage.clear()
   window.localStorage.clear()
