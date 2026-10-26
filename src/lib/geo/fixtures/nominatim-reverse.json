@@ -1,0 +1,32 @@
+{
+  "place_id": 431540335,
+  "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+  "osm_type": "node",
+  "osm_id": 14318392762,
+  "lat": "39.4701926",
+  "lon": "-0.3757294",
+  "category": "office",
+  "type": "it",
+  "place_rank": 30,
+  "importance": 7.688792248412325e-5,
+  "addresstype": "office",
+  "name": "Ailet",
+  "display_name": "Ailet, 21, Plaça de l'Ajuntament, Ciutat Vella, Валенсия, Comarca de València, Валенсия, 46002, Испания",
+  "address": {
+    "office": "Ailet",
+    "house_number": "21",
+    "road": "Plaça de l'Ajuntament",
+    "residential": "Ciutat Vella",
+    "suburb": "Ciutat Vella",
+    "city": "Валенсия",
+    "county": "Comarca de València",
+    "state_district": "Валенсия",
+    "ISO3166-2-lvl6": "ES-V",
+    "state": "Валенсия",
+    "ISO3166-2-lvl4": "ES-VC",
+    "postcode": "46002",
+    "country": "Испания",
+    "country_code": "es"
+  },
+  "boundingbox": ["39.4701426", "39.4702426", "-0.3757794", "-0.3756794"]
+}

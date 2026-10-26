@@ -1,0 +1,255 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API (fixture: Geofabrik valencia-261025)",
+  "osm3s": {
+    "timestamp_osm_base": "2026-10-25T21:21:21Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+    {
+      "type": "node",
+      "id": 105865399,
+      "lat": 39.4951529,
+      "lon": -0.3964149,
+      "tags": {
+        "amenity": "pharmacy",
+        "healthcare": "pharmacy",
+        "name": "Farmacia del Treda"
+      }
+    },
+    {
+      "type": "node",
+      "id": 100986804,
+      "lat": 39.4510701,
+      "lon": -0.4026173,
+      "tags": {
+        "name": "Sant Isidre",
+        "name:ca": "Sant Isidre",
+        "operator": "Ferrocarrils de la Generalitat Valenciana",
+        "public_transport": "station",
+        "railway": "station",
+        "station": "subway",
+        "subway": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 107171636,
+      "lat": 39.4833051,
+      "lon": -0.3572899,
+      "tags": {
+        "name": "Vicent Zaragozà",
+        "operator": "Ferrocarrils de la Generalitat Valenciana",
+        "public_transport": "stop_position",
+        "railway": "tram_stop"
+      }
+    },
+    {
+      "type": "way",
+      "id": 156305130,
+      "tags": {
+        "name": "Platja Pobla Marina",
+        "name:ca": "Platja Pobla Marina",
+        "natural": "beach"
+      },
+      "geometry": [
+        {
+          "lat": 39.5607328,
+          "lon": -0.2852396
+        },
+        {
+          "lat": 39.56088,
+          "lon": -0.2855581
+        },
+        {
+          "lat": 39.5596861,
+          "lon": -0.2863148
+        },
+        {
+          "lat": 39.5595378,
+          "lon": -0.2860125
+        },
+        {
+          "lat": 39.5594079,
+          "lon": -0.2858057
+        },
+        {
+          "lat": 39.5594189,
+          "lon": -0.2857555
+        },
+        {
+          "lat": 39.5596476,
+          "lon": -0.2857027
+        },
+        {
+          "lat": 39.5598558,
+          "lon": -0.2855462
+        },
+        {
+          "lat": 39.5600961,
+          "lon": -0.2853124
+        },
+        {
+          "lat": 39.5602535,
+          "lon": -0.2850461
+        },
+        {
+          "lat": 39.5603589,
+          "lon": -0.2847953
+        },
+        {
+          "lat": 39.5604284,
+          "lon": -0.2846487
+        },
+        {
+          "lat": 39.5607328,
+          "lon": -0.2852396
+        }
+      ]
+    },
+    {
+      "type": "way",
+      "id": 4787521,
+      "tags": {
+        "natural": "coastline"
+      },
+      "geometry": [
+        {
+          "lat": 39.5549594,
+          "lon": -0.2897897
+        },
+        {
+          "lat": 39.5550689,
+          "lon": -0.2897501
+        },
+        {
+          "lat": 39.5551372,
+          "lon": -0.2897015
+        },
+        {
+          "lat": 39.555284,
+          "lon": -0.2896031
+        },
+        {
+          "lat": 39.5554302,
+          "lon": -0.2895504
+        },
+        {
+          "lat": 39.5555724,
+          "lon": -0.2894754
+        },
+        {
+          "lat": 39.5557297,
+          "lon": -0.2893946
+        },
+        {
+          "lat": 39.5558827,
+          "lon": -0.2892787
+        },
+        {
+          "lat": 39.5561012,
+          "lon": -0.289108
+        },
+        {
+          "lat": 39.5563275,
+          "lon": -0.2888853
+        },
+        {
+          "lat": 39.5564778,
+          "lon": -0.2887026
+        },
+        {
+          "lat": 39.5566312,
+          "lon": -0.2884784
+        },
+        {
+          "lat": 39.5567374,
+          "lon": -0.2882513
+        },
+        {
+          "lat": 39.5568298,
+          "lon": -0.2879973
+        },
+        {
+          "lat": 39.5569269,
+          "lon": -0.2877824
+        },
+        {
+          "lat": 39.5569786,
+          "lon": -0.2876779
+        }
+      ]
+    },
+    {
+      "type": "way",
+      "id": 105443286,
+      "tags": {
+        "amenity": "hospital",
+        "healthcare": "hospital",
+        "name": "Hospital Quirón Salud Valencia"
+      },
+      "center": {
+        "lat": 39.478019599999996,
+        "lon": -0.36417964999999997
+      }
+    },
+    {
+      "type": "relation",
+      "id": 1651643,
+      "tags": {
+        "leisure": "park",
+        "type": "multipolygon"
+      },
+      "center": {
+        "lat": 39.48492295,
+        "lon": -0.4502854
+      }
+    },
+    {
+      "type": "relation",
+      "id": 20242344,
+      "tags": {
+        "aeroway": "aerodrome",
+        "iata": "VLC",
+        "name": "Aeropuerto Internacional de Valencia",
+        "name:ca": "Aeroport Internacional de València",
+        "name:en": "Valencia International Airport",
+        "name:es": "Aeropuerto Internacional de Valencia",
+        "type": "multipolygon"
+      },
+      "center": {
+        "lat": 39.488233750000006,
+        "lon": -0.48264530000000005
+      }
+    },
+    {
+      "type": "node",
+      "id": 34105607,
+      "lat": 39.4697065,
+      "lon": -0.3763353,
+      "tags": {
+        "name": "València",
+        "name:ca": "València",
+        "name:en": "Valencia",
+        "name:es": "Valencia",
+        "name:ru": "Валенсия",
+        "place": "city"
+      }
+    },
+    {
+      "type": "node",
+      "id": 1,
+      "lat": 39.47,
+      "lon": -0.37,
+      "tags": {
+        "shop": "bakery"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2,
+      "lat": 39.47,
+      "lon": -0.37
+    }
+  ]
+}

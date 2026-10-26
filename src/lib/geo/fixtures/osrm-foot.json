@@ -1,0 +1,36 @@
+{
+  "code": "Ok",
+  "routes": [
+    {
+      "legs": [{ "steps": [], "weight": 418.62, "summary": "", "duration": 3900.1, "distance": 4870 }],
+      "weight_name": "routability",
+      "geometry": {
+        "coordinates": [
+          [-0.376272, 39.469808],
+          [-0.376016, 39.469855],
+          [-0.375977, 39.469738],
+          [-0.326475, 39.469904],
+          [-0.326, 39.469903]
+        ],
+        "type": "LineString"
+      },
+      "weight": 418.62,
+      "duration": 3900.1,
+      "distance": 4870
+    }
+  ],
+  "waypoints": [
+    {
+      "hint": "FkD4jyJA-I9oAAAAvQAAAIoBAAAAAAAA0d9IQX8YtUEVWD1CAAAAAGQAAAC2AAAAewEAAAAAAAB9AAAAMEL6__BCWgIUQvr_TENaAgQAzwQAAAAA",
+      "location": [-0.376272, 39.469808],
+      "name": "",
+      "distance": 10.49454758
+    },
+    {
+      "hint": "VdWfgMzum4VUAQAACAEAAAAAAABTAAAAEXwjQjeg_EEAAAAARlIeQUcBAAD9AAAAAAAAAE8AAAB9AAAAkAb7_09DWgKQBvv_sENaAgAArwUAAAAA",
+      "location": [-0.326, 39.469903],
+      "name": "Carrer de Francesc Miralles",
+      "distance": 10.76938243
+    }
+  ]
+}
