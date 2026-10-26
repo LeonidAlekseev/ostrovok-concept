@@ -96,15 +96,10 @@ describe('the layout of Eval’s page', () => {
     expect(aside.textContent).not.toMatch(/маршрут|авиабилет|виз/i)
   })
 
-  it('opens a chat at its address and goes back to the list (Scenario: Телефон)', async () => {
-    const older = chatOf('Горы', 60, ['В горы'])
-    const user = renderWith([chatOf('Море', 5, ['К морю']), older])
-    await user.click(await within(chatList()).findByRole('button', { name: /^(?!Действия).*(?:Горы)/ }))
-    expect(window.location.pathname).toBe(`/assistant/${older.id}`)
-    expect(await within(log()).findByText('В горы')).toBeTruthy()
-
-    await user.click(screen.getAllByRole('button', { name: 'Назад к чатам' })[0])
-    await waitFor(() => expect(window.location.pathname).toBe('/assistant'))
+  it('starts a new chat without an address of its own (Scenario: Компьютер)', async () => {
+    const user = renderWith([chatOf('Тихий отель', 5, ['Тихий отель в Лиссабоне'])])
+    await user.click(await within(chatList()).findByRole('button', { name: 'Новый чат' }))
+    expect(window.location.pathname).toBe('/assistant')
   })
 })
 
@@ -115,6 +110,17 @@ describe('the layout of Eval’s page on a phone', () => {
     window.history.replaceState(null, '', '/assistant')
   })
 
+  it('opens a chat at its address and goes back to the list (Scenario: Телефон)', async () => {
+    const older = chatOf('Горы', 60, ['В горы'])
+    const user = renderWith([chatOf('Море', 5, ['К морю']), older])
+    await user.click(await within(chatList()).findByRole('button', { name: /^(?!Действия).*(?:Горы)/ }))
+    expect(window.location.pathname).toBe(`/assistant/${older.id}`)
+    expect(await within(log()).findByText('В горы')).toBeTruthy()
+
+    await user.click(screen.getAllByRole('button', { name: 'Назад к чатам' })[0])
+    await waitFor(() => expect(window.location.pathname).toBe('/assistant'))
+  })
+
   it('opens the list at /assistant, not the newest chat, and hides the open chat', () => {
     renderWith([chatOf('Тихий отель', 5, ['Тихий отель в Лиссабоне'])])
     expect(window.location.pathname).toBe('/assistant')
@@ -122,7 +128,7 @@ describe('the layout of Eval’s page on a phone', () => {
     expect(screen.getByRole('region', { name: 'Чат с Эвалом' }).className).toContain('max-lg:hidden')
   })
 
-  it('starts a new chat at an address of its own, unlike the column of a wide screen', async () => {
+  it('starts a new chat at an address of its own', async () => {
     const user = renderWith([chatOf('Тихий отель', 5, ['Тихий отель в Лиссабоне'])])
     await user.click(await within(chatList()).findByRole('button', { name: 'Новый чат' }))
     expect(window.location.pathname).toMatch(/^\/assistant\/[0-9a-f-]{36}$/)
