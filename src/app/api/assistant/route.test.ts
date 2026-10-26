@@ -385,6 +385,38 @@ describe('POST /api/assistant: the semantic search', () => {
     expect(body.matches).toBeUndefined()
     expect(body.source).toBe('rules')
   })
+
+  it('answers within 15 s when the models take their 9 s and the first request to the embeddings hangs', async () => {
+    // The text models use their 9 s, the rules come after; the search gets what the answer has left.
+    const stall = new MockLanguageModelV4({
+      doGenerate: async () => {
+        vi.setSystemTime(Date.now() + 9000)
+        throw new DOMException('The operation timed out.', 'TimeoutError')
+      },
+    })
+    vi.mocked(getTextModels).mockResolvedValue(chain([stall], 9000))
+    vi.mocked(semanticSearch).mockImplementation(async (_, { timeoutMs = 0 }) => {
+      vi.setSystemTime(Date.now() + timeoutMs)
+      return { status: 'failed', reason: 'timeout' }
+    })
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const start = Date.now()
+    const body = await (
+      await post({
+        messages: [
+          { role: 'user', text: 'тихий хостел с быстрым Wi‑Fi' },
+          { role: 'assistant', text: 'Куда?' },
+          { role: 'user', text: 'в Прагу' },
+        ],
+        brief: complete,
+      })
+    ).json()
+    const spent = Date.now() - start
+    vi.useRealTimers()
+    expect(semanticSearch).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ timeoutMs: 6000 }))
+    expect(body.matches).toBeUndefined()
+    expect(spent).toBe(15_000)
+  })
 })
 
 // assistant-search, Requirements: Подбор по свойствам здания и окружения, Шаги агентов в чате

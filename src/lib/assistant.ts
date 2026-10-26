@@ -730,10 +730,10 @@ export const HOTEL_UNAVAILABLE = 'Сейчас не могу ответить. �
 export const MAX_MESSAGE_LENGTH = 500
 export const MAX_HISTORY = 20
 /**
- * The client's own limit: the route gives the text models 9 s (the rules after that) and answers within 14 s with
+ * The client's own limit: the route gives the text models 9 s (the rules after that) and answers within 15 s with
  * the semantic search's hotels, when the plan is due.
  */
-const ASSISTANT_TIMEOUT_MS = 15_000
+const ASSISTANT_TIMEOUT_MS = 16_000
 /** With photos the route looks at them first (the models in turn, up to 18 s) and answers within 28 s. */
 const PHOTO_TIMEOUT_MS = 30_000
 
