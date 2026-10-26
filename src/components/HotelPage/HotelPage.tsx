@@ -1,6 +1,6 @@
 import { cn } from 'cn'
-import { isRated, type Hotel } from '@/lib/catalog'
-import type { HotelDetails } from '@/lib/hotelDetails'
+import type { Hotel } from '@/lib/catalog'
+import { hasGuestReviews, type HotelDetails } from '@/lib/hotelDetails'
 import { AboutHotel, HotelAmenities } from './AboutHotel'
 import { BookingCard } from './BookingCard'
 import { Gallery } from './Gallery'
@@ -60,14 +60,19 @@ export function HotelPage({ hotel, details, titleId, stay }: Props) {
             <div className="flex min-w-0 flex-col gap-6">
               <HotelHeader hotel={hotel} titleId={titleId} />
               <Gallery hotel={hotel} />
-              <HotelTabs hotel={hotel} inDialog={inDialog} className={cn(!inDialog && 'max-lg:top-14')} />
+              <HotelTabs
+                hotel={hotel}
+                details={details}
+                inDialog={inDialog}
+                className={cn(!inDialog && 'max-lg:top-14')}
+              />
               <div className={sectionGap}>
                 <AboutHotel hotel={hotel} details={details}>
                   <WhyGuests hotel={hotel} className={cn(card, !inDialog && 'lg:hidden')} />
                 </AboutHotel>
                 <HotelRooms hotel={hotel} className="flex flex-col gap-4 outline-none" />
                 <HotelAmenities hotel={hotel} details={details} />
-                {isRated(hotel) && <HotelRating hotel={hotel} details={details} />}
+                {hasGuestReviews(hotel, details) && <HotelRating hotel={hotel} details={details} />}
                 <HotelLocation hotel={hotel} details={details} />
                 <HotelRules hotel={hotel} details={details} />
                 {inDialog && (

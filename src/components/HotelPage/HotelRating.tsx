@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import type { Hotel, SectionScore } from '@/lib/catalog'
+import { isRated, type Hotel, type SectionScore } from '@/lib/catalog'
 import { REVIEW_SOURCE_LABEL, type HotelDetails, type SourceScores } from '@/lib/hotelDetails'
 import { formatDecimal } from '../../lib/format'
 import { ratingLabel, scoreColor } from '../../lib/reviews'
@@ -76,7 +76,8 @@ function ViewQuotes({ quotes }: { quotes: HotelDetails['viewQuotes'] }) {
 /**
  * "Отзывы гостей", the guests' rating: the badge, its word and the counts, the scores of the eight sections with
  * bars in the colours of the same scale, and the reviews dialog. A real hotel's page gives the scores by source
- * (Островок, TripAdvisor), its reviews with their sources and the guests' words about the view.
+ * (Островок, TripAdvisor), its reviews with their sources and the guests' words about the view; without Ostrovok's
+ * total there is no badge, the rest shows.
  */
 export function HotelRating({ hotel, details }: { hotel: Hotel; details?: HotelDetails | null }) {
   const { rating, reviewCount, sectionScores } = hotel
@@ -86,18 +87,21 @@ export function HotelRating({ hotel, details }: { hotel: Hotel; details?: HotelD
       <h2 id="rating-title" className="text-heading font-bold">
         Отзывы гостей
       </h2>
-      <div className="flex items-center gap-3">
-        <ScoreBadge score={rating} />
-        <div className="flex min-w-0 flex-col">
-          <span className="text-lg/tight font-bold">{ratingLabel(rating)}</span>
-          <span className="text-sm text-muted-foreground">{basedOnLabel(reviewCount)}</span>
-          {reviews.length > 0 && (
-            <span className="text-sm text-pretty text-muted-foreground">
-              {ownLanguageLabel(details ? reviews.length : reviewCount)}
-            </span>
-          )}
+      {/* Without Ostrovok's total the page's reviews and scores still show, under no badge. */}
+      {isRated(hotel) && (
+        <div className="flex items-center gap-3">
+          <ScoreBadge score={rating} />
+          <div className="flex min-w-0 flex-col">
+            <span className="text-lg/tight font-bold">{ratingLabel(rating)}</span>
+            <span className="text-sm text-muted-foreground">{basedOnLabel(reviewCount)}</span>
+            {reviews.length > 0 && (
+              <span className="text-sm text-pretty text-muted-foreground">
+                {ownLanguageLabel(details ? reviews.length : reviewCount)}
+              </span>
+            )}
+          </div>
         </div>
-      </div>
+      )}
       {details
         ? details.scores.map((scores) => <SourceBlock key={scores.source} scores={scores} />)
         : sectionScores.length > 0 && <SectionBars scores={sectionScores} label="Оценки по разделам" />}

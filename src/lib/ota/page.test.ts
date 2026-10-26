@@ -8,6 +8,7 @@ import {
   pageRowSchema,
   placeRowSchema,
   plainNotes,
+  roomFloorsOf,
   trimPage,
   viewQuotes,
   type PlaceRow,
@@ -310,6 +311,14 @@ describe('otaHotelDetails', () => {
     expect(otaHotelDetails(storedRow(), []).building).toBeNull()
   })
 
+  it('shows no building lower than the floors the rooms take: the point matched another building', () => {
+    const lower = { floors: 3, height_m: 10, floors_source: 'gov-spain', height_source: 'gov-spain' }
+    const doubtful = otaHotelDetails(storedRow(), places, lower)
+    expect(doubtful.building).toBeNull()
+    expect(factLines(doubtful.facts, doubtful.building)).toContain('Номера занимают 6 этажей (по данным отеля)')
+    expect(factLines(doubtful.facts, doubtful.building).join()).not.toMatch(/В здании/)
+  })
+
   it('lists the priced services and the fees, and the notes as they are', () => {
     expect(details.policies).toEqual([
       { label: 'Парковка рядом с отелем', value: '22 € за машину в сутки' },
@@ -397,6 +406,18 @@ describe('plainNotes', () => {
         'Стойка работает 24/7.\n<p><b>Полезная информация</b> <br /><ul><li>Доплата: 8.50 EUR &amp; более</li><li>Животные</li></ul></p>',
       ),
     ).toBe('Стойка работает 24/7.\nПолезная информация\n• Доплата: 8.50 EUR & более\n• Животные')
+  })
+})
+
+describe('roomFloorsOf', () => {
+  it('maps the hotels to the floors their rooms take, the unknown ones left out', () => {
+    expect(
+      roomFloorsOf([
+        { master_id: 1, floors: 6 },
+        { master_id: '2', floors: 0 },
+        { master_id: 3, floors: null },
+      ]),
+    ).toEqual(new Map([['ota-1', 6]]))
   })
 })
 

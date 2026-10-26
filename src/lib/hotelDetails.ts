@@ -16,6 +16,25 @@ export const REVIEW_SOURCE_LABEL: Record<ReviewSource, string> = {
   tripadvisor: 'TripAdvisor',
 }
 
+/**
+ * The sources of Ostrovok's review codes (`reviews.list[].reviewType`, `featuredReviews[].source`): the one place to
+ * change them. `ESR` is labelled Островок by decision: Ostrovok counts these reviews in its own `reviewsCountWithEsr`,
+ * though what the code stands for is not known. A review of a code not here is not shown.
+ */
+export const REVIEW_SOURCE_OF_CODE: Readonly<Record<string, ReviewSource>> = {
+  OST: 'ostrovok',
+  ESR: 'ostrovok',
+  TRP: 'tripadvisor',
+  TA: 'tripadvisor',
+}
+
+/**
+ * The guests' part of the hotel page: a rating, or the page's reviews or scores — a real hotel without Ostrovok's
+ * total still shows its reviews.
+ */
+export const hasGuestReviews = (hotel: { rating: number }, details: HotelDetails | null | undefined) =>
+  hotel.rating > 0 || Boolean(details && (details.reviews.length > 0 || details.scores.length > 0))
+
 export interface DescriptionPart {
   /** «Расположение», «В отеле», …; may be empty. */
   title: string

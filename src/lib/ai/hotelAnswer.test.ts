@@ -148,6 +148,13 @@ describe('hotelFacts', () => {
     expect(facts).toContain('Скорость Wi‑Fi неизвестна')
     expect(facts).not.toContain('Данных о местах рядом')
   })
+
+  it('says there are no reliable data of a doubtful building, and gives none of its floors', () => {
+    const facts = hotelFacts(hotel, undefined, { views: [], buildingDoubtful: true }, details)
+    expect(facts).toContain('Этажность и высота здания: надёжных данных по зданию нет')
+    expect(facts).not.toContain('Этажей в здании')
+    expect(facts).toContain('Номера занимают 6 этажей (по данным отеля)')
+  })
 })
 
 // assistant-search, Requirement: Пометка непроверенного

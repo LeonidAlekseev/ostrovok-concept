@@ -42,6 +42,35 @@ export interface HotelFeatures {
   lnight?: NoiseBand
   /** The room types with a view, as their names say. */
   views: RoomView[]
+  /**
+   * The building at the hotel's point is doubtful: the hotel says its rooms take more floors than the building has
+   * (`isDoubtfulBuilding`), so its floors and height are dropped.
+   */
+  buildingDoubtful?: true
+}
+
+/**
+ * The building EUBUCCO found at the hotel's point cannot be the hotel's when the hotel's rooms take more floors (as the
+ * hotel says, Ostrovok's `floorsNumber`) than the building has: the point matched another building.
+ */
+export const isDoubtfulBuilding = (buildingFloors: number | null | undefined, roomFloors: number | null | undefined) =>
+  Boolean(buildingFloors && roomFloors && roomFloors > buildingFloors)
+
+/**
+ * The features without the doubtful buildings' floors and height (`isDoubtfulBuilding`), marked `buildingDoubtful`;
+ * `roomFloors` are the floors each hotel's rooms take, by hotel id.
+ */
+export function withoutDoubtfulBuildings(
+  features: ReadonlyMap<string, HotelFeatures>,
+  roomFloors: ReadonlyMap<string, number>,
+): Map<string, HotelFeatures> {
+  return new Map(
+    [...features].map(([id, f]) => {
+      if (!isDoubtfulBuilding(f.floors, roomFloors.get(id))) return [id, f]
+      const { floors: _floors, heightM: _height, ...rest } = f
+      return [id, { ...rest, buildingDoubtful: true as const }]
+    }),
+  )
 }
 
 /** What the traveller asked of the hotel. */

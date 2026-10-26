@@ -2,7 +2,8 @@ import 'server-only'
 import { createClient } from '@supabase/supabase-js'
 import { unstable_cache } from 'next/cache'
 import type { Database } from '@/lib/db/database.types'
-import { featuresOf, type HotelFeatures } from '@/lib/features'
+import { featuresOf, withoutDoubtfulBuildings, type HotelFeatures } from '@/lib/features'
+import { ROOM_FLOORS_COLUMNS, roomFloorsOf } from '@/lib/ota/page'
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/config'
 import { CATALOG_LIFETIME, CATALOG_TAG } from './catalog'
 
@@ -30,7 +31,7 @@ async function readAll<T>(read: (from: number, to: number) => PromiseLike<{ data
 const readFeatures = unstable_cache(
   async (): Promise<[string, HotelFeatures][]> => {
     const db = database()
-    const [hotels, views] = await Promise.all([
+    const [hotels, views, pages] = await Promise.all([
       readAll((from, to) =>
         db
           .from('hotel_features')
@@ -47,9 +48,13 @@ const readFeatures = unstable_cache(
           .order('view')
           .range(from, to),
       ),
+      // The floors the rooms take: a building lower than them is not the hotel's. None before the pages' migration.
+      readAll((from, to) =>
+        db.from('ota_hotel_pages').select(ROOM_FLOORS_COLUMNS).order('master_id').range(from, to),
+      ).catch(() => []),
     ])
     // A cached value is JSON: the map goes as its entries.
-    return [...featuresOf(hotels, views)]
+    return [...withoutDoubtfulBuildings(featuresOf(hotels, views), roomFloorsOf(pages))]
   },
   [CATALOG_TAG, 'features'],
   { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME },

@@ -24,9 +24,16 @@ registerHooks({
 const { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, contentHash, embeddingModel, toVector } =
   await import('../src/lib/ai/embedding.ts')
 const { hotelDocument } = await import('../src/lib/ai/documents.ts')
-const { featuresOf } = await import('../src/lib/features.ts')
-const { amenityGroupsOf, amenityGroupsSchema, nearbyOf, PLACE_COLUMNS, placeRowSchema } =
-  await import('../src/lib/ota/page.ts')
+const { featuresOf, withoutDoubtfulBuildings } = await import('../src/lib/features.ts')
+const {
+  amenityGroupsOf,
+  amenityGroupsSchema,
+  nearbyOf,
+  PLACE_COLUMNS,
+  placeRowSchema,
+  ROOM_FLOORS_COLUMNS,
+  roomFloorsOf,
+} = await import('../src/lib/ota/page.ts')
 type DocumentDetails = import('../src/lib/ai/documents.ts').DocumentDetails
 type PlaceRow = import('../src/lib/ota/page.ts').PlaceRow
 const { NVIDIA_KEY, pacer, withRetry } = await import('../src/lib/ai/nvidia.ts')
@@ -84,18 +91,25 @@ const destinations = ((await readAll<{ data: Destination }>('destinations', 'dat
 const cityOf = new Map(destinations.map((d) => [d.id, d]))
 const hotels = ((await readAll<{ data: Hotel }>('hotels', 'data')) ?? []).map((row) => row.data)
 
-// The building, the noise and the room views of `npm run db:features`; none before its migration.
-const features = featuresOf(
-  (await readAll<FeatureRow>(
-    'hotel_features',
-    'hotel_id, floors, height_m, lden_min, lden_max, lnight_min, lnight_max',
-    ['hotel_id'],
-  )) ?? [],
-  (await readAll<RoomViewRow>('hotel_room_views_named', 'hotel_id, view, room_name', [
-    'hotel_id',
-    'rg_hash',
-    'view',
-  ])) ?? [],
+// The building, the noise and the room views of `npm run db:features`; none before its migration. A building lower
+// than the floors the hotel's rooms take is not the hotel's: its floors and height are left out.
+const features = withoutDoubtfulBuildings(
+  featuresOf(
+    (await readAll<FeatureRow>(
+      'hotel_features',
+      'hotel_id, floors, height_m, lden_min, lden_max, lnight_min, lnight_max',
+      ['hotel_id'],
+    )) ?? [],
+    (await readAll<RoomViewRow>('hotel_room_views_named', 'hotel_id, view, room_name', [
+      'hotel_id',
+      'rg_hash',
+      'view',
+    ])) ?? [],
+  ),
+  roomFloorsOf(
+    (await readAll<{ master_id: unknown; floors: unknown }>('ota_hotel_pages', ROOM_FLOORS_COLUMNS, ['master_id'])) ??
+      [],
+  ),
 )
 
 // The places and the amenities of the real hotels' Ostrovok pages (`npm run db:load:ota-pages`); none before its

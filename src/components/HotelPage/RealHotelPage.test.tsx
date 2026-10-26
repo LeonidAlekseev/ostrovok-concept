@@ -155,6 +155,22 @@ describe('HotelPage of a real hotel with its Ostrovok page', () => {
     expect(screen.getAllByText('Места рядом появятся позже').length).toBeGreaterThan(0)
   })
 
+  it('shows the reviews of a hotel without Ostrovok’s total, without the badge', () => {
+    const unrated = { ...hotel, rating: 0, reviewCount: 0 }
+    render(<HotelPage hotel={unrated} details={{ ...details, scores: [] }} />)
+    const rating = screen.getByRole('region', { name: 'Отзывы гостей' })
+    expect(within(rating).queryByText(/^Основано на/)).toBeNull()
+    expect(within(rating).getByRole('button', { name: /^Читать отзывы \(2\)$/ })).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Отзывы (2)' })).toBeDefined()
+  })
+
+  it('has no rating section without a rating, reviews or scores', () => {
+    render(
+      <HotelPage hotel={{ ...hotel, rating: 0, reviewCount: 0 }} details={{ ...details, scores: [], reviews: [] }} />,
+    )
+    expect(screen.queryByRole('region', { name: 'Отзывы гостей' })).toBeNull()
+  })
+
   it('has no "Об отеле" without a description', () => {
     render(<HotelPage hotel={{ ...hotel, description: '' }} />)
     expect(screen.queryByRole('heading', { name: 'Об отеле' })).toBeNull()

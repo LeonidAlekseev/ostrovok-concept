@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { SCORE_SECTIONS, type Review, type SectionScore } from '../catalog'
+import { isDoubtfulBuilding } from '../features'
 import { formatDecimal } from '../format'
 import type {
   AmenityGroup,
@@ -9,10 +10,10 @@ import type {
   HotelFacts,
   NearbyPlace,
   PolicyLine,
-  ReviewSource,
   SourceScores,
   ViewQuote,
 } from '../hotelDetails'
+import { REVIEW_SOURCE_OF_CODE, type ReviewSource } from '../hotelDetails'
 import type { OtaPageFields } from './hotel'
 
 /**
@@ -499,12 +500,8 @@ function scoresOf(row: Pick<PageRow, 'rating'>): SourceScores[] {
   return scores
 }
 
-/**
- * The review's source: `TRP` and `TA` are TripAdvisor's; `OST` is Ostrovok's, and so is `ESR`, which Ostrovok counts in
- * its own `reviewsCountWithEsr`.
- */
-const sourceOf = (code: string): ReviewSource | null =>
-  code === 'TRP' || code === 'TA' ? 'tripadvisor' : code === 'OST' || code === 'ESR' ? 'ostrovok' : null
+/** The review's source by its code (`REVIEW_SOURCE_OF_CODE`); `null` for a code not known. */
+const sourceOf = (code: string): ReviewSource | null => REVIEW_SOURCE_OF_CODE[code] ?? null
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}/
 const key = (value: string | undefined) => clean(value ?? '').toLocaleLowerCase('ru')
@@ -631,8 +628,9 @@ export const nearbyOf = (places: readonly PlaceRow[]): NearbyPlace[] =>
     }))
     .sort((a, b) => a.distanceM - b.distanceM || a.id - b.id)
 
-const buildingOf = (row: BuildingRow | null | undefined): HotelBuilding | null =>
-  row && (row.floors || row.height_m)
+/** The building at the hotel's point; none when it is lower than the floors the rooms take (`isDoubtfulBuilding`). */
+const buildingOf = (row: BuildingRow | null | undefined, roomFloors: number | null): HotelBuilding | null =>
+  row && (row.floors || row.height_m) && !isDoubtfulBuilding(row.floors, roomFloors)
     ? {
         floors: row.floors,
         heightM: row.height_m,
@@ -683,7 +681,7 @@ export function otaHotelDetails(
     policies: policiesOf(row),
     notes: notes || null,
     facts: factsOf(row),
-    building: buildingOf(building),
+    building: buildingOf(building, row.facts.floorsNumber),
     scores: scoresOf(row),
     reviews,
     nearby: nearbyOf(places),
@@ -716,3 +714,15 @@ export function pageFields(row: z.infer<typeof pageFieldsRowSchema>): OtaPageFie
   const { checkIn, checkOut } = stayTimes(row)
   return { description: descriptionText(row), checkIn, checkOut, workspace: hasWorkstation(row.roomGroups) }
 }
+
+/** The columns of `ota_hotel_pages` for `roomFloorsOf`. */
+export const ROOM_FLOORS_COLUMNS = 'master_id, floors:hotel->facts->floorsNumber'
+
+/** The floors each hotel's rooms take, as the hotel says (Ostrovok's `floorsNumber`), by hotel id. */
+export const roomFloorsOf = (rows: readonly { master_id: unknown; floors: unknown }[]): Map<string, number> =>
+  new Map(
+    rows.flatMap((row) => {
+      const floors = Number(row.floors)
+      return Number.isInteger(floors) && floors > 0 ? [[`ota-${Number(row.master_id)}`, floors] as const] : []
+    }),
+  )

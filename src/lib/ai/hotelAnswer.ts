@@ -186,6 +186,8 @@ export function hotelFacts(
       ? `Wi‑Fi ${hotel.wifiMbps} Мбит/с${hotel.workspace ? ', есть рабочая зона' : ''}`
       : `Скорость Wi‑Fi неизвестна${hotel.workspace ? '; есть рабочая зона' : ''}`,
     features?.floors && `Этажей в здании (EUBUCCO): ${features.floors}`,
+    features?.buildingDoubtful &&
+      'Этажность и высота здания: надёжных данных по зданию нет (здание в EUBUCCO у точки отеля ниже, чем этажи номеров по данным отеля).',
     ...(details ? detailLines(details) : []),
     dates
       ? `Даты: ${dates.checkIn} — ${dates.checkOut} (${nights} н.)`
