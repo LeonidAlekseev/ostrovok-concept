@@ -48,6 +48,15 @@ const MAX_CANDIDATES = 50
 const queryVectors = new Map<string, Promise<number[]>>()
 const QUERY_CACHE = 500
 
+/**
+ * A search that gives up on its own time out forgets the vector it waited for, when that is still the one in the
+ * cache: the next search asks the model again instead of waiting for the stalled request. The request itself ends
+ * by its own `AbortSignal.timeout`; the other searches waiting on it keep it.
+ */
+function forgetVector(query: string, vector: Promise<number[]>) {
+  if (queryVectors.get(query) === vector) queryVectors.delete(query)
+}
+
 /** The shared request has its own limit: a search that gives up does not cancel the vector for the others. */
 function queryVector(apiKey: string, query: string): Promise<number[]> {
   const cached = queryVectors.get(query)
@@ -122,8 +131,10 @@ export async function semanticSearch(
 
   let matches: Match[]
   let stage: 'model' | 'database' = 'model'
+  let vector: Promise<number[]> | undefined
   try {
-    const embedding = await untilAborted(queryVector(apiKey, query), abortSignal)
+    vector = queryVector(apiKey, query)
+    const embedding = await untilAborted(vector, abortSignal)
     stage = 'database'
     const { data, error } = await database()
       .rpc('match_embeddings', {
@@ -138,7 +149,9 @@ export async function semanticSearch(
     matches = (data ?? []).filter((m) => isVisibleHotel({ id: m.ref_id }))
   } catch (error) {
     warn('no vectors, using the rules', error)
-    return failed(reasonOf(stage))
+    const reason = reasonOf(stage)
+    if (reason === 'timeout' && stage === 'model' && vector) forgetVector(query, vector)
+    return failed(reason)
   }
   if (matches.length === 0) return EMPTY
 

@@ -84,7 +84,7 @@ const textDeadline = (deadline: number) => Math.min(Date.now() + MODEL_TIMEOUT_M
 /**
  * Once the brief is complete and the plan is due, Эвал's turn runs its steps (src/lib/ai/turn.ts): the hotels by
  * meaning, then their building, noise and views when the traveller asked of them. Nothing found keeps the plan on
- * the rules; the steps go to the answer for the feed.
+ * the rules; the steps go to the answer for the feed. A search that failed twice sets `modelsDown`.
  */
 async function planTurn(context: Omit<TurnContext, 'summaries' | 'features'>): Promise<Partial<AssistantResponse>> {
   if (nextQuestion(context.brief, context.today)) return {}
@@ -98,6 +98,7 @@ async function planTurn(context: Omit<TurnContext, 'summaries' | 'features'>): P
     ...(state.matches?.length && { matches: state.matches }),
     ...(state.features && Object.keys(state.features).length > 0 && { features: state.features }),
     ...(state.missing?.length && { missing: state.missing }),
+    ...(state.semanticDown && { modelsDown: true as const }),
     steps,
   }
 }

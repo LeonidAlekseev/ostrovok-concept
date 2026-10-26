@@ -156,6 +156,38 @@ describe('semanticSearch', () => {
     expect(await search).toEqual({ status: 'failed', reason: 'aborted' })
   })
 
+  it('asks the model again when the first search gave up on a stalled vector', async () => {
+    vi.mocked(rerank).mockResolvedValue(reranked([{ originalIndex: 0, score: 0.9 }]))
+    const text = words()
+    vi.mocked(embed).mockReturnValueOnce(new Promise(() => {}) as ReturnType<typeof embed>)
+    expect(await semanticSearch(text, { timeoutMs: 20 })).toEqual({ status: 'failed', reason: 'timeout' })
+    expect(await semanticSearch(text, { k: 1 })).toEqual({
+      status: 'found',
+      hits: [{ id: 'prague-central-hostel', destinationId: 'prague', score: 0.9 }],
+    })
+    expect(embed).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not take the vector away from a concurrent search when another one gives up on it', async () => {
+    vi.mocked(rerank).mockResolvedValue(reranked([{ originalIndex: 0, score: 0.9 }]))
+    const text = words()
+    let answer!: (result: Awaited<ReturnType<typeof embed>>) => void
+    vi.mocked(embed).mockImplementationOnce(
+      () => new Promise((resolve) => (answer = resolve)) as ReturnType<typeof embed>,
+    )
+    const giving = semanticSearch(text, { timeoutMs: 50 })
+    const waiting = semanticSearch(text, {})
+    // The waiting search asks for the vector before the other one runs out of time.
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    expect(embed).toHaveBeenCalledTimes(1)
+    expect(await giving).toEqual({ status: 'failed', reason: 'timeout' })
+    answer({ embedding: [0.1, 0.2] } as Awaited<ReturnType<typeof embed>>)
+    // The waiting search keeps the answer it was promised; the search after them asks the model again.
+    expect(await waiting).toMatchObject({ status: 'found' })
+    expect(await semanticSearch(text, {})).toMatchObject({ status: 'found' })
+    expect(embed).toHaveBeenCalledTimes(2)
+  })
+
   it('embeds the same words once', async () => {
     vi.mocked(rerank).mockResolvedValue(reranked([{ originalIndex: 0, score: 1 }]))
     const text = words()
