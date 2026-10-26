@@ -33,6 +33,12 @@ describe('getTextModels', () => {
       expect(m.timeoutMs).toBeLessThanOrEqual(8000)
     })
   })
+
+  it('gives lightning 3.5 s, the main model of the text chain', async () => {
+    vi.mocked(getSecret).mockResolvedValue('test-key')
+    const models = await getTextModels()
+    expect(models?.[0]).toMatchObject({ id: 'nvidia/nemotron-3.5-lightning-30b-a3b', timeoutMs: 3500 })
+  })
 })
 
 // assistant-search, Requirement: Сбой модели фото
