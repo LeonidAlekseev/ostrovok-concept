@@ -29,7 +29,7 @@ export async function vibeHotelsAction(answers: Answer[]): Promise<Hotel[]> {
     (list) => clientIp({ headers: list }),
     () => 'local',
   )
-  if (!wish || !allowRequest(ip)) return byRules
+  if (!wish || !(await allowRequest(ip))) return byRules
   // The cities shown: in production the nearest vectors are not spent on the hidden hotels.
   const result = await semanticSearch(wish, {
     destinationIds: destinations.map((d) => d.id),

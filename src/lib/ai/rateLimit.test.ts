@@ -93,3 +93,47 @@ describe('the limit of the photos', () => {
     expect(await allowVisionRequest('192.0.2.12', now)).toBe(true)
   })
 })
+
+// assistant-search, Requirement: Общий лимит запросов к Эвалу
+describe('the limit of the requests', () => {
+  it('is 20 a minute per IP in Supabase, one for every instance of the server (Scenario: Превышение лимита)', async () => {
+    const rpc = sharedDatabase()
+    const first = await rateLimit()
+    const second = await rateLimit()
+    for (let i = 0; i < 10; i++) expect(await first.allowRequest('192.0.2.20')).toBe(true)
+    for (let i = 0; i < 10; i++) expect(await second.allowRequest('192.0.2.20')).toBe(true)
+    expect(await first.allowRequest('192.0.2.20')).toBe(false)
+    expect(await second.allowRequest('192.0.2.21')).toBe(true)
+    const [name, args] = rpc.mock.calls[0]
+    expect(name).toBe('rate_limit_hit')
+    expect(args).toEqual({
+      hit_key: expect.stringMatching(/^request:[0-9a-f]{32}$/),
+      hit_limit: 20,
+      window_seconds: 60,
+    })
+    expect(JSON.stringify(rpc.mock.calls)).not.toContain('192.0.2.20')
+  })
+
+  it('is counted in the memory of the instance without Supabase', async () => {
+    config.isSupabaseConfigured = false
+    const { allowRequest, RATE_LIMIT } = await rateLimit()
+    const now = Date.now()
+    for (let i = 0; i < RATE_LIMIT; i++) expect(await allowRequest('192.0.2.22', now)).toBe(true)
+    expect(await allowRequest('192.0.2.22', now)).toBe(false)
+    expect(await allowRequest('192.0.2.22', now + 60_000)).toBe(true)
+    expect(supabase.createClient).not.toHaveBeenCalled()
+  })
+
+  it('is counted in memory when the shared counter fails or does not answer in time', async () => {
+    const rpc = vi.fn(() => ({
+      abortSignal: async () => {
+        throw new Error('fetch failed')
+      },
+    }))
+    supabase.createClient.mockReturnValue({ rpc })
+    const { allowRequest, RATE_LIMIT } = await rateLimit()
+    const now = Date.now()
+    for (let i = 0; i < RATE_LIMIT; i++) expect(await allowRequest('192.0.2.23', now)).toBe(true)
+    expect(await allowRequest('192.0.2.23', now)).toBe(false)
+  })
+})

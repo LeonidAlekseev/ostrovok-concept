@@ -340,7 +340,7 @@ async function photoTurn(photos: readonly string[], ip: string, context: WishCon
  */
 export async function POST(request: Request) {
   const ip = clientIp(request)
-  if (!allowRequest(ip)) return Response.json({ error: 'Too many requests' }, { status: 429 })
+  if (!(await allowRequest(ip))) return Response.json({ error: 'Too many requests' }, { status: 429 })
   const parsedBody = requestSchema.safeParse(await request.json().catch(() => null))
   if (!parsedBody.success) return Response.json({ error: 'Invalid request' }, { status: 400 })
 

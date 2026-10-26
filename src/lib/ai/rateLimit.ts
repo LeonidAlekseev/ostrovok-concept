@@ -29,9 +29,17 @@ function allow(counter: Hits, limit: number, ip: string, now: number): boolean {
   return hit.count <= limit
 }
 
-/** Counts the request and tells whether `ip` is still within `RATE_LIMIT` requests per minute. */
-export function allowRequest(ip: string, now = Date.now()): boolean {
-  return allow(hits, RATE_LIMIT, ip, now)
+/** The key of the shared counter: the kind of the limit and a hash of the IP, so the counter keeps no address. */
+function sharedKey(kind: 'request' | 'vision', ip: string): string {
+  return `${kind}:${createHash('sha256').update(ip).digest('hex').slice(0, 32)}`
+}
+
+/**
+ * Counts the request and tells whether `ip` is still within `RATE_LIMIT` requests a minute: in Supabase, shared by
+ * the instances of the server, or in the process memory without it.
+ */
+export async function allowRequest(ip: string, now = Date.now()): Promise<boolean> {
+  return (await allowShared(sharedKey('request', ip), RATE_LIMIT).catch(() => null)) ?? allow(hits, RATE_LIMIT, ip, now)
 }
 
 let counterClient: Promise<SupabaseClient<Database> | null> | undefined
@@ -70,8 +78,10 @@ async function allowShared(key: string, limit: number): Promise<boolean | null> 
  * by the instances of the server, or in the process memory without it. The counter keeps a hash of the IP.
  */
 export async function allowVisionRequest(ip: string, now = Date.now()): Promise<boolean> {
-  const key = `vision:${createHash('sha256').update(ip).digest('hex').slice(0, 32)}`
-  return (await allowShared(key, VISION_RATE_LIMIT).catch(() => null)) ?? allow(visionHits, VISION_RATE_LIMIT, ip, now)
+  return (
+    (await allowShared(sharedKey('vision', ip), VISION_RATE_LIMIT).catch(() => null)) ??
+    allow(visionHits, VISION_RATE_LIMIT, ip, now)
+  )
 }
 
 /** The client's address behind the Vercel proxy, from a request or from a server action's `headers()`. */
