@@ -185,7 +185,7 @@ export function HotelAssistant({ className }: { className?: string }) {
               variant="secondary"
               shape="pill"
               size="sm"
-              className="h-auto min-h-8 bg-primary/10 px-3 py-1.5 text-sm font-normal whitespace-normal text-primary hover:bg-primary/15"
+              className="h-auto min-h-8 bg-muted px-3 py-1.5 text-sm font-normal whitespace-normal text-muted-foreground-strong hover:bg-[var(--brand-line)]"
               disabled={thinking || !ready}
               onClick={() => ask(question)}
             >
