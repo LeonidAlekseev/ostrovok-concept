@@ -312,10 +312,7 @@ function HotelRow({ plan, full, onChoose }: HotelRowProps) {
         className="-mx-0.5 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-0.5 pt-0.5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {plan.options.map((option) => (
-          <li
-            key={option.hotel?.id ?? option.destination.id}
-            className="flex w-[clamp(240px,70vw,280px)] flex-none snap-start"
-          >
+          <li key={option.hotel?.id ?? option.destination.id} className="flex w-[min(78vw,20rem)] flex-none snap-start">
             <OptionCard option={option} full={full} plan={plan} onChoose={onChoose} />
           </li>
         ))}
@@ -341,17 +338,14 @@ interface OptionCardProps extends HotelRowProps {
 }
 
 /**
- * An option of the plan: the site's hotel card with the price for the stay, leading to the hotel's page on the plan's
- * dates. A city without a hotel leads to its search; a hotel that did not load, to its page.
+ * An option of the plan: the home page's plain hotel card, leading to the hotel's page on the plan's dates. A city
+ * without a hotel leads to its search; a hotel that did not load, to its page.
  */
 function OptionCard({ option, full, plan, onChoose }: OptionCardProps) {
   const { destination, hotel: summary, total } = option
   const hotel = summary && full?.get(summary.id)
-  const stay = { total, nights: plan.nights, guests: plan.query.guests }
   if (hotel)
-    return (
-      <HotelTile hotel={hotel} href={hotelHref(hotel.id, plan.query)} stay={stay} heading="h4" className="w-full" />
-    )
+    return <HotelTile hotel={hotel} href={hotelHref(hotel.id, plan.query)} plain heading="h4" className="w-full" />
   if (summary && !full)
     return (
       <div

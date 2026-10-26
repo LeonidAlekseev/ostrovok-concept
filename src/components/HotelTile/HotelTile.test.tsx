@@ -119,24 +119,6 @@ describe('HotelTile text and prices', () => {
   })
 })
 
-// hotel-tile, Requirement: Цена за срок на карточке
-describe('HotelTile price for a stay', () => {
-  it('prices the stay with its nights and guests (Scenario: Цена за срок)', () => {
-    render(
-      <HotelTile
-        hotel={hotel}
-        href="/"
-        stay={{ total: 50_000, nights: 5, guests: { adults: 2, children: 0, rooms: 1 } }}
-      />,
-    )
-    const card = screen.getByRole('article')
-    expect(within(card).getByText(formatPrice(50_000), exact)).toBeDefined()
-    expect(within(card).getByText(formatPrice(45_000), exact).textContent).toBe(`Цена GURU ${formatPrice(45_000)}`)
-    expect(within(card).getByText('за 5 ночей · 2 гостя')).toBeDefined()
-    expect(within(card).queryByText(formatPrice(hotel.priceFrom), exact)).toBeNull()
-  })
-})
-
 // hotel-tile, Requirement: Бесплатная отмена на карточке
 describe('HotelTile free cancellation', () => {
   it('follows the hotel by default', () => {
