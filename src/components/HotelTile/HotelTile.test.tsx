@@ -57,17 +57,14 @@ describe('HotelTile photo', () => {
   })
 })
 
+// hotel-tile, Requirement: Без типа жилья на карточке
 describe('HotelTile kind of stay', () => {
-  it('labels a hostel with its type and stars, an apartment without stars, and a hotel with neither', () => {
-    const find = (type: string) => fullHotelsIn('prague').find((h) => h.stayType === type)!
-    const { rerender } = render(<HotelTile hotel={hotel} href="/h" />)
-    expect(screen.queryByText(/^(Отель|Хостел|Апартаменты|Вилла)$/)).toBeNull()
-    rerender(<HotelTile hotel={find('hostel')} href="/h" />)
-    expect(screen.getByText('Хостел')).toBeDefined()
-    expect(screen.getByRole('img', { name: /звезд|звёзд/ })).toBeDefined()
-    rerender(<HotelTile hotel={find('apartments')} href="/h" />)
-    expect(screen.getByText('Апартаменты')).toBeDefined()
-    expect(screen.queryByRole('img', { name: /звезд|звёзд/ })).toBeNull()
+  it.each(['hostel', 'apartments', 'villa'])('shows no kind of a %s on the card', (type) => {
+    const stay = fullHotelsIn('prague').find((h) => h.stayType === type)!
+    render(<HotelTile hotel={stay} href="/h" />)
+    const card = screen.getByRole('article')
+    expect(card.textContent).not.toMatch(/Хостел|Апартаменты|Вилла/)
+    expect(within(card).getByText(`${formatDecimal(stay.distanceKm)} км от центра Праги`)).toBeDefined()
   })
 })
 
