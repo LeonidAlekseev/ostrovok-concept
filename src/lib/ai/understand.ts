@@ -19,7 +19,7 @@ import { VIEW_LABEL } from '../features'
 import { isRussian } from './hotelAnswer'
 
 /** The text chain's time (src/lib/ai/model.ts): after this the route answers with the rules. */
-export const MODEL_TIMEOUT_MS = 8000
+export const MODEL_TIMEOUT_MS = 9000
 
 /** A field the message may leave out; a wrong type is dropped instead of failing the whole answer. */
 const optional = <T extends z.ZodType>(schema: T) => schema.nullable().catch(null)

@@ -13,7 +13,7 @@ export interface ChainModel {
 /**
  * The text tasks: reading the traveller's wish, the answers about a hotel, the intent of the photos. The wish is read
  * in about 1 s by `lightning`, 2–2.5 s by `bolt`, 2–4.5 s by `minimax-m3.1-flash`; the next one is asked when the one
- * before failed or stalled, all within the route's 8 s.
+ * before failed or stalled, all within the route's 9 s.
  */
 export const TEXT_CHAIN: readonly ChainModel[] = [
   { id: 'nvidia/nemotron-3.5-lightning-30b-a3b', timeoutMs: 3500 },
