@@ -241,6 +241,12 @@ describe('SearchResultsPage hotel card', () => {
     expect(page.className).toMatch(/(^|\s)3xl:max-w-\(--page-max-wide\)(\s|$)/)
     const columns = screen.getByRole('region', { name: 'Отели' }).closest('.grid')!
     expect(columns.className).toMatch(/(^|\s)3xl:grid-cols-\[15rem_minmax\(0,1\.6fr\)_minmax\(0,1fr\)\](\s|$)/)
+    // Three columns from 1440 px, not from the global xl (1240 px): the filters, the list and the map each get a place.
+    expect(columns.className).toMatch(
+      /(^|\s)min-\[1440px\]:grid-cols-\[15rem_minmax\(0,1fr\)_minmax\(0,1\.25fr\)\](\s|$)/,
+    )
+    expect(columns.className).not.toMatch(/(^|\s)xl:grid-cols-/)
+    expect(screen.getByRole('region', { name: 'Отели' }).className).toMatch(/(^|\s)min-\[1440px\]:col-start-2(\s|$)/)
   })
 })
 
