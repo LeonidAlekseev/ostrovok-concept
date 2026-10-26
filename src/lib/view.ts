@@ -1,4 +1,4 @@
-import { countRu, formatDecimal } from './format'
+import { countRu } from './format'
 import type { HotelBuilding } from './hotelDetails'
 import { distanceLabel } from './hotelDetails'
 
@@ -342,15 +342,16 @@ export const localTime = (time: Date) =>
 /** «293° (северо-запад)». */
 export const bearingLabel = (bearing: number) => `${Math.round(bearing) % 360}° (${compassPoint(bearing)})`
 
-/** «≈ 36 м (оценка EUBUCCO)», «36 м». */
+/** «36», «34,5»: metres to a decimetre. */
+const metres = (value: number) => String(Math.round(value * 10) / 10).replace('.', ',')
+
+/** «≈ 36 м (по оценке EUBUCCO)», «36 м». */
 export const heightLabel = (heightM: number, estimated: boolean) =>
-  estimated
-    ? `≈ ${formatDecimal(Math.round(heightM * 10) / 10)} м (по оценке EUBUCCO)`
-    : `${formatDecimal(Math.round(heightM * 10) / 10)} м`
+  estimated ? `≈ ${metres(heightM)} м (по оценке EUBUCCO)` : `${metres(heightM)} м`
 
 /** «окно 12-го этажа, ≈ 33,5 м над землёй», «окно у крыши, ≈ 20 м над землёй». */
 export function observerLabel(observer: ViewObserver): string {
-  const eye = `${observer.heightEstimated ? '≈ ' : ''}${formatDecimal(Math.round(observer.eyeM * 10) / 10)} м над землёй`
+  const eye = `${observer.heightEstimated ? '≈ ' : ''}${metres(observer.eyeM)} м над землёй`
   return observer.floor ? `окно ${observer.floor}-го этажа, ${eye}` : `окно у крыши, ${eye}`
 }
 

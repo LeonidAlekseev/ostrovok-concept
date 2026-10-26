@@ -75,18 +75,21 @@ export function floorOf(text: string): number | null {
   return Number.isInteger(floor) && floor > 0 ? floor : null
 }
 
-// The words of a question about the view, not a place's name.
+// The words of a question about the view, not a place's name: the window and the floor first, then the single words.
+const VIEW_PHRASES =
+  /(?<!\p{L})(?:(?:из|с|со|на) (?:окн|номер|отел|балкон|террас|крыш)\p{L}*|(?:с|со|на) \d+\S* этаж\p{L}*|(?:вид|видом) на)(?!\p{L})/giu
 const VIEW_WORDS =
-  /(?<!\p{L})(?:видн\p{L}*|виден|увиж\p{L}*|увидеть|ли|из|с|со|на|в|а|и|окн\p{L}*|номер\p{L}*|отел\p{L}*|балкон\p{L}*|вид|вида|видом|этаж\p{L}*|какой|какая|что|будет|можно|мне|нам|нас|вас|там|у|\d+\p{L}*|-?(?:й|го|ом))(?!\p{L})/giu
+  /(?<!\p{L})(?:видн\p{L}*|виден|увиж\p{L}*|увидеть|просматрива\p{L}*|ли|вид|какой|какая|что|будет|можно|мне|нам|а|там|отсюда)(?!\p{L})/giu
 
 /** The name of the place the question asks about, without the words of the question; `null` when nothing is left. */
 export function placeQuery(text: string): string | null {
   const rest = text
+    .replace(VIEW_PHRASES, ' ')
     .replace(VIEW_WORDS, ' ')
     .replace(/[?!.,«»"]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-  return rest.replace(/\p{L}/gu, '').length < rest.length && rest.length >= 3 ? rest : null
+  return /\p{L}{3}/u.test(rest) ? rest : null
 }
 
 interface Checked {
@@ -208,7 +211,7 @@ export async function viewTurn(
   for (const target of named) checked.push(fromTarget(target, eyeM))
 
   const kinds = questionCategories(text).filter((c) => c !== 'sea' && c !== 'beach')
-  const query = named.length || kinds.length ? null : placeQuery(text)
+  const query = named.length || kinds.length || wantsSea || wantsSunset ? null : placeQuery(text)
   let planner: GeoOutcome['planner'] = 'rules'
   let modelsDown = false
   const found: { label: string; category: string; point: LatLon }[] = []
@@ -319,10 +322,13 @@ export async function viewTurn(
   }
 
   const placeLines = checked.filter((c) => c.label !== 'Берег моря').map((c) => lineOf(c, point))
+  // The guests' own words about the view, as they wrote them: not checked against the lines.
+  const quote = details.viewQuotes[0]
   const summary = [
     `Из окна (${observerLabel(view.observer)}; ${buildingLabel(view.observer)}):`,
     ...lines,
     ...placeLines,
+    ...(quote ? [`Гость о виде (${quote.author}): «${quote.text}»`] : []),
     NOTE,
   ].join('\n')
 

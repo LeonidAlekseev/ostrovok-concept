@@ -224,7 +224,7 @@ export function HotelView({ hotel, building }: { hotel: Hotel; building: HotelBu
                 <span className="flex flex-col">
                   <b>{buildingLabel(top)}</b>
                   <span className="text-sm text-muted-foreground">
-                    {observerLabel(view?.observer ?? observerOf(building, floor)!)}
+                    {observerLabel(observerOf(building, floor) ?? top)}
                   </span>
                 </span>
               </p>
