@@ -97,8 +97,20 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
   кладёт в `ota_hotels` (ключ `master_id`, уникальный `ota_hotel_id`), остальное о поиске — в `ota_searches`, а отели
   каталога `ota-<master_id>` (маппер `src/lib/ota/hotel.ts`) — в `hotels` после сгенерированных. JSON в репозиторий
   не кладём. Печатает число строк; после загрузки — `npm run db:embed`.
+- `uv run scripts/load-valencia-geo.py buildings [<ES52.parquet>]`, затем `… noise <ES.gpkg>` — геоданные города
+  Валенсия (PostGIS, схема `extensions`): здания EUBUCCO v0.2 региона ES52 (город `city_id` ES46250) в `geo_buildings`
+  — без пути DuckDB читает их с S3 EUBUCCO (`s3://eubucco/v0.2/buildings/parquet/nuts_id=ES52/ES52.parquet`, анонимно),
+  только строки города; контуры шума EEA END 2022 (`ES.gpkg` из хранилища EEA,
+  `eea_v_3035_1_k_noise-contours-end2022_p_2026_v01_r00`, ~1,6 ГБ) по охвату зданий плюс 300 м в `geo_noise`. Файлы
+  держим вне git. Каждая строка ссылается на набор в `geo_datasets` (название, версия, обработка) и хранит поля
+  источника и уверенности набора под их именами: у зданий `*_source`, `*_source_id(s)`, `*_confidence*` (границы
+  оценки высоты и этажности), у шума поставку Reportnet, исправление геометрии EEA и ширину полосы `band_db`. Каждая
+  команда заменяет свою таблицу в одной транзакции; затем `npm run db:features`. Чтение: `hotel_geo(lat, lon)` —
+  здание и шум в точке, `hotel_geo_features(lat, lon, radius_m)` — GeoJSON зданий (для `fill-extrusion`) и зон шума
+  в круге, радиус 300 м по умолчанию, не больше 500 м.
 - `npm run db:features [-- --dry-run]` — `scripts/hotel-features.ts`: свойства настоящих отелей для Эвала — здание и
-  шум по `hotel_geo` в `hotel_features`, вид из номеров по названиям групп номеров `ota_hotels` в `hotel_room_views`.
+  шум по `hotel_geo` в `hotel_features` с их происхождением (наборы данных, источник и границы высоты и этажности),
+  вид из номеров по названиям групп номеров `ota_hotels` в `hotel_room_views`.
   Сырые данные не копирует, повторный запуск ничего не меняет; `--dry-run` только считает. Затем — `npm run db:embed`.
 - `npm run db:embed` — `scripts/embed.ts`: векторы для поиска по смыслу (см. «Поиск по смыслу») по каталогу из базы —
   все отели. В модель уходят только новые и изменённые отели (`content_hash`),
