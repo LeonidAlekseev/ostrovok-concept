@@ -36,12 +36,18 @@ const wishSchema = z.object({
   when: optional(z.coerce.string()).describe(
     'номер месяца "1"–"12", soon — в ближайшее время, только если сказано явно; иначе null',
   ),
-  checkIn: optional(z.string()).describe('дата заезда YYYY-MM-DD, только если назван день; иначе null'),
-  checkOut: optional(z.string()).describe('дата выезда YYYY-MM-DD, только если назван день; иначе null'),
+  checkIn: optional(z.string()).describe(
+    'дата заезда YYYY-MM-DD, только если назван день: «с 10 по 15 ноября», «12–16 ноября», «20.11–25.11» — первое число; иначе null',
+  ),
+  checkOut: optional(z.string()).describe(
+    'дата выезда YYYY-MM-DD, только если назван день: «с 10 по 15 ноября», «12–16 ноября», «20.11–25.11» — второе число; иначе null',
+  ),
   nights: optional(z.coerce.number()).describe(
     'число ночей, только если сказано явно (неделя — 7, выходные — 2); иначе null',
   ),
-  party: optional(z.string()).describe('id состава из списка, только если сказано явно; иначе null'),
+  party: optional(z.string()).describe(
+    'id состава из списка, только если сказано явно: «вдвоём», «нас двое», «двое взрослых», «с женой» — couple; «один», «для меня одного» — solo; иначе null',
+  ),
   mood: optional(z.string()).describe('calm — спокойно, active — активно, только если сказано явно; иначе null'),
   budget: optional(z.coerce.number()).describe('бюджет на всю поездку в рублях, целое; «недорого» без суммы — null'),
   quiet: optional(z.boolean()).describe(
@@ -69,7 +75,10 @@ function instructions(brief: Brief, today: IsoDate, destinations: readonly Desti
     '(«тепло и поплавать с маской» — море, «старинные улочки» — города Европы). Тему (vibe) определяй по смыслу; остальное не додумывай: если не сказано явно — null.',
     'Предыдущие сообщения — контекст для коротких ответов на вопрос помощника.',
     'Уточнения («а повыше?», «а потише?») дополняют прежние условия: верни только то, что сказано в последнем сообщении.',
-    'Даты: «с 10 по 15 ноября», «10–15.11», «на выходные 14–16 ноября» — checkIn и checkOut в YYYY-MM-DD; год — ближайший не прошедший. «а с 12-го?» — только checkIn, выезд возьмём по прежней длительности.',
+    'Город может стоять в любом падеже («в Валенсии», «в Праге», «во Флоренции», «в Сочи»): destinationId — его id из списка. Если пользователь поправился («в Таллине… то есть в Хельсинки»), бери последний город.',
+    'Даты: «с 10 по 15 ноября», «12–16 ноября», «10-15 ноября», «20.11–25.11», «на выходные 14–16 ноября» — всегда заполни и checkIn, и checkOut в YYYY-MM-DD (первое число — заезд, второе — выезд); год — ближайший не прошедший. «а с 12-го?» — только checkIn, выезд возьмём по прежней длительности.',
+    'Состав: «вдвоём», «нас двое», «двое взрослых», «с мужем/женой» — couple; «один», «для меня одного», «я один» — solo; «с ребёнком», «с детьми», «семьёй» — family; «с друзьями» — friends.',
+    `Пример. «Тихий отель в Валенсии с 10 по 15 ноября вдвоём» (сегодня ${today}) → destinationId valencia, checkIn и checkOut — 10 и 15 ноября ближайшего года, party couple, quiet true.`,
     `Сегодня ${today}.`,
     `Темы (vibe): ${list(VIBE_LABEL)}.`,
     `Состав (party): ${list(PARTY_LABEL)}.`,
@@ -80,6 +89,10 @@ function instructions(brief: Brief, today: IsoDate, destinations: readonly Desti
     `Отвечай только JSON по схеме: ${JSON.stringify(z.toJSONSchema(wishSchema))}`,
   ].join('\n')
 }
+
+/** Who goes, said by a count: «нас двое», «двое взрослых», «для меня одного» (the rules in `parseWish` do not read them). */
+const PARTY_COUNT =
+  /(?<![а-яё])(?:(?:нас|мы)\s+дво[еи]|дв(?:ое|ух)\s+взросл|для\s+меня\s+одного|на\s+одного|на\s+двоих)/
 
 /**
  * Without reasoning the model fills fields the traveller never mentioned, and then the assistant skips its
@@ -94,6 +107,7 @@ function grounded(key: keyof Brief, parsed: Brief, input: string, destinations: 
     const name = destinations.find((d) => d.id === parsed.destinationId)?.name.toLocaleLowerCase('ru') ?? ''
     return name !== '' && text.includes(name.slice(0, Math.max(4, name.length - 2)))
   }
+  if (key === 'party' && PARTY_COUNT.test(text)) return true
   return parseWish(input, destinations)[key] !== undefined
 }
 
