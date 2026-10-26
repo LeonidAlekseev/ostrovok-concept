@@ -20,7 +20,7 @@ describe('getTextModels', () => {
     expect(getSecret).toHaveBeenCalledWith('NVIDIA_API_KEY')
   })
 
-  it('gives the text chain of the NVIDIA API in order, each with its own time, within the 8 s', async () => {
+  it('gives the text chain of the NVIDIA API in order, each with its own time, within the 9 s', async () => {
     vi.mocked(getSecret).mockResolvedValue('test-key')
     const models = await getTextModels()
     expect(models?.map((m) => m.id)).toEqual([
@@ -30,7 +30,7 @@ describe('getTextModels', () => {
     ])
     models?.forEach((m, i) => {
       expect(m.model).toMatchObject({ modelId: TEXT_CHAIN[i].id, provider: 'nvidia.chat' })
-      expect(m.timeoutMs).toBeLessThanOrEqual(8000)
+      expect(m.timeoutMs).toBeLessThanOrEqual(9000)
     })
   })
 

@@ -78,7 +78,7 @@ const warn = (what: string, error: unknown) => {
   console.warn(`assistant: ${what} (${reason}${call})`)
 }
 
-/** The text models' time: 8 s at most, never past the answer's `deadline`. */
+/** The text models' time: 9 s at most, never past the answer's `deadline`. */
 const textDeadline = (deadline: number) => Math.min(Date.now() + MODEL_TIMEOUT_MS, deadline)
 
 /**
@@ -162,7 +162,7 @@ interface WishContext {
 
 /**
  * Reads the traveller's newest message into the brief with the text models in turn; without a key, or when none of
- * them answered in 8 s — with the rules, so the dialog goes on either way, and Эвал says the models are down. Once the brief is complete, runs the steps
+ * them answered in 9 s — with the rules, so the dialog goes on either way, and Эвал says the models are down. Once the brief is complete, runs the steps
  * of the turn (`planTurn`) for the hotels (`matches`), their features and the steps' lines.
  */
 async function wishTurn({ messages, brief, today, destinations, deadline, signal }: WishContext) {

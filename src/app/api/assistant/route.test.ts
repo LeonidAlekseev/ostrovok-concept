@@ -44,7 +44,7 @@ const answer = (fields: Record<string, unknown>) => ({
 })
 
 /** A chain of `models` in order, each with `timeoutMs`. */
-const chain = (models: MockLanguageModelV4[], timeoutMs = 8000): ModelLink[] =>
+const chain = (models: MockLanguageModelV4[], timeoutMs = 9000): ModelLink[] =>
   models.map((model, i) => ({ id: `model-${i + 1}`, model: model as LanguageModel, timeoutMs }))
 
 /** The text chain of one model, or none (no key). */
@@ -179,7 +179,7 @@ describe('POST /api/assistant', () => {
     expect((await (await ask('чтобы был красивый вид из окна')).json()).brief).toEqual({ view: 'any' })
   })
 
-  it('turns reasoning off for the 8 seconds', async () => {
+  it('turns reasoning off for the 9 seconds', async () => {
     const model = new MockLanguageModelV4({ doGenerate: answer({}) })
     setModel(model)
     await ask('море')
@@ -229,7 +229,7 @@ describe('POST /api/assistant', () => {
     })
   })
 
-  it('gives the model one attempt of 8 seconds, then the rules (Scenario: Модель недоступна)', async () => {
+  it('gives the model one attempt of 9 seconds, then the rules (Scenario: Модель недоступна)', async () => {
     const clock = new AbortController()
     const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(clock.signal)
     const model = new MockLanguageModelV4({
@@ -241,7 +241,7 @@ describe('POST /api/assistant', () => {
     })
     setModel(model)
     const response = await ask('в горы')
-    expect(timeout).toHaveBeenCalledWith(8000)
+    expect(timeout).toHaveBeenCalledWith(9000)
     expect(model.doGenerateCalls).toHaveLength(1)
     expect(await response.json()).toEqual({ brief: { vibe: 'mountains' }, source: 'rules', modelsDown: true })
   })
@@ -263,7 +263,7 @@ describe('POST /api/assistant', () => {
     expect(second.doGenerateCalls[0].prompt.filter((m) => m.role !== 'system')).toHaveLength(3)
   })
 
-  it('keeps the text chain within its 8 s, then the rules and the warning (Scenario: Ни одна модель не ответила)', async () => {
+  it('keeps the text chain within its 9 s, then the rules and the warning (Scenario: Ни одна модель не ответила)', async () => {
     const times: number[] = []
     const real = AbortSignal.timeout.bind(AbortSignal)
     vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms) => {
@@ -287,7 +287,35 @@ describe('POST /api/assistant', () => {
     vi.useRealTimers()
     expect(body).toEqual({ brief: { vibe: 'mountains' }, source: 'rules', modelsDown: true })
     expect(models.map((m) => m.doGenerateCalls.length)).toEqual([1, 1, 1])
-    expect(spent).toBe(8000)
+    expect(spent).toBe(9000)
+  })
+
+  it('gives minimax the 2 s left when lightning and bolt stall (Scenario: Две модели зависли)', async () => {
+    // Each stall lasts the model's own time: lightning 3,5 s, bolt 3,5 s; the rest of the 9 s is minimax's.
+    const stall = (ms: number) =>
+      new MockLanguageModelV4({
+        doGenerate: async () => {
+          vi.setSystemTime(Date.now() + ms)
+          throw new DOMException('The operation timed out.', 'TimeoutError')
+        },
+      })
+    const lightning = stall(3500)
+    const bolt = stall(3500)
+    const minimax = new MockLanguageModelV4({ doGenerate: answer({ vibe: 'mountains' }) })
+    vi.mocked(getTextModels).mockResolvedValue([
+      { id: 'lightning', model: lightning as LanguageModel, timeoutMs: 3500 },
+      { id: 'bolt', model: bolt as LanguageModel, timeoutMs: 3500 },
+      { id: 'minimax', model: minimax as LanguageModel, timeoutMs: 5000 },
+    ])
+    const timeout = vi.spyOn(AbortSignal, 'timeout')
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const body = await (await ask('в горы')).json()
+    vi.useRealTimers()
+    expect(lightning.doGenerateCalls).toHaveLength(1)
+    expect(bolt.doGenerateCalls).toHaveLength(1)
+    expect(minimax.doGenerateCalls).toHaveLength(1)
+    expect(timeout).toHaveBeenCalledWith(2000)
+    expect(body).toMatchObject({ brief: { vibe: 'mountains' }, source: 'model' })
   })
 
   it('cleans the brief sent by the client', async () => {
