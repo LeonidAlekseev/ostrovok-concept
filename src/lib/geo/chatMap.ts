@@ -17,6 +17,8 @@ export interface MapPoint extends LatLon {
   category?: string
   /** From the hotel, metres, by the straight line to the place's shape. */
   distanceM?: number
+  /** A place of the hotel's Ostrovok page; the rest are OpenStreetMap's. */
+  source?: 'ostrovok'
 }
 
 export type MapRouteMode = 'foot' | 'car' | 'straight'
@@ -84,6 +86,7 @@ function parsePoint(value: unknown): MapPoint[] {
       lon: value.lon,
       ...(category && { category }),
       ...(isMetres(value.distanceM) && { distanceM: value.distanceM }),
+      ...(value.source === 'ostrovok' && { source: 'ostrovok' as const }),
     },
   ]
 }
@@ -114,4 +117,10 @@ export function parseChatMap(value: unknown): ChatMap | undefined {
   if (!points.some((p) => p.kind === 'place')) return undefined
   const routes = Array.isArray(value.routes) ? value.routes.slice(0, MAX_ROUTES).flatMap(parseRoute) : []
   return { points, routes, attribution: MAP_ATTRIBUTION_TEXT }
+}
+
+/** The number of each point in the list under the map: the places from 1, the hotel none. */
+export const placeNumbers = (data: ChatMap) => {
+  let n = 0
+  return data.points.map((point) => (point.kind === 'place' ? ++n : 0))
 }

@@ -6,11 +6,11 @@
 
 - Ход Эвала в чате отеля получает гео-шаги (`src/lib/ai/geoTurn.ts`): модель из цепочки `TEXT_CHAIN` выбирает вызовы `tool()` AI SDK (без MCP и OpenAI SDK); каждый вызов исполняется отдельным шагом со своим запасом времени и показывается в ленте отдельным сообщением «Инструмент» (что и где ищет, что нашёл). Без модели вызовы выбирают правила по словам вопроса.
 - К найденным местам строятся маршруты: пешком (`routed-foot`) до близких, на машине (`routed-car`) до дальних (аэропорт ~10 км); без маршрута — расстояние «по прямой» с подписью.
-- Ответ про отель берёт факты из найденного: модель пишет объяснение только из них; лимиты и сбои Overpass/Nominatim/OSRM честно дописываются к ответу («подождите N с», «не удалось проверить»). Без модели — ответ правилами из тех же фактов.
+- Ответ — объяснение находок, собранное кодом из найденного: ближайшее место каждого вида, расстояние, путь пешком или на машине, следующие места; лимиты и сбои Overpass/Nominatim/OSRM — их же словами («подождите N с», «не удалось проверить»). Модель только выбирает вызовы: в живой проверке быстрые модели цепочки искажали числа («до моря доходит от 3,3 до 3,9 км») и теряли места.
 - Сообщение Эвала несёт карту (`map`): отель, метки мест с номерами, линии маршрутов, подпись «© OpenStreetMap». Карта — тот же MapLibre и стиль, что у карты результатов, на Tailwind; хранится в чате (гость и Supabase) и в снимке по ссылке.
 - Гео-ответ только там, где места загружены заранее (сейчас Валенсия); у отелей других городов — честное «данных о местах рядом нет», как раньше.
 - Находки `osm-places-cache`: для аэропорта, центра, моря и пляжа на большом радиусе покрытием считается загруженная область, где стоит точка (без одновременных «найдено» и «вне области»); «до моря» — до ближайшего пляжа, береговая линия — только если пляжа нет; Nominatim — не больше одного вызова за ход.
-- PR #321 (`ota-hotel-pages`, места рядом от Островка) не слит к началу работы: места Островка не используются, см. design.md.
+- Места рядом от Островка (`ota_hotel_places`, PR #321) — первоисточник: отдельный шаг «Смотрю места рядом по данным Островка», их вид места в ответе и на карте раньше OSM; OSM — дополнение для видов, которых у Островка нет.
 
 ## Capabilities
 
@@ -25,6 +25,6 @@
 
 ## Impact
 
-- Код: `src/lib/ai/geoTurn.ts`, `src/lib/geo/{osrm,places,tools,chatMap,questions}.ts`, `src/app/api/assistant/route.ts`, `src/lib/ai/hotelAnswer.ts`, `src/lib/assistant.ts`, `src/lib/assistantChats.ts`, `src/components/AssistantPage/{ChatFeed,useChats}.tsx`, `src/components/HotelPage/HotelAssistant.tsx`, новый `src/components/AssistantPage/PlacesMap.tsx`.
+- Код: `src/lib/ai/geoTurn.ts`, `src/lib/geo/{osrm,places,tools,chatMap,questions}.ts`, `src/app/api/assistant/route.ts`, `src/lib/assistant.ts`, `src/lib/assistantChats.ts`, `src/components/AssistantPage/{ChatFeed.tsx,useChats.ts}`, `src/components/HotelPage/HotelAssistant.tsx`, `src/components/SearchResultsPage/{mapSetup.ts,SearchMap.tsx}` (общий класс атрибуции), новые `src/components/AssistantPage/{PlacesMap,MapMessage}.tsx`.
 - База: без миграций.
 - Внешние сервисы: добавляется `routing.openstreetmap.de/routed-car` по тем же правилам, что `routed-foot`.

@@ -16,8 +16,7 @@ import { MODEL_TIMEOUT_MS } from './understand'
  * (`HotelDetails`: the places nearby, the paid services, the facts, the scores, the reviews and the guests' words about
  * the view) — and, apart, from the model's general knowledge, which the feed marks «Не проверено». Without the model
  * the ready-made questions about the rooms, the parking, the pets and the places nearby are answered by rules from
- * the data; anything else is an honest «не могу ответить». A question about the places near runs the geo steps first
- * (src/lib/ai/geoTurn.ts): their facts — the Ostrovok places first, OpenStreetMap besides — go to the model as `nearby`.
+ * the data; anything else is an honest «не могу ответить».
  */
 
 export interface HotelAnswer {
@@ -171,8 +170,6 @@ export function hotelFacts(
   dates?: StayDates,
   features?: HotelFeatures,
   details?: HotelDetails | null,
-  /** The facts of the geo steps: the places near the hotel the answer may name. */
-  nearby?: string,
 ): string {
   const nights = dates ? nightsBetween(dates.checkIn, dates.checkOut) : 0
   const amenities = hotel.amenities.map((key) => `${amenityLabel(key)}${paid(key)}`)
@@ -204,10 +201,7 @@ export function hotelFacts(
         return `- ${room.name}: ${roomFacts(room)}${meal}${price ? `; ${price}` : ''}`
       })
       .join('\n')}`,
-    nearby,
-    !nearby &&
-      !details?.nearby.length &&
-      'Данных о местах рядом (кафе, достопримечательности, пляж) в базе нет.',
+    !details?.nearby.length && 'Данных о местах рядом (кафе, достопримечательности, пляж) в базе нет.',
   ]
     .filter(Boolean)
     .join('\n')
@@ -222,30 +216,17 @@ const answerSchema = z.object({
     .describe('то, чего в данных нет, но что ты знаешь сам (общие знания); null, если добавить нечего'),
 })
 
-function instructions(
-  hotel: Hotel,
-  dates?: StayDates,
-  features?: HotelFeatures,
-  details?: HotelDetails | null,
-  nearby?: string,
-) {
+function instructions(hotel: Hotel, dates?: StayDates, features?: HotelFeatures, details?: HotelDetails | null) {
   return [
     `Ты Эвал, помощник сервиса «О!бъективно» на странице отеля «${hotel.name}». Отвечай по-русски, дружелюбно и коротко.`,
     'Поле answer — ТОЛЬКО то, что есть в данных отеля ниже. Ничего не выдумывай: если в данных ответа нет, так и скажи.',
     'Поле unverified — то, чего в данных нет, но ты знаешь из общих знаний (например, что обычно есть рядом с этим районом); это не проверено. Если нечего добавить — null.',
     'Названия мест рядом, расстояния и время пешком, которых нет в данных, можно писать только в unverified.',
     'Этажность здания — только строка «Этажей в здании (EUBUCCO)»; «номера занимают N этажей» — это не этажность здания.',
-    ...(nearby
-      ? [
-          'Места рядом, расстояния и время в пути бери только из данных Островка и раздела «Места рядом с отелем»:',
-          'места Островка — первыми, OpenStreetMap — дополнение. «По прямой» так и пиши, время на машине — без пробок.',
-          'Что «не удалось проверить» — так и скажи. Карта с этими местами и маршрутами показывается под ответом.',
-        ]
-      : []),
     'Цены называй только из данных. Отвечай только JSON по схеме: ' + JSON.stringify(z.toJSONSchema(answerSchema)),
     '',
     'Данные отеля:',
-    hotelFacts(hotel, dates, features, details, nearby),
+    hotelFacts(hotel, dates, features, details),
   ].join('\n')
 }
 
@@ -279,8 +260,6 @@ export async function answerWithModel(
     dates?: StayDates
     features?: HotelFeatures
     details?: HotelDetails | null
-    /** The facts of the geo steps (src/lib/ai/geoTurn.ts): the places near the hotel the answer may name. */
-    nearby?: string
     signal?: AbortSignal
     timeoutMs?: number
   } = {},
@@ -288,7 +267,7 @@ export async function answerWithModel(
   const timeout = AbortSignal.timeout(options.timeoutMs ?? MODEL_TIMEOUT_MS)
   const { output } = await generateText({
     model,
-    instructions: instructions(hotel, options.dates, options.features, options.details, options.nearby),
+    instructions: instructions(hotel, options.dates, options.features, options.details),
     messages: messages.map(({ role, text }) => ({ role, content: text.slice(0, MAX_MESSAGE_LENGTH) })),
     output: Output.object({ schema: answerSchema }),
     reasoning: 'none',
@@ -299,10 +278,4 @@ export async function answerWithModel(
   if (!answer) throw new Error('The model gave no answer')
   const unverified = clean(output.unverified, MAX_ANSWER_LENGTH)
   return { answer, ...(unverified && { unverified }) }
-}
-
-/** The model's answer with what the services could not check, unless it says so itself: never lost. */
-export function withNotes(answer: string, notes: readonly string[]): string {
-  const missing = notes.filter((note) => !answer.includes(note))
-  return missing.length ? `${answer}\n\n${missing.join(' ')}` : answer
 }

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { firstAnswer } from '@/lib/ai/chain'
 import { geoTurn } from '@/lib/ai/geoTurn'
-import { answerWithModel, ruleAnswer, withNotes } from '@/lib/ai/hotelAnswer'
+import { answerWithModel, ruleAnswer } from '@/lib/ai/hotelAnswer'
 import { getTextModels, getVisionModels } from '@/lib/ai/model'
 import { APICallError } from 'ai'
 import { allowRequest, allowVisionRequest, clientIp } from '@/lib/ai/rateLimit'
@@ -109,9 +109,9 @@ async function planTurn(context: Omit<TurnContext, 'summaries' | 'features'>): P
 /**
  * A question about the hotel the chat is on: the model answers from the hotel's data, with its general knowledge
  * apart; on a missing key, an error or a timeout the rules answer the ready-made questions (src/lib/ai/hotelAnswer.ts).
- * A question about the places near runs the geo steps first (src/lib/ai/geoTurn.ts): the Ostrovok places of the hotel,
- * then OpenStreetMap; their facts go to the answer, their lines and the map to the feed. A hotel with neither is
- * answered as before.
+ * A question about the places near is the geo steps' (src/lib/ai/geoTurn.ts): the model chooses the calls of the geo
+ * tools, the answer tells what they found — the Ostrovok places of the hotel first, OpenStreetMap besides — with the
+ * steps' lines and the map; a hotel with neither data is answered as before.
  */
 async function hotelTurn(
   hotel: Hotel,
@@ -133,20 +133,22 @@ async function hotelTurn(
         onError: (id, error) => warn(`${id} did not choose the geo calls`, error),
       })
     : null
-  const found = geo ? { steps: geo.steps, ...(geo.map && { map: geo.map }) } : {}
+  if (geo)
+    return Response.json({
+      brief: next,
+      reply: geo.summary,
+      source: geo.planner,
+      steps: geo.steps,
+      ...(geo.map && { map: geo.map }),
+      ...(geo.modelsDown && { modelsDown: true }),
+    } satisfies AssistantResponse)
   let down = false
   if (models) {
     const features = (await loadHotelFeatures().catch(() => null))?.get(hotel.id)
     const result = await firstAnswer(
       models,
       (model, timeout) =>
-        answerWithModel(model, { messages }, hotel, {
-          dates: brief.dates,
-          features,
-          details,
-          nearby: geo?.facts,
-          signal: timeout,
-        }),
+        answerWithModel(model, { messages }, hotel, { dates: brief.dates, features, details, signal: timeout }),
       {
         deadline: textDeadline(deadline),
         signal,
@@ -157,21 +159,19 @@ async function hotelTurn(
       const { answer, unverified } = result.value
       return Response.json({
         brief: next,
-        reply: geo ? withNotes(answer, geo.notes) : answer,
+        reply: answer,
         ...(unverified && { unverified }),
         source: 'model',
-        ...found,
       } satisfies AssistantResponse)
     }
     down = result.failed.length > 0
     console.warn('assistant: no model answered a hotel question, using the rules')
   }
-  const reply = geo?.summary ?? ruleAnswer(messages[messages.length - 1].text, hotel, brief.dates, details).answer
+  const { answer } = ruleAnswer(messages[messages.length - 1].text, hotel, brief.dates, details)
   return Response.json({
     brief: next,
-    reply,
+    reply: answer,
     source: 'rules',
-    ...found,
     ...(down && { modelsDown: true }),
   } satisfies AssistantResponse)
 }

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import route from './fixtures/osrm-foot.json'
 import { RateGate } from './limits'
-import { MAX_WALK_M, parseRoute, routeUrl, walkingRoute } from './osrm'
+import { drivingRoute, MAX_WALK_M, parseRoute, routeUrl, walkingRoute } from './osrm'
 
 const cityHall = { lat: 39.4699, lon: -0.3763 }
 const beach = { lat: 39.47, lon: -0.326 }
@@ -68,5 +68,29 @@ describe('the walking route', () => {
     expect(far.distanceM).toBeGreaterThan(MAX_WALK_M)
     expect(far).toMatchObject({ kind: 'straight', reason: expect.stringContaining('по прямой') })
     expect(fetch).not.toHaveBeenCalled()
+  })
+})
+
+// assistant-geo, Requirement: Гео-инструменты Эвала
+describe('the route by car', () => {
+  const airport = { lat: 39.4893, lon: -0.4816 }
+
+  // Scenario: На машине до аэропорта
+  it('asks the car profile and reads the drive', async () => {
+    const fetch = vi.fn(async (_url: string | URL | Request) => Response.json(route))
+    const result = await drivingRoute(cityHall, airport, deps(fetch))
+    expect(String(fetch.mock.calls[0][0])).toMatch(
+      /^https:\/\/routing\.openstreetmap\.de\/routed-car\/route\/v1\/driving\//,
+    )
+    expect(result).toMatchObject({ kind: 'car', distanceM: 4870, durationS: 3900 })
+  })
+
+  it('gives the straight line, marked, when there is no route', async () => {
+    const result = await drivingRoute(cityHall, airport, deps(vi.fn(async () => Response.json({ code: 'NoRoute' }))))
+    expect(result).toMatchObject({
+      kind: 'straight',
+      note: 'по прямой',
+      reason: 'Маршрут на машине между этими точками не найден.',
+    })
   })
 })

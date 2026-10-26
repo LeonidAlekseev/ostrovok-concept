@@ -38,6 +38,7 @@ import { formatDateRange } from '../../lib/dates'
 import { formatPrice, guestsLabel } from '../../lib/format'
 import { HotelTile } from '../HotelTile/HotelTile'
 import { MessagePhotos, type PhotoUrl } from './ChatPhotos'
+import { MapMessage } from './MapMessage'
 
 /** The agent's bubble: flat light grey, no avatar beside it, the feed's full width at most. */
 const agentBubble =
@@ -185,6 +186,7 @@ function MessageItem({ message, photoUrl, onChoose, onRetry, actions }: MessageP
             </BubbleContent>
           </Bubble>
         )}
+        {data.map && <MapMessage map={data.map} />}
         {data.plan && <PlanView plan={data.plan} onChoose={onChoose} />}
         {status === 'failed' && onRetry ? (
           <MessageFooter className="px-0">

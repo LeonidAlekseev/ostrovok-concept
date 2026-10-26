@@ -35,7 +35,8 @@ const WORDS: [PlaceCategory[], RegExp[]][] = [
   [['museum'], [stemOf('музе')]],
   [['viewpoint'], [stemOf('смотров')]],
   [['attraction'], [stemOf('достопримечат'), /что посмотреть|куда сходить/i]],
-  [['centre'], [stemOf('центр')]],
+  // «Центр», not «Центральный рынок»: a named place is geocoded.
+  [['centre'], [word('центр', '|а|е|у|ом')]],
 ]
 
 const NEARBY = /рядом|поблизости|недалеко|вокруг|окрестност|в шаговой|близко/i

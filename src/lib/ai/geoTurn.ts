@@ -12,11 +12,10 @@ import {
   thinLine,
   type ChatMap,
   type MapPoint,
-  type MapRoute,
 } from '../geo/chatMap'
 import { haversineMeters, type LatLon } from '../geo/distance'
-import type { DriveRoute, WalkRoute } from '../geo/osrm'
-import { FAR_CATEGORIES, type Geocoded, type Nearby, type NearbyGroup } from '../geo/places'
+import { MAX_WALK_M, type DriveRoute, type WalkRoute } from '../geo/osrm'
+import { FAR_CATEGORIES, type Geocoded, type Nearby, type NearbyGroup, type Place } from '../geo/places'
 import { EVERYDAY, FAR_RADIUS_M, NEAR_RADIUS_M, questionCategories } from '../geo/questions'
 import type { GeoResult } from '../geo/result'
 import {
@@ -30,11 +29,12 @@ import {
 import { firstAnswer, type ModelLink } from './chain'
 
 /**
- * Эвал's geo steps in a chat about a hotel: a model of the chain chooses the calls of the geo tools (the rules do
- * without one), each call runs as a step of its own with its own time and its own line in the feed, then the routes to
- * the nearest places are built. The hotel's Ostrovok places (`ota_hotel_places`) come first, OpenStreetMap adds what
- * they do not have. What came of it are the facts for the answer, the rules' answer, the honest notes of the services
- * that failed and the map of the message. Only for a hotel with Ostrovok places or in the OSM data loaded in advance.
+ * Эвал's geo steps in a chat about a hotel. A model of the chain chooses the calls of the geo tools (the rules do
+ * without one); each call runs as a step of its own, with its own time and its own line in the feed; then the routes
+ * to the nearest places are built, on foot or, far, by car. The hotel's Ostrovok places (`ota_hotel_places`) come
+ * first, OpenStreetMap adds what they do not have. The answer tells what was found by rules — no model can add a place
+ * or a distance — with the honest words of the services that failed, and the map of the message shows it. Only for a
+ * hotel with Ostrovok places or in the OSM data loaded in advance.
  */
 
 export interface GeoHotel extends LatLon {
@@ -43,13 +43,13 @@ export interface GeoHotel extends LatLon {
 
 export interface GeoOutcome {
   steps: TurnStep[]
-  /** What was found, for the model's answer: the only places and distances it may name. */
-  facts: string
-  /** The answer by rules from the same facts. */
+  /** Эвал's answer: what the steps found, the places and the distances of the data only. */
   summary: string
-  /** What the services could not check: added to the model's answer, so it cannot be lost. */
-  notes: string[]
   map?: ChatMap
+  /** Who chose the calls. */
+  planner: 'model' | 'rules'
+  /** The models were asked and none chose the calls: the rules did. */
+  modelsDown?: true
 }
 
 export interface GeoTurnOptions {
@@ -67,20 +67,44 @@ export interface GeoTurnOptions {
 export const PLAN_MS = 5000
 /** A call of a tool gets this much, never past the steps' deadline. */
 export const STEP_MS = 4000
-/** Left of the answer's time for the answer itself. */
-export const ANSWER_RESERVE_MS = 3500
+/** Left of the answer's time when the steps end: the answer and its way back. */
+export const ANSWER_RESERVE_MS = 1500
+/** A place found this near is the hotel itself: the model looked the hotel up. */
+const SELF_M = 150
 /** A step is not started with less than this left. */
 const MIN_STEP_MS = 500
 /** The calls of the model a turn runs. */
 const MAX_CALLS = 3
+/** The kinds of places a turn searches: the answer stays short. */
+const MAX_CATEGORIES = 6
 /** The routes a turn builds: to the nearest places of the first categories asked. */
 const MAX_ROUTES = 2
 /** Farther than this the route is by car. */
 export const WALK_MAX_M = 3000
+/** «Сколько идти» walks up to the farthest walk of OSRM; «сколько ехать» drives. */
+const WALK_WORDS = /идти|пешком|пешк|дойти|прогул/i
+const DRIVE_WORDS = /ехать|машин|такси|доехать|авто/i
+
+/** On foot or by car: as the question says, else on foot up to `WALK_MAX_M`. */
+export function walks(distanceM: number, text: string): boolean {
+  if (DRIVE_WORDS.test(text)) return false
+  if (WALK_WORDS.test(text)) return distanceM <= MAX_WALK_M
+  return distanceM <= WALK_MAX_M
+}
 /** The places of a category the answer and the map show. */
 const SHOWN_PER_CATEGORY = 3
+/** «Рядом» is farther for the places a city has few of. */
+const MIN_RADIUS_M: Partial<Record<PlaceCategory, number>> = {
+  hospital: 3000,
+  clinic: 2000,
+  train_station: 3000,
+  museum: 2000,
+  park: 2000,
+  attraction: 2000,
+}
 
-type Call = { tool: 'nearbyPlaces'; categories: PlaceCategory[]; radiusM: number } | { tool: 'geocode'; query: string }
+type NearbyCall = { tool: 'nearbyPlaces'; categories: PlaceCategory[]; radiusM: number }
+type Call = NearbyCall | { tool: 'geocode'; query: string }
 
 const nearbyInput = z.object({
   categories: z.array(z.enum(PLACE_CATEGORIES)).min(1).max(6),
@@ -92,25 +116,24 @@ const geocodeInput = z.object({ query: z.string().trim().min(2).max(200).describ
  * The tools as the model sees them to choose the calls: the point is the hotel's, so the model never makes up
  * coordinates; no `execute`, the turn runs each call as a step of its own.
  */
-function planTools(descriptions: { nearby: string; geocode: string }) {
-  return {
-    nearbyPlaces: tool({
-      description: `${descriptions.nearby} Точка — отель, её указывать не нужно.`,
-      inputSchema: nearbyInput,
-    }),
-    geocode: tool({
-      description: `${descriptions.geocode} Только когда спрашивают о конкретном месте по названию.`,
-      inputSchema: geocodeInput,
-    }),
-  }
+const PLAN_TOOLS = {
+  nearbyPlaces: tool({
+    description: `${NEARBY_DESCRIPTION} Точка — отель, её указывать не нужно.`,
+    inputSchema: nearbyInput,
+  }),
+  geocode: tool({
+    description: `${GEOCODE_DESCRIPTION} Только для конкретного места по названию, не для видов мест.`,
+    inputSchema: geocodeInput,
+  }),
 }
 
 const planInstructions = (hotel: GeoHotel) =>
   [
     `Ты Эвал, помощник по отелю «${hotel.name}» в Валенсии. Выбери вызовы инструментов, чтобы ответить на последний`,
-    'вопрос гостя о местах рядом с отелем или о пути до места. Больница, аптека, бар, клуб, кафе — nearbyPlaces',
-    'с радиусом 1000–3000. Море — категории beach и sea. Центр города и аэропорт — радиус 20000. Конкретное место',
-    `по названию — geocode. Не больше ${MAX_CALLS} вызовов.`,
+    'вопрос гостя о местах рядом с отелем или о пути до места. Виды мест (больница, аптека, бар, клуб, кафе, метро) —',
+    'nearbyPlaces с радиусом 1000–3000; «что рядом» без вида — attraction, restaurant, supermarket, pharmacy, metro.',
+    'Море — категории beach и sea, центр города — centre, аэропорт — airport, радиус 20000. Место с названием',
+    `(рынок, музей, площадь, улица) — geocode с этим названием. Не больше ${MAX_CALLS} вызовов.`,
   ].join(' ')
 
 /** The calls the model chose; throws when it chose none, so the next model of the chain is asked. */
@@ -118,14 +141,13 @@ async function modelPlan(
   model: LanguageModel,
   hotel: GeoHotel,
   messages: AssistantRequest['messages'],
-  tools: ReturnType<typeof planTools>,
   signal: AbortSignal,
 ): Promise<Call[]> {
   const { toolCalls } = await generateText({
     model,
     instructions: planInstructions(hotel),
     messages: messages.slice(-4).map(({ role, text }) => ({ role, content: text })),
-    tools,
+    tools: PLAN_TOOLS,
     toolChoice: 'required',
     reasoning: 'none',
     maxRetries: 0,
@@ -146,32 +168,57 @@ async function modelPlan(
   return calls
 }
 
-/** The calls by the words of the question: the near categories in a walk's radius, the far ones in 20 km. */
-export function rulesPlan(text: string): Call[] {
-  const named = questionCategories(text)
-  const categories = named.length ? named : [...EVERYDAY]
+/** The radius of a search: «рядом» of its categories, 20 km for a far one. */
+const radiusOf = (categories: readonly PlaceCategory[], asked = NEAR_RADIUS_M) =>
+  categories.some((c) => FAR_CATEGORIES.includes(c))
+    ? FAR_RADIUS_M
+    : Math.max(asked, NEAR_RADIUS_M, ...categories.map((c) => MIN_RADIUS_M[c] ?? 0))
+
+/** The searches of `categories`: the near ones together, the far ones in 20 km. */
+function searches(categories: readonly PlaceCategory[]): NearbyCall[] {
   const near = categories.filter((c) => !FAR_CATEGORIES.includes(c))
   const far = categories.filter((c) => FAR_CATEGORIES.includes(c))
-  return [
-    ...(near.length ? [{ tool: 'nearbyPlaces' as const, categories: near, radiusM: NEAR_RADIUS_M }] : []),
-    ...(far.length ? [{ tool: 'nearbyPlaces' as const, categories: far, radiusM: FAR_RADIUS_M }] : []),
-  ]
+  return [near, far].flatMap((group): NearbyCall[] =>
+    group.length ? [{ tool: 'nearbyPlaces', categories: group, radiusM: radiusOf(group) }] : [],
+  )
+}
+
+/** The calls by the words of the question; «что рядом» without a kind asks the everyday places. */
+export function rulesPlan(text: string): Call[] {
+  const named = questionCategories(text)
+  return searches(named.length ? named : EVERYDAY)
 }
 
 /**
- * The model's calls made safe: the sea is asked with its beaches (the coastline has the port), a far category gets
- * the far radius, a call repeated is dropped, at most `MAX_CALLS`.
+ * The model's calls made safe. A geocode of a kind of place («центр Валенсии», «аэропорт») is the search of the
+ * kind; the kinds the words name and the model forgot are searched too; the sea is asked with its beaches (the
+ * coastline has the port); the radius is at least the kind's «рядом», 20 km for a far one; a call repeated is
+ * dropped; at most `MAX_CALLS`.
  */
-export function tidyPlan(calls: readonly Call[]): Call[] {
+export function tidyPlan(calls: readonly Call[], text: string): Call[] {
+  const kept = calls.flatMap((call): Call[] => {
+    if (call.tool === 'nearbyPlaces') return [call]
+    const kinds = questionCategories(call.query)
+    return kinds.length ? searches(kinds) : [call]
+  })
+  const asked = new Set(kept.flatMap((call) => (call.tool === 'nearbyPlaces' ? call.categories : [])))
+  const forgotten = questionCategories(text).filter((c) => !asked.has(c))
+  const all = [...kept, ...searches(forgotten)]
   const seen = new Set<string>()
-  return calls
-    .map((call): Call => {
-      if (call.tool !== 'nearbyPlaces') return call
-      const categories = [
-        ...new Set(call.categories.includes('sea') ? ['beach' as const, ...call.categories] : call.categories),
-      ]
-      const far = categories.some((c) => FAR_CATEGORIES.includes(c))
-      return { ...call, categories: categories.slice(0, 6), radiusM: far ? FAR_RADIUS_M : call.radiusM }
+  const taken = new Set<PlaceCategory>()
+  return (all.length ? all : rulesPlan(text))
+    .flatMap((call): Call[] => {
+      if (call.tool !== 'nearbyPlaces') return [call]
+      const wanted = call.categories.includes('sea') ? ['beach' as const, ...call.categories] : call.categories
+      const kept: PlaceCategory[] = []
+      for (const c of wanted) {
+        // The sea goes with its beaches: it takes no room of its own.
+        const counted = [...taken].filter((t) => t !== 'sea').length
+        if (taken.has(c) || (c !== 'sea' && counted >= MAX_CATEGORIES)) continue
+        taken.add(c)
+        kept.push(c)
+      }
+      return kept.length ? [{ ...call, categories: kept, radiusM: radiusOf(kept, call.radiusM) }] : []
     })
     .filter((call) => {
       const key = JSON.stringify(call)
@@ -198,7 +245,7 @@ interface OstrovokHit {
   place: NearbyPlace
 }
 
-/** The Ostrovok places of the asked categories, nearest first, `SHOWN_PER_CATEGORY` of each. */
+/** The Ostrovok places of `categories`, nearest first, `SHOWN_PER_CATEGORY` of each. */
 export function ostrovokHits(places: readonly NearbyPlace[], categories: readonly PlaceCategory[]): OstrovokHit[] {
   return categories.flatMap((category) =>
     places
@@ -215,15 +262,30 @@ export function askedCategories(calls: readonly Call[]): PlaceCategory[] {
   return all.filter((c) => c !== 'sea' || !all.includes('beach'))
 }
 
-const categoryLabel = (category: PlaceCategory) => (category === 'beach' ? 'пляж (море)' : CATEGORY[category].label)
-
 const capital = (text: string) => text.charAt(0).toLocaleUpperCase('ru') + text.slice(1)
-const quoted = (name: string | null, category: PlaceCategory | 'other') =>
-  name ? `«${name}»` : `${CATEGORY[category as PlaceCategory]?.label ?? 'место'} без названия`
+const kindLabel = (category: PlaceCategory) =>
+  category === 'beach' ? 'море (ближайший пляж)' : CATEGORY[category].label
+const placeName = (place: Place, group: NearbyGroup) =>
+  place.name ?? (group.category === 'sea' ? 'Берег моря' : `${capital(group.label)} без названия`)
+
+/**
+ * The groups the answer shows: the sea is its nearest beach, the coastline only when no beach is near (`sea` may be
+ * the port); each category once, the first call's; a place mapped twice (a node and a building) once.
+ */
+export function shownGroups(groups: readonly NearbyGroup[]): NearbyGroup[] {
+  const unique = groups.filter((g, i) => groups.findIndex((h) => h.category === g.category) === i)
+  const beach = unique.find((g) => g.category === 'beach')
+  return unique
+    .filter((g) => g.category !== 'sea' || beach?.status !== 'found')
+    .map((g) => ({
+      ...g,
+      places: g.places.filter((p, i) => !p.name || g.places.findIndex((q) => q.name === p.name) === i),
+    }))
+}
 
 interface Target extends LatLon {
   label: string
-  /** The group it is the nearest of; none for a geocoded place. */
+  /** The category it is the nearest of; none for a geocoded place. */
   category?: PlaceCategory
 }
 
@@ -232,66 +294,21 @@ interface Routed {
   route: WalkRoute | DriveRoute
 }
 
-function routeLine({ target, route }: Routed): string {
-  const name = `«${target.label}»`
+/** «пешком 1,3 км, около 18 мин», «маршрут не получен — по прямой 12 км». */
+function wayText(route: WalkRoute | DriveRoute): string {
   if (route.kind === 'straight')
-    return `до ${name} по прямой ${distanceText(route.distanceM)} — маршрут не получен (${route.reason.replace(/\.$/, '')})`
+    return `маршрут не получен (${route.reason.replace(/\.$/, '')}) — по прямой ${distanceText(route.distanceM)}`
   const how = route.kind === 'foot' ? 'пешком' : 'на машине'
-  const traffic = route.kind === 'car' ? ' без пробок' : ''
-  return `${how} до ${name}: ${distanceText(route.distanceM)}, около ${durationText(route.durationS)}${traffic}`
-}
-
-/**
- * The groups the answer shows: the sea is its nearest beach; the coastline only when no beach is near (`sea` may be
- * the port). Each category once, the first call's.
- */
-export function shownGroups(groups: readonly NearbyGroup[]): NearbyGroup[] {
-  const unique = groups.filter((g, i) => groups.findIndex((h) => h.category === g.category) === i)
-  const beach = unique.find((g) => g.category === 'beach')
-  return unique.filter((g) => g.category !== 'sea' || !beach || beach.status !== 'found')
-}
-
-function groupLine(group: NearbyGroup, radiusM: number): string {
-  const label = group.category === 'beach' ? 'пляж (море)' : group.label
-  if (group.status === 'unchecked')
-    return `${label}: проверить не удалось — ${group.failure?.message ?? 'сервис не ответил.'}`
-  if (group.status === 'none') return `${label}: в радиусе ${distanceText(radiusM)} нет`
-  const places = group.places
-    .slice(0, SHOWN_PER_CATEGORY)
-    .map((p) => `${quoted(p.name, p.category)} — ${distanceText(p.distanceM)}`)
-  return `${label}: ${places.join('; ')}`
+  return `${how} ${distanceText(route.distanceM)}, около ${durationText(route.durationS)}${route.kind === 'car' ? ' без пробок' : ''}`
 }
 
 /** The steps' state: what the calls found. */
 interface Found {
   ostrovok: OstrovokHit[]
   groups: { group: NearbyGroup; radiusM: number }[]
-  geocoded?: Geocoded['places'][number]
+  geocoded?: Geocoded['places'][number] & { distanceM: number }
   failures: string[]
   routes: Routed[]
-}
-
-function facts(found: Found): string {
-  const lines = [
-    ...shownGroups(found.groups.map((g) => g.group)).map((group) => {
-      const radiusM = found.groups.find((g) => g.group === group)?.radiusM ?? NEAR_RADIUS_M
-      return `- ${groupLine(group, radiusM)}`
-    }),
-    ...(found.geocoded
-      ? [`- ${found.geocoded.name ?? found.geocoded.displayName}: ${found.geocoded.displayName}`]
-      : []),
-  ]
-  const routes = found.routes.map((r) => `- ${routeLine(r)}`)
-  const ostrovok = found.ostrovok.map(
-    ({ category, place }) => `- ${categoryLabel(category)}: «${place.name}» — ${distanceText(place.distanceM)}`,
-  )
-  return [
-    ...(ostrovok.length ? ['Места рядом с отелем по данным Островка (первоисточник):', ...ostrovok] : []),
-    'Места рядом с отелем (OpenStreetMap; расстояния по прямой от отеля):',
-    ...(lines.length ? lines : ['- ничего не проверено']),
-    ...(routes.length ? ['Маршруты от отеля (OSRM):', ...routes] : []),
-    ...(found.failures.length ? ['Не удалось проверить:', ...found.failures.map((f) => `- ${f}`)] : []),
-  ].join('\n')
 }
 
 /** The OSM groups the answer and the map show: the categories the Ostrovok places do not answer. */
@@ -300,91 +317,111 @@ const osmShown = (found: Found) =>
     (group) => !found.ostrovok.some((hit) => hit.category === (group.category === 'sea' ? 'beach' : group.category)),
   )
 
-function summary(found: Found): string {
-  const ostrovok = [...new Set(found.ostrovok.map((hit) => hit.category))].map((category) => {
-    const { place } = found.ostrovok.find((hit) => hit.category === category)!
+const radiusOfGroup = (found: Found, category: PlaceCategory) =>
+  found.groups.find((g) => g.group.category === category)?.radiusM ?? NEAR_RADIUS_M
+
+/** Эвал's answer from what was found: a line a kind, the nearest place, the way to it and the next ones. */
+function summary(found: Found, hasMap: boolean): string {
+  const way = (category?: PlaceCategory) => {
     const routed = found.routes.find((r) => r.target.category === category)
-    const way = routed && routed.route.kind !== 'straight' ? `; ${routeLine(routed)}` : ''
-    return `${capital(categoryLabel(category))}: ближайшее — «${place.name}», ${distanceText(place.distanceM)}${way}.`
-  })
-  const lines = osmShown(found).map((group) => {
-    const radiusM = found.groups.find((g) => g.group === group)?.radiusM ?? NEAR_RADIUS_M
-    const label = capital(group.category === 'beach' ? 'море (ближайший пляж)' : group.label)
-    if (group.status === 'unchecked') return `${label}: ${group.failure?.message ?? 'не удалось проверить.'}`
-    if (group.status === 'none') return `${label}: в радиусе ${distanceText(radiusM)} нет.`
-    const nearest = group.places[0]
-    const routed = found.routes.find((r) => r.target.category === group.category)
-    const way = routed && routed.route.kind !== 'straight' ? `; ${routeLine(routed)}` : ''
-    return `${label}: ближайшее — ${quoted(nearest.name, nearest.category)}, ${distanceText(nearest.distanceM)} по прямой${way}.`
-  })
-  if (found.geocoded) {
-    const target = found.routes.find((r) => !r.target.category)
-    const name = found.geocoded.name ?? found.geocoded.displayName
-    lines.push(target ? `${capital(routeLine(target))}.` : `${name}: ${found.geocoded.displayName}.`)
+    return routed ? `; ${wayText(routed.route)}` : ''
   }
+  const kinds = new Set([...found.ostrovok.map((hit) => hit.category), ...osmShown(found).map((g) => g.category)])
+  // A long answer of many kinds names the nearest place of each only.
+  const others = (names: string[]) => (names.length && kinds.size <= 2 ? ` Ещё: ${names.join(', ')}.` : '')
+  const ostrovok = [...new Set(found.ostrovok.map((hit) => hit.category))].map((category) => {
+    const [{ place }, ...rest] = found.ostrovok.filter((hit) => hit.category === category)
+    const more = rest.map((hit) => `«${hit.place.name}» — ${distanceText(hit.place.distanceM)}`)
+    // Ostrovok names an airport by its city: «Валенсия» (аэропорт).
+    const kind = place.name.toLocaleLowerCase('ru').includes(place.kind.toLocaleLowerCase('ru'))
+      ? ''
+      : ` (${place.kind.toLocaleLowerCase('ru')})`
+    return `• ${capital(kindLabel(category))}: ближе всего — «${place.name}»${kind}, ${distanceText(place.distanceM)} от отеля${way(category)}.${others(more)}`
+  })
+  const osm = osmShown(found).map((group) => {
+    const label = capital(group.category === 'sea' ? 'берег моря' : kindLabel(group.category))
+    if (group.status === 'unchecked') return `• ${label}: ${group.failure?.message ?? 'не удалось проверить.'}`
+    if (group.status === 'none')
+      return `• ${label}: в радиусе ${distanceText(radiusOfGroup(found, group.category))} нет.`
+    const [nearest, ...rest] = group.places
+    const more = rest.map((p) => `«${placeName(p, group)}» — ${distanceText(p.distanceM)}`)
+    return `• ${label}: ближе всего — «${placeName(nearest, group)}», ${distanceText(nearest.distanceM)} от отеля по прямой${way(group.category)}.${others(more)}`
+  })
+  const place = found.geocoded
+  const named = place
+    ? [`• «${place.name ?? place.displayName}»: ${distanceText(place.distanceM)} от отеля по прямой${way(undefined)}.`]
+    : []
+  const sources = [found.ostrovok.length && 'Островка', (osm.length || named.length) && 'OpenStreetMap'].filter(Boolean)
+  const lines = [...ostrovok, ...osm, ...named]
   const notes = found.failures.filter((f) => !lines.some((line) => line.includes(f)))
+  if (lines.length === 0) return notes.join(' ') || 'Не нашёл таких мест в данных.'
   return [
-    ...(ostrovok.length ? ['По данным Островка:', ...ostrovok] : []),
-    ...(lines.length || !ostrovok.length ? ['По данным OpenStreetMap:', ...lines] : []),
+    `По данным ${sources.join(' и ')}:`,
+    ...lines,
     ...notes,
+    ...(hasMap ? ['Места и маршруты — на карте ниже.'] : []),
   ].join('\n')
 }
 
 function chatMap(hotel: GeoHotel, found: Found): ChatMap | undefined {
-  const ostrovok: MapPoint[] = found.ostrovok.map(({ category, place }) => ({
-    kind: 'place',
-    label: place.name,
-    category: CATEGORY[category].label,
-    distanceM: Math.round(place.distanceM),
-    lat: place.lat,
-    lon: place.lon,
-  }))
-  const places: MapPoint[] = osmShown(found).flatMap((group) =>
-    group.places.slice(0, SHOWN_PER_CATEGORY).map((p) => ({
+  const places: MapPoint[] = [
+    ...(found.geocoded
+      ? [
+          {
+            kind: 'place' as const,
+            label: found.geocoded.name ?? found.geocoded.displayName,
+            distanceM: found.geocoded.distanceM,
+            lat: found.geocoded.lat,
+            lon: found.geocoded.lon,
+          },
+        ]
+      : []),
+    ...found.ostrovok.map(({ category, place }) => ({
       kind: 'place' as const,
-      label: p.name ?? (group.category === 'sea' ? 'Берег моря' : capital(group.label)),
-      category: group.label,
-      distanceM: Math.round(p.distanceM),
-      lat: p.lat,
-      lon: p.lon,
+      label: place.name,
+      category: CATEGORY[category].label,
+      distanceM: Math.round(place.distanceM),
+      lat: place.lat,
+      lon: place.lon,
+      source: 'ostrovok' as const,
     })),
-  )
-  places.unshift(...ostrovok)
-  if (found.geocoded)
-    places.unshift({
-      kind: 'place',
-      label: found.geocoded.name ?? found.geocoded.displayName,
-      distanceM: Math.round(haversineMeters(hotel, found.geocoded)),
-      lat: found.geocoded.lat,
-      lon: found.geocoded.lon,
-    })
+    ...osmShown(found).flatMap((group) =>
+      group.places.map((p) => ({
+        kind: 'place' as const,
+        label: placeName(p, group),
+        category: group.label,
+        distanceM: Math.round(p.distanceM),
+        lat: p.lat,
+        lon: p.lon,
+      })),
+    ),
+  ]
   if (places.length === 0) return undefined
-  const routes: MapRoute[] = found.routes.map(({ target, route }) => ({
-    mode: route.kind,
-    distanceM: route.distanceM,
-    durationS: route.durationS,
-    coordinates: thinLine(route.geometry.coordinates),
-    to: target.label,
-  }))
   return {
     points: [
       { kind: 'hotel', label: hotel.name, lat: hotel.lat, lon: hotel.lon },
       ...places.slice(0, MAX_MAP_POINTS - 1),
     ],
-    routes,
+    routes: found.routes.map(({ target, route }) => ({
+      mode: route.kind,
+      distanceM: route.distanceM,
+      durationS: route.durationS,
+      coordinates: thinLine(route.geometry.coordinates),
+      to: target.label,
+    })),
     attribution: MAP_ATTRIBUTION_TEXT,
   }
 }
 
 /** The step's line of the places near: «аптека — 3, бар или паб — нет». */
-function nearbyResult(nearby: Nearby): { status: TurnStep['status']; result: string } {
+function nearbyResult(nearby: Nearby): Pick<TurnStep, 'status' | 'result'> {
   const groups = shownGroups(nearby.groups)
   const unchecked = groups.filter((g) => g.status === 'unchecked')
   if (unchecked.length === groups.length)
-    return { status: 'failed', result: unchecked[0].failure?.message ?? 'не удалось проверить' }
+    return { status: 'failed', result: unchecked[0]?.failure?.message ?? 'не удалось проверить' }
   const parts = groups.map((g) =>
     g.status === 'found'
-      ? `${g.label} — ${Math.min(g.places.length, SHOWN_PER_CATEGORY)}`
+      ? `${g.label} — ${g.places.length}`
       : g.status === 'none'
         ? `${g.label} — нет`
         : `${g.label} — не проверено`,
@@ -392,16 +429,15 @@ function nearbyResult(nearby: Nearby): { status: TurnStep['status']; result: str
   return { status: 'done', result: parts.join(', ') }
 }
 
-const nearbyTitle = (call: Extract<Call, { tool: 'nearbyPlaces' }>) => {
-  const labels = shownGroups(
-    call.categories.map((category) => ({ category, label: CATEGORY[category].label }) as NearbyGroup),
-  ).map((g) => (g.category === 'beach' ? 'пляж' : g.label))
-  return `Ищу рядом с отелем: ${labels.join(', ')} — в радиусе ${distanceText(call.radiusM)}`
-}
+const searchLabels = (categories: readonly PlaceCategory[]) =>
+  categories
+    .filter((c) => c !== 'sea' || !categories.includes('beach'))
+    .map((c) => (c === 'beach' ? 'пляж' : CATEGORY[c].label))
+    .join(', ')
 
 /**
- * The geo steps of a hotel's question, or `null` when the hotel's point is not in the data loaded in advance: no
- * guesses about a city whose places are not there.
+ * The geo steps of a hotel's question, or `null` when the hotel has neither Ostrovok places nor a point in the OSM
+ * data loaded in advance: no guesses about a city whose places are not there.
  */
 export async function geoTurn(
   hotel: GeoHotel,
@@ -411,8 +447,7 @@ export async function geoTurn(
   const stepsUntil = deadline - ANSWER_RESERVE_MS
   const point = { lat: hotel.lat, lon: hotel.lon }
   const here = await deps.store.near(point, 1, PLACE_CATEGORIES, 1, { deadline: stepsUntil, signal })
-  // Outside the OSM data loaded in advance only the Ostrovok places answer; a cache that cannot be read says nothing
-  // of the point, so without the Ostrovok places the answer is the hotel's own data, as before.
+  // A cache that cannot be read says nothing of the point: only the Ostrovok places answer then.
   const osm = here.ok && here.value.covered.length > 0
   if (!osm && ostrovok.length === 0) return null
 
@@ -421,32 +456,45 @@ export async function geoTurn(
   const fail = (message: string) => {
     if (!found.failures.includes(message)) found.failures.push(message)
   }
+  if (!here.ok) fail(here.message)
 
-  const session = newGeoSession()
-  const tools = (until: number) => geoTools({ deadline: until, signal, session }, deps)
   const text = messages.at(-1)?.text ?? ''
   let calls = rulesPlan(text)
+  let planner: GeoOutcome['planner'] = 'rules'
+  let modelsDown = false
   if (models?.length) {
-    const plan = await firstAnswer(
-      models,
-      (model, timeout) =>
-        modelPlan(
-          model,
-          hotel,
-          messages,
-          planTools({ nearby: NEARBY_DESCRIPTION, geocode: GEOCODE_DESCRIPTION }),
-          timeout,
-        ),
-      { deadline: Math.min(Date.now() + PLAN_MS, stepsUntil), signal, onError },
-    )
-    if (plan.ok) calls = plan.value
+    const plan = await firstAnswer(models, (model, timeout) => modelPlan(model, hotel, messages, timeout), {
+      deadline: Math.min(Date.now() + PLAN_MS, stepsUntil),
+      signal,
+      onError,
+    })
+    if (plan.ok) {
+      calls = plan.value
+      planner = 'model'
+    } else modelsDown = plan.failed.length > 0
+  }
+  const plan = tidyPlan(calls, text)
+
+  if (ostrovok.length) {
+    found.ostrovok = ostrovokHits(ostrovok, askedCategories(plan))
+    const kinds = [...new Set(found.ostrovok.map((hit) => hit.category))]
+    steps.push({
+      agent: 'geo',
+      title: 'Смотрю места рядом по данным Островка',
+      status: 'done',
+      result: kinds.length
+        ? kinds.map((c) => `${CATEGORY[c].label} — ${found.ostrovok.filter((h) => h.category === c).length}`).join(', ')
+        : 'таких мест в данных нет',
+    })
   }
 
+  const session = newGeoSession()
+  const options = { toolCallId: 'geo', messages: [], abortSignal: signal, context: {} } as never
   /** Runs one call as a step with its own time; `undefined` when no time was left or the call threw. */
   async function step<T>(
     title: string,
     run: (tools: ReturnType<typeof geoTools>) => Promise<T>,
-    line: (value: T) => { status: TurnStep['status']; result: string },
+    line: (value: T) => Pick<TurnStep, 'status' | 'result'>,
   ): Promise<T | undefined> {
     const until = Math.min(Date.now() + STEP_MS, stepsUntil)
     if (until - Date.now() < MIN_STEP_MS) {
@@ -454,7 +502,7 @@ export async function geoTurn(
       return undefined
     }
     try {
-      const value = await run(tools(until))
+      const value = await run(geoTools({ deadline: until, signal, session }, deps))
       steps.push({ agent: 'geo', title, ...line(value) })
       return value
     } catch (error) {
@@ -465,26 +513,10 @@ export async function geoTurn(
     }
   }
 
-  const plan = tidyPlan(calls)
-  if (ostrovok.length) {
-    found.ostrovok = ostrovokHits(ostrovok, askedCategories(plan))
-    const kinds = [...new Set(found.ostrovok.map((hit) => hit.category))]
-    steps.push({
-      agent: 'geo',
-      title: 'Смотрю места рядом по данным Островка',
-      status: 'done',
-      result: kinds.length
-        ? kinds.map((c) => `${categoryLabel(c)} — ${found.ostrovok.filter((h) => h.category === c).length}`).join(', ')
-        : 'таких мест в данных нет',
-    })
-  }
-  if (!here.ok) fail(here.message)
-
-  const options = { toolCallId: 'geo', messages: [], abortSignal: signal, context: {} } as never
   for (const call of osm ? plan : []) {
     if (call.tool === 'nearbyPlaces') {
       const nearby = await step(
-        nearbyTitle(call),
+        `Ищу рядом с отелем: ${searchLabels(call.categories)} — в радиусе ${distanceText(call.radiusM)}`,
         (t) =>
           t.nearbyPlaces.execute!(
             { ...point, categories: call.categories, radiusM: call.radiusM, perCategory: SHOWN_PER_CATEGORY },
@@ -501,12 +533,19 @@ export async function geoTurn(
         `Ищу на карте «${call.query}»`,
         (t) => t.geocode.execute!({ query: call.query }, options) as Promise<GeoResult<Geocoded>>,
         (result) =>
-          result.ok
-            ? { status: 'done', result: `нашёл: ${result.value.places[0].name ?? result.value.places[0].displayName}` }
-            : { status: 'failed', result: result.message },
+          !result.ok
+            ? { status: 'failed', result: result.message }
+            : haversineMeters(point, result.value.places[0]) <= SELF_M
+              ? { status: 'done', result: 'это сам отель' }
+              : {
+                  status: 'done',
+                  result: `нашёл: ${result.value.places[0].name ?? result.value.places[0].displayName}`,
+                },
       )
-      if (geocoded?.ok) found.geocoded ??= geocoded.value.places[0]
-      else if (geocoded && geocoded.reason !== 'not-found') fail(geocoded.message)
+      const place = geocoded?.ok ? geocoded.value.places[0] : undefined
+      const distanceM = place ? Math.round(haversineMeters(point, place)) : 0
+      if (place && distanceM > SELF_M) found.geocoded ??= { ...place, distanceM }
+      else if (geocoded && !geocoded.ok) fail(geocoded.message)
     }
   }
 
@@ -520,11 +559,11 @@ export async function geoTurn(
     ...osmShown(found).flatMap((group): Target[] => {
       const nearest = group.places[0]
       if (group.status !== 'found' || !nearest) return []
-      return [{ ...nearest.near, label: nearest.name ?? capital(group.label), category: group.category }]
+      return [{ ...nearest.near, label: placeName(nearest, group), category: group.category }]
     }),
   ].slice(0, MAX_ROUTES)
   for (const target of targets) {
-    const walk = haversineMeters(point, target) <= WALK_MAX_M
+    const walk = walks(haversineMeters(point, target), text)
     const route = await step(
       `Строю маршрут ${walk ? 'пешком' : 'на машине'} до «${target.label}»`,
       (t) =>
@@ -539,13 +578,12 @@ export async function geoTurn(
     if (route) found.routes.push({ target, route })
   }
 
+  const map = chatMap(hotel, found)
   return {
     steps,
-    facts: facts(found),
-    summary: summary(found),
-    notes: found.failures,
-    ...withMap(chatMap(hotel, found)),
+    summary: summary(found, Boolean(map)),
+    planner,
+    ...(map && { map }),
+    ...(modelsDown && { modelsDown: true as const }),
   }
 }
-
-const withMap = (map: ChatMap | undefined) => (map ? { map } : {})
