@@ -69,12 +69,17 @@
       желании — источник: #287 — лёгкая — пользователь.
 - [ ] Формулировка «км от центра» повторяется в `HotelLocation.tsx:31` и `HotelTile` — общий помощник — источник: #283 —
       лёгкая — нет.
-- [ ] Мобильная раскладка Эвала без теста: никто не задаёт `NARROW` из `src/test/screen.ts` — тест в
-      `AssistantLayout.test.tsx` с `setScreen(NARROW)`; `searchResultsTestKit.tsx:185` и `Hero.test.tsx:126` задают
-      `matchMedia` вручную без восстановления — перевести на `setScreen` — источник: #308 — лёгкая — нет.
+- [ ] Ветки reduced-motion в `Hero.tsx:223,231` не покрыты: в `Hero.test.tsx` `reducedMotion` всегда `false` — тест с
+      `setScreen(NARROW, { reducedMotion: true })`, что `animate` не вызывается — источник: #310 — лёгкая — нет.
+- [ ] `searchResultsTestKit.tsx` в режиме `desktop` раньше включал и reduced-motion, теперь нет: смена страницы скроллит
+      `smooth` (`SearchResultsPage.tsx:248`), ни один тест прокрутку не проверяет — тест при желании — источник: #310 —
+      лёгкая — нет.
 
 ## Выполнено
 
+- [x] `test-screen-helper` (#310; решение 49а): `setScreen(width, { reducedMotion })` (px и rem) вместо ручных заглушек
+      `matchMedia` в Hero, StarSearch и `searchResultsTestKit`; сценарий «Телефон» Эвала на `NARROW`, парный тест
+      широкого экрана; 1182 теста. Проверки локальные (CI — биллинг).
 - [x] `semantic-retry-text` (#307; решение 48а): повтор поиска по смыслу без фото, новый запрос вместо зависшего из
       кэша; при неудаче — правила и «Модели сейчас недоступны…»; `test-hook-order` (#308; решение 47а): хуки в порядке
       объявления, `setScreen` для `matchMedia`; 1179 тестов на объединённом `dev`. Проверки локальные (CI — биллинг).
