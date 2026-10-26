@@ -12,6 +12,10 @@ export default defineConfig({
     },
   },
   test: {
+    // Hooks run in declaration order, so the setup file's `afterEach(cleanup)` (declared first) unmounts before a test
+    // file clears its storage. The default 'stack' runs `afterEach` in reverse: an unmount would save into the cleared
+    // storage and leak the chat into the next test (see #304).
+    sequence: { hooks: 'list' },
     projects: [
       {
         extends: true,

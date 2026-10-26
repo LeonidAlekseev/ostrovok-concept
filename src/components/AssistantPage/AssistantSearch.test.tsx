@@ -3,11 +3,12 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { destinations } from '../../data/destinations'
 import { makePlan } from '../../lib/assistant'
-import { CHATS_KEY } from '../../lib/assistantChats'
+import { CHATS_KEY, type Chat } from '../../lib/assistantChats'
 import { newHotels } from '../../lib/catalogGenerator'
 import { DIALOG_KEY } from '../../lib/assistantDialog'
 import { todayIso } from '../../lib/dates'
 import { catalogFetch } from '../../test/catalog'
+import { setScreen, WIDE } from '../../test/screen'
 import { AssistantSearch } from './AssistantSearch'
 
 const fetchMock = vi.fn<typeof fetch>()
@@ -28,9 +29,14 @@ vi.mock('../../lib/assistant', async (importOriginal) => {
   }
 })
 
+// Heavy by nature: a multi-step dialog rendered in jsdom takes ~0.5 s alone and several times that on a busy machine,
+// so the default 5 s is not enough there.
+const HEAVY = 20_000
+
 // The assistant "thinks" for 650 ms before it answers: the tests do not wait for it in real time.
 const THINK_MS = 650
 beforeEach(() => {
+  setScreen(WIDE)
   const realSetTimeout = globalThis.setTimeout
   vi.spyOn(globalThis, 'setTimeout').mockImplementation(((handler: TimerHandler, ms?: number, ...args: unknown[]) =>
     realSetTimeout(handler, ms === THINK_MS ? 0 : ms, ...args)) as typeof setTimeout)
@@ -74,6 +80,30 @@ const hotelLinksOnly = () =>
   within(log())
     .queryAllByRole('link')
     .every((link) => /^\/(hotels\/[^/?]+|search)\?/.test(link.getAttribute('href') ?? ''))
+/** The links of the Lisbon hotel cards, once the hotels have loaded. */
+const lisbonHotelLinks = async () =>
+  (await within(log()).findAllByRole('article')).flatMap((card) =>
+    within(card)
+      .getAllByRole('link')
+      .filter((link) => link.getAttribute('href')?.startsWith('/hotels/lisbon-')),
+  )
+/** Where the messages went: every stored chat with its messages, for a failure to tell the chat a message landed in. */
+const storedChats = () =>
+  JSON.stringify(
+    (JSON.parse(window.localStorage.getItem(CHATS_KEY) ?? '[]') as Chat[]).map((c) => ({
+      id: c.id,
+      title: c.title,
+      messages: c.messages.map((m) => `${m.role}: ${m.text}`),
+    })),
+    null,
+    1,
+  )
+/** The newest chat is open and empty: Эвал's greeting, no log. */
+const emptyChatOpen = async () => {
+  expect(await screen.findByText(/О каком путешествии вы мечтаете/)).toBeTruthy()
+  expect(screen.queryByRole('log', { name: 'Диалог с Эвалом' })).toBeNull()
+}
+
 const answer = (body: object) => Response.json({ source: 'model', ...body })
 
 /** A reply the test sends when it wants to. */
@@ -85,41 +115,49 @@ function deferred() {
 
 // assistant-search, Requirement: Разбор пожелания
 describe('AssistantSearch with the model', () => {
-  it('shows what the model understood from a free phrase (Scenario: Свободная фраза)', async () => {
-    fetchMock.mockResolvedValue(answer({ brief: { vibe: 'sea', budget: 40000 }, reply: 'Тёплое море!' }))
-    const { user } = renderAssistant()
+  it(
+    'shows what the model understood from a free phrase (Scenario: Свободная фраза)',
+    async () => {
+      fetchMock.mockResolvedValue(answer({ brief: { vibe: 'sea', budget: 40000 }, reply: 'Тёплое море!' }))
+      const { user } = renderAssistant()
 
-    await user.type(input(), 'хочу туда, где тепло и можно поплавать с маской{Enter}')
+      await user.type(input(), 'хочу туда, где тепло и можно поплавать с маской{Enter}')
 
-    expect(await inLog('Записал: море · до 40 000 ₽. Когда планируете поехать?')).toBeTruthy()
-    const [url] = fetchMock.mock.calls[0]
-    expect(url).toBe('/api/assistant')
-    expect(bodyOf(0)).toEqual({
-      messages: [{ role: 'user', text: 'хочу туда, где тепло и можно поплавать с маской' }],
-      brief: {},
-    })
-  })
+      expect(await inLog('Записал: море · до 40 000 ₽. Когда планируете поехать?')).toBeTruthy()
+      const [url] = fetchMock.mock.calls[0]
+      expect(url).toBe('/api/assistant')
+      expect(bodyOf(0)).toEqual({
+        messages: [{ role: 'user', text: 'хочу туда, где тепло и можно поплавать с маской' }],
+        brief: {},
+      })
+    },
+    HEAVY,
+  )
 
-  it('sends the dialog so far and the brief with the next message', async () => {
-    fetchMock
-      .mockResolvedValueOnce(answer({ brief: { vibe: 'sea' } }))
-      .mockResolvedValueOnce(answer({ brief: { vibe: 'sea', when: 9 } }))
-    const { user } = renderAssistant()
+  it(
+    'sends the dialog so far and the brief with the next message',
+    async () => {
+      fetchMock
+        .mockResolvedValueOnce(answer({ brief: { vibe: 'sea' } }))
+        .mockResolvedValueOnce(answer({ brief: { vibe: 'sea', when: 9 } }))
+      const { user } = renderAssistant()
 
-    await user.type(input(), 'к морю{Enter}')
-    await inLog(/Когда планируете поехать/)
-    await user.type(input(), 'осенью, в октябре{Enter}')
-    await inLog(/С кем едете/)
+      await user.type(input(), 'к морю{Enter}')
+      await inLog(/Когда планируете поехать/)
+      await user.type(input(), 'осенью, в октябре{Enter}')
+      await inLog(/С кем едете/)
 
-    expect(bodyOf(1)).toEqual({
-      messages: [
-        { role: 'user', text: 'к морю' },
-        { role: 'assistant', text: 'Записал: море. Когда планируете поехать?' },
-        { role: 'user', text: 'осенью, в октябре' },
-      ],
-      brief: { vibe: 'sea' },
-    })
-  })
+      expect(bodyOf(1)).toEqual({
+        messages: [
+          { role: 'user', text: 'к морю' },
+          { role: 'assistant', text: 'Записал: море. Когда планируете поехать?' },
+          { role: 'user', text: 'осенью, в октябре' },
+        ],
+        brief: { vibe: 'sea' },
+      })
+    },
+    HEAVY,
+  )
 
   it('leads with the model remark when nothing is understood yet', async () => {
     fetchMock.mockResolvedValue(answer({ brief: {}, reply: 'Привет!' }))
@@ -302,9 +340,12 @@ describe('AssistantSearch steps of the agents', () => {
 
     await user.type(input(), 'тихо и повыше, Лиссабон в октябре, один{Enter}')
 
-    const option = await within(log()).findByRole('article', { name: lisbon.name }, {})
-    expect(option.textContent).toContain('ночью 45–49 дБ')
-    expect(option.textContent).toContain('здание 12 этажей, 38 м')
+    const why = await within(log()).findByRole('list', { name: 'Почему эти отели' })
+    const line = within(why).getByText(lisbon.name).closest('li')!
+    expect(line.textContent).toContain('ночью 45–49 дБ')
+    expect(line.textContent).toContain('здание 12 этажей, 38 м')
+    const card = (await within(log()).findByRole('link', { name: lisbon.name })).closest('article')!
+    expect(card.textContent).not.toContain('дБ')
   })
 })
 
@@ -315,9 +356,25 @@ describe('AssistantSearch plan', () => {
     const { user } = renderAssistant()
     await user.type(input(), 'Лиссабон в октябре, один{Enter}')
     expect(await within(log()).findByText('Атмосфера поездки', {})).toBeTruthy()
-    expect(within(log()).getAllByRole('button', { name: /Искать в городе Лиссабон/ }).length).toBeGreaterThan(0)
+    expect(await lisbonHotelLinks()).not.toHaveLength(0)
     expect(log().textContent).not.toMatch(/маршрут/i)
     expect(hotelLinksOnly()).toBe(true)
+  })
+
+  it('asks again for the hotels of the plan after a failed load, instead of keeping the bare cards', async () => {
+    fetchMock.mockResolvedValue(answer({ brief: { destinationId: 'lisbon', when: 9, party: 'solo' } }))
+    let failed = false
+    vi.stubGlobal('fetch', ((input, init) => {
+      if (!String(input).startsWith('/api/hotels')) return fetchMock(input, init)
+      if (failed) return catalogFetch(input)
+      failed = true
+      return Promise.resolve(new Response('{}', { status: 500 }))
+    }) as typeof fetch)
+    const { user } = { user: userEvent.setup(), ...render(view()) }
+    await user.type(input(), 'Лиссабон в октябре, один{Enter}')
+    expect(await within(log()).findByText('Атмосфера поездки', {})).toBeTruthy()
+    await waitFor(async () => expect(await lisbonHotelLinks()).not.toHaveLength(0), { timeout: 8000 })
+    expect(failed).toBe(true)
   })
 })
 
@@ -332,10 +389,17 @@ describe('AssistantSearch chats', () => {
     await user.click(newChatButton())
 
     expect(screen.queryByRole('log', { name: 'Диалог с Эвалом' })).toBeNull()
-    expect(screen.getByRole('heading', { name: /О каком путешествии вы мечтаете/ })).toBeTruthy()
-    const previous = within(chatList()).getByRole('button', { name: /к морю/ })
+    expect(screen.getByText(/О каком путешествии вы мечтаете/)).toBeTruthy()
+    const previous = within(chatList()).getByRole('button', { name: /^(?!Действия).*(?:к морю)/ })
     await user.click(previous)
     expect(await inLog('Записал: море. Когда планируете поехать?')).toBeTruthy()
+  })
+
+  it('has one «Новый чат» in the list, floating on phones and in the column from lg', () => {
+    renderAssistant()
+    const button = within(chatList()).getByRole('button', { name: 'Новый чат' })
+    expect(button.className).toContain('max-lg:fixed')
+    expect(screen.getAllByRole('button', { name: 'Новый чат' })).toHaveLength(1)
   })
 
   it('brings the answer to its own chat while another is open (Scenarios: Ответ в другом чате, Сброс)', async () => {
@@ -345,7 +409,7 @@ describe('AssistantSearch chats', () => {
     await user.type(input(), 'к морю{Enter}')
     await user.click(newChatButton())
 
-    const waiting = within(chatList()).getByRole('button', { name: /к морю/ })
+    const waiting = within(chatList()).getByRole('button', { name: /^(?!Действия).*(?:к морю)/ })
     expect(waiting.textContent).toContain('ждёт ответа')
 
     await act(async () => reply.resolve(answer({ brief: { vibe: 'sea' } })))
@@ -357,29 +421,35 @@ describe('AssistantSearch chats', () => {
 
     await user.click(waiting)
     expect(await inLog('Записал: море. Когда планируете поехать?')).toBeTruthy()
-    expect(within(chatList()).getByRole('button', { name: /к морю/ }).textContent).not.toContain('новое')
+    expect(within(chatList()).getByRole('button', { name: /^(?!Действия).*(?:к морю)/ }).textContent).not.toContain(
+      'новое',
+    )
   })
 })
 
 // assistant-search, Requirement: Чаты после перезагрузки
 describe('AssistantSearch after a reload', () => {
-  it('restores the dialog, the brief and the question (Scenario: Перезагрузка после «Записал»)', async () => {
-    fetchMock
-      .mockResolvedValueOnce(answer({ brief: { vibe: 'sea' } }))
-      .mockResolvedValueOnce(answer({ brief: { vibe: 'sea', when: 9 } }))
-    const { user, unmount } = renderAssistant()
-    await user.type(input(), 'к морю{Enter}')
-    await inLog('Записал: море. Когда планируете поехать?')
+  it(
+    'restores the dialog, the brief and the question (Scenario: Перезагрузка после «Записал»)',
+    async () => {
+      fetchMock
+        .mockResolvedValueOnce(answer({ brief: { vibe: 'sea' } }))
+        .mockResolvedValueOnce(answer({ brief: { vibe: 'sea', when: 9 } }))
+      const { user, unmount } = renderAssistant()
+      await user.type(input(), 'к морю{Enter}')
+      await inLog('Записал: море. Когда планируете поехать?')
 
-    unmount()
-    render(view())
+      unmount()
+      render(view())
 
-    expect(await inLog('Записал: море. Когда планируете поехать?')).toBeTruthy()
-    expect(screen.queryByLabelText('Эвал думает')).toBeNull()
-    await user.type(input(), 'в октябре{Enter}')
-    await inLog(/С кем едете/)
-    expect(bodyOf(1).brief).toEqual({ vibe: 'sea' })
-  })
+      expect(await inLog('Записал: море. Когда планируете поехать?')).toBeTruthy()
+      expect(screen.queryByLabelText('Эвал думает')).toBeNull()
+      await user.type(input(), 'в октябре{Enter}')
+      await inLog(/С кем едете/)
+      expect(bodyOf(1).brief).toEqual({ vibe: 'sea' })
+    },
+    HEAVY,
+  )
 
   it('finishes a pending answer after a reload', async () => {
     fetchMock.mockReturnValueOnce(new Promise(() => {})).mockResolvedValueOnce(answer({ brief: { vibe: 'sea' } }))
@@ -395,25 +465,60 @@ describe('AssistantSearch after a reload', () => {
     expect(bodyOf(1)).toEqual(bodyOf(0))
   })
 
-  it('keeps every chat after a reload (Scenario: Вторая сессия)', async () => {
-    // A body is read once: every request gets its own response.
+  it(
+    'keeps every chat after a reload (Scenario: Вторая сессия)',
+    async () => {
+      // A body is read once: every request gets its own response.
+      fetchMock.mockImplementation(async () => answer({ brief: { vibe: 'sea' } }))
+      const { user, unmount } = renderAssistant()
+      await user.type(input(), 'к морю{Enter}')
+      // A duplicate here has flaked in CI: a failure tells which messages the chats hold.
+      await inLog(/Когда планируете поехать/).catch((error: unknown) => {
+        throw new Error(`${error instanceof Error ? error.message : String(error)}\nstored: ${storedChats()}`)
+      })
+      await user.click(newChatButton())
+      await emptyChatOpen()
+      await user.type(input(), 'тихий отель{Enter}')
+      await inLog(/Когда планируете поехать/)
+      // One question in the open chat: a second one means the message went to the old chat.
+      expect(within(log()).getAllByText(/Когда планируете поехать/), storedChats()).toHaveLength(1)
+
+      unmount()
+      render(view())
+
+      const chats = within(chatList()).getAllByRole('button', { name: /^(?!Действия).*(?:к морю|тихий отель)/ })
+      expect(chats.map((c) => c.textContent)).toEqual([
+        expect.stringContaining('тихий отель'),
+        expect.stringContaining('к морю'),
+      ])
+      expect(JSON.parse(window.localStorage.getItem(CHATS_KEY)!)).toHaveLength(2)
+    },
+    HEAVY,
+  )
+
+  it('opens an empty chat right after the answer and sends there (Scenario: Новый чат сразу после ответа)', async () => {
     fetchMock.mockImplementation(async () => answer({ brief: { vibe: 'sea' } }))
-    const { user, unmount } = renderAssistant()
+    const { user } = renderAssistant()
     await user.type(input(), 'к морю{Enter}')
     await inLog(/Когда планируете поехать/)
-    await user.click(newChatButton())
+
+    // At once: no pause between the answer and the click, nor between the click and the typing.
+    fireEvent.click(newChatButton())
     await user.type(input(), 'тихий отель{Enter}')
     await inLog(/Когда планируете поехать/)
 
-    unmount()
-    render(view())
-
-    const chats = within(chatList()).getAllByRole('button', { name: /к морю|тихий отель/ })
-    expect(chats.map((c) => c.textContent)).toEqual([
-      expect.stringContaining('тихий отель'),
-      expect.stringContaining('к морю'),
+    expect(within(log()).getAllByText(/Когда планируете поехать/), storedChats()).toHaveLength(1)
+    expect(within(log()).queryByText('к морю')).toBeNull()
+    const stored = JSON.parse(window.localStorage.getItem(CHATS_KEY)!) as Chat[]
+    expect(
+      stored.map((c) => c.messages.map((m) => m.text)),
+      storedChats(),
+    ).toEqual([
+      ['тихий отель', expect.stringContaining('Когда планируете поехать')],
+      ['к морю', expect.stringContaining('Когда планируете поехать')],
     ])
-    expect(JSON.parse(window.localStorage.getItem(CHATS_KEY)!)).toHaveLength(2)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(bodyOf(1).messages).toEqual([{ role: 'user', text: 'тихий отель' }])
   })
 
   it('moves the dialog of an older version with a route into a chat (Scenario: Старый диалог с маршрутом)', async () => {
@@ -441,7 +546,7 @@ describe('AssistantSearch after a reload', () => {
     renderAssistant()
 
     expect(await within(log()).findByText('Атмосфера поездки', {})).toBeTruthy()
-    expect(within(log()).getAllByRole('button', { name: /Искать в городе Лиссабон/ }).length).toBeGreaterThan(0)
+    expect(await lisbonHotelLinks()).not.toHaveLength(0)
     expect(screen.queryByText('Воркейшн в Лиссабоне')).toBeNull()
     expect(hotelLinksOnly()).toBe(true)
     expect(window.sessionStorage.getItem(DIALOG_KEY)).toBeNull()
@@ -460,8 +565,42 @@ describe('AssistantSearch after a reload', () => {
     storage.setItem(key, raw)
     renderAssistant()
     expect(screen.queryByRole('log', { name: 'Диалог с Эвалом' })).toBeNull()
-    expect(screen.getByText('О каком путешествии вы мечтаете?')).toBeTruthy()
+    expect(screen.getByText(/О каком путешествии вы мечтаете/)).toBeTruthy()
   })
+})
+
+// assistant-search, Requirement: Одна копия сообщения — the two tests go in this order.
+describe('AssistantSearch from one test to the next', () => {
+  it('ends right as the answer shows, before its chat is saved', async () => {
+    const reply = deferred()
+    fetchMock.mockReturnValueOnce(reply.promise)
+    const { user } = renderAssistant()
+    await user.type(input(), 'к морю{Enter}')
+    // The answer's render is in the page, the effect saving its chat has not run yet: no wait that lets a task pass.
+    const shown = new Promise<void>((resolve) => {
+      const observer = new MutationObserver(() => {
+        if (!document.body.textContent?.includes('Когда планируете поехать')) return
+        observer.disconnect()
+        resolve()
+      })
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true })
+    })
+    reply.resolve(answer({ brief: { vibe: 'sea' } }))
+    await shown
+  })
+
+  it(
+    'starts without the chats of the test before (Scenario: Один ввод)',
+    async () => {
+      expect(window.localStorage.getItem(CHATS_KEY), storedChats()).toBeNull()
+      fetchMock.mockImplementation(async () => answer({ brief: { vibe: 'sea' } }))
+      const { user } = renderAssistant()
+      await user.type(input(), 'к морю{Enter}')
+      await inLog(/Когда планируете поехать/)
+      expect(within(log()).getAllByText('к морю')).toHaveLength(1)
+    },
+    HEAVY,
+  )
 })
 
 // assistant-search, Requirement: Начальный экран
@@ -471,17 +610,35 @@ describe('AssistantSearch start screen', () => {
     expect(screen.getByAltText('Эвал')).toBeTruthy()
   })
 
-  it('opens with the reply bubble, the example and three photo cards', () => {
+  it('opens with the greeting cloud, the example and five chips', () => {
     renderAssistant()
-    expect(screen.getByRole('heading', { name: 'О каком путешествии вы мечтаете?' })).toBeTruthy()
-    expect(screen.getByText('Я подберу идеальное жильё, направление и лучшие варианты для вашего отдыха')).toBeTruthy()
-    expect(screen.getByPlaceholderText('Например: «Хочу на море в октябре, спокойный отдых, с ребёнком»')).toBeTruthy()
+    expect(
+      screen.getByText(
+        /О каком путешествии вы мечтаете\?.*Я подберу идеальное жильё, направление и лучшие варианты для вашего отдыха/,
+      ),
+    ).toBeTruthy()
+    expect(screen.getByPlaceholderText('Напишите, что ищете…')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Новый чат' })).toBeTruthy()
+    expect(screen.getByText('Ассистент Эвал')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Поделиться' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Действия с чатом' })).toBeNull()
     const ideas = screen.getByRole('list', { name: 'Идеи для поездки' })
     expect(
       within(ideas)
         .getAllByRole('button')
         .map((button) => button.textContent),
-    ).toEqual(['🌴На море', '⛰️В горы', '🏛️Города'])
+    ).toEqual(['🏖️На море', '⛰️В горы', '🏙️В город', '👨‍👩‍👧С детьми', '✈️Куда угодно'])
+  })
+
+  it('shows the chat’s title, «Поделиться» and the menu after the first message (Scenario: Первое сообщение)', async () => {
+    fetchMock.mockResolvedValue(answer({ brief: { vibe: 'mountains' } }))
+    const { user } = renderAssistant()
+
+    await user.click(screen.getByRole('button', { name: 'В горы' }))
+
+    expect(await screen.findByRole('button', { name: 'Поделиться' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Действия с чатом' })).toBeTruthy()
+    expect(screen.queryByText('Ассистент Эвал')).toBeNull()
   })
 
   it('sends the card’s label as the traveller’s message (Scenario: Чип отправляет текст)', async () => {

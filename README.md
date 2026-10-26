@@ -3,7 +3,6 @@
 Островок! - концепт агрегатора в сфере онлайн-бронирования жилья
 
 Главная страница сервиса бронирования отелей (Next.js 16 App Router + React 19 + TypeScript).
-Визуальный референс — `references/homepage.jpg`.
 
 ## Запуск
 
@@ -17,6 +16,11 @@ npm run typecheck
 npm test
 npm run format:check
 ```
+
+Для `npm run dev` и `npm run build` нужны `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+(сборка читает каталог из базы и без них останавливается). Остальные имена — в `.env.example`; значения достаёт
+`npm run secrets:reveal` (создаёт `.env.local`, см. «Ключи API»). Для ИИ-ответов нужен `NVIDIA_API_KEY`, без него
+помощник отвечает по правилам. Тесты и lint ключей не требуют.
 
 CI (GitHub Actions, `.github/workflows/ci.yml`) на каждый PR и push в `dev` и `main` запускает
 `npm ci`, `npm run lint`, `npm run typecheck`, `npm test` и `npm run format:check` в job `checks`
@@ -93,14 +97,33 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
   кладёт в `ota_hotels` (ключ `master_id`, уникальный `ota_hotel_id`), остальное о поиске — в `ota_searches`, а отели
   каталога `ota-<master_id>` (маппер `src/lib/ota/hotel.ts`) — в `hotels` после сгенерированных. JSON в репозиторий
   не кладём. Печатает число строк; после загрузки — `npm run db:embed`.
+- `uv run scripts/load-valencia-geo.py buildings [<ES52.parquet>]`, затем `… noise <ES.gpkg>` — геоданные города
+  Валенсия (PostGIS, схема `extensions`): здания EUBUCCO v0.2 региона ES52 (город `city_id` ES46250) в `geo_buildings`
+  — без пути DuckDB читает их с S3 EUBUCCO (`s3://eubucco/v0.2/buildings/parquet/nuts_id=ES52/ES52.parquet`, анонимно),
+  только строки города; контуры шума EEA END 2022 (`ES.gpkg` из хранилища EEA,
+  `eea_v_3035_1_k_noise-contours-end2022_p_2026_v01_r00`, ~1,6 ГБ) по охвату зданий плюс 300 м в `geo_noise`. Файлы
+  держим вне git. Каждая строка ссылается на набор в `geo_datasets` (название, версия, обработка) и хранит поля
+  источника и уверенности набора под их именами: у зданий `*_source`, `*_source_id(s)`, `*_confidence*` (границы
+  оценки высоты и этажности), у шума поставку Reportnet, исправление геометрии EEA и ширину полосы `band_db`. Каждая
+  команда заменяет свою таблицу в одной транзакции; затем `npm run db:features`. Чтение: `hotel_geo(lat, lon)` —
+  здание и шум в точке, `hotel_geo_features(lat, lon, radius_m)` — GeoJSON зданий (для `fill-extrusion`) и зон шума
+  в круге, радиус 300 м по умолчанию, не больше 500 м.
 - `npm run db:features [-- --dry-run]` — `scripts/hotel-features.ts`: свойства настоящих отелей для Эвала — здание и
-  шум по `hotel_geo` в `hotel_features`, вид из номеров по названиям групп номеров `ota_hotels` в `hotel_room_views`.
+  шум по `hotel_geo` в `hotel_features` с их происхождением (наборы данных, источник и границы высоты и этажности),
+  вид из номеров по названиям групп номеров `ota_hotels` в `hotel_room_views`.
   Сырые данные не копирует, повторный запуск ничего не меняет; `--dry-run` только считает. Затем — `npm run db:embed`.
 - `npm run db:embed` — `scripts/embed.ts`: векторы для поиска по смыслу (см. «Поиск по смыслу») по каталогу из базы —
   все отели. В модель уходят только новые и изменённые отели (`content_hash`),
   векторы удалённых объектов стираются; пачки по 32, при 429 и 5xx — повтор с паузой 2, 4, 8… с. Печатает: всего, посчитано,
   без изменений, ошибок, удалено. Запускать после `db:seed`; нужен `NVIDIA_API_KEY`, не больше 40 запросов в минуту (лимит ключа), при 429 — ожидание
   (`Retry-After` или 2, 4, 8… с) и повтор.
+  Модель входит в `content_hash`: после смены модели (`EMBEDDING_MODEL`) первый `npm run db:embed` пересчитывает
+  векторы всех отелей (миграция не нужна; число отелей ÷ 32 запросов, не больше 40 в минуту), повторный — ничего не шлёт
+  в модель. Пока переиндексация не прошла, поиск по смыслу сравнивает вектор запроса со старыми векторами другой
+  модели — запускать её сразу после выкладки.
+- `npm run db:clean:shared-photos [-- --delete]` — `scripts/clean-shared-photos.ts`: фото снимков «Поделиться» в
+  публичном bucket без снимка (удалён вместе с аккаунтом или вручную); без `--delete` только показывает папки и число
+  файлов. Папки моложе часа не трогает. Нужен `SUPABASE_SERVICE_ROLE_KEY`.
 
 ## Производительность глобуса
 
@@ -124,10 +147,10 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
   атмосферу поездки и предлагает три варианта; выбранный открывает страницу результатов `/search`
   с его городом, датами и гостями (`src/lib/assistant.ts`). Сообщение читает языковая модель через `POST /api/assistant`
   (Vercel AI SDK, `src/lib/ai/`; см. «Модели»).
-  Без `NVIDIA_API_KEY`, при ошибке, лимите (20 запросов в минуту с IP) или через 8 с — прежние правила по ключевым
+  Без `NVIDIA_API_KEY`, при ошибке, лимите (20 запросов в минуту с IP) или через 9 с — прежние правила по ключевым
   словам, без сообщения об ошибке. Сообщение — до 500 символов, история — до 20 сообщений. Когда все вопросы заданы,
   отели плана подбирает поиск по смыслу по всем словам путешественника в городах плана («тихий хостел с быстрым
-  Wi‑Fi в Праге» — хостелы Праги); ответ с ним — до 14 с, клиент ждёт 15.
+  Wi‑Fi в Праге» — хостелы Праги); ответ с ним — до 15 с, клиент ждёт 16.
 - **Вручную** — стандартная форма: направление, даты, гости; «Найти отель» открывает `/search`.
 - **Звёзды подскажут** — имя и знак зодиака, затем детерминированное предсказание по западной
   астрологии: знак, Солнце и Луна в день заезда, фаза Луны и города каталога
@@ -140,13 +163,14 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 
 ### Поиск по смыслу
 
-`src/lib/ai/semantic.ts` (только сервер): `semanticSearch(текст, { kind, destinationIds, k })` — вектор запроса
-`nvidia/nemotron-3.5-embed-8b` (`input_type: query`), ближайшие объекты в Supabase pgvector
+`src/lib/ai/semantic.ts` (только сервер): `semanticSearch(текст, { destinationIds, k, timeoutMs })` — вектор запроса
+`nvidia/nemotron-3.5-embed-1b` (`input_type: query`), ближайшие объекты в Supabase pgvector
 (`match_embeddings`, косинус, индекс HNSW), затем реранжирование `nvidia/nemotron-3.5-rerank-8b` (адаптер
-`RerankingModelV4` в `src/lib/ai/rerank.ts`). Модель отдаёт 4096 чисел, а HNSW индексирует не больше 4000, поэтому
-берутся первые 2048 и нормируются заново (модель обучена по Matryoshka, параметра `dimensions` в API NVIDIA нет);
-они хранятся как `halfvec(2048)`. Без ключа, без векторов, при ошибке или через 8 с — `null`, и вызывающий код берёт
-прежние правила; упал только реранкер — порядок векторов. Векторы недавних запросов кешируются в памяти процесса.
+`RerankingModelV4` в `src/lib/ai/rerank.ts`). Модель отдаёт 2048 чисел (HNSW индексирует не больше 4000), они хранятся как `halfvec(2048)`;
+если вектор длиннее, берутся первые 2048 и нормируются заново. Без ключа, без векторов, при ошибке или через 8 с — `failed` с причиной (`no-key`, `timeout`, `aborted`, `model`,
+`database`), и вызывающий код берёт прежние правила; упал только реранкер — порядок векторов. Поиск по смыслу в плане
+(`searchStep`, `src/lib/ai/turn.ts`) повторяется один раз при `timeout`, `model` или `database`, если до срока ответа
+(15 с) хватает времени; если и повтор не удался, ответ помечается `modelsDown`. Векторы недавних запросов кешируются в памяти процесса.
 Таблица `embeddings` закрыта: читают её только функции `security definer`, пишет сервисный ключ.
 Качество — `node --env-file=.env.local scripts/semantic-eval.ts` (15 запросов, попадания в top-5 до и после
 реранжирования; вне CI).
@@ -156,15 +180,16 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 Все модели — через API NVIDIA (build.nvidia.com) с одним ключом `NVIDIA_API_KEY` (см. «Ключи API»); лимит ключа —
 40 запросов в минуту, дневного лимита нет. Общий запрос и ошибки — `src/lib/ai/nvidia.ts`.
 
-- **Лёгкие текстовые задачи** (помощник, `src/lib/ai/model.ts`, `understand.ts`) — `nvidia/nemotron-3.5-lightning-30b-a3b`
-  через OpenAI-совместимый `https://integrate.api.nvidia.com/v1` (`@ai-sdk/openai-compatible`). Рассуждения
+- **Текстовые задачи** (помощник, `src/lib/ai/model.ts`, `understand.ts`) — цепочка `nvidia/nemotron-3.5-lightning-30b-a3b`
+  → `nvidia/nemotron-3.5-bolt-e4b` → `minimaxai/minimax-m3.1-flash`: следующая модель отвечает, если предыдущая
+  не уложилась в свой срок или ошиблась. Все — через OpenAI-совместимый `https://integrate.api.nvidia.com/v1` (`@ai-sdk/openai-compatible`). Рассуждения
   выключены (`reasoning: 'none'` → `reasoning_effort: none`): иначе модель тратит на них время и токены ответа.
-- **Эмбеддинги** — `nvidia/nemotron-3.5-embed-8b` (`/v1/embeddings`, `input_type` query/passage, `truncate: END`).
+- **Эмбеддинги** — `nvidia/nemotron-3.5-embed-1b` (`/v1/embeddings`, `input_type` query/passage, `truncate: END`).
   Свой адаптер в `src/lib/ai/embedding.ts`: провайдер AI SDK не передаёт `input_type`.
 - **Реранк** — `nvidia/nemotron-3.5-rerank-8b`
   (`https://ai.api.nvidia.com/v1/retrieval/nvidia/nemotron-3.5-rerank-8b/reranking`), оценка — логит модели.
-- Сложные мультимодальные задачи — `nvidia/nemotron-3.5-super-vl-120b-a12b`; подключается вместе с первой такой
-  задачей.
+- **Фото** (`src/lib/ai/vision.ts`) — цепочка `nvidia/nemotron-3.5-super-vl-120b-a12b` →
+  `minimaxai/minimax-m3.1-flash`.
 
 Скрипты (`db:embed`, `semantic-eval`) выдерживают 40 запросов в минуту и при 429 ждут (`Retry-After` или 2, 4,
 8… с) и повторяют; приложение при ошибке, лимите или таймауте уходит в запасной путь по правилам.

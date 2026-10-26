@@ -39,9 +39,12 @@ export function fetchHotels(query: HotelsQuery): Promise<Hotel[]> {
 /** Forgets the fetched hotels: for the tests. */
 export const clearHotelRequests = () => requests.clear()
 
-/** The hotels of `query` (`null` — nothing to load yet), loaded once per distinct set of ids. */
-export function useHotels(query: HotelsQuery | null): HotelsState {
-  const key = query ? urlOf(query) : null
+/**
+ * The hotels of `query` (`null` — nothing to load yet), loaded once per distinct set of ids. A new `attempt` asks
+ * again after an error.
+ */
+export function useHotels(query: HotelsQuery | null, attempt = 0): HotelsState {
+  const key = query ? `${urlOf(query)}#${attempt}` : null
   const [state, setState] = useState<{ key: string | null; value: HotelsState }>({ key, value: { status: 'loading' } })
 
   useEffect(() => {

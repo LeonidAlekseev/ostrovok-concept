@@ -1,15 +1,18 @@
 import { z } from 'zod'
+import { firstAnswer } from '@/lib/ai/chain'
 import { answerWithModel, ruleAnswer } from '@/lib/ai/hotelAnswer'
-import { getAssistantModel, getVisionModel } from '@/lib/ai/model'
+import { getTextModels, getVisionModels } from '@/lib/ai/model'
 import { APICallError } from 'ai'
 import { allowRequest, allowVisionRequest, clientIp } from '@/lib/ai/rateLimit'
 import { SEMANTIC_TIMEOUT_MS, semanticSearch } from '@/lib/ai/semantic'
 import { MATCHES, runTurn, type TurnContext } from '@/lib/ai/turn'
 import { MODEL_TIMEOUT_MS, understandWish } from '@/lib/ai/understand'
 import {
+  INTENT_TIMEOUT_MS,
   MAX_PHOTO_URL_LENGTH,
   PHOTO_DATA_URL,
   modelPhotoIntent,
+  ownWords,
   photoIntent,
   refinedText,
   seePhotos,
@@ -48,12 +51,16 @@ const requestSchema = z.object({
   photos: z.array(z.string().max(MAX_PHOTO_URL_LENGTH).regex(PHOTO_DATA_URL)).max(MAX_PHOTOS).optional(),
 })
 
-/** The answer is due in 14 s: the client waits 15. The steps of the turn get what the model left. */
-const ANSWER_BUDGET_MS = 14_000
-/** With photos the model that sees them takes up to 12 s first: the answer is due in 28 s, the client waits 30. */
+/** The answer is due in 15 s: the client waits 16. The steps of the turn get what the model left. */
+const ANSWER_BUDGET_MS = 15_000
+/** With photos the models that see them take up to 18 s first: the answer is due in 28 s, the client waits 30. */
 const PHOTO_BUDGET_MS = 28_000
-/** The look at the photos needs this much of the answer's time to be worth starting. */
+/** The models that see photos leave this much of the answer's time for the text models and the search. */
+const VISION_RESERVE_MS = 10_000
+/** A model that sees photos needs this much time to be worth asking. */
 const MIN_VISION_MS = 3000
+/** The step of the feed when the first model that sees photos failed and the next ones were asked. */
+const VISION_SWITCH_STEP = 'Модель фото не ответила, смотрю другой'
 /** The first try of the search for similar hotels; usually it takes about 2 s. */
 const FIRST_SEARCH_MS = 6000
 /** A retry of the search needs this much time to be worth starting. */
@@ -71,10 +78,13 @@ const warn = (what: string, error: unknown) => {
   console.warn(`assistant: ${what} (${reason}${call})`)
 }
 
+/** The text models' time: 9 s at most, never past the answer's `deadline`. */
+const textDeadline = (deadline: number) => Math.min(Date.now() + MODEL_TIMEOUT_MS, deadline)
+
 /**
  * Once the brief is complete and the plan is due, Эвал's turn runs its steps (src/lib/ai/turn.ts): the hotels by
  * meaning, then their building, noise and views when the traveller asked of them. Nothing found keeps the plan on
- * the rules; the steps go to the answer for the feed.
+ * the rules; the steps go to the answer for the feed. A search that failed twice sets `modelsDown`.
  */
 async function planTurn(context: Omit<TurnContext, 'summaries' | 'features'>): Promise<Partial<AssistantResponse>> {
   if (nextQuestion(context.brief, context.today)) return {}
@@ -88,6 +98,7 @@ async function planTurn(context: Omit<TurnContext, 'summaries' | 'features'>): P
     ...(state.matches?.length && { matches: state.matches }),
     ...(state.features && Object.keys(state.features).length > 0 && { features: state.features }),
     ...(state.missing?.length && { missing: state.missing }),
+    ...(state.semanticDown && { modelsDown: true as const }),
     steps,
   }
 }
@@ -106,30 +117,39 @@ async function hotelTurn(
   }: { brief: Brief; messages: AssistantRequest['messages']; signal: AbortSignal; deadline: number },
 ): Promise<Response> {
   const next: Brief = { ...brief, hotelId: hotel.id, destinationId: hotel.destinationId }
-  const model = await getAssistantModel()
-  if (model) {
-    try {
-      const features = (await loadHotelFeatures().catch(() => null))?.get(hotel.id)
-      const { answer, unverified } = await answerWithModel(model, { messages }, hotel, {
-        dates: brief.dates,
-        features,
+  const models = await getTextModels()
+  let down = false
+  if (models) {
+    const features = (await loadHotelFeatures().catch(() => null))?.get(hotel.id)
+    const result = await firstAnswer(
+      models,
+      (model, timeout) =>
+        answerWithModel(model, { messages }, hotel, { dates: brief.dates, features, signal: timeout }),
+      {
+        deadline: textDeadline(deadline),
         signal,
-        timeoutMs: Math.min(MODEL_TIMEOUT_MS, deadline - Date.now()),
-      })
+        onError: (id, error) => warn(`${id} failed on a hotel question`, error),
+      },
+    )
+    if (result.ok) {
+      const { answer, unverified } = result.value
       return Response.json({
         brief: next,
         reply: answer,
         ...(unverified && { unverified }),
         source: 'model',
       } satisfies AssistantResponse)
-    } catch (error) {
-      if (signal.aborted) throw error
-      const reason = error instanceof Error ? `${error.name}: ${error.message.slice(0, 200)}` : String(error)
-      console.warn(`assistant: model failed on a hotel question, using the rules (${reason})`)
     }
+    down = result.failed.length > 0
+    console.warn('assistant: no model answered a hotel question, using the rules')
   }
   const { answer } = ruleAnswer(messages[messages.length - 1].text, hotel, brief.dates)
-  return Response.json({ brief: next, reply: answer, source: 'rules' } satisfies AssistantResponse)
+  return Response.json({
+    brief: next,
+    reply: answer,
+    source: 'rules',
+    ...(down && { modelsDown: true }),
+  } satisfies AssistantResponse)
 }
 
 interface WishContext {
@@ -142,8 +162,8 @@ interface WishContext {
 }
 
 /**
- * Reads the traveller's newest message into the brief with the language model; without a key, on a model
- * error or after 8 s — with the rules, so the dialog goes on either way. Once the brief is complete, runs the steps
+ * Reads the traveller's newest message into the brief with the text models in turn; without a key, or when none of
+ * them answered in 9 s — with the rules, so the dialog goes on either way, and Эвал says the models are down. Once the brief is complete, runs the steps
  * of the turn (`planTurn`) for the hotels (`matches`), their features and the steps' lines.
  */
 async function wishTurn({ messages, brief, today, destinations, deadline, signal }: WishContext) {
@@ -156,42 +176,64 @@ async function wishTurn({ messages, brief, today, destinations, deadline, signal
     .join('. ')
   const found = (next: Brief) => planTurn({ brief: next, wish, today, destinations, deadline, signal })
 
-  const model = await getAssistantModel()
-  if (model) {
-    try {
-      const { parsed, reply } = await understandWish(model, { messages, brief }, today, destinations, signal)
+  const models = await getTextModels()
+  let down = false
+  if (models) {
+    const result = await firstAnswer(
+      models,
+      (model, timeout) => understandWish(model, { messages, brief }, today, destinations, timeout),
+      { deadline: textDeadline(deadline), signal, onError: (id, error) => warn(`${id} failed`, error) },
+    )
+    if (result.ok) {
+      const { parsed, reply } = result.value
       const next = foldBrief(brief, parsed, input, asked)
       return { brief: next, reply, source: 'model', ...(await found(next)) } satisfies AssistantResponse
-    } catch (error) {
-      warn('model failed, using the rules', error)
     }
+    down = result.failed.length > 0
+    console.warn('assistant: no model answered, using the rules')
   }
   const next = mergeBrief(brief, input, asked, destinations)
-  return { brief: next, source: 'rules', ...(await found(next)) } satisfies AssistantResponse
+  return {
+    brief: next,
+    source: 'rules',
+    ...(down && { modelsDown: true as const }),
+    ...(await found(next)),
+  } satisfies AssistantResponse
 }
 
 /**
- * What the photos show; `null` without the model or the time for it; `limited` over the limit; `unstable` when the model failed (an error, a
- * timeout, an answer not in Russian): the provider now and then answers 500 or stalls, so the client asks again.
+ * What the photos show, by the models that see photos in turn (each with the same photos), with the step of the
+ * switch when the first failed; `null` without the models or the time for them; `limited` over the limit (ours, or
+ * the provider's 429 of every model); `failed` when none answered (an error, a timeout, an answer not in Russian).
  */
 async function look(
   photos: readonly string[],
   ip: string,
   deadline: number,
   signal: AbortSignal,
-): Promise<PhotoSight | 'limited' | 'unstable' | null> {
-  const timeoutMs = deadline - Date.now() - MIN_VISION_MS
-  if (timeoutMs < MIN_VISION_MS) return null
-  if (!allowVisionRequest(ip)) return 'limited'
-  const model = await getVisionModel()
-  if (!model) return null
-  try {
-    return await seePhotos(model, photos, { signal, timeoutMs })
-  } catch (error) {
-    if (signal.aborted) throw error
-    warn('the photos were not seen', error)
-    return 'unstable'
-  }
+): Promise<{ sight: PhotoSight; steps: TurnStep[] } | { failed: 'limited' | 'down'; steps: TurnStep[] } | null> {
+  const until = deadline - VISION_RESERVE_MS
+  if (until - Date.now() < MIN_VISION_MS) return null
+  if (!(await allowVisionRequest(ip))) return { failed: 'limited', steps: [] }
+  const models = await getVisionModels()
+  if (!models) return null
+  const result = await firstAnswer(models, (model, timeout) => seePhotos(model, photos, { signal: timeout }), {
+    deadline: until,
+    signal,
+    minMs: MIN_VISION_MS,
+    onError: (id, error) => warn(`${id} did not see the photos`, error),
+  })
+  const steps: TurnStep[] =
+    result.failed.length === 0
+      ? []
+      : [
+          result.ok
+            ? { agent: 'vision', title: VISION_SWITCH_STEP, status: 'done', result: 'посмотрел' }
+            : { agent: 'vision', title: VISION_SWITCH_STEP, status: 'failed', result: 'ни одна модель не ответила' },
+        ]
+  if (result.ok) return { sight: result.value, steps }
+  if (result.limited) return { failed: 'limited', steps: [] }
+  return { failed: 'down', steps }
 }
 
 /** The hotels by the meaning of the photo's description, in the brief's city when it has one. */
@@ -199,18 +241,17 @@ async function similarTurn(sight: PhotoSight, { brief, deadline, signal }: WishC
   const title = 'Ищу отели, похожие на фото'
   const like = sightFeatures(sight)
   const [query, retry] = similarQueries(sight)
-  // `null` is both «nothing found» and a failure: one that took the whole time is the search not answering.
   let missed = false
   const search = async (text: string, timeoutMs: number) => {
-    const start = Date.now()
-    const hits = await semanticSearch(text, {
+    const result = await semanticSearch(text, {
       ...(brief.destinationId && { destinationIds: [brief.destinationId] }),
       k: MATCHES,
       timeoutMs,
       signal,
     })
-    missed = !hits && Date.now() - start >= timeoutMs * 0.9
-    return hits
+    // Only a failure is the search not answering; nothing found is an answer.
+    missed = result.status === 'failed'
+    return result.status === 'found' ? result.hits : null
   }
   // The embedding of the NVIDIA API now and then stalls for minutes: a short first try, then other words with
   // the rest of the answer's time.
@@ -244,32 +285,54 @@ async function similarTurn(sight: PhotoSight, { brief, deadline, signal }: WishC
 /**
  * A message with photos: what to do with them comes from its words (the rules, then the text model), otherwise
  * Эвал asks. «Найти похожие» looks for the hotels by the meaning of the photo's description; «Учесть в запросе» adds
- * what the photo shows to the message, and the wish is read as usual. Without the model that sees photos Эвал says
- * it could not look at them; when the model failed the client asks again.
+ * what the photo shows to the message, and the wish is read as usual. Without the models that see photos Эвал says
+ * it could not look at them; when none of them answered, the text models answer the message's words without them.
+ * The next photos start with the first model again: nothing of a failure is kept.
  */
 async function photoTurn(photos: readonly string[], ip: string, context: WishContext): Promise<AssistantResponse> {
   const { messages, brief, signal, deadline } = context
   const input = messages[messages.length - 1].text
   let intent = photoIntent(input)
+  let down = false
   if (intent === 'unclear' && input.trim()) {
-    const model = await getAssistantModel()
-    if (model)
-      intent = await modelPhotoIntent(model, input, { signal }).catch((error: unknown) => {
-        if (signal.aborted) throw error
-        warn('the intent of the photos was not read', error)
-        return 'unclear' as const
-      })
+    const models = await getTextModels()
+    if (models) {
+      const result = await firstAnswer(
+        models,
+        (model, timeout) => modelPhotoIntent(model, input, { signal: timeout }),
+        {
+          deadline: Math.min(Date.now() + INTENT_TIMEOUT_MS, deadline),
+          signal,
+          onError: (id, error) => warn(`${id} did not read the intent of the photos`, error),
+        },
+      )
+      if (result.ok) intent = result.value
+      else down = result.failed.length > 0
+    }
   }
-  if (intent === 'unclear') return { brief, source: 'rules', photo: { action: 'ask' } }
-  const sight = await look(photos, ip, deadline, signal)
-  if (!sight) return { brief, source: 'rules', photo: { action: 'unseen' } }
-  if (sight === 'limited' || sight === 'unstable') return { brief, source: 'rules', photo: { action: sight } }
+  if (intent === 'unclear')
+    return { brief, source: 'rules', photo: { action: 'ask' }, ...(down && { modelsDown: true as const }) }
+  const seen = await look(photos, ip, deadline, signal)
+  if (!seen) return { brief, source: 'rules', photo: { action: 'unseen' } }
+  const { steps } = seen
+  const withSteps = (answer: AssistantResponse): AssistantResponse => {
+    const all = [...steps, ...(answer.steps ?? [])]
+    return { ...answer, ...(all.length > 0 && { steps: all }) }
+  }
+  if ('failed' in seen) {
+    if (seen.failed === 'limited') return { brief, source: 'rules', photo: { action: 'limited' } }
+    // No model saw the photos: the text models answer the message's words with the chat's context, Эвал says so.
+    if (!ownWords(input)) return withSteps({ brief, source: 'rules', photo: { action: 'unseen' } })
+    return withSteps({ ...(await wishTurn(context)), photo: { action: 'skipped' } })
+  }
+  const { sight } = seen
   // Nothing on the photo to choose a hotel by: no search and no wish of it, Эвал asks for words.
-  if (sight.unusable) return { brief, source: 'model', photo: { action: 'unusable', seen: sight.description } }
-  if (intent === 'similar') return similarTurn(sight, context)
+  if (sight.unusable)
+    return withSteps({ brief, source: 'model', photo: { action: 'unusable', seen: sight.description } })
+  if (intent === 'similar') return withSteps(await similarTurn(sight, context))
   const text = refinedText(input, sight).slice(0, MAX_MESSAGE_LENGTH)
   const answer = await wishTurn({ ...context, messages: [...messages.slice(0, -1), { role: 'user', text }] })
-  return { ...answer, photo: { action: 'refine', seen: sight.description } }
+  return withSteps({ ...answer, photo: { action: 'refine', seen: sight.description } })
 }
 
 /**
@@ -278,7 +341,7 @@ async function photoTurn(photos: readonly string[], ip: string, context: WishCon
  */
 export async function POST(request: Request) {
   const ip = clientIp(request)
-  if (!allowRequest(ip)) return Response.json({ error: 'Too many requests' }, { status: 429 })
+  if (!(await allowRequest(ip))) return Response.json({ error: 'Too many requests' }, { status: 429 })
   const parsedBody = requestSchema.safeParse(await request.json().catch(() => null))
   if (!parsedBody.success) return Response.json({ error: 'Invalid request' }, { status: 400 })
 

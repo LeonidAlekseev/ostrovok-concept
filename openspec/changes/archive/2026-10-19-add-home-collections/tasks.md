@@ -7,5 +7,5 @@
 
 ## 2. Итог
 
-- [ ] 2.1 Замер JS главной до и после — в proposal.md; проверка: числа записаны.
+- [x] 2.1 Замер JS главной до и после — в proposal.md; проверка: числа записаны.
 - [x] 2.2 `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check`, `npm run build` проходят.

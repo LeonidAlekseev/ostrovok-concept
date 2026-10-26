@@ -1,12 +1,12 @@
-// Embeds the catalog for the semantic search: every hotel gets a vector from nvidia/nemotron-3.5-embed-8b in the `embeddings` table.
+// Embeds the catalog for the semantic search: every hotel gets a vector from nvidia/nemotron-3.5-embed-1b in the `embeddings` table.
 //   npm run db:embed   (Node runs the TypeScript itself; the keys come from .env.local, see README «Ключи API»)
-// Only new and changed hotels go to the model (`content_hash`); vectors of removed hotels are deleted.
+// Only new and changed hotels go to the model (`content_hash`, which includes the model, so vectors of another model are redone); vectors of removed hotels are deleted.
 // Batches of BATCH texts, at most 40 requests a minute (the NVIDIA key's limit); a 429 or a 5xx is retried with a
 // pause. Needs NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and NVIDIA_API_KEY; prints counts, never the keys.
 // Exits with 1 on errors.
-import { createHash } from 'node:crypto'
 import { registerHooks } from 'node:module'
 import { createClient } from '@supabase/supabase-js'
+import type { Database } from '../src/lib/db/database.types.ts'
 import { embedMany } from 'ai'
 
 // The app's modules import each other without extensions, as the bundler allows; Node needs `.ts`.
@@ -21,7 +21,8 @@ registerHooks({
   },
 })
 
-const { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, embeddingModel, toVector } = await import('../src/lib/ai/embedding.ts')
+const { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, contentHash, embeddingModel, toVector } =
+  await import('../src/lib/ai/embedding.ts')
 const { hotelDocument } = await import('../src/lib/ai/documents.ts')
 const { featuresOf } = await import('../src/lib/features.ts')
 const { NVIDIA_KEY, pacer, withRetry } = await import('../src/lib/ai/nvidia.ts')
@@ -34,6 +35,8 @@ type RoomViewRow = import('../src/lib/features.ts').RoomViewRowRead
 
 const BATCH = 32
 const PAGE = 1000
+/** A table of the schema, for the helpers that take its name. */
+type Table = keyof Database['public']['Tables']
 
 function required(name: string): string {
   const value = process.env[name]
@@ -41,22 +44,26 @@ function required(name: string): string {
   return value
 }
 
-const supabase = createClient(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
+const supabase = createClient<Database>(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 const model = embeddingModel(required(NVIDIA_KEY), 'passage')
 const turn = pacer()
 
 /** Every row of `table`, page by page; `null` when the table does not exist yet. */
-async function readAll<T>(table: string, columns: string, orderBy = ['id']): Promise<T[] | null> {
+async function readAll<T>(
+  table: Table | 'hotel_room_views_named',
+  columns: string,
+  orderBy = ['id'],
+): Promise<T[] | null> {
   const rows: T[] = []
   for (let from = 0; ; from += PAGE) {
-    const query = orderBy.reduce((q, column) => q.order(column), supabase.from(table).select(columns))
+    const query = orderBy.reduce((q, column) => q.order(column), supabase.from(table as Table).select(columns))
     const { data, error } = await query.range(from, from + PAGE - 1)
     // PGRST205: no such table in the schema cache.
     if (error?.code === 'PGRST205' || error?.code === '42P01') return null
     if (error) throw new Error(`${table}: ${error.message}`)
-    rows.push(...(data as T[]))
+    rows.push(...(data as unknown as T[]))
     if (data.length < PAGE) return rows
   }
 }
@@ -68,9 +75,6 @@ interface Document {
   content: string
   content_hash: string
 }
-
-const hash = (content: string) =>
-  createHash('sha256').update(`${EMBEDDING_MODEL}\n${EMBEDDING_DIMENSIONS}\n${content}`).digest('hex')
 
 const destinations = ((await readAll<{ data: Destination }>('destinations', 'data')) ?? []).map((row) => row.data)
 const cityOf = new Map(destinations.map((d) => [d.id, d]))
@@ -96,7 +100,13 @@ for (const hotel of hotels) {
   const city = cityOf.get(hotel.destinationId)
   if (!city) continue
   const content = hotelDocument(hotel, city, scale, features.get(hotel.id))
-  documents.push({ kind: 'hotel', ref_id: hotel.id, destination_id: city.id, content, content_hash: hash(content) })
+  documents.push({
+    kind: 'hotel',
+    ref_id: hotel.id,
+    destination_id: city.id,
+    content,
+    content_hash: contentHash(content),
+  })
 }
 
 const stored = (await readAll<{ kind: string; ref_id: string; content_hash: string }>(

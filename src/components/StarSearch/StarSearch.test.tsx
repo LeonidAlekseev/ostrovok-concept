@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { addDays, formatLongDate, todayIso } from '../../lib/dates'
+import { setScreen, WIDE } from '../../test/screen'
 import { StarSearch } from './StarSearch'
 import { READING_MS, StarSearchDialog } from './StarSearchDialog'
 import { ZodiacRing } from './ZodiacRing'
@@ -38,7 +39,7 @@ afterEach(() => {
 })
 
 const reduceMotion = () => {
-  window.matchMedia = vi.fn(() => ({ matches: true }) as MediaQueryList)
+  setScreen(WIDE, { reducedMotion: true })
 }
 
 async function fillForm(user: ReturnType<typeof userEvent.setup>) {
@@ -52,6 +53,10 @@ function renderDialog() {
 }
 
 // star-search, Requirement: Блок на главной
+// The 100 frames of the progress test wait for a real timer each (>= 1 ms, 4 ms nested), and the form tests open the
+// whole window in jsdom: heavy by nature, so the default 5 s is not enough on a busy machine.
+const HEAVY = 20_000
+
 describe('StarSearch section', () => {
   it('opens the window with the focus in the first field', async () => {
     const user = userEvent.setup()
@@ -96,22 +101,26 @@ describe('StarSearch section', () => {
 
 // star-search, Requirement: Анкета
 describe('StarSearch form', () => {
-  it('picks the check-in in the search calendar, where past days are not available', async () => {
-    reduceMotion()
-    const user = userEvent.setup()
-    renderDialog()
-    await fillForm(user)
-    const today = todayIso()
-    const later = addDays(today, 10)
+  it(
+    'picks the check-in in the search calendar, where past days are not available',
+    async () => {
+      reduceMotion()
+      const user = userEvent.setup()
+      renderDialog()
+      await fillForm(user)
+      const today = todayIso()
+      const later = addDays(today, 10)
 
-    await user.click(screen.getByRole('button', { name: /^Дата заезда: / }))
-    const calendar = await screen.findByRole('dialog', { name: 'Выбор даты заезда' })
-    const day = (iso: string) => calendar.querySelector<HTMLButtonElement>(`[data-date="${iso}"]`)
-    expect(day(addDays(today, -1))?.disabled).toBe(true)
-    await user.click(day(later)!)
-    expect(screen.queryByRole('dialog', { name: 'Выбор даты заезда' })).toBeNull()
-    expect(screen.getByRole('button', { name: `Дата заезда: ${formatLongDate(later)}` })).toBeTruthy()
-  })
+      await user.click(screen.getByRole('button', { name: /^Дата заезда: / }))
+      const calendar = await screen.findByRole('dialog', { name: 'Выбор даты заезда' })
+      const day = (iso: string) => calendar.querySelector<HTMLButtonElement>(`[data-date="${iso}"]`)
+      expect(day(addDays(today, -1))?.disabled).toBe(true)
+      await user.click(day(later)!)
+      expect(screen.queryByRole('dialog', { name: 'Выбор даты заезда' })).toBeNull()
+      expect(screen.getByRole('button', { name: `Дата заезда: ${formatLongDate(later)}` })).toBeTruthy()
+    },
+    HEAVY,
+  )
 
   it('shows the sign as soon as the birthday is known', async () => {
     const user = userEvent.setup()
@@ -160,16 +169,20 @@ describe('StarSearch form', () => {
 
 // star-search, Requirement: Гадание и результат
 describe('StarSearch reading', () => {
-  it('reads the stars, then shows the result', async () => {
-    const user = userEvent.setup()
-    renderDialog()
-    await fillForm(user)
-    await user.click(screen.getByRole('button', { name: 'Гадать' }))
+  it(
+    'reads the stars, then shows the result',
+    async () => {
+      const user = userEvent.setup()
+      renderDialog()
+      await fillForm(user)
+      await user.click(screen.getByRole('button', { name: 'Гадать' }))
 
-    expect(screen.getByRole('status').textContent).toBe('Звёзды совещаются…')
-    expect(screen.queryByRole('heading', { name: /ваш знак/ })).toBeNull()
-    expect(await screen.findByRole('heading', { name: /Анна, ваш знак — Овен/ }, {})).toBeTruthy()
-  })
+      expect(screen.getByRole('status').textContent).toBe('Звёзды совещаются…')
+      expect(screen.queryByRole('heading', { name: /ваш знак/ })).toBeNull()
+      expect(await screen.findByRole('heading', { name: /Анна, ваш знак — Овен/ }, {})).toBeTruthy()
+    },
+    HEAVY,
+  )
 
   it("skips the animation under reduced motion and answers with a selection of the stars' hotels", async () => {
     reduceMotion()
@@ -266,31 +279,35 @@ describe('StarSearch video', () => {
     await user.click(screen.getByRole('button', { name: 'Гадать' }))
   }
 
-  it('moves the progress bar in 1 % steps, not on every frame', async () => {
-    vi.stubGlobal('MediaRecorder', { isTypeSupported: () => true })
-    let finish!: () => void
-    vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _type, { onProgress }) => {
-      await new Promise<void>((resolve) => (finish = resolve))
-      onProgress(0)
-      for (let i = 1; i <= 100; i++) {
-        onProgress(i / 1000)
-        await new Promise((resolve) => setTimeout(resolve, 0))
-      }
-      return video
-    })
-    const user = userEvent.setup()
-    await showResult(user)
-    await user.click(screen.getByRole('button', { name: 'Создать видео для друзей' }))
-    const bar = await screen.findByRole('progressbar', { name: 'Создание видео' })
-    const writes: string[] = []
-    const observer = new MutationObserver(() => writes.push(bar.getAttribute('aria-valuenow')!))
-    observer.observe(bar, { attributes: true, subtree: true })
-    finish()
-    await screen.findByRole('button', { name: /Скачать видео|Поделиться видео/ }, {})
-    observer.disconnect()
-    // 100 frames cover 10 % of the bar.
-    expect(writes.length).toBeLessThanOrEqual(11)
-  })
+  it(
+    'moves the progress bar in 1 % steps, not on every frame',
+    async () => {
+      vi.stubGlobal('MediaRecorder', { isTypeSupported: () => true })
+      let finish!: () => void
+      vi.mocked(renderReadingVideo).mockImplementationOnce(async (_reading, _name, _type, { onProgress }) => {
+        await new Promise<void>((resolve) => (finish = resolve))
+        onProgress(0)
+        for (let i = 1; i <= 100; i++) {
+          onProgress(i / 1000)
+          await new Promise((resolve) => setTimeout(resolve, 0))
+        }
+        return video
+      })
+      const user = userEvent.setup()
+      await showResult(user)
+      await user.click(screen.getByRole('button', { name: 'Создать видео для друзей' }))
+      const bar = await screen.findByRole('progressbar', { name: 'Создание видео' })
+      const writes: string[] = []
+      const observer = new MutationObserver(() => writes.push(bar.getAttribute('aria-valuenow')!))
+      observer.observe(bar, { attributes: true, subtree: true })
+      finish()
+      await screen.findByRole('button', { name: /Скачать видео|Поделиться видео/ }, {})
+      observer.disconnect()
+      // 100 frames cover 10 % of the bar.
+      expect(writes.length).toBeLessThanOrEqual(11)
+    },
+    HEAVY,
+  )
 
   it('warns not to hide the tab while recording and says so after a restart', async () => {
     vi.stubGlobal('MediaRecorder', { isTypeSupported: () => true })

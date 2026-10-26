@@ -13,7 +13,7 @@
   },
   "overrides": [
     {
-      "files": ["src/components/ui/**"],
+      "files": ["src/components/ui/**", "src/**/*TestKit.tsx"],
       "rules": { "react/only-export-components": "off" }
     }
   ]

@@ -1,6 +1,14 @@
+import { createHash } from 'node:crypto'
 import { APICallError, embedMany } from 'ai'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, EMBEDDING_URL, embeddingModel, truncate } from './embedding'
+import {
+  EMBEDDING_DIMENSIONS,
+  EMBEDDING_MODEL,
+  EMBEDDING_URL,
+  contentHash,
+  embeddingModel,
+  truncate,
+} from './embedding'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -23,6 +31,19 @@ describe('truncate', () => {
   it('keeps the first numbers and scales them back to length 1', () => {
     expect(truncate([3, 4, 12], 2)).toEqual([0.6, 0.8])
     expect(truncate([0, 0, 1], 2)).toEqual([0, 0])
+  })
+})
+
+describe('contentHash', () => {
+  it('is stable for the same text and changes with the text', () => {
+    expect(contentHash('вилла')).toBe(contentHash('вилла'))
+    expect(contentHash('вилла')).not.toBe(contentHash('хостел'))
+  })
+
+  it('changes with the model, so a vector of another model is embedded again', () => {
+    const sha = (text: string) => createHash('sha256').update(text).digest('hex')
+    expect(contentHash('вилла')).toBe(sha(`${EMBEDDING_MODEL}\n${EMBEDDING_DIMENSIONS}\nвилла`))
+    expect(contentHash('вилла')).not.toBe(sha(`nvidia/nemotron-3.5-embed-8b\n${EMBEDDING_DIMENSIONS}\nвилла`))
   })
 })
 

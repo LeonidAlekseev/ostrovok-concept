@@ -56,6 +56,10 @@ const SearchMap = dynamic(() => import('./SearchMap').catch(() => ({ default: Ma
   loading: () => <div className="size-full animate-pulse bg-muted" aria-hidden />,
 })
 
+/** The title of the blank search; its hotels are those of every destination, see `top`. */
+const TOP_TITLE = 'Лучшие по оценкам гостей'
+const TOP_TARGET: Selection = { kind: 'selection', hotels: [], title: TOP_TITLE }
+
 /** The hotel opened from the map, `?hotel=<id>`: one history entry, so "Назад" closes it. */
 const HOTEL_PARAM = 'hotel'
 
@@ -118,8 +122,22 @@ export function SearchResultsPage() {
   const selection = useMemo(() => parseSelection(new URLSearchParams(request)), [request])
 
   if (!today) return <SearchResultsFallback />
-  // Opened from the menu or the home page: a blank form, its errors only after a submit.
-  if (!request) return <QueryForm query={query} />
+  // Opened from the menu or the home page: a blank form, its errors only after a submit, and the best rated hotels.
+  if (!request) {
+    const filters = parseFilters(params)
+    // The blank search lists the best rated first, unless the address asks for another sorting.
+    const sort = params.get('sort') ? filters.sort : 'rating'
+    return (
+      <Results
+        key="top"
+        query={query}
+        target={TOP_TARGET}
+        initialFilters={{ ...filters, sort }}
+        hotelId={params.get(HOTEL_PARAM)}
+        top
+      />
+    )
+  }
   const errors = validateSearch(query, today, destinations)
   // A selection has its hotels instead of a destination.
   if (selection) delete errors.destination
@@ -164,9 +182,11 @@ interface ResultsProps {
   initialFilters: Filters
   /** The hotel opened from the map; an unknown id is ignored. */
   hotelId: string | null
+  /** A blank search: the visible hotels of every destination under an empty form. */
+  top?: boolean
 }
 
-function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
+function Results({ query, target, initialFilters, hotelId, top = false }: ResultsProps) {
   const params = useSearchParams()
   const router = useRouter()
   const [status, setStatus] = useState<Status>({ state: 'loading' })
@@ -195,9 +215,11 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
   useEffect(() => {
     const controller = new AbortController()
     const hotels = fetchHotels(
-      target.kind === 'selection'
-        ? { ids: target.hotels }
-        : { destinations: targetDestinations(target, destinations).map((d) => d.id) },
+      top
+        ? { destinations: destinations.map((d) => d.id) }
+        : target.kind === 'selection'
+          ? { ids: target.hotels }
+          : { destinations: targetDestinations(target, destinations).map((d) => d.id) },
     )
     runDemoSearch(query, target, hotels, controller.signal).then(
       (result) => setStatus({ state: 'done', result }),
@@ -207,7 +229,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
       },
     )
     return () => controller.abort()
-  }, [query, target, destinations])
+  }, [query, target, destinations, top])
 
   const items = useMemo(() => (result ? applyFilters(result.hotels, filters, query) : []), [result, filters, query])
   const bounds = useMemo(() => (result ? priceBounds(result.hotels, query) : null), [result, query])
@@ -278,7 +300,9 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
   return (
     <main className={pageClass}>
       {/* A selection names its source; a search names its place in the form. */}
-      <h1 className={target.kind === 'selection' ? 'text-title font-bold tracking-[-0.02em]' : 'sr-only'}>{title}</h1>
+      <h1 className={target.kind === 'selection' && !top ? 'text-title font-bold tracking-[-0.02em]' : 'sr-only'}>
+        {top ? 'Поиск отелей' : title}
+      </h1>
       {/* The manual search, filled from the address: a new search changes the address and the results. */}
       <EditSearch query={query} />
       {result && (
@@ -311,6 +335,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
         </div>
       )}
 
+      {top && result && <h2 className="text-title font-bold tracking-[-0.02em]">{TOP_TITLE}</h2>}
       <div aria-live="polite">
         {status.state === 'loading' && <Searching />}
         {status.state === 'error' && <p className="text-sm text-destructive">{status.message}</p>}
@@ -325,7 +350,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
 
       {result && (
         <>
-          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_minmax(0,1fr)] 3xl:grid-cols-[15rem_minmax(0,1.6fr)_minmax(0,1fr)]">
+          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] min-[1440px]:grid-cols-[15rem_minmax(0,1fr)_minmax(0,1.25fr)] 3xl:grid-cols-[15rem_minmax(0,1.6fr)_minmax(0,1fr)]">
             {desktop && (
               <aside aria-label="Фильтры" className="lg:col-start-1 lg:row-start-1">
                 <FiltersPanel filters={filters} onChange={updateFilters} priceBounds={bounds ?? [0, 0]} />
@@ -335,7 +360,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
             <section
               aria-label="Отели"
               className={cn(
-                'flex flex-col gap-3 lg:col-start-1 lg:row-start-2 xl:col-start-2 xl:row-start-1',
+                'flex flex-col gap-3 lg:col-start-1 lg:row-start-2 min-[1440px]:col-start-2 min-[1440px]:row-start-1',
                 view === 'map' && 'max-lg:hidden',
               )}
             >
@@ -363,7 +388,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
 
             {(desktop || view === 'map') && (
               // `svh`: the phone address bar showing and hiding while scrolling does not resize the map.
-              <div className="h-[70svh] overflow-hidden rounded-2xl shadow-(--shadow-card) lg:sticky lg:top-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-[calc(100svh-2rem)] xl:col-start-3">
+              <div className="h-[70svh] overflow-hidden rounded-2xl shadow-(--shadow-card) lg:sticky lg:top-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:h-[calc(100svh-2rem)] min-[1440px]:col-start-3">
                 <SearchMap
                   hotels={items}
                   activeId={activeId}

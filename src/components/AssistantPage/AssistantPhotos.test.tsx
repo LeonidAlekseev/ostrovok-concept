@@ -1,12 +1,13 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CHATS_KEY, newChat, type Chat } from '../../lib/assistantChats'
+import { SIGNED_URL_REFRESH_MS } from '../../lib/assistantChatsRemote'
 import { newHotels } from '../../lib/catalogGenerator'
 import { catalogFetch } from '../../test/catalog'
+import { setScreen, WIDE } from '../../test/screen'
 import { AssistantSearch } from './AssistantSearch'
 import { SharedChat } from './SharedChat'
-import { PHOTO_RETRY_MS } from './useChats'
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
@@ -30,15 +31,14 @@ vi.mock('../../lib/imageOptimize', async (importOriginal) => {
 
 const fetchMock = vi.fn<typeof fetch>()
 const THINK_MS = 650
+// Heavy by nature: a multi-step dialog rendered in jsdom takes ~0.5 s alone and several times that on a busy machine,
+// so the default 5 s is not enough there.
+const HEAVY = 20_000
 beforeEach(() => {
+  setScreen(WIDE)
   const realSetTimeout = globalThis.setTimeout
   vi.spyOn(globalThis, 'setTimeout').mockImplementation(((handler: TimerHandler, ms?: number, ...args: unknown[]) =>
-    realSetTimeout(
-      handler,
-      // The retry of the photos waits a little: its step shows meanwhile.
-      ms === THINK_MS ? 0 : (PHOTO_RETRY_MS as readonly number[]).includes(ms ?? 0) ? 50 : ms,
-      ...args,
-    )) as typeof setTimeout)
+    realSetTimeout(handler, ms === THINK_MS ? 0 : ms, ...args)) as typeof setTimeout)
 })
 
 afterEach(() => {
@@ -70,76 +70,95 @@ const answer = (body: object) => Response.json({ source: 'model', ...body })
 
 // assistant-search, Requirement: Фото во вложениях
 describe('the photos of a message', () => {
-  it('sends two photos with the message and clears the field (Scenario: Отправка фото)', async () => {
-    fetchMock.mockResolvedValue(answer({ brief: {}, photo: { action: 'ask' } }))
-    const { user } = renderAssistant()
+  it(
+    'sends two photos with the message and clears the field (Scenario: Отправка фото)',
+    async () => {
+      fetchMock.mockResolvedValue(answer({ brief: {}, photo: { action: 'ask' } }))
+      const { user } = renderAssistant()
 
-    await user.upload(picker(), [photo('a.jpg'), photo('b.png', 'image/png')])
-    expect(within(attached()!).getAllByRole('img')).toHaveLength(2)
-    expect(screen.getByText(/2 из 4 фото/)).toBeTruthy()
-    await user.click(send())
+      await user.upload(picker(), [photo('a.jpg'), photo('b.png', 'image/png')])
+      expect(within(attached()!).getAllByRole('img')).toHaveLength(2)
+      expect(screen.getByText(/2 из 4 фото/)).toBeTruthy()
+      await user.click(send())
 
-    const photos = await within(log()).findByRole('list', { name: 'Фото' })
-    expect(within(photos).getAllByRole('button', { name: /Открыть фото/ })).toHaveLength(2)
-    expect(attached()).toBeNull()
-    expect((input() as HTMLTextAreaElement).value).toBe('')
-    // The route gets the photos of 1600 px and «Фото» for the message without words.
-    expect(bodyOf(0)).toEqual({
-      messages: [{ role: 'user', text: 'Фото' }],
-      brief: {},
-      photos: [`data:image/webp;base64,${btoa('a.jpg')}`, `data:image/webp;base64,${btoa('b.png')}`],
-    })
-  })
+      const photos = await within(log()).findByRole('list', { name: 'Фото' })
+      expect(within(photos).getAllByRole('button', { name: /Открыть фото/ })).toHaveLength(2)
+      expect(attached()).toBeNull()
+      expect((input() as HTMLTextAreaElement).value).toBe('')
+      // The route gets the photos of 1600 px and «Фото» for the message without words.
+      expect(bodyOf(0)).toEqual({
+        messages: [{ role: 'user', text: 'Фото' }],
+        brief: {},
+        photos: [`data:image/webp;base64,${btoa('a.jpg')}`, `data:image/webp;base64,${btoa('b.png')}`],
+      })
+    },
+    HEAVY,
+  )
 
-  it('sends the words and the photos together', async () => {
-    fetchMock.mockResolvedValue(answer({ brief: {}, photo: { action: 'unseen' } }))
+  it(
+    'sends the words and the photos together',
+    async () => {
+      fetchMock.mockResolvedValue(answer({ brief: {}, photo: { action: 'unseen' } }))
+      const { user } = renderAssistant()
+      await user.upload(picker(), photo('a.jpg'))
+      await user.type(input(), 'найди похожий{Enter}')
+      expect(await within(log()).findByText('Провайдер распознавания фото не отвечает. Повторите позже.')).toBeTruthy()
+      expect(bodyOf(0).messages).toEqual([{ role: 'user', text: 'найди похожий' }])
+      expect(bodyOf(0).photos).toHaveLength(1)
+    },
+    HEAVY,
+  )
+
+  it('shows the switch to another model in one request (Scenario: Провайдер ответил со второго раза)', async () => {
+    fetchMock.mockResolvedValue(
+      answer({
+        brief: {},
+        photo: { action: 'unusable', seen: 'Только цветные полосы' },
+        steps: [
+          { agent: 'vision', title: 'Модель фото не ответила, смотрю другой', status: 'done', result: 'посмотрел' },
+        ],
+      }),
+    )
     const { user } = renderAssistant()
     await user.upload(picker(), photo('a.jpg'))
     await user.type(input(), 'найди похожий{Enter}')
-    expect(await within(log()).findByText('Провайдер распознавания фото не отвечает. Повторите позже.')).toBeTruthy()
-    expect(bodyOf(0).messages).toEqual([{ role: 'user', text: 'найди похожий' }])
-    expect(bodyOf(0).photos).toHaveLength(1)
-  })
-
-  it('says the provider is unstable and asks again (Scenario: Провайдер ответил со второго раза)', async () => {
-    fetchMock
-      .mockResolvedValueOnce(answer({ brief: {}, photo: { action: 'unstable' } }))
-      .mockResolvedValueOnce(answer({ brief: {}, photo: { action: 'unusable', seen: 'Только цветные полосы' } }))
-    const { user } = renderAssistant()
-    await user.upload(picker(), photo('a.jpg'))
-    await user.type(input(), 'найди похожий{Enter}')
-    expect(await within(log()).findByText('Нестабильное подключение к провайдеру, пробую ещё раз…')).toBeTruthy()
     expect(await within(log()).findByText(/^Вижу на фото: Только цветные полосы\./)).toBeTruthy()
-    expect(within(log()).queryByText(/Нестабильное подключение/)).toBeNull()
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(bodyOf(1)).toEqual(bodyOf(0))
+    expect(within(log()).getByText('Модель фото не ответила, смотрю другой — посмотрел')).toBeTruthy()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('gives up after three retries (Scenario: Провайдер не ответил)', async () => {
-    fetchMock.mockImplementation(async () => answer({ brief: {}, photo: { action: 'unstable' } }))
+  it('answers the words without the photos and says so (Scenario: Провайдер не ответил)', async () => {
+    fetchMock.mockResolvedValue(answer({ brief: { destinationId: 'valencia' }, photo: { action: 'skipped' } }))
     const { user } = renderAssistant()
     await user.upload(picker(), photo('a.jpg'))
-    await user.type(input(), 'найди похожий{Enter}')
-    expect(await within(log()).findByText('Провайдер распознавания фото не отвечает. Повторите позже.')).toBeTruthy()
-    expect(fetchMock).toHaveBeenCalledTimes(1 + PHOTO_RETRY_MS.length)
-    expect(within(log()).queryByText(/Нестабильное подключение/)).toBeNull()
+    await user.type(input(), 'хочу в Валенсию{Enter}')
+    expect(
+      await within(log()).findByText(
+        /^Модель распознавания фото сейчас недоступна — ответил без фото\. Записал: Валенсия/,
+      ),
+    ).toBeTruthy()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('says the limit is over without retries (Scenario: Лимит запросов к модели фото)', async () => {
-    fetchMock
-      .mockResolvedValueOnce(answer({ brief: {}, photo: { action: 'limited' } }))
-      .mockResolvedValueOnce(Response.json({ error: 'Too many requests' }, { status: 429 }))
-    const { user } = renderAssistant()
-    await user.upload(picker(), photo('a.jpg'))
-    await user.type(input(), 'найди похожий{Enter}')
-    const limit = 'Превышен лимит запросов к модели распознавания фото. Повторите позже.'
-    expect(await within(log()).findByText(limit)).toBeTruthy()
-    // The route's own limit reads the same.
-    await user.upload(picker(), photo('b.jpg'))
-    await user.type(input(), 'найди похожий{Enter}')
-    await waitFor(() => expect(within(log()).getAllByText(limit)).toHaveLength(2))
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-  })
+  it(
+    'says the limit is over without retries (Scenario: Лимит запросов к модели фото)',
+    async () => {
+      fetchMock
+        .mockResolvedValueOnce(answer({ brief: {}, photo: { action: 'limited' } }))
+        .mockResolvedValueOnce(Response.json({ error: 'Too many requests' }, { status: 429 }))
+      const { user } = renderAssistant()
+      await user.upload(picker(), photo('a.jpg'))
+      await user.type(input(), 'найди похожий{Enter}')
+      const limit = 'Превышен лимит запросов к модели распознавания фото. Повторите позже.'
+      expect(await within(log()).findByText(limit)).toBeTruthy()
+      // The route's own limit reads the same.
+      await user.upload(picker(), photo('b.jpg'))
+      await user.type(input(), 'найди похожий{Enter}')
+      await waitFor(() => expect(within(log()).getAllByText(limit)).toHaveLength(2))
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    },
+    HEAVY,
+  )
 
   it('takes no fifth photo and says why (Scenario: Пятое фото)', async () => {
     const { user } = renderAssistant()
@@ -177,6 +196,39 @@ describe('the photos of a message', () => {
     await user.click(await within(log()).findByRole('button', { name: 'Открыть фото 1' }))
     const dialog = await screen.findByRole('dialog', { name: 'Фото 1' })
     expect(within(dialog).getByRole('img').getAttribute('src')).toBe(`data:image/webp;base64,${btoa('small-a.jpg')}`)
+  })
+
+  it('opens the full photo large while the thumbnail stays the preview', async () => {
+    const chat: Chat = {
+      ...newChat('2026-10-25T10:00:00.000Z'),
+      messages: [
+        {
+          id: crypto.randomUUID(),
+          role: 'user',
+          status: 'done',
+          text: '',
+          data: {
+            attachments: [
+              {
+                preview: 'data:image/webp;base64,c21hbGw=',
+                url: 'https://cdn.example/full.webp',
+                width: 1600,
+                height: 1200,
+              },
+            ],
+          },
+          createdAt: '2026-10-25T10:00:00.000Z',
+        },
+      ],
+    }
+    window.localStorage.setItem(CHATS_KEY, JSON.stringify([chat]))
+    window.history.replaceState(null, '', `/assistant/${chat.id}`)
+    const { user } = renderAssistant()
+    const tile = await screen.findByRole('button', { name: 'Открыть фото 1' })
+    expect(tile.querySelector('img')?.getAttribute('src')).toBe('data:image/webp;base64,c21hbGw=')
+    await user.click(tile)
+    const dialog = await screen.findByRole('dialog', { name: 'Фото 1' })
+    expect(within(dialog).getByRole('img').getAttribute('src')).toBe('https://cdn.example/full.webp')
   })
 
   it('reads «Фото» for a photo whose file is gone', async () => {
@@ -391,22 +443,22 @@ describe('a signed-in user’s photos', () => {
       await downloaded
       return { data: new Blob(['photo'], { type: 'image/webp' }), error: null }
     })
+    let links = 0
+    const createSignedUrls = vi.fn(async (paths: string[]) => {
+      links += 1
+      return {
+        data: paths.map((p) => ({ path: p, signedUrl: `https://cdn.example/${p}?v=${links}`, error: null })),
+        error: null,
+      }
+    })
     supabase.client = {
       auth: { getSession: async () => ({ data: { session: { user: { id: userId, email: 'a@b.c' } } } }) },
       from: (table: string) => query({ data: table === 'assistant_chats' ? [row] : null, error: null }),
-      storage: {
-        from: () => ({
-          download,
-          createSignedUrls: async (paths: string[]) => ({
-            data: paths.map((p) => ({ path: p, signedUrl: `https://cdn.example/${p}`, error: null })),
-            error: null,
-          }),
-        }),
-      },
+      storage: { from: () => ({ download, createSignedUrls }) },
     }
     fetchMock.mockResolvedValue(answer({ brief: {}, photo: { action: 'ask' } }))
     window.history.replaceState(null, '', `/assistant/${chatId}`)
-    return { download, release: () => release(), path }
+    return { download, release: () => release(), path, createSignedUrls }
   }
 
   it('asks a pending answer with photos in Storage once after a reload', async () => {
@@ -424,7 +476,28 @@ describe('a signed-in user’s photos', () => {
     expect(bodyOf(0).photos).toEqual([`data:image/webp;base64,${btoa('photo')}`])
     expect(
       within(log()).getByRole('button', { name: 'Открыть фото 1' }).querySelector('img')?.getAttribute('src'),
-    ).toBe(`https://cdn.example/${path}`)
+    ).toBe(`https://cdn.example/${path}?v=1`)
+  })
+
+  it('asks for new links before the old ones expire and shows the photo with them', async () => {
+    const { release, path, createSignedUrls } = signedIn()
+    // The page's timer for the links: run by hand instead of waiting for it.
+    const timers = new Map<number, () => void>()
+    const real = window.setInterval.bind(window)
+    vi.spyOn(window, 'setInterval').mockImplementation(((handler: () => void, delay?: number) => {
+      if (delay !== SIGNED_URL_REFRESH_MS) return real(handler, delay)
+      timers.set(timers.size + 1, handler)
+      return timers.size
+    }) as typeof window.setInterval)
+    renderAssistant()
+    release()
+    const tile = async () => (await within(log()).findByRole('button', { name: 'Открыть фото 1' })).querySelector('img')
+    await waitFor(async () => expect((await tile())?.getAttribute('src')).toBe(`https://cdn.example/${path}?v=1`))
+    expect(createSignedUrls).toHaveBeenCalledTimes(1)
+    expect(timers.size).toBe(1)
+    await act(async () => [...timers.values()].forEach((run) => run()))
+    await waitFor(async () => expect((await tile())?.getAttribute('src')).toBe(`https://cdn.example/${path}?v=2`))
+    expect(createSignedUrls).toHaveBeenCalledTimes(2)
   })
 
   it('starts no second turn when the page mounts again while the photos load', async () => {
@@ -439,5 +512,30 @@ describe('a signed-in user’s photos', () => {
     expect(await within(log()).findByText(/Что сделать с фото\?/)).toBeTruthy()
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+// semantic-search, Requirement: Модели через API NVIDIA
+describe('the rules instead of the models', () => {
+  const DOWN = 'Модели сейчас недоступны, поэтому отвечаю по простым правилам. Попробуйте чуть позже — подберу точнее.'
+
+  it('says so in a message of its own after the answer (Scenario: Ни одна модель не ответила)', async () => {
+    fetchMock.mockResolvedValue(
+      Response.json({ brief: { destinationId: 'valencia' }, source: 'rules', modelsDown: true }),
+    )
+    const { user } = renderAssistant()
+    await user.type(input(), 'хочу в Валенсию{Enter}')
+    const warning = await within(log()).findByText(DOWN)
+    const answerText = within(log()).getByText(/^Записал: Валенсия/)
+    // The warning comes right after the answer.
+    expect(answerText.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('stays quiet without the key (Scenario: Нет ключа)', async () => {
+    fetchMock.mockResolvedValue(Response.json({ brief: { destinationId: 'valencia' }, source: 'rules' }))
+    const { user } = renderAssistant()
+    await user.type(input(), 'хочу в Валенсию{Enter}')
+    expect(await within(log()).findByText(/^Записал: Валенсия/)).toBeTruthy()
+    expect(within(log()).queryByText(DOWN)).toBeNull()
   })
 })

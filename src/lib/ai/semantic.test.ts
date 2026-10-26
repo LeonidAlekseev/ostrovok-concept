@@ -54,10 +54,13 @@ describe('semanticSearch', () => {
     )
     const text = words()
     const hits = await semanticSearch(text, { destinationIds: ['prague'], k: 2 })
-    expect(hits).toEqual([
-      { id: 'prague-skyline-hostel', destinationId: 'prague', score: 0.9 },
-      { id: 'prague-central-hostel', destinationId: 'prague', score: 0.3 },
-    ])
+    expect(hits).toEqual({
+      status: 'found',
+      hits: [
+        { id: 'prague-skyline-hostel', destinationId: 'prague', score: 0.9 },
+        { id: 'prague-central-hostel', destinationId: 'prague', score: 0.3 },
+      ],
+    })
     expect(rpc).toHaveBeenCalledWith('match_embeddings', {
       query_embedding: '[0.1,0.2]',
       match_kind: 'hotel',
@@ -76,8 +79,8 @@ describe('semanticSearch', () => {
 
     const failing = words()
     vi.mocked(embed).mockRejectedValueOnce(new Error('timeout'))
-    expect(await semanticSearch(failing, {})).toBeNull()
-    expect(await semanticSearch(failing, {})).not.toBeNull()
+    expect(await semanticSearch(failing, {})).toMatchObject({ status: 'failed' })
+    expect(await semanticSearch(failing, {})).toMatchObject({ status: 'found' })
     expect(embed).toHaveBeenCalledTimes(3)
   })
 
@@ -97,44 +100,92 @@ describe('semanticSearch', () => {
     const second = semanticSearch(text, {})
     await vi.waitFor(() => expect(embed).toHaveBeenCalledTimes(1))
     first.abort()
-    expect(await cancelled).toBeNull()
+    expect(await cancelled).toEqual({ status: 'failed', reason: 'aborted' })
     answer({ embedding: [0.1, 0.2] } as Awaited<ReturnType<typeof embed>>)
-    expect(await second).toEqual([{ id: 'prague-central-hostel', destinationId: 'prague', score: 0.9 }])
+    expect(await second).toEqual({
+      status: 'found',
+      hits: [{ id: 'prague-central-hostel', destinationId: 'prague', score: 0.9 }],
+    })
     expect(embed).toHaveBeenCalledTimes(1)
   })
 
   it('does not keep a shared vector that failed for everyone waiting on it', async () => {
     const text = words()
     vi.mocked(embed).mockRejectedValueOnce(new Error('timeout'))
-    expect(await Promise.all([semanticSearch(text, {}), semanticSearch(text, {})])).toEqual([null, null])
+    expect(await Promise.all([semanticSearch(text, {}), semanticSearch(text, {})])).toEqual([
+      { status: 'failed', reason: 'model' },
+      { status: 'failed', reason: 'model' },
+    ])
     vi.mocked(rerank).mockResolvedValue(reranked([{ originalIndex: 0, score: 0.9 }]))
-    expect(await semanticSearch(text, {})).not.toBeNull()
+    expect(await semanticSearch(text, {})).toMatchObject({ status: 'found' })
     expect(embed).toHaveBeenCalledTimes(2)
   })
 
   it('keeps the vectors’ order when the reranker fails', async () => {
     vi.mocked(rerank).mockRejectedValue(new Error('429'))
-    const hits = await semanticSearch(words(), { k: 2 })
-    expect(hits?.map((h) => [h.id, h.score])).toEqual([
+    const result = await semanticSearch(words(), { k: 2 })
+    expect(result.status === 'found' && result.hits.map((h) => [h.id, h.score])).toEqual([
       ['prague-central-hostel', 0.7],
       ['prague-skyline-hostel', 0.6],
     ])
   })
 
-  it('gives null without the key, on a model error, without vectors or without text', async () => {
+  it('tells nothing found from a failure, and names the failure', async () => {
+    const empty = { status: 'empty' }
     vi.mocked(getSecret).mockResolvedValueOnce(undefined)
-    expect(await semanticSearch(words(), {})).toBeNull()
+    expect(await semanticSearch(words(), {})).toEqual({ status: 'failed', reason: 'no-key' })
     expect(getSecret).toHaveBeenCalledWith('NVIDIA_API_KEY')
     expect(embed).not.toHaveBeenCalled()
-    vi.mocked(embed).mockRejectedValueOnce(new Error('timeout'))
-    expect(await semanticSearch(words(), {})).toBeNull()
-    rpc.mockResolvedValueOnce({ data: [], error: null })
-    expect(await semanticSearch(words(), {})).toBeNull()
+    vi.mocked(embed).mockRejectedValueOnce(new Error('500'))
+    expect(await semanticSearch(words(), {})).toEqual({ status: 'failed', reason: 'model' })
     rpc.mockResolvedValueOnce({ data: null, error: { message: 'no function' } })
-    expect(await semanticSearch(words(), {})).toBeNull()
-    expect(await semanticSearch('   ', {})).toBeNull()
-    expect(await semanticSearch(words(), { destinationIds: [] })).toBeNull()
+    expect(await semanticSearch(words(), {})).toEqual({ status: 'failed', reason: 'database' })
+    rpc.mockResolvedValueOnce({ data: [], error: null })
+    expect(await semanticSearch(words(), {})).toEqual(empty)
+    expect(await semanticSearch('   ', {})).toEqual(empty)
+    expect(await semanticSearch(words(), { destinationIds: [] })).toEqual(empty)
     expect(rerank).not.toHaveBeenCalled()
+  })
+
+  it('is a timeout failure when the search runs out of time, and aborted when the caller gives up', async () => {
+    vi.mocked(embed).mockReturnValue(new Promise(() => {}) as ReturnType<typeof embed>)
+    expect(await semanticSearch(words(), { timeoutMs: 20 })).toEqual({ status: 'failed', reason: 'timeout' })
+    const controller = new AbortController()
+    const search = semanticSearch(words(), { signal: controller.signal })
+    controller.abort()
+    expect(await search).toEqual({ status: 'failed', reason: 'aborted' })
+  })
+
+  it('asks the model again when the first search gave up on a stalled vector', async () => {
+    vi.mocked(rerank).mockResolvedValue(reranked([{ originalIndex: 0, score: 0.9 }]))
+    const text = words()
+    vi.mocked(embed).mockReturnValueOnce(new Promise(() => {}) as ReturnType<typeof embed>)
+    expect(await semanticSearch(text, { timeoutMs: 20 })).toEqual({ status: 'failed', reason: 'timeout' })
+    expect(await semanticSearch(text, { k: 1 })).toEqual({
+      status: 'found',
+      hits: [{ id: 'prague-central-hostel', destinationId: 'prague', score: 0.9 }],
+    })
+    expect(embed).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not take the vector away from a concurrent search when another one gives up on it', async () => {
+    vi.mocked(rerank).mockResolvedValue(reranked([{ originalIndex: 0, score: 0.9 }]))
+    const text = words()
+    let answer!: (result: Awaited<ReturnType<typeof embed>>) => void
+    vi.mocked(embed).mockImplementationOnce(
+      () => new Promise((resolve) => (answer = resolve)) as ReturnType<typeof embed>,
+    )
+    const giving = semanticSearch(text, { timeoutMs: 50 })
+    const waiting = semanticSearch(text, {})
+    // The waiting search asks for the vector before the other one runs out of time.
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    expect(embed).toHaveBeenCalledTimes(1)
+    expect(await giving).toEqual({ status: 'failed', reason: 'timeout' })
+    answer({ embedding: [0.1, 0.2] } as Awaited<ReturnType<typeof embed>>)
+    // The waiting search keeps the answer it was promised; the search after them asks the model again.
+    expect(await waiting).toMatchObject({ status: 'found' })
+    expect(await semanticSearch(text, {})).toMatchObject({ status: 'found' })
+    expect(embed).toHaveBeenCalledTimes(2)
   })
 
   it('embeds the same words once', async () => {
@@ -153,13 +204,16 @@ describe('semanticSearch in production', () => {
     const real = { ref_id: 'ota-1', destination_id: 'valencia', content: 'Отель у моря', similarity: 0.4 }
     rpc.mockResolvedValue({ data: [...matches, real], error: null })
     vi.mocked(rerank).mockResolvedValue(reranked([{ originalIndex: 0, score: 0.8 }]))
-    expect(await semanticSearch(words(), { k: 2 })).toEqual([{ id: 'ota-1', destinationId: 'valencia', score: 0.8 }])
+    expect(await semanticSearch(words(), { k: 2 })).toEqual({
+      status: 'found',
+      hits: [{ id: 'ota-1', destinationId: 'valencia', score: 0.8 }],
+    })
     expect(vi.mocked(rerank).mock.calls[0][0]).toMatchObject({ documents: ['Отель у моря'], topN: 1 })
   })
 
-  it('falls back to the rules when every match is synthetic', async () => {
+  it('finds nothing when every match is synthetic', async () => {
     setProduction(true)
-    expect(await semanticSearch(words(), {})).toBeNull()
+    expect(await semanticSearch(words(), {})).toEqual({ status: 'empty' })
     expect(rerank).not.toHaveBeenCalled()
   })
 })

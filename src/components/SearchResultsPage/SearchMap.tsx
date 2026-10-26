@@ -18,12 +18,22 @@ import { Star } from 'lucide-react'
 import { cn } from 'cn'
 import { Badge } from '@/components/ui/badge'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
-import { hasStars, isRated, STAY_TYPES, type Hotel } from '../../lib/catalog'
+import { hasStars, isRated, type Hotel } from '../../lib/catalog'
 import { countRu, formatDecimal, formatPrice } from '../../lib/format'
 import { clusterPoints, expansionZoom, type MapCluster } from '../../lib/mapClusters'
-import { ATTRIBUTION_SHOWN_MS, foldAttribution, MAP_STYLE } from './mapSetup'
+import { ATTRIBUTION_SHOWN_MS, foldAttribution, MAP_ATTRIBUTION, MAP_STYLE, silenceSourceAttribution } from './mapSetup'
 import { MapUnavailable } from './MapUnavailable'
 import type { MapCamera } from './searchView'
+
+// The attribution is a small white pill: "© OpenStreetMap" and a black round "i" on its right. MapLibre's
+// unlayered styles beat Tailwind's layers, hence the important flags.
+const ATTRIBUTION_CLASS = [
+  '[&_.maplibregl-ctrl-attrib]:m-2! [&_.maplibregl-ctrl-attrib]:rounded-full! [&_.maplibregl-ctrl-attrib]:bg-white! [&_.maplibregl-ctrl-attrib]:text-xs! [&_.maplibregl-ctrl-attrib]:leading-6!',
+  '[&_.maplibregl-ctrl-attrib.maplibregl-compact]:min-h-6! [&_.maplibregl-ctrl-attrib.maplibregl-compact]:p-0! [&_.maplibregl-ctrl-attrib.maplibregl-compact]:pr-6!',
+  '[&_.maplibregl-ctrl-attrib.maplibregl-compact-show]:py-0! [&_.maplibregl-ctrl-attrib.maplibregl-compact-show]:pr-7! [&_.maplibregl-ctrl-attrib.maplibregl-compact-show]:pl-2.5!',
+  '[&_.maplibregl-ctrl-attrib_a]:font-medium! [&_.maplibregl-ctrl-attrib_a]:text-black!',
+  '[&_.maplibregl-ctrl-attrib-button]:top-0! [&_.maplibregl-ctrl-attrib-button]:right-0! [&_.maplibregl-ctrl-attrib-button]:left-auto! [&_.maplibregl-ctrl-attrib-button]:size-6! [&_.maplibregl-ctrl-attrib-button]:rounded-full! [&_.maplibregl-ctrl-attrib-button]:bg-black! [&_.maplibregl-ctrl-attrib-button]:bg-[url("data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%2724%27%20height=%2724%27%20viewBox=%270%200%2024%2024%27%20fill=%27white%27%3E%3Ccircle%20cx=%2712%27%20cy=%277.5%27%20r=%271.4%27/%3E%3Crect%20x=%2710.8%27%20y=%2710.5%27%20width=%272.4%27%20height=%276.5%27%20rx=%271.2%27/%3E%3C/svg%3E")]!',
+].join(' ')
 
 export interface MapHotel {
   hotel: Hotel
@@ -130,7 +140,7 @@ export default function SearchMap({
         style: MAP_STYLE,
         center: camera?.center ?? [0, 30],
         zoom: camera?.zoom ?? 1,
-        attributionControl: { compact: true },
+        attributionControl: { compact: true, customAttribution: MAP_ATTRIBUTION },
       })
     } catch {
       // No WebGL.
@@ -138,6 +148,7 @@ export default function SearchMap({
       return
     }
     let loaded = false
+    instance.on('styledata', () => silenceSourceAttribution(instance))
     let foldTimer: ReturnType<typeof setTimeout> | undefined
     const fold = () => {
       clearTimeout(foldTimer)
@@ -219,14 +230,14 @@ export default function SearchMap({
   }
 
   return (
-    <div ref={containerRef} className="size-full" aria-label="Карта отелей" role="region">
+    <div ref={containerRef} className={cn('size-full', ATTRIBUTION_CLASS)} aria-label="Карта отелей" role="region">
       {map &&
         clusters.map((cluster) => {
           if (cluster.members.length > 1)
             return createPortal(
               <button
                 type="button"
-                aria-label={`${countRu(cluster.members.length, ['отель', 'отеля', 'отелей'])}, от ${formatPrice(cluster.price)}, приблизить`}
+                aria-label={`${countRu(cluster.members.length, ['вариант', 'варианта', 'вариантов'])}, от ${formatPrice(cluster.price)}, приблизить`}
                 data-active={cluster.members.some(({ hotel }) => hotel.id === activeId) || undefined}
                 onClick={() =>
                   map.easeTo({
@@ -290,7 +301,7 @@ function MapPreview({ id, hotel, price }: MapHotel & { id: string }) {
       <PhotoPlaceholder photo={hotel.photos[0]} className="aspect-[2/1] w-full" />
       <div className="flex flex-col gap-1 p-3">
         <p className="text-[15px]/[1.3] font-[650]">{hotel.name}</p>
-        {hasStars(hotel) ? (
+        {hasStars(hotel) && (
           <span
             role="img"
             aria-label={countRu(hotel.stars, ['звезда', 'звезды', 'звёзд'])}
@@ -300,8 +311,6 @@ function MapPreview({ id, hotel, price }: MapHotel & { id: string }) {
               <Star key={i} className="size-3.5" fill="currentColor" strokeWidth={0} aria-hidden />
             ))}
           </span>
-        ) : (
-          <span className="text-sm/[normal] text-muted-foreground">{STAY_TYPES[hotel.stayType]}</span>
         )}
         <div className="flex items-center gap-2 pt-1">
           <p className="mr-auto text-base font-bold whitespace-nowrap">{formatPrice(price)}</p>

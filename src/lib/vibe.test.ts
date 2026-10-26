@@ -44,6 +44,11 @@ describe('VIBE_AXES', () => {
       }
   })
 
+  it('takes a hotel with no rates as neutral on «Завтрак в номер» / «Ужин в новом месте», not NaN', () => {
+    const food = VIBE_AXES.find((axis) => axis.id === 'food')!
+    expect(food.fit({ ...catalogue[0], rooms: [] }, scale)).toBe(0)
+  })
+
   it('tells hotels apart on every axis', () => {
     for (const axis of VIBE_AXES)
       expect(new Set(catalogue.map((h) => axis.fit(h, scale))).size, axis.id).toBeGreaterThan(1)

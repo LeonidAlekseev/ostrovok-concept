@@ -11,8 +11,9 @@ import { nvidiaReranker } from './rerank'
 
 /**
  * Search by meaning over the vectors of `npm run db:embed`: the query's vector, the nearest objects in
- * pgvector, then the reranker. Every failure — no key, no vectors yet, a model error, the time out — gives
- * `null`, and the caller keeps its rules; the traveller never sees an error.
+ * pgvector, then the reranker. The result tells «found», «nothing found» and a failure with its reason apart — no
+ * key, the time out, a model or a database error; the caller keeps its rules in the last two, and the traveller
+ * never sees an error.
  */
 
 export interface SemanticHit {
@@ -21,6 +22,14 @@ export interface SemanticHit {
   /** The reranker's relevance, or the cosine similarity when the reranker failed; higher is closer. */
   score: number
 }
+
+export type SemanticFailure = 'no-key' | 'timeout' | 'aborted' | 'model' | 'database'
+
+export type SemanticResult =
+  { status: 'found'; hits: SemanticHit[] } | { status: 'empty' } | { status: 'failed'; reason: SemanticFailure }
+
+const EMPTY: SemanticResult = { status: 'empty' }
+const failed = (reason: SemanticFailure): SemanticResult => ({ status: 'failed', reason })
 
 /**
  * The whole search, the query's vector, pgvector and the reranker together. On the NVIDIA API the embedding
@@ -38,6 +47,15 @@ const MAX_CANDIDATES = 50
  */
 const queryVectors = new Map<string, Promise<number[]>>()
 const QUERY_CACHE = 500
+
+/**
+ * A search that gives up on its own time out forgets the vector it waited for, when that is still the one in the
+ * cache: the next search asks the model again instead of waiting for the stalled request. The request itself ends
+ * by its own `AbortSignal.timeout`; the other searches waiting on it keep it.
+ */
+function forgetVector(query: string, vector: Promise<number[]>) {
+  if (queryVectors.get(query) === vector) queryVectors.delete(query)
+}
 
 /** The shared request has its own limit: a search that gives up does not cancel the vector for the others. */
 function queryVector(apiKey: string, query: string): Promise<number[]> {
@@ -92,23 +110,32 @@ export interface SemanticOptions {
 }
 
 /**
- * The `k` hotels shown (`isVisibleHotel`) closest in meaning to `text`, best first, or `null` to fall back to the
- * rules.
+ * The `k` hotels shown (`isVisibleHotel`) closest in meaning to `text`, best first; `empty` when there are none,
+ * `failed` with the reason when the search could not answer.
  */
 export async function semanticSearch(
   text: string,
   { destinationIds, k = 5, candidates = 30, timeoutMs = SEMANTIC_TIMEOUT_MS, signal }: SemanticOptions,
-): Promise<SemanticHit[] | null> {
+): Promise<SemanticResult> {
   const query = text.trim().slice(0, MAX_SEMANTIC_QUERY)
-  if (!query || !isSupabaseConfigured || destinationIds?.length === 0) return null
+  if (!query || destinationIds?.length === 0) return EMPTY
+  if (!isSupabaseConfigured) return failed('database')
   const apiKey = await getSecret(NVIDIA_KEY)
-  if (!apiKey) return null
+  if (!apiKey) return failed('no-key')
   const timeout = AbortSignal.timeout(timeoutMs)
   const abortSignal = signal ? AbortSignal.any([signal, timeout]) : timeout
 
+  // The caller's own abort is not the search's time out.
+  const reasonOf = (stage: 'model' | 'database'): SemanticFailure =>
+    signal?.aborted ? 'aborted' : timeout.aborted ? 'timeout' : stage
+
   let matches: Match[]
+  let stage: 'model' | 'database' = 'model'
+  let vector: Promise<number[]> | undefined
   try {
-    const embedding = await untilAborted(queryVector(apiKey, query), abortSignal)
+    vector = queryVector(apiKey, query)
+    const embedding = await untilAborted(vector, abortSignal)
+    stage = 'database'
     const { data, error } = await database()
       .rpc('match_embeddings', {
         query_embedding: toVector(embedding),
@@ -122,9 +149,11 @@ export async function semanticSearch(
     matches = (data ?? []).filter((m) => isVisibleHotel({ id: m.ref_id }))
   } catch (error) {
     warn('no vectors, using the rules', error)
-    return null
+    const reason = reasonOf(stage)
+    if (reason === 'timeout' && stage === 'model' && vector) forgetVector(query, vector)
+    return failed(reason)
   }
-  if (matches.length === 0) return null
+  if (matches.length === 0) return EMPTY
 
   const hit = (match: Match, score: number): SemanticHit => ({
     id: match.ref_id,
@@ -140,10 +169,10 @@ export async function semanticSearch(
       abortSignal,
       maxRetries: 0,
     })
-    return ranking.map(({ originalIndex, score }) => hit(matches[originalIndex], score))
+    return { status: 'found', hits: ranking.map(({ originalIndex, score }) => hit(matches[originalIndex], score)) }
   } catch (error) {
     // The vectors' own order is still by meaning: better than the rules.
     warn('the reranker failed, using the vectors’ order', error)
-    return matches.slice(0, k).map((m) => hit(m, m.similarity))
+    return { status: 'found', hits: matches.slice(0, k).map((m) => hit(m, m.similarity)) }
   }
 }

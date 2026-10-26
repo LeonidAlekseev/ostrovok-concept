@@ -332,19 +332,38 @@ describe('the presets of Eval', () => {
 
   it('offers only the themes with a city shown in the season (Scenario: Пресеты без видимых городов)', () => {
     // Production shows Valencia only: no mountains; the sea only outside winter.
-    expect(presetChips(valencia, '2026-06-01').map((c) => c.label)).toEqual(['На море', 'Города'])
-    expect(presetChips(valencia, '2026-11-20').map((c) => c.label)).toEqual(['Города'])
-    expect(presetChips(destinations, '2026-11-20').map((c) => c.label)).toEqual(['На море', 'В горы', 'Города'])
+    expect(presetChips(valencia, '2026-06-01').map((c) => c.label)).toEqual([
+      'На море',
+      'В город',
+      'С детьми',
+      'Куда угодно',
+    ])
+    expect(presetChips(valencia, '2026-11-20').map((c) => c.label)).toEqual(['В город', 'С детьми', 'Куда угодно'])
+    expect(presetChips(destinations, '2026-11-20').map((c) => c.label)).toEqual([
+      'На море',
+      'В горы',
+      'В город',
+      'С детьми',
+      'Куда угодно',
+    ])
+  })
+
+  it('hands the theme to Eval on «Куда угодно» and asks the party on «С детьми» (Scenario: Куда угодно)', () => {
+    expect(mergeBrief({}, 'Куда угодно', null, destinations).vibe).toBe('any')
+    expect(mergeBrief({}, 'В город', null, destinations).vibe).toBe('europe')
+    const kids = mergeBrief({}, 'С детьми', null, destinations)
+    expect(kids.party).toBe('family')
+    expect(kids.vibe).toBeUndefined()
   })
 
   it('leaves out the quick replies without a city', () => {
-    expect(nextQuestion({}, '2026-06-01', valencia)?.replies).toEqual(['На море', 'Города Европы', 'Удиви меня'])
+    expect(nextQuestion({}, '2026-06-01', valencia)?.replies).toEqual(['На море', 'В город', 'Куда угодно'])
     expect(nextQuestion({}, '2026-06-01')?.replies).toEqual([
       'На море',
       'В горы',
-      'Города Европы',
+      'В город',
       'Романтика',
-      'Удиви меня',
+      'Куда угодно',
     ])
   })
 })
@@ -477,5 +496,17 @@ describe('askAssistant with photos', () => {
     await askAssistant({ ...request, photos: [] }, null, destinations)
     const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
     expect(JSON.parse(init.body as string)).not.toHaveProperty('photos')
+  })
+})
+
+describe('askAssistant: the models down', () => {
+  it('keeps the route’s mark of the rules answering for the models', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ brief: {}, source: 'rules', modelsDown: true })),
+    )
+    const response = await askAssistant({ messages: [{ role: 'user', text: 'в горы' }], brief: {} }, null, destinations)
+    expect(response.modelsDown).toBe(true)
+    vi.unstubAllGlobals()
   })
 })

@@ -399,13 +399,17 @@ describe('HotelPage', () => {
     expect(header.textContent).not.toContain('Бесплатная отмена')
   })
 
-  it('names the kind of a stay that is not a hotel, and shows no stars for apartments', () => {
-    const villa = fullHotelsIn('prague').find((h) => h.stayType === 'villa')!
-    render(<HotelPage hotel={villa} />)
+  it.each([
+    ['villa', 'Вилла'],
+    ['apartments', 'Апартаменты'],
+    ['hostel', 'Хостел'],
+  ])('names a %s by its kind in the header, not as a hotel', (type, label) => {
+    const stay = fullHotelsIn('prague').find((h) => h.stayType === type)!
+    render(<HotelPage hotel={stay} />)
     const header = screen.getByRole('heading', { level: 1 }).closest('header')!
-    expect(header.textContent).toContain('Вилла')
+    expect(header.textContent).toContain(label)
     expect(header.textContent).not.toContain('звёздочный')
-    expect(within(header).queryByRole('img')).toBeNull()
+    if (type !== 'hostel') expect(within(header).queryByRole('img')).toBeNull()
   })
 
   // hotel-page, Requirement: Страница отеля
@@ -571,5 +575,21 @@ describe('HotelPage generated', () => {
   it('does not mark a real hotel (Scenario: Настоящий отель)', () => {
     render(<HotelPage hotel={{ ...hotel, id: 'ota-9322089' }} />)
     expect(screen.queryByText('generated')).toBeNull()
+  })
+})
+
+// hotel-page, Requirement: Вкладки страницы отеля
+describe('HotelTabs', () => {
+  it('runs to the phone edges on the page and in the dialog, and leaves lg alone (Scenario: Вкладки на телефоне)', () => {
+    const { unmount } = render(<HotelPage hotel={hotel} />)
+    const pageNav = screen.getByRole('navigation', { name: 'Разделы отеля' })
+    expect(pageNav.className).toContain('max-lg:-mx-(--page-x)')
+    expect(pageNav.querySelector('ul')!.className).toContain('max-lg:px-(--page-x)')
+    unmount()
+
+    render(<HotelPage hotel={hotel} titleId="t" />)
+    const dialogNav = screen.getByRole('navigation', { name: 'Разделы отеля' })
+    expect(dialogNav.className).toContain('max-lg:-mx-4')
+    expect(dialogNav.querySelector('ul')!.className).toContain('max-lg:px-4')
   })
 })

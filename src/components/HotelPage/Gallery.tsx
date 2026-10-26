@@ -1,12 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { cn } from 'cn'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import type { Hotel, Photo } from '@/lib/catalog'
 import { PhotoMosaic, type MosaicStart } from './PhotoMosaic'
 import { useHistoryDialog } from './useHistoryDialog'
-import { useSnapRow } from './useSnapRow'
 
 interface Props {
   hotel: Hotel
@@ -26,17 +25,52 @@ function smallClass(index: number, count: number): string {
   return ''
 }
 
+/** Width / height of a strip photo until its image has loaded and told its own. */
+const STRIP_RATIO = 4 / 3
+
+/** One photo of the phone strip: as high as the strip, as wide as its image (whole, never cropped). */
+function StripPhoto({ photo, onOpen }: { photo: Photo; onOpen: () => void }) {
+  const [ratio, setRatio] = useState(STRIP_RATIO)
+  return (
+    <button
+      type="button"
+      aria-label={`Открыть фото: ${photo.caption}`}
+      className="block h-full shrink-0 overflow-hidden rounded-lg"
+      style={{ aspectRatio: ratio }}
+      onClick={onOpen}
+    >
+      <PhotoPlaceholder photo={photo} large onRatio={setRatio} className="size-full text-base" />
+    </button>
+  )
+}
+
 const tileButton = 'relative block size-full overflow-hidden rounded-lg'
 
 /**
  * The photos of the hotel, flat. From `md` a tile: one large photo on two rows and up to six beside it
- * (3 × 2), the last with "+N фото" over the rest. On a phone a plain carousel as wide as the content with a
- * counter. A photo opens the mosaic at itself, "+N фото" the mosaic as a whole.
+ * (3 × 2), the last with "+N фото" over the rest. On a phone a strip of photos of one height, each as wide as its
+ * own proportions, running off both screen edges, with a counter. A photo opens the mosaic at itself, "+N фото" the mosaic as a whole.
  */
 export function Gallery({ hotel }: Props) {
   const { photos } = hotel
   const [selected, setSelected] = useState(0)
-  const { ref, onScroll } = useSnapRow(selected, photos.length, setSelected)
+  const stripRef = useRef<HTMLDivElement>(null)
+  // The photo under the content line is the current one; the last one once the strip is at its end.
+  const onScroll = () => {
+    const strip = stripRef.current
+    if (!strip) return
+    const slides = Array.from(strip.children) as HTMLElement[]
+    const atEnd = strip.scrollLeft + strip.clientWidth >= strip.scrollWidth - 1
+    let index = atEnd ? slides.length - 1 : 0
+    if (!atEnd) {
+      const line = strip.scrollLeft + strip.clientWidth / 2
+      index = Math.max(
+        0,
+        slides.findIndex((el) => el.offsetLeft + el.offsetWidth > line),
+      )
+    }
+    if (index !== selected) setSelected(index)
+  }
   const mosaic = useHistoryDialog<MosaicStart>()
 
   const small = photos.slice(1, 1 + TILE_SMALL)
@@ -58,27 +92,16 @@ export function Gallery({ hotel }: Props) {
     <section aria-label="Фотографии отеля">
       <div className="relative md:hidden">
         <div
-          ref={ref}
+          ref={stripRef}
           onScroll={onScroll}
-          className="flex aspect-4/3 snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-lg [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="-mx-(--page-x) flex h-60 touch-pan-x touch-pan-y gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain px-(--page-x) [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {photos.map((photo, index) => (
-            <button
-              key={photo.id}
-              type="button"
-              // Only the photo on screen takes focus and clicks; the row still scrolls under a finger.
-              inert={index !== selected}
-              aria-hidden={index !== selected || undefined}
-              aria-label={`Открыть фото: ${photo.caption}`}
-              className="h-full w-full shrink-0 snap-center snap-always"
-              onClick={() => open(index)}
-            >
-              <PhotoPlaceholder photo={photo} large className="size-full text-base" />
-            </button>
+            <StripPhoto key={photo.id} photo={photo} onOpen={() => open(index)} />
           ))}
         </div>
         {photos.length > 1 && (
-          <p className="pointer-events-none absolute right-2 bottom-2 m-0 rounded-md bg-black/60 px-2 py-0.5 text-sm font-medium text-white">
+          <p className="pointer-events-none absolute right-(--page-x) bottom-2 m-0 rounded-md bg-black/60 px-2 py-0.5 text-sm font-medium text-white">
             {selected + 1} / {photos.length}
           </p>
         )}

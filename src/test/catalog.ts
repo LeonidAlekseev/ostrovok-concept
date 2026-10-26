@@ -25,9 +25,9 @@ export const loadCityHotels = async (destinationIds: readonly string[]) =>
   destinationIds.flatMap(fullHotelsIn).filter(isVisibleHotel)
 export const loadAllHotels = async () => (await loadHotelSummaries()).map((h) => getHotel(h.id)!)
 
-/** The whole catalogue, built once for the tests that need every full hotel. */
+/** The whole catalogue, built once, for the tests that need every full hotel the catalogue shows. */
 let all: Hotel[] | undefined
-export const allHotels = () => (all ??= buildCatalog())
+export const allHotels = () => (all ??= buildCatalog()).filter(isVisibleHotel)
 
 const listOf = (value: string | null) => value?.split(',').filter(Boolean) ?? []
 

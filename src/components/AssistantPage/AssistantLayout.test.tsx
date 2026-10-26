@@ -7,6 +7,7 @@ import { CHATS_KEY, newChat, type Chat, type ChatMessage } from '../../lib/assis
 import { getHotel, hotels, newHotels } from '../../lib/catalogGenerator'
 import { addDays, todayIso } from '../../lib/dates'
 import { catalogFetch } from '../../test/catalog'
+import { NARROW, setScreen, WIDE } from '../../test/screen'
 import { AssistantSearch } from './AssistantSearch'
 import { SharedChat } from './SharedChat'
 
@@ -16,6 +17,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
 const fetchMock = vi.fn<typeof fetch>()
 const THINK_MS = 650
 beforeEach(() => {
+  setScreen(WIDE)
   const realSetTimeout = globalThis.setTimeout
   vi.spyOn(globalThis, 'setTimeout').mockImplementation(((handler: TimerHandler, ms?: number, ...args: unknown[]) =>
     realSetTimeout(handler, ms === THINK_MS ? 0 : ms, ...args)) as typeof setTimeout)
@@ -29,7 +31,6 @@ afterEach(() => {
   push.mockClear()
   window.localStorage.clear()
   window.history.replaceState(null, '', '/assistant')
-  delete (window as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition
 })
 
 const answer = (body: object) => Response.json({ source: 'model', ...body })
@@ -85,7 +86,7 @@ describe('the layout of Eval’s page', () => {
     expect(window.location.pathname).toBe(`/assistant/${chat.id}`)
     expect(
       within(chatList())
-        .getByRole('button', { name: /Тихий отель/ })
+        .getByRole('button', { name: /^(?!Действия).*Тихий отель/ })
         .getAttribute('aria-current'),
     ).toBe('true')
     const aside = screen.getByRole('complementary', { name: 'О поездке' })
@@ -95,15 +96,42 @@ describe('the layout of Eval’s page', () => {
     expect(aside.textContent).not.toMatch(/маршрут|авиабилет|виз/i)
   })
 
+  it('starts a new chat without an address of its own (Scenario: Компьютер)', async () => {
+    const user = renderWith([chatOf('Тихий отель', 5, ['Тихий отель в Лиссабоне'])])
+    await user.click(await within(chatList()).findByRole('button', { name: 'Новый чат' }))
+    expect(window.location.pathname).toBe('/assistant')
+  })
+})
+
+// assistant-search, Requirement: Раскладка страницы Эвала, Scenario: Телефон
+describe('the layout of Eval’s page on a phone', () => {
+  beforeEach(() => {
+    setScreen(NARROW)
+    window.history.replaceState(null, '', '/assistant')
+  })
+
   it('opens a chat at its address and goes back to the list (Scenario: Телефон)', async () => {
     const older = chatOf('Горы', 60, ['В горы'])
     const user = renderWith([chatOf('Море', 5, ['К морю']), older])
-    await user.click(await within(chatList()).findByRole('button', { name: /Горы/ }))
+    await user.click(await within(chatList()).findByRole('button', { name: /^(?!Действия).*(?:Горы)/ }))
     expect(window.location.pathname).toBe(`/assistant/${older.id}`)
     expect(await within(log()).findByText('В горы')).toBeTruthy()
 
     await user.click(screen.getAllByRole('button', { name: 'Назад к чатам' })[0])
     await waitFor(() => expect(window.location.pathname).toBe('/assistant'))
+  })
+
+  it('opens the list at /assistant, not the newest chat, and hides the open chat', () => {
+    renderWith([chatOf('Тихий отель', 5, ['Тихий отель в Лиссабоне'])])
+    expect(window.location.pathname).toBe('/assistant')
+    expect(chatList().className).not.toContain('max-lg:hidden')
+    expect(screen.getByRole('region', { name: 'Чат с Эвалом' }).className).toContain('max-lg:hidden')
+  })
+
+  it('starts a new chat at an address of its own', async () => {
+    const user = renderWith([chatOf('Тихий отель', 5, ['Тихий отель в Лиссабоне'])])
+    await user.click(await within(chatList()).findByRole('button', { name: 'Новый чат' }))
+    expect(window.location.pathname).toMatch(/^\/assistant\/[0-9a-f-]{36}$/)
   })
 })
 
@@ -116,11 +144,11 @@ describe('the list of chats', () => {
     renderWith([chatOf('Сегодняшний', 5, ['Найди тихий отель', 'Записал: тихо ночью.']), old])
     const list = chatList()
     expect(await within(list).findByRole('region', { name: 'Сегодня' })).toBeTruthy()
-    const row = within(within(list).getByRole('region', { name: 'Сегодня' })).getByRole('button')
+    const row = within(within(list).getByRole('region', { name: 'Сегодня' })).getAllByRole('button')[0]
     expect(row.textContent).toContain('Сегодняшний')
     expect(row.textContent).toContain('Записал: тихо ночью.')
     expect(row.textContent).toMatch(/\d\d:\d\d/)
-    expect(within(within(list).getByRole('region', { name: 'Вчера' })).getByRole('button').textContent).toContain(
+    expect(within(within(list).getByRole('region', { name: 'Вчера' })).getAllByRole('button')[0].textContent).toContain(
       'Вчерашний',
     )
   })
@@ -131,14 +159,14 @@ describe('the list of chats', () => {
       chatOf('Валенсия на выходные', 10, ['Куда-нибудь']),
       chatOf('Горы', 15, ['Тбилиси']),
     ])
-    await within(chatList()).findByRole('button', { name: /Горы/ })
+    await within(chatList()).findByRole('button', { name: /^(?!Действия).*(?:Горы)/ })
     await user.type(screen.getByLabelText('Поиск чатов'), 'Валенсия')
     const titles = within(chatList())
       .getAllByRole('button', { name: /./ })
       .filter((b) => b.getAttribute('aria-current') !== null)
       .map((b) => b.textContent)
     expect(titles).toHaveLength(2)
-    expect(within(chatList()).queryByRole('button', { name: /Горы/ })).toBeNull()
+    expect(within(chatList()).queryByRole('button', { name: /^(?!Действия).*(?:Горы)/ })).toBeNull()
   })
 })
 
@@ -151,7 +179,13 @@ describe('the header of a chat', () => {
     await user.clear(field)
     await user.type(field, 'Ноябрь в Лиссабоне{Enter}')
     expect(screen.getByRole('heading', { name: 'Ноябрь в Лиссабоне' })).toBeTruthy()
-    expect(within(chatList()).getByRole('button', { name: /Ноябрь в Лиссабоне/ })).toBeTruthy()
+    expect(within(chatList()).getByRole('button', { name: /^(?!Действия).*(?:Ноябрь в Лиссабоне)/ })).toBeTruthy()
+  })
+
+  it('keeps the title of a chat about a search plain, not a link', async () => {
+    renderWith([chatOf('Ноябрь в Лиссабоне', 5, ['Привет'])])
+    expect(await screen.findByRole('heading', { name: 'Ноябрь в Лиссабоне' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Ноябрь в Лиссабоне' })).toBeNull()
   })
 
   it('shows the guests, the dates and the city of the chat', async () => {
@@ -169,10 +203,50 @@ describe('the header of a chat', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Удалить чат?' })
     await user.click(within(dialog).getByRole('button', { name: 'Удалить' }))
 
-    await waitFor(() => expect(within(chatList()).queryByRole('button', { name: /Первый/ })).toBeNull())
+    await waitFor(() =>
+      expect(within(chatList()).queryByRole('button', { name: /^(?!Действия).*(?:Первый)/ })).toBeNull(),
+    )
     expect(window.location.pathname).toBe(`/assistant/${next.id}`)
     expect(await within(log()).findByText('Второй чат')).toBeTruthy()
     expect(JSON.parse(window.localStorage.getItem(CHATS_KEY)!)).toHaveLength(1)
+  })
+
+  it('deletes a chat from the menu of its row after the confirmation, the open one stays', async () => {
+    const user = renderWith([chatOf('Первый', 5, ['Первый чат']), chatOf('Второй', 30, ['Второй чат'])])
+    await within(log()).findByText('Первый чат')
+    const openId = chatId()
+    await user.click(within(chatList()).getByRole('button', { name: 'Действия с чатом «Второй»' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Удалить' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Удалить чат?' })
+    // The menu does not open the chat.
+    expect(chatId()).toBe(openId)
+    await user.click(within(dialog).getByRole('button', { name: 'Удалить' }))
+
+    await waitFor(() => expect(within(chatList()).queryByRole('button', { name: /^(?!Действия).*Второй/ })).toBeNull())
+    expect(chatId()).toBe(openId)
+    expect(JSON.parse(window.localStorage.getItem(CHATS_KEY)!)).toHaveLength(1)
+  })
+
+  it('renames a chat from the menu of its row without opening it', async () => {
+    const user = renderWith([chatOf('Первый', 5, ['Первый чат']), chatOf('Второй', 30, ['Второй чат'])])
+    await within(log()).findByText('Первый чат')
+    const openId = chatId()
+    await user.click(within(chatList()).getByRole('button', { name: 'Действия с чатом «Второй»' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Переименовать' }))
+    const field = within(chatList()).getByLabelText('Название чата')
+    await user.clear(field)
+    await user.type(field, 'Осень{Enter}')
+
+    expect(await within(chatList()).findByRole('button', { name: 'Действия с чатом «Осень»' })).toBeTruthy()
+    expect(chatId()).toBe(openId)
+  })
+
+  it('offers a guest to sign in to share a chat from the menu of its row', async () => {
+    const user = renderWith([chatOf('Чат', 5, ['Привет'])])
+    await user.click(await within(chatList()).findByRole('button', { name: 'Действия с чатом «Чат»' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Поделиться' }))
+    expect(await screen.findByText(/Войдите, чтобы поделиться чатом/)).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Войти' }).getAttribute('href')).toBe('/login')
   })
 
   it('offers a guest to sign in to share the chat', async () => {
@@ -249,8 +323,9 @@ describe('the actions under an answer with hotels', () => {
     await waitFor(() => expect(within(log()).getAllByText('Атмосфера поездки')).toHaveLength(2))
     const shown = new Set(plan.options.map((o) => o.hotel?.id))
     const cards = within(log()).getAllByRole('list', { name: 'Отели' }).at(-1)!
-    for (const card of within(cards).getAllByRole('article'))
-      expect([...shown].some((id) => card.querySelector(`#option-${id}`))).toBe(false)
+    const links = (await within(cards).findAllByRole('article')).flatMap((card) => within(card).getAllByRole('link'))
+    expect(links.length).toBeGreaterThan(0)
+    for (const link of links) expect(shown.has(link.getAttribute('href')!.match(/^\/hotels\/([^?]+)/)?.[1])).toBe(false)
   })
 })
 
@@ -260,66 +335,100 @@ describe('the hotel cards of an answer', () => {
   const withParking = lisbonHotels.find((h) => getHotel(h.id)!.amenities.includes('parking'))!
   const without = lisbonHotels.find((h) => !getHotel(h.id)!.amenities.some((a) => a.startsWith('parking')))!
 
-  it('shows the rating, the real features, the price for the stay and «Выбрать»', async () => {
-    const plan = makePlan(lisbonBrief, today, destinations, newHotels, [withParking], {
+  /** The site's hotel card of a hotel, once the hotel has loaded. */
+  const cardOf = async (name: string) => (await within(log()).findByRole('link', { name })).closest('article')!
+  const comment = () => within(log()).getByRole('list', { name: 'Почему эти отели' })
+
+  it('shows the plain card of the home page, leading to the hotel on the plan’s dates', async () => {
+    const plan = makePlan(lisbonBrief, today, destinations, newHotels, [withParking])
+    renderWith([withPlan('Лиссабон', 5, plan)])
+    const card = await cardOf(withParking.name)
+    expect(within(card).queryByRole('group', { name: 'Фото отеля' })).toBeNull()
+    expect(within(card).queryByText(/Оценка гостей/)).toBeNull()
+    expect(card.textContent).toContain('км от центра')
+    expect(card.textContent).not.toMatch(/за \d+ ноч\S* · \d+ гост/)
+    expect(within(card).getByRole('link', { name: withParking.name }).getAttribute('href')).toContain(
+      `/hotels/${withParking.id}?checkin=${plan.query.checkIn}`,
+    )
+  })
+
+  it('tells why each hotel fits in a message after the cards (Scenario: Комментарий отдельным сообщением)', async () => {
+    const plan = makePlan({ ...lisbonBrief, budget: 1 }, today, destinations, newHotels, [withParking], {
       [withParking.id]: { views: [{ roomName: 'Люкс с видом на море', view: 'sea' }] },
     })
     renderWith([withPlan('Лиссабон', 5, plan)])
-    const card = await within(log()).findByRole('article', { name: withParking.name })
-    expect(await within(card).findByText('Парковка')).toBeTruthy()
-    expect(within(card).getByText('Номера с видом на море')).toBeTruthy()
-    expect(card.textContent).toMatch(/за \d+ ноч\S* · 2 гостя/)
-    expect(
-      within(card)
-        .getByRole('link', { name: `Выбрать «${withParking.name}»` })
-        .getAttribute('href'),
-    ).toContain(`/hotels/${withParking.id}?checkin=${plan.query.checkIn}`)
+    const card = await cardOf(withParking.name)
+    const line = within(await within(log()).findByRole('list', { name: 'Почему эти отели' })).getByRole('listitem')
+    expect(within(line).getByText(withParking.name)).toBeTruthy()
+    expect(await within(line).findByText('Парковка')).toBeTruthy()
+    expect(within(line).getByText('Номера с видом на море')).toBeTruthy()
+    expect(within(line).getByText('выше бюджета')).toBeTruthy()
+    expect(within(card).queryByText(/Парковка|с видом|выше бюджета/)).toBeNull()
+    // The cards, then the word, then the note on the budget.
+    const row = within(log()).getByRole('list', { name: 'Отели' })
+    expect(row.compareDocumentPosition(comment()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(log()).getByText(/В бюджет не уложился/)).toBeTruthy()
   })
 
   it('has no lines of features without data (Scenario: Без свойств)', async () => {
     const plan = makePlan(lisbonBrief, today, destinations, newHotels, [without])
     renderWith([withPlan('Лиссабон', 5, plan)])
-    const card = await within(log()).findByRole('article', { name: without.name })
-    await within(card).findByText(/км от центра/)
-    expect(within(card).queryByText(/Парковка/)).toBeNull()
-    expect(within(card).queryByText(/с видом/)).toBeNull()
-    expect(within(card).getByRole('link', { name: /^Выбрать/ })).toBeTruthy()
+    const card = await cardOf(without.name)
+    expect(within(card).getAllByText(/км от центра/).length).toBeGreaterThan(0)
+    expect(within(log()).queryByText(/Парковка/)).toBeNull()
+    expect(within(log()).queryByText(/с видом/)).toBeNull()
+  })
+
+  it('leads a city without a hotel to its search', async () => {
+    const plan = lisbonPlan()
+    const city: Plan = { ...plan, options: [{ ...plan.options[0], hotel: undefined }] }
+    const user = renderWith([withPlan('Лиссабон', 5, city)])
+    await user.click(within(log()).getByRole('button', { name: 'Искать в городе Лиссабон на эти даты' }))
+    expect(push).toHaveBeenCalledWith({ ...plan.query, destination: 'Лиссабон' })
+  })
+})
+
+// assistant-search, Requirement: Карточки и инструменты в ленте чата
+describe('the feed', () => {
+  it('has no avatar beside Eval’s messages', async () => {
+    renderWith([withPlan('Лиссабон', 5, lisbonPlan())])
+    await within(log()).findAllByRole('article')
+    expect(log().querySelector('[data-slot=message-avatar], img[src*="eval"]')).toBeNull()
+  })
+
+  it.each([
+    ['pending', 'Шаг выполняется:', 'Подбираю отели…'],
+    ['done', 'Шаг готово:', 'Подбираю отели — нашёл 3 отеля'],
+    ['failed', 'Шаг не удалось:', 'Подбираю отели — нет ответа'],
+  ] as const)('shows a %s step as a card of the tool with its status', (status, label, title) => {
+    const step = {
+      agent: 'search' as const,
+      title: 'Подбираю отели',
+      result: status === 'done' ? 'нашёл 3 отеля' : 'нет ответа',
+    }
+    const chat = chatOf('Лиссабон', 5, ['Лиссабон вдвоём'])
+    chat.messages.push(message('agent', '', minutesAgo(4), { status, data: { step } }))
+    renderWith([chat])
+    const card = within(log()).getByText(title).closest<HTMLElement>('[data-slot=trace]')!
+    expect(within(card).getByText('Инструмент').className).toMatch(/\buppercase\b/)
+    expect(within(card).getByText(label)).toBeTruthy()
+    expect(card.querySelector('[data-slot=trace-icon]')!.className).toMatch(/\brounded-full\b/)
   })
 })
 
 // assistant-search, Requirement: Голосовой ввод
 describe('the voice input', () => {
-  it('has no microphone without speech recognition (Scenario: Без поддержки)', async () => {
-    renderWith([])
-    expect(await screen.findByLabelText('Опишите поездку')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Надиктовать сообщение' })).toBeNull()
-  })
-
-  it('puts the dictated words into the field without sending them', async () => {
-    let recognition: { onresult: (event: unknown) => void; onend: () => void; lang: string } | undefined
-    class FakeRecognition {
-      lang = ''
-      onresult = () => {}
-      onend = () => {}
-      constructor() {
-        recognition = this as never
-      }
-      start() {}
-      stop() {
-        this.onend()
-      }
-      abort() {}
+  it('has no microphone even where speech recognition exists (Scenario: Без микрофона)', async () => {
+    ;(window as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition = class {}
+    try {
+      renderWith([])
+      expect(await screen.findByLabelText('Опишите поездку')).toBeTruthy()
+      expect(screen.queryByRole('button', { name: 'Надиктовать сообщение' })).toBeNull()
+      expect(screen.getByRole('button', { name: 'Отправить' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: /Приложить фото/ })).toBeTruthy()
+    } finally {
+      delete (window as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition
     }
-    ;(window as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition = FakeRecognition
-    const user = renderWith([])
-    await user.click(await screen.findByRole('button', { name: 'Надиктовать сообщение' }))
-    expect(recognition?.lang).toBe('ru-RU')
-    recognition!.onresult({ results: [Object.assign([{ transcript: 'тихий отель в Валенсии' }], { isFinal: true })] })
-    recognition!.onend()
-    await waitFor(() =>
-      expect((screen.getByLabelText('Опишите поездку') as HTMLTextAreaElement).value).toBe('тихий отель в Валенсии'),
-    )
-    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('shows the time under the messages', async () => {
@@ -348,7 +457,7 @@ describe('a shared chat', () => {
     )
     expect(screen.getByRole('heading', { level: 1, name: 'Лиссабон' })).toBeTruthy()
     expect(within(log()).getByText('Записал: Лиссабон.')).toBeTruthy()
-    expect(within(log()).getAllByRole('article').length).toBe(plan.options.length)
+    expect((await within(log()).findAllByRole('article')).length).toBe(plan.options.length)
     expect(screen.queryByLabelText('Опишите поездку')).toBeNull()
     expect(screen.queryByRole('navigation', { name: 'Чаты' })).toBeNull()
     expect(screen.queryByRole('group', { name: 'Что дальше' })).toBeNull()
@@ -361,7 +470,7 @@ describe('an unknown address', () => {
     fetchMock.mockResolvedValue(answer({ brief: { vibe: 'sea' } }))
     window.history.replaceState(null, '', '/assistant/5a1e0c3b-0000-4000-8000-000000000001')
     const user = renderWith([chatOf('Другой', 5, ['Привет'])])
-    expect(await screen.findByRole('heading', { name: /О каком путешествии вы мечтаете/ })).toBeTruthy()
+    expect(await screen.findByText(/О каком путешествии вы мечтаете/)).toBeTruthy()
     await user.type(screen.getByLabelText('Опишите поездку'), 'к морю{Enter}')
     await within(log()).findByText('к морю')
     expect(chatId()).toBe('5a1e0c3b-0000-4000-8000-000000000001')
@@ -390,8 +499,16 @@ describe('a chat about a hotel', () => {
     expect(within(feed.parentElement!).getByText('Не проверено')).toBeTruthy()
     expect(within(log()).getAllByText('Не проверено')).toHaveLength(1)
     expect(screen.getByRole('heading', { name: hotel.name })).toBeTruthy()
-    const link = screen.getByRole('link', { name: 'Страница отеля' })
+    const link = screen.getByRole('link', { name: hotel.name })
     expect(link.getAttribute('href')).toMatch(new RegExp(`^/hotels/${hotel.id}\\?`))
+    expect(screen.queryByRole('link', { name: 'Страница отеля' })).toBeNull()
+  })
+
+  it('opens the hotel page by the title of the chat (Scenario: Название чата отеля)', async () => {
+    renderWith([aboutHotel()])
+    const link = await screen.findByRole('link', { name: hotel.name })
+    expect(link.getAttribute('href')).toMatch(new RegExp(`^/hotels/${hotel.id}\\?`))
+    expect(screen.getByRole('button', { name: 'Переименовать чат' })).toBeTruthy()
   })
 
   it('keeps asking about the hotel after «Открыть в Эвале», with no plan or questions (Scenario: Открыть в Эвале)', async () => {

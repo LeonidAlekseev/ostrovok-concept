@@ -1,5 +1,5 @@
 import Image from 'next/image'
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import {
   Building2,
   Heart,
@@ -9,15 +9,21 @@ import {
   MessageCircle,
   Mountain,
   Palmtree,
+  EllipsisVertical,
+  Pencil,
   Plus,
   Search,
+  Share2,
+  Trash2,
   Waves,
   type LucideIcon,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { chatKind, chatPreview, chatTime, groupChats, searchChats, type ChatKind } from '../../lib/assistantChatList'
+import { DeleteDialog, RenameForm, ShareDialog } from './ChatActions'
 import { isPending, type Chat } from '../../lib/assistantChats'
 
 /** The icon of a chat by the kind of trip, on its tint. */
@@ -47,7 +53,7 @@ const KIND_ICON: Record<ChatKind, { icon: LucideIcon; tint: string }> = {
 export function ChatIcon({ chat, className = '' }: { chat: Chat; className?: string }) {
   const { icon: Icon, tint } = KIND_ICON[chatKind(chat.brief)]
   return (
-    <span className={`grid size-10 flex-none place-items-center rounded-xl ${tint} ${className}`} aria-hidden>
+    <span className={`grid size-10 flex-none place-items-center rounded-full ${tint} ${className}`} aria-hidden>
       <Icon className="size-5" />
     </span>
   )
@@ -58,17 +64,30 @@ interface Props {
   activeId: string | null
   /** The chats are still loading. */
   ready: boolean
+  signedIn: boolean
   onChoose: (chatId: string) => void
   onNew: () => void
+  onRename: (chatId: string, title: string) => void
+  onDelete: (chatId: string) => void
   className?: string
 }
 
 /**
  * The left column on wider screens, the first screen on phones: the logo, «Новый чат», the search over the titles
  * and the messages, the chats by day (an icon by the trip, the title, the time, the start of the last message, a mark
- * of a new or a pending answer) and the card of the assistant.
+ * of a new or a pending answer, the menu of «Переименовать», «Поделиться» and «Удалить») and the card of the assistant.
  */
-export function ChatList({ chats, activeId, ready, onChoose, onNew, className = '' }: Props) {
+export function ChatList({
+  chats,
+  activeId,
+  ready,
+  signedIn,
+  onChoose,
+  onNew,
+  onRename,
+  onDelete,
+  className = '',
+}: Props) {
   const [query, setQuery] = useState('')
   const searchId = useId()
   // The groups and the times are of the day the page opened.
@@ -87,13 +106,13 @@ export function ChatList({ chats, activeId, ready, onChoose, onNew, className = 
       <Button
         variant="secondary"
         size="lg"
-        className="h-12 w-full rounded-2xl bg-[color-mix(in_srgb,var(--primary)_10%,var(--decor-light))] text-base text-primary hover:bg-[color-mix(in_srgb,var(--primary)_16%,var(--decor-light))]"
+        className="h-12 w-full rounded-2xl bg-[color-mix(in_srgb,var(--primary)_10%,var(--decor-light))] text-base text-primary hover:bg-[color-mix(in_srgb,var(--primary)_16%,var(--decor-light))] max-lg:fixed max-lg:right-[max(16px,env(safe-area-inset-right))] max-lg:bottom-[max(16px,env(safe-area-inset-bottom))] max-lg:z-20 max-lg:h-14 max-lg:w-auto max-lg:rounded-full max-lg:bg-primary max-lg:px-5 max-lg:text-primary-foreground max-lg:shadow-(--shadow-popover) max-lg:hover:bg-primary/90"
         onClick={onNew}
       >
         <Plus className="size-5" aria-hidden />
         Новый чат
       </Button>
-      <InputGroup className="h-11 rounded-2xl border-0 bg-(--decor-light) shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--border)_80%,transparent)]">
+      <InputGroup className="h-11 rounded-2xl border-0 bg-muted shadow-none">
         <InputGroupAddon>
           <Search className="size-4.5" aria-hidden />
         </InputGroupAddon>
@@ -109,14 +128,22 @@ export function ChatList({ chats, activeId, ready, onChoose, onNew, className = 
         />
       </InputGroup>
 
-      <div className="-mx-1 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-1 pb-1">
+      <div className="-mx-1 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-1 pb-1 max-lg:pb-24">
         {groups.map((group) => (
           <section key={group.label} aria-label={group.label} className="flex flex-col gap-1">
             <h3 className="px-2 text-sm/[normal] font-medium text-muted-foreground">{group.label}</h3>
-            <ul className="flex flex-col gap-0.5">
+            <ul className="flex flex-col divide-y divide-border/70">
               {group.chats.map((chat) => (
                 <li key={chat.id}>
-                  <ChatRow chat={chat} now={now} current={chat.id === activeId} onChoose={onChoose} />
+                  <ChatRow
+                    chat={chat}
+                    now={now}
+                    current={chat.id === activeId}
+                    signedIn={signedIn}
+                    onChoose={onChoose}
+                    onRename={(title) => onRename(chat.id, title)}
+                    onDelete={() => onDelete(chat.id)}
+                  />
                 </li>
               ))}
             </ul>
@@ -147,44 +174,103 @@ interface RowProps {
   chat: Chat
   now: Date
   current: boolean
+  signedIn: boolean
   onChoose: (chatId: string) => void
+  onRename: (title: string) => void
+  onDelete: () => void
 }
 
-function ChatRow({ chat, now, current, onChoose }: RowProps) {
+function ChatRow({ chat, now, current, signedIn, onChoose, onRename, onDelete }: RowProps) {
   const pending = isPending(chat)
   const preview = chatPreview(chat)
+  const [editing, setEditing] = useState(false)
+  const [sharing, setSharing] = useState(false)
+  const [confirm, setConfirm] = useState(false)
+  // «Переименовать» of the menu: the focus stays in the field, not back on the menu's button.
+  const renaming = useRef(false)
+  const title = chat.title || 'Новый чат'
+  if (editing) {
+    return (
+      <div className="flex items-center gap-3 px-2 py-3">
+        <ChatIcon chat={chat} className="size-12" />
+        <RenameForm
+          title={chat.title}
+          className="min-w-0 flex-1"
+          onDone={(next) => {
+            if (next !== null) onRename(next)
+            renaming.current = false
+            setEditing(false)
+          }}
+        />
+      </div>
+    )
+  }
   return (
-    <button
-      type="button"
-      className="group flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left transition-colors hover:bg-(--decor-light) aria-[current=true]:bg-[color-mix(in_srgb,var(--primary)_10%,var(--decor-light))]"
+    <div
+      className="group flex items-center gap-1 rounded-2xl pr-1 transition-colors hover:bg-(--decor-light) aria-[current=true]:bg-[color-mix(in_srgb,var(--primary)_10%,var(--decor-light))]"
       aria-current={current}
-      onClick={() => onChoose(chat.id)}
     >
-      <ChatIcon chat={chat} />
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex items-baseline gap-2">
-          <span className="min-w-0 flex-1 truncate text-[15px]/[1.3] font-semibold group-aria-[current=true]:text-primary">
-            {chat.title || 'Новый чат'}
-          </span>
-          <time
-            dateTime={chat.updatedAt}
-            className="flex-none text-xs/[normal] text-muted-foreground group-aria-[current=true]:text-primary"
-          >
-            {chatTime(chat.updatedAt, now)}
-          </time>
-        </span>
-        <span className="flex items-center gap-1.5 text-sm/[1.3] text-muted-foreground">
-          {pending ? (
-            <span className="inline-flex items-center gap-1">
-              <LoaderCircle className="size-3.5 motion-safe:animate-spin" aria-hidden />
-              ждёт ответа
+      <button
+        type="button"
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-2 py-3 text-left"
+        aria-current={current}
+        onClick={() => onChoose(chat.id)}
+      >
+        <ChatIcon chat={chat} className="size-12" />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex items-baseline gap-2">
+            <span className="min-w-0 flex-1 truncate text-base/[1.3] font-bold group-aria-[current=true]:text-primary">
+              {title}
             </span>
-          ) : (
-            <span className="min-w-0 flex-1 truncate">{preview}</span>
-          )}
-          {chat.unread && <Badge className="h-4 flex-none px-1.5 text-[11px]">новое</Badge>}
+            <time
+              dateTime={chat.updatedAt}
+              className="flex-none text-xs/[normal] text-muted-foreground group-aria-[current=true]:text-primary"
+            >
+              {chatTime(chat.updatedAt, now)}
+            </time>
+          </span>
+          <span className="flex items-center gap-1.5 text-sm/[1.3] text-muted-foreground">
+            {pending ? (
+              <span className="inline-flex items-center gap-1">
+                <LoaderCircle className="size-3.5 motion-safe:animate-spin" aria-hidden />
+                ждёт ответа
+              </span>
+            ) : (
+              <span className="min-w-0 flex-1 truncate">{preview}</span>
+            )}
+            {chat.unread && <Badge className="h-4 flex-none px-1.5 text-[11px]">новое</Badge>}
+          </span>
         </span>
-      </span>
-    </button>
+      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={<Button variant="ghost" size="icon-sm" className="flex-none text-muted-foreground" />}
+          aria-label={`Действия с чатом «${title}»`}
+        >
+          <EllipsisVertical className="size-5" aria-hidden />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-44" finalFocus={() => !renaming.current}>
+          <DropdownMenuItem
+            onClick={() => {
+              renaming.current = true
+              setEditing(true)
+            }}
+          >
+            <Pencil aria-hidden />
+            Переименовать
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setSharing(true)}>
+            <Share2 aria-hidden />
+            Поделиться
+          </DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={() => setConfirm(true)}>
+            <Trash2 aria-hidden />
+            Удалить
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ShareDialog chat={chat} signedIn={signedIn} open={sharing} onOpenChange={setSharing} />
+      <DeleteDialog chat={chat} open={confirm} onOpenChange={setConfirm} onDelete={onDelete} />
+    </div>
   )
 }

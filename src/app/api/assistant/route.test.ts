@@ -1,7 +1,9 @@
 import { APICallError, type LanguageModel } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getAssistantModel, getVisionModel } from '@/lib/ai/model'
+import type { ModelLink } from '@/lib/ai/chain'
+import { getTextModels, getVisionModels } from '@/lib/ai/model'
+import { allowVisionRequest } from '@/lib/ai/rateLimit'
 import { semanticSearch } from '@/lib/ai/semantic'
 import { loadHotelFeatures } from '@/lib/db/features'
 import type { HotelFeatures } from '@/lib/features'
@@ -9,7 +11,7 @@ import { nextQuestion } from '@/lib/assistant'
 import { getHotel } from '@/lib/catalogGenerator'
 import { POST } from './route'
 
-vi.mock('@/lib/ai/model', () => ({ getAssistantModel: vi.fn(), getVisionModel: vi.fn() }))
+vi.mock('@/lib/ai/model', () => ({ getTextModels: vi.fn(), getVisionModels: vi.fn() }))
 vi.mock('@/lib/ai/semantic', () => ({ SEMANTIC_TIMEOUT_MS: 8000, semanticSearch: vi.fn() }))
 vi.mock('@/lib/db/catalog', () => import('@/test/catalog'))
 vi.mock('@/lib/db/features', () => ({ loadHotelFeatures: vi.fn() }))
@@ -41,9 +43,21 @@ const answer = (fields: Record<string, unknown>) => ({
   warnings: [],
 })
 
+/** A chain of `models` in order, each with `timeoutMs`. */
+const chain = (models: MockLanguageModelV4[], timeoutMs = 9000): ModelLink[] =>
+  models.map((model, i) => ({ id: `model-${i + 1}`, model: model as LanguageModel, timeoutMs }))
+
+/** The text chain of one model, or none (no key). */
 function setModel(model: MockLanguageModelV4 | undefined) {
-  vi.mocked(getAssistantModel).mockResolvedValue(model as LanguageModel | undefined)
+  vi.mocked(getTextModels).mockResolvedValue(model && chain([model]))
 }
+
+const failing = (message: string) =>
+  new MockLanguageModelV4({
+    doGenerate: async () => {
+      throw new Error(message)
+    },
+  })
 
 let ip = 0
 /** Each request comes from its own address unless one is given, so the rate limit stays out of the way. */
@@ -60,9 +74,9 @@ function post(body: unknown, address = `10.0.0.${++ip}`) {
 const ask = (text: string, brief = {}) => post({ messages: [{ role: 'user', text }], brief })
 
 beforeEach(() => {
-  vi.mocked(getVisionModel).mockResolvedValue(undefined)
+  vi.mocked(getVisionModels).mockResolvedValue(undefined)
   vi.spyOn(console, 'warn').mockImplementation(() => {})
-  vi.mocked(semanticSearch).mockResolvedValue(null)
+  vi.mocked(semanticSearch).mockResolvedValue({ status: 'empty' })
   vi.mocked(loadHotelFeatures).mockResolvedValue(new Map())
 })
 afterEach(() => {
@@ -165,7 +179,7 @@ describe('POST /api/assistant', () => {
     expect((await (await ask('чтобы был красивый вид из окна')).json()).brief).toEqual({ view: 'any' })
   })
 
-  it('turns reasoning off for the 8 seconds', async () => {
+  it('turns reasoning off for the 9 seconds', async () => {
     const model = new MockLanguageModelV4({ doGenerate: answer({}) })
     setModel(model)
     await ask('море')
@@ -194,7 +208,11 @@ describe('POST /api/assistant', () => {
       }),
     )
     const response = await ask('Хочу на море в октябре, бюджет до 70 000 ₽')
-    expect(await response.json()).toEqual({ brief: { vibe: 'sea', when: 9, budget: 70000 }, source: 'rules' })
+    expect(await response.json()).toEqual({
+      brief: { vibe: 'sea', when: 9, budget: 70000 },
+      source: 'rules',
+      modelsDown: true,
+    })
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('429 Rate limit exceeded'))
   })
 
@@ -204,10 +222,14 @@ describe('POST /api/assistant', () => {
         doGenerate: { ...answer({}), content: [{ type: 'text', text: 'Конечно! Море — отличный выбор.' }] },
       }),
     )
-    expect(await (await ask('в горы')).json()).toEqual({ brief: { vibe: 'mountains' }, source: 'rules' })
+    expect(await (await ask('в горы')).json()).toEqual({
+      brief: { vibe: 'mountains' },
+      source: 'rules',
+      modelsDown: true,
+    })
   })
 
-  it('gives the model one attempt of 8 seconds, then the rules (Scenario: Модель недоступна)', async () => {
+  it('gives the model one attempt of 9 seconds, then the rules (Scenario: Модель недоступна)', async () => {
     const clock = new AbortController()
     const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(clock.signal)
     const model = new MockLanguageModelV4({
@@ -219,9 +241,81 @@ describe('POST /api/assistant', () => {
     })
     setModel(model)
     const response = await ask('в горы')
-    expect(timeout).toHaveBeenCalledWith(8000)
+    expect(timeout).toHaveBeenCalledWith(9000)
     expect(model.doGenerateCalls).toHaveLength(1)
-    expect(await response.json()).toEqual({ brief: { vibe: 'mountains' }, source: 'rules' })
+    expect(await response.json()).toEqual({ brief: { vibe: 'mountains' }, source: 'rules', modelsDown: true })
+  })
+
+  it('asks the next text model with the same chat when one fails (Scenario: Запасная текстовая модель)', async () => {
+    const first = failing('500 Internal Server Error')
+    const second = new MockLanguageModelV4({ doGenerate: answer({ vibe: 'sea' }) })
+    vi.mocked(getTextModels).mockResolvedValue(chain([first, second]))
+    const response = await post({
+      messages: [
+        { role: 'user', text: 'Хочу отдохнуть' },
+        { role: 'assistant', text: 'Куда хотите?' },
+        { role: 'user', text: 'туда, где тепло и можно поплавать' },
+      ],
+      brief: {},
+    })
+    expect(await response.json()).toMatchObject({ brief: { vibe: 'sea' }, source: 'model' })
+    expect(second.doGenerateCalls[0].prompt).toEqual(first.doGenerateCalls[0].prompt)
+    expect(second.doGenerateCalls[0].prompt.filter((m) => m.role !== 'system')).toHaveLength(3)
+  })
+
+  it('keeps the text chain within its 9 s, then the rules and the warning (Scenario: Ни одна модель не ответила)', async () => {
+    const times: number[] = []
+    const real = AbortSignal.timeout.bind(AbortSignal)
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms) => {
+      times.push(ms)
+      return real(ms)
+    })
+    // Each model stalls for the whole time the chain gives it (the time before understandWish's own cap).
+    const stalls = () =>
+      new MockLanguageModelV4({
+        doGenerate: async () => {
+          vi.setSystemTime(Date.now() + times.at(-2)!)
+          throw new DOMException('The operation timed out.', 'TimeoutError')
+        },
+      })
+    const models = [stalls(), stalls(), stalls()]
+    vi.mocked(getTextModels).mockResolvedValue(chain(models, 3000))
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const start = Date.now()
+    const body = await (await ask('в горы')).json()
+    const spent = Date.now() - start
+    vi.useRealTimers()
+    expect(body).toEqual({ brief: { vibe: 'mountains' }, source: 'rules', modelsDown: true })
+    expect(models.map((m) => m.doGenerateCalls.length)).toEqual([1, 1, 1])
+    expect(spent).toBe(9000)
+  })
+
+  it('gives minimax the 2 s left when lightning and bolt stall (Scenario: Две модели зависли)', async () => {
+    // Each stall lasts the model's own time: lightning 3,5 s, bolt 3,5 s; the rest of the 9 s is minimax's.
+    const stall = (ms: number) =>
+      new MockLanguageModelV4({
+        doGenerate: async () => {
+          vi.setSystemTime(Date.now() + ms)
+          throw new DOMException('The operation timed out.', 'TimeoutError')
+        },
+      })
+    const lightning = stall(3500)
+    const bolt = stall(3500)
+    const minimax = new MockLanguageModelV4({ doGenerate: answer({ vibe: 'mountains' }) })
+    vi.mocked(getTextModels).mockResolvedValue([
+      { id: 'lightning', model: lightning as LanguageModel, timeoutMs: 3500 },
+      { id: 'bolt', model: bolt as LanguageModel, timeoutMs: 3500 },
+      { id: 'minimax', model: minimax as LanguageModel, timeoutMs: 5000 },
+    ])
+    const timeout = vi.spyOn(AbortSignal, 'timeout')
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const body = await (await ask('в горы')).json()
+    vi.useRealTimers()
+    expect(lightning.doGenerateCalls).toHaveLength(1)
+    expect(bolt.doGenerateCalls).toHaveLength(1)
+    expect(minimax.doGenerateCalls).toHaveLength(1)
+    expect(timeout).toHaveBeenCalledWith(2000)
+    expect(body).toMatchObject({ brief: { vibe: 'mountains' }, source: 'model' })
   })
 
   it('cleans the brief sent by the client', async () => {
@@ -254,14 +348,11 @@ describe('POST /api/assistant', () => {
 describe('POST /api/assistant: the semantic search', () => {
   const complete = { destinationId: 'prague', when: 5, party: 'solo' }
   const hit = (id: string) => ({ id, destinationId: 'prague', score: 0.9 })
+  const found = (...ids: string[]) => ({ status: 'found' as const, hits: ids.map(hit) })
 
   it('adds the hotels found for all the traveller’s words in the plan’s cities once the plan is due', async () => {
     setModel(undefined)
-    vi.mocked(semanticSearch).mockResolvedValue([
-      hit('prague-skyline-hostel'),
-      hit('unknown'),
-      hit('prague-central-hostel'),
-    ])
+    vi.mocked(semanticSearch).mockResolvedValue(found('prague-skyline-hostel', 'unknown', 'prague-central-hostel'))
     const response = await post({
       messages: [
         { role: 'user', text: 'тихий хостел с быстрым Wi‑Fi' },
@@ -293,6 +384,98 @@ describe('POST /api/assistant: the semantic search', () => {
     expect(semanticSearch).toHaveBeenCalledTimes(1)
     expect(body.matches).toBeUndefined()
     expect(body.source).toBe('rules')
+  })
+
+  it('answers within 15 s when the models take their 9 s and the first request to the embeddings hangs', async () => {
+    // The text models use their 9 s, the rules come after; the search gets what the answer has left.
+    const stall = new MockLanguageModelV4({
+      doGenerate: async () => {
+        vi.setSystemTime(Date.now() + 9000)
+        throw new DOMException('The operation timed out.', 'TimeoutError')
+      },
+    })
+    vi.mocked(getTextModels).mockResolvedValue(chain([stall], 9000))
+    vi.mocked(semanticSearch).mockImplementation(async (_, { timeoutMs = 0 }) => {
+      vi.setSystemTime(Date.now() + timeoutMs)
+      return { status: 'failed', reason: 'timeout' }
+    })
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const start = Date.now()
+    const body = await (
+      await post({
+        messages: [
+          { role: 'user', text: 'тихий хостел с быстрым Wi‑Fi' },
+          { role: 'assistant', text: 'Куда?' },
+          { role: 'user', text: 'в Прагу' },
+        ],
+        brief: complete,
+      })
+    ).json()
+    const spent = Date.now() - start
+    vi.useRealTimers()
+    // The first try leaves 1.5 s for the retry, which the answer's time runs out on.
+    const [[, first], [, retry]] = vi.mocked(semanticSearch).mock.calls
+    expect(first.timeoutMs).toBe(4500)
+    expect(retry.timeoutMs).toBe(1500)
+    expect(body.matches).toBeUndefined()
+    expect(body.steps[0]).toMatchObject({ agent: 'search', result: 'модель не ответила — подобрал по правилам' })
+    expect(spent).toBe(15_000)
+  })
+
+  it('answers by the meaning within 15 s when the first embedding hangs and the retry finds the hotels', async () => {
+    setModel(undefined)
+    // The first try runs out of its own time; the retry asks the model anew and finds the hotels.
+    vi.mocked(semanticSearch)
+      .mockImplementationOnce(async (_, { timeoutMs = 0 }) => {
+        vi.setSystemTime(Date.now() + timeoutMs)
+        return { status: 'failed', reason: 'timeout' }
+      })
+      .mockResolvedValueOnce(found('prague-skyline-hostel'))
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const start = Date.now()
+    const body = await (await ask('тихо', complete)).json()
+    const spent = Date.now() - start
+    vi.useRealTimers()
+    expect(semanticSearch).toHaveBeenCalledTimes(2)
+    expect(body.matches.map((h: { id: string }) => h.id)).toEqual(['prague-skyline-hostel'])
+    expect(body.modelsDown).toBeUndefined()
+    expect(spent).toBeLessThanOrEqual(15_000)
+  })
+
+  it('tries the search again when the first try fails, and the hotels found are no failure (Scenario: Повтор успел)', async () => {
+    setModel(undefined)
+    vi.mocked(semanticSearch)
+      .mockResolvedValueOnce({ status: 'failed', reason: 'model' })
+      .mockResolvedValueOnce(found('prague-skyline-hostel'))
+    const body = await (await ask('тихо', complete)).json()
+    expect(semanticSearch).toHaveBeenCalledTimes(2)
+    expect(body.matches.map((h: { id: string }) => h.id)).toEqual(['prague-skyline-hostel'])
+    expect(body.modelsDown).toBeUndefined()
+    expect(body.steps[0]).toMatchObject({ agent: 'search', status: 'done', result: 'нашёл 1 отель' })
+  })
+
+  it('says the models are down once, when the search and its retry both fail (Scenario: Повтор не удался)', async () => {
+    setModel(undefined)
+    vi.mocked(semanticSearch).mockResolvedValue({ status: 'failed', reason: 'database' })
+    const body = await (await ask('тихо', complete)).json()
+    expect(semanticSearch).toHaveBeenCalledTimes(2)
+    expect(body.matches).toBeUndefined()
+    expect(body.modelsDown).toBe(true)
+    expect(body.steps[0]).toMatchObject({ agent: 'search', result: 'модель не ответила — подобрал по правилам' })
+  })
+
+  it('does not retry nor warn without a key or with an empty result', async () => {
+    setModel(undefined)
+    vi.mocked(semanticSearch).mockResolvedValue({ status: 'failed', reason: 'no-key' })
+    const noKey = await (await ask('тихо', complete)).json()
+    expect(semanticSearch).toHaveBeenCalledTimes(1)
+    expect(noKey.modelsDown).toBeUndefined()
+    expect(noKey.steps[0]).toMatchObject({ result: 'подобрал по каталогу' })
+
+    vi.mocked(semanticSearch).mockReset().mockResolvedValue({ status: 'empty' })
+    const empty = await (await ask('тихо', complete)).json()
+    expect(semanticSearch).toHaveBeenCalledTimes(1)
+    expect(empty.modelsDown).toBeUndefined()
   })
 })
 
@@ -440,6 +623,7 @@ describe('POST /api/assistant: a question about a hotel', () => {
     const body = await (await aboutHotel('Есть ли парковка?')).json()
     expect(body.source).toBe('rules')
     expect(body.reply).toMatch(/парковк/i)
+    expect(body.modelsDown).toBe(true)
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('429 Rate limit exceeded'))
   })
 
@@ -455,19 +639,23 @@ describe('POST /api/assistant with photos', () => {
   const photo = 'data:image/webp;base64,UklGRhIAAABXRUJQVlA4'
   const withPhotos = (text: string, photos = [photo], brief = {}, address?: string) =>
     post({ messages: [{ role: 'user', text }], brief, photos }, address)
-  const sees = (fields: Record<string, unknown>) =>
-    vi.mocked(getVisionModel).mockResolvedValue(
-      new MockLanguageModelV4({
-        doGenerate: answer({ features: [], view: null, place: null, ...fields }),
-      }) as LanguageModel,
-    )
+  const sight = (fields: Record<string, unknown>) =>
+    new MockLanguageModelV4({ doGenerate: answer({ features: [], view: null, place: null, ...fields }) })
+  const sees = (fields: Record<string, unknown>) => vi.mocked(getVisionModels).mockResolvedValue(chain([sight(fields)]))
+  const httpError = (statusCode: number) =>
+    new MockLanguageModelV4({
+      doGenerate: async () => {
+        throw new APICallError({ message: '', url: 'x', requestBodyValues: {}, statusCode })
+      },
+    })
   const hit = (id: string) => ({ id, destinationId: 'prague', score: 0.9 })
+  const found = (...ids: string[]) => ({ status: 'found' as const, hits: ids.map(hit) })
 
   it('asks what to do with photos sent without words (Scenario: Фото без текста)', async () => {
     setModel(undefined)
     const body = await (await withPhotos('Фото')).json()
     expect(body).toEqual({ brief: {}, source: 'rules', photo: { action: 'ask' } })
-    expect(getVisionModel).not.toHaveBeenCalled()
+    expect(getVisionModels).not.toHaveBeenCalled()
   })
 
   it('asks when the text model cannot tell either', async () => {
@@ -479,7 +667,7 @@ describe('POST /api/assistant with photos', () => {
   it('looks for similar hotels by the photo’s description at once (Scenario: Понятный текст)', async () => {
     setModel(undefined)
     sees({ description: 'Номер в старом городе с деревянными балками.', features: ['старый город'] })
-    vi.mocked(semanticSearch).mockResolvedValue([hit('prague-skyline-hostel'), hit('unknown')])
+    vi.mocked(semanticSearch).mockResolvedValue(found('prague-skyline-hostel', 'unknown'))
     const body = await (await withPhotos('найди похожий отель')).json()
     expect(body).toMatchObject({
       brief: {},
@@ -492,7 +680,9 @@ describe('POST /api/assistant with photos', () => {
     expect(text).toBe('старый город. Номер в старом городе с деревянными балками')
     expect(options.destinationIds).toBeUndefined()
     // The photos go to the model that sees them as images.
-    const vision = (await vi.mocked(getVisionModel).mock.results[0].value) as MockLanguageModelV4
+    const [{ model: vision }] = (await vi.mocked(getVisionModels).mock.results[0].value) as {
+      model: MockLanguageModelV4
+    }[]
     const parts = vision.doGenerateCalls[0].prompt.at(-1)!.content as { type: string }[]
     expect(parts.map((p) => p.type)).toEqual(['file', 'text'])
   })
@@ -501,31 +691,32 @@ describe('POST /api/assistant with photos', () => {
     setModel(undefined)
     sees({ description: 'Номер с видом на море.', features: ['вид на море'] })
     vi.mocked(semanticSearch)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce([hit('prague-skyline-hostel')])
-    const found = await (await withPhotos('найди похожий')).json()
-    expect(found.matches.map((h: { id: string }) => h.id)).toEqual(['prague-skyline-hostel'])
+      .mockResolvedValueOnce({ status: 'failed', reason: 'timeout' })
+      .mockResolvedValueOnce(found('prague-skyline-hostel'))
+    const found1 = await (await withPhotos('найди похожий')).json()
+    expect(found1.matches.map((h: { id: string }) => h.id)).toEqual(['prague-skyline-hostel'])
+    expect(found1.photo.missed).toBeUndefined()
     const [[first, firstOptions], [retry]] = vi.mocked(semanticSearch).mock.calls
     expect(first).toBe('вид на море. Номер с видом на море')
     expect(retry).toBe('вид на море')
     expect(firstOptions.timeoutMs).toBeLessThanOrEqual(6000)
 
-    // Nothing found at once is not the search failing.
-    vi.mocked(semanticSearch).mockReset().mockResolvedValue(null)
-    const none = await (await withPhotos('найди похожий')).json()
-    expect(none.photo.missed).toBeUndefined()
-    expect(none.steps[0]).toMatchObject({ status: 'done', result: 'похожих не нашёл' })
-
-    // A search that takes its whole time did not answer.
+    // Nothing found is not the search failing, however long it took.
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.mocked(semanticSearch)
       .mockReset()
       .mockImplementation(async (_, { timeoutMs = 0 }) => {
         vi.setSystemTime(Date.now() + timeoutMs)
-        return null
+        return { status: 'empty' }
       })
-    const missed = await (await withPhotos('найди похожий')).json()
+    const none = await (await withPhotos('найди похожий')).json()
     vi.useRealTimers()
+    expect(none.photo.missed).toBeUndefined()
+    expect(none.steps.at(-1)).toMatchObject({ status: 'done', result: 'похожих не нашёл' })
+
+    // A failure, however quick, is the search not answering.
+    vi.mocked(semanticSearch).mockReset().mockResolvedValue({ status: 'failed', reason: 'no-key' })
+    const missed = await (await withPhotos('найди похожий')).json()
     expect(missed.photo).toMatchObject({ action: 'similar', missed: true })
     expect(missed.matches).toBeUndefined()
     expect(missed.steps).toEqual([
@@ -571,48 +762,158 @@ describe('POST /api/assistant with photos', () => {
     expect(body).toEqual({ brief: {}, source: 'rules', photo: { action: 'unseen' } })
   })
 
-  it('marks a model error or an answer not in Russian as unstable for the client to ask again', async () => {
+  it('asks the next model that sees photos when one fails, with the same photos (Scenario: Провайдер ответил со второго раза)', async () => {
     setModel(undefined)
-    vi.mocked(getVisionModel).mockResolvedValue(
-      new MockLanguageModelV4({
-        doGenerate: async () => {
-          throw new Error('504 Gateway Timeout')
-        },
-      }) as LanguageModel,
+    const first = httpError(500)
+    const second = sight({ description: 'Номер с видом на море.', features: ['вид на море'] })
+    const third = sight({ description: 'Не спрашивали.' })
+    vi.mocked(getVisionModels).mockResolvedValue(chain([first, second, third]))
+    vi.mocked(semanticSearch).mockResolvedValue(found('prague-skyline-hostel'))
+    const body = await (await withPhotos('найди похожий')).json()
+    expect(body.photo).toMatchObject({ action: 'similar', seen: 'Номер с видом на море.' })
+    expect(body.steps).toEqual([
+      { agent: 'vision', title: 'Модель фото не ответила, смотрю другой', status: 'done', result: 'посмотрел' },
+      expect.objectContaining({ agent: 'search' }),
+    ])
+    expect(third.doGenerateCalls).toHaveLength(0)
+    // The second model gets the request of the first: the same photos, the same words.
+    expect(second.doGenerateCalls[0].prompt).toEqual(first.doGenerateCalls[0].prompt)
+  })
+
+  it('takes an answer not in Russian as a failure and asks the next model', async () => {
+    setModel(undefined)
+    const english = sight({ description: 'A room with a view.' })
+    vi.mocked(getVisionModels).mockResolvedValue(chain([english, sight({ description: 'Тихий двор с садом.' })]))
+    const body = await (await withPhotos('найди похожий')).json()
+    expect(body.photo).toMatchObject({ action: 'similar', seen: 'Тихий двор с садом.' })
+  })
+
+  it('answers the words without the photos when no model sees them (Scenario: Провайдер не ответил)', async () => {
+    const text = new MockLanguageModelV4({ doGenerate: answer({ vibe: 'sea' }) })
+    setModel(text)
+    vi.mocked(getVisionModels).mockResolvedValue(
+      chain([failing('500 Internal Server Error'), httpError(429), failing('504 Gateway Timeout')]),
     )
-    expect((await (await withPhotos('найди похожий')).json()).photo).toEqual({ action: 'unstable' })
+    const body = await post({
+      messages: [
+        { role: 'user', text: 'Хочу в Валенсию' },
+        { role: 'assistant', text: 'Когда поедете?' },
+        { role: 'user', text: 'хочу на море, найди похожий' },
+      ],
+      brief: { destinationId: 'valencia' },
+      photos: [photo],
+    }).then((r) => r.json())
+    expect(body).toMatchObject({ brief: { destinationId: 'valencia', vibe: 'sea' }, source: 'model' })
+    expect(body.photo).toEqual({ action: 'skipped' })
+    expect(body.steps).toEqual([
+      {
+        agent: 'vision',
+        title: 'Модель фото не ответила, смотрю другой',
+        status: 'failed',
+        result: 'ни одна модель не ответила',
+      },
+    ])
+    // The text model reads the whole chat, as without photos.
+    expect(text.doGenerateCalls[0].prompt.filter((m) => m.role !== 'system')).toHaveLength(3)
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('504 Gateway Timeout'))
-    // An error of the API brings its status and its short answer, not the request.
-    vi.mocked(getVisionModel).mockResolvedValue(
+  })
+
+  it('says the photos went unseen when no model sees them and the message has no words', async () => {
+    setModel(undefined)
+    vi.mocked(getVisionModels).mockResolvedValue(chain([failing('500'), failing('500'), failing('500')]))
+    const body = await (await withPhotos('Найти похожие отели')).json()
+    expect(body).toMatchObject({ brief: {}, source: 'rules', photo: { action: 'unseen' } })
+  })
+
+  it('says the limit is over only when every model that sees photos answered 429 (Scenario: Лимит запросов к модели фото)', async () => {
+    setModel(undefined)
+    vi.mocked(getVisionModels).mockResolvedValue(chain([httpError(429), httpError(429), httpError(429)]))
+    expect(await (await withPhotos('найди похожий')).json()).toEqual({
+      brief: {},
+      source: 'rules',
+      photo: { action: 'limited' },
+    })
+  })
+
+  it('starts the next photos with the main model again (Scenario: Снова с основной)', async () => {
+    setModel(undefined)
+    const main = new MockLanguageModelV4({
+      doGenerate: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('500'))
+        .mockResolvedValue(answer({ description: 'Бассейн на крыше.', features: [], view: null, place: null })),
+    })
+    const spare = sight({ description: 'Номер с балконом.' })
+    vi.mocked(getVisionModels).mockResolvedValue(chain([main, spare]))
+    expect((await (await withPhotos('найди похожий')).json()).photo.seen).toBe('Номер с балконом.')
+    expect((await (await withPhotos('найди похожий')).json()).photo.seen).toBe('Бассейн на крыше.')
+    expect(main.doGenerateCalls).toHaveLength(2)
+    expect(spare.doGenerateCalls).toHaveLength(1)
+  })
+
+  it('keeps the models that see photos within the answer’s time', async () => {
+    setModel(undefined)
+    const times: number[] = []
+    const real = AbortSignal.timeout.bind(AbortSignal)
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms) => {
+      times.push(ms)
+      return real(ms)
+    })
+    // Each model stalls for the whole time the chain gives it (the time before seePhotos' own cap of 12 s).
+    const stalls = () =>
       new MockLanguageModelV4({
         doGenerate: async () => {
-          throw new APICallError({
-            message: '',
-            url: 'https://integrate.api.nvidia.com/v1/chat/completions',
-            requestBodyValues: { messages: ['secret photo'] },
-            statusCode: 429,
-            responseBody: `{"detail":"Too many requests ${'x'.repeat(400)}"}`,
-          })
+          vi.setSystemTime(Date.now() + times.at(-2)!)
+          throw new DOMException('The operation timed out.', 'TimeoutError')
         },
-      }) as LanguageModel,
+      })
+    const models = [stalls(), stalls(), stalls()]
+    vi.mocked(getVisionModels).mockResolvedValue(chain(models, 10_000))
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const start = Date.now()
+    const body = await (await withPhotos('Найти похожие отели')).json()
+    const spent = Date.now() - start
+    vi.useRealTimers()
+    expect(body.photo).toEqual({ action: 'unseen' })
+    // 10 s for the first, the 8 s left of the 18 s for the second, no time for the third.
+    expect(models.map((m) => m.doGenerateCalls.length)).toEqual([1, 1, 0])
+    expect(spent).toBe(18_000)
+  })
+
+  it('brings the status and the short answer of an API error to the log, not the request', async () => {
+    setModel(undefined)
+    vi.mocked(getVisionModels).mockResolvedValue(
+      chain([
+        new MockLanguageModelV4({
+          doGenerate: async () => {
+            throw new APICallError({
+              message: '',
+              url: 'https://integrate.api.nvidia.com/v1/chat/completions',
+              requestBodyValues: { messages: ['secret photo'] },
+              statusCode: 429,
+              responseBody: `{"detail":"Too many requests ${'x'.repeat(400)}"}`,
+            })
+          },
+        }),
+      ]),
     )
     await withPhotos('найди похожий')
-    const line = vi.mocked(console.warn).mock.calls.at(-1)![0] as string
+    const line = vi.mocked(console.warn).mock.calls.find((call) => String(call[0]).includes('HTTP 429'))![0] as string
     expect(line).toContain('HTTP 429: {"detail":"Too many requests')
     expect(line).not.toContain('secret photo')
     expect(line.length).toBeLessThan(400)
-    sees({ description: 'A room with a view.' })
-    expect((await (await withPhotos('найди похожий')).json()).photo).toEqual({ action: 'unstable' })
   })
 
   it('has a limit of its own for the model that sees photos', async () => {
     setModel(undefined)
     sees({ description: 'Бассейн.' })
     const answers = []
-    for (let i = 0; i < 7; i++)
+    // The address has looked at 19 photos this minute: the 20th still passes, the 21st does not.
+    for (let i = 0; i < 19; i++) await allowVisionRequest('10.9.9.9')
+    for (let i = 0; i < 2; i++)
       answers.push((await (await withPhotos('найди похожий', [photo], {}, '10.9.9.9')).json()).photo)
-    expect(answers.slice(0, 6).every((p) => p.action === 'similar')).toBe(true)
-    expect(answers[6]).toEqual({ action: 'limited' })
+    expect(answers[0].action).toBe('similar')
+    expect(answers[1]).toEqual({ action: 'limited' })
   })
 
   it('takes at most four optimised photos', async () => {

@@ -98,8 +98,10 @@ export async function deleteRemoteChat(client: Client, chatId: string) {
 // The photos in Storage
 
 export const PHOTO_BUCKET = 'assistant-attachments'
-/** A signed link opens the photo this long: a chat open longer asks for new ones on the next load. */
+/** A signed link opens the photo this long. */
 const SIGNED_URL_SECONDS = 60 * 60
+/** An open chat asks for new links at four fifths of that, before the old ones stop working. */
+export const SIGNED_URL_REFRESH_MS = SIGNED_URL_SECONDS * 0.8 * 1000
 
 /** The honest line when the photos did not reach the account (no bucket yet, no network). */
 export const PHOTO_SAVE_ERROR = 'Не получилось сохранить фото в аккаунте: сейчас они видны только на этом устройстве.'
@@ -118,7 +120,7 @@ export const photoPath = (userId: string, chatId: string, messageId: string, n: 
 
 /**
  * Uploads the message's photos (data URLs, in the order of `attachments`) and gives the attachments with their paths.
- * Any failure throws; the files uploaded before it stay and are overwritten by the next try.
+ * Uploads run together. Any failure throws; the files that got through stay and are overwritten by the next try.
  */
 export async function uploadPhotos(
   client: Client,
@@ -128,17 +130,17 @@ export async function uploadPhotos(
   photos: readonly string[],
 ): Promise<Attachment[]> {
   const attachments = message.data.attachments ?? []
-  const uploaded: Attachment[] = []
-  for (const [n, attachment] of attachments.entries()) {
-    const blob = dataUrlBlob(photos[n])
-    const path = photoPath(userId, chatId, message.id, n, blob.type)
-    const { error } = await client.storage
-      .from(PHOTO_BUCKET)
-      .upload(path, blob, { contentType: blob.type, upsert: true, cacheControl: '31536000' })
-    fail(PHOTO_BUCKET, error)
-    uploaded.push({ ...attachment, path })
-  }
-  return uploaded
+  return Promise.all(
+    attachments.map(async (attachment, n) => {
+      const blob = dataUrlBlob(photos[n])
+      const path = photoPath(userId, chatId, message.id, n, blob.type)
+      const { error } = await client.storage
+        .from(PHOTO_BUCKET)
+        .upload(path, blob, { contentType: blob.type, upsert: true, cacheControl: '31536000' })
+      fail(PHOTO_BUCKET, error)
+      return { ...attachment, path }
+    }),
+  )
 }
 
 /** The signed links of the photos, by path; a photo without one is left out. */
@@ -180,25 +182,23 @@ export async function deleteRemotePhotos(client: Client, paths: readonly string[
 }
 
 /**
- * A guest's chat moving to the account: the previews of its photos (a guest keeps no other) go to Storage. A photo
- * that fails keeps its preview in the message, so it is still shown.
+ * A guest's chat moving to the account: the previews of its photos (a guest keeps no other) go to Storage, the
+ * messages at once. A photo that fails keeps its preview in the message, so it is still shown.
  */
 export async function moveGuestPhotos(client: Client, userId: string, chat: Chat): Promise<Chat> {
-  const messages: ChatMessage[] = []
-  for (const message of chat.messages) {
-    const attachments = message.data.attachments
-    const previews = attachments?.map((a) => a.preview)
-    if (!attachments || attachments.some((a) => a.path) || !previews?.every(Boolean)) {
-      messages.push(message)
-      continue
-    }
-    try {
-      const uploaded = await uploadPhotos(client, userId, chat.id, message, previews as string[])
-      messages.push({ ...message, data: { ...message.data, attachments: uploaded } })
-    } catch (error) {
-      console.warn(`chats: photos not moved (${error instanceof Error ? error.message.slice(0, 200) : 'error'})`)
-      messages.push(message)
-    }
-  }
+  const messages = await Promise.all(
+    chat.messages.map(async (message) => {
+      const attachments = message.data.attachments
+      const previews = attachments?.map((a) => a.preview)
+      if (!attachments || attachments.some((a) => a.path) || !previews?.every(Boolean)) return message
+      try {
+        const uploaded = await uploadPhotos(client, userId, chat.id, message, previews as string[])
+        return { ...message, data: { ...message.data, attachments: uploaded } }
+      } catch (error) {
+        console.warn(`chats: photos not moved (${error instanceof Error ? error.message.slice(0, 200) : 'error'})`)
+        return message
+      }
+    }),
+  )
   return { ...chat, messages }
 }

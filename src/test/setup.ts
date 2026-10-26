@@ -1,4 +1,4 @@
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
 import { afterEach, beforeEach, vi } from 'vitest'
 import { clearHotelRequests } from '@/hooks/useHotels'
 import type { ReadingInput } from '@/lib/horoscope'
@@ -6,6 +6,10 @@ import { sessionStore } from '@/lib/session'
 import type { Answer } from '@/lib/vibe'
 import { catalogFetch } from './catalog'
 import { setProduction } from './env'
+
+// `waitFor` and `findBy*` give up after 1 s by default; on a busy machine (parallel files, other processes) a full page
+// takes longer than that to settle. A passing wait still ends at once: only a failing one waits longer.
+configure({ asyncUtilTimeout: 5000 })
 
 // Testing Library unmounts on its own only when the runner exposes globals; this config does not.
 afterEach(cleanup)

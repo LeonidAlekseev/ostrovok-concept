@@ -8,6 +8,7 @@ import {
   describeBrief,
   makePlan,
   mergeBrief,
+  MODELS_DOWN,
   missingNote,
   nextQuestion,
   planCities,
@@ -15,7 +16,7 @@ import {
   PHOTO_TEXT,
   PHOTO_LIMITED,
   PHOTO_MISSED,
-  PHOTO_RETRY_STEP,
+  PHOTO_SKIPPED,
   PHOTO_UNSEEN,
   PHOTO_UNUSABLE,
   type AssistantResponse,
@@ -32,7 +33,6 @@ import {
   newId,
   saveGuestChats,
   shownHotels,
-  type Attachment,
   type Chat,
   type ChatMessage,
 } from '@/lib/assistantChats'
@@ -47,8 +47,10 @@ import {
   photoPaths,
   saveRemoteChat,
   signedPhotoUrls,
+  SIGNED_URL_REFRESH_MS,
   uploadPhotos,
 } from '@/lib/assistantChatsRemote'
+import type { PhotoUrl } from './ChatPhotos'
 import type { HotelSummary } from '@/lib/catalog'
 import { todayIso } from '@/lib/dates'
 import type { OptimizedPhoto } from '@/lib/imageOptimize'
@@ -63,9 +65,6 @@ type Mode = { kind: 'loading' } | { kind: 'guest' } | { kind: 'remote'; email: s
 const later = (iso: string, ms: number) => new Date(Date.parse(iso) + ms).toISOString()
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const reason = (error: unknown) => (error instanceof Error ? error.message.slice(0, 200) : 'error')
-
-/** The pauses before Эвал asks the failed model that sees photos again: it usually answers within seconds. */
-export const PHOTO_RETRY_MS = [3000, 6000, 10_000] as const
 
 /** The first step the turn will show, while the answer is on its way: only when the plan is surely due. */
 const SEARCH_STEP = { agent: 'search', title: 'Подбираю отели по вашему описанию' } as const
@@ -87,9 +86,13 @@ export function compose(
   }
   // The photos: Эвал asks what to do with them, or says it could not look at them.
   if (photo?.action === 'ask') return { brief, question: PHOTO_QUESTION, text: PHOTO_QUESTION.text, data: {} }
-  // The provider does not answer (every retry failed too) or the limit is over: Эвал says so honestly.
-  if (photo?.action === 'unseen' || photo?.action === 'unstable')
-    return { brief, question: null, text: PHOTO_UNSEEN, data: {} }
+  // No model that sees photos answered: the answer to the message's words, and Эвал says the photos went unseen.
+  if (photo?.action === 'skipped') {
+    const answer = compose({ ...response, photo: undefined }, destinations, newHotels, exclude)
+    return { ...answer, text: `${PHOTO_SKIPPED} ${answer.text}`.trim() }
+  }
+  // The provider does not answer (every model of the chain failed) or the limit is over: Эвал says so honestly.
+  if (photo?.action === 'unseen') return { brief, question: null, text: PHOTO_UNSEEN, data: {} }
   if (photo?.action === 'limited') return { brief, question: null, text: PHOTO_LIMITED, data: {} }
   const seen = photo?.seen ? `Вижу на фото: ${photo.seen.replace(/[.!]?$/, '.')}` : ''
   if (photo?.action === 'unusable') return { brief, question: null, text: `${seen} ${PHOTO_UNUSABLE}`.trim(), data: {} }
@@ -153,7 +156,7 @@ export interface Chats {
   /** Resolves once the changes so far are saved (in the account: written to Supabase), e.g. before opening a chat elsewhere. */
   flush: () => Promise<void>
   /** What shows a photo of a message: the shared link, the signed link of Storage or the preview; none reads «Фото». */
-  photoUrl: (attachment: Attachment) => string | undefined
+  photoUrl: PhotoUrl
   /** The photos did not reach the account: the honest line under the composer. */
   photoError: string | null
 }
@@ -181,6 +184,8 @@ export function useChats(
   const activeRef = useRef(activeId)
   const modeRef = useRef(mode)
   const inflight = useRef(new Map<string, AbortController>())
+  /** The pending messages already answered (or failed) in this visit: a late re-run of the effect must not ask again. */
+  const answered = useRef(new Set<string>())
   /** What Supabase already has of each chat, to write only the changed ones. */
   const saved = useRef(new Map<string, Chat>())
   const queue = useRef(Promise.resolve())
@@ -286,6 +291,20 @@ export function useChats(
       .catch((error: unknown) => console.warn(`chats: no links to the photos (${reason(error)})`))
   }, [chats, mode])
 
+  // The links expire: a chat left open asks for new ones before that.
+  useEffect(() => {
+    if (mode.kind !== 'remote') return
+    const timer = setInterval(() => {
+      const client = getBrowserClient()
+      const paths = [...new Set(chatsRef.current.flatMap(photoPaths))]
+      if (!client || paths.length === 0) return
+      signedPhotoUrls(client, paths)
+        .then((urls) => setSigned((before) => new Map([...before, ...urls])))
+        .catch((error: unknown) => console.warn(`chats: links to the photos not renewed (${reason(error)})`))
+    }, SIGNED_URL_REFRESH_MS)
+    return () => clearInterval(timer)
+  }, [mode])
+
   /**
    * The photos the route looks at: those of the message just sent, or of the one Эвал asked about. This visit's
    * photos of 1600 px; after a reload the ones in Storage, else the previews.
@@ -314,7 +333,7 @@ export function useChats(
   /** Eval's answer to the chat's pending message: its steps, then the text and the plan. */
   const runTurn = useCallback(
     async (chatId: string, pendingId: string) => {
-      if (inflight.current.has(chatId)) return
+      if (inflight.current.has(chatId) || answered.current.has(pendingId)) return
       const chat = chatsRef.current.find((c) => c.id === chatId)
       const pending = chat?.messages.find((m) => m.id === pendingId)
       if (!chat || !pending || pending.status !== 'pending') return
@@ -363,19 +382,14 @@ export function useChats(
             destinations,
             controller.signal,
           )
-        let [response] = await Promise.all([ask(), delay(THINK_MS)])
-        // The model that sees photos now and then fails: Эвал says so and asks again after a pause.
-        for (const pause of PHOTO_RETRY_MS) {
-          if (controller.signal.aborted || response.photo?.action !== 'unstable') break
-          showRetry(chatId, pending.createdAt)
-          await delay(pause)
-          if (controller.signal.aborted) return
-          response = await ask()
-        }
+        // The route asks the models that see photos in turn itself: one request, its steps tell of a switch.
+        const [response] = await Promise.all([ask(), delay(THINK_MS)])
         if (controller.signal.aborted) return
+        answered.current.add(pendingId)
         finish(chatId, pendingId, response)
       } catch {
         if (controller.signal.aborted) return
+        answered.current.add(pendingId)
         update(chatId, (c) => ({
           ...c,
           messages: c.messages
@@ -391,23 +405,6 @@ export function useChats(
     [destinations, newHotels, update, requestPhotos],
   )
 
-  /** The pending step of the turn's retry of the photos, once: `finish` drops it with the other pending steps. */
-  function showRetry(chatId: string, pendingAt: string) {
-    update(chatId, (c) => {
-      const isRetry = (m: ChatMessage) => m.role === 'agent' && m.data.step?.title === PHOTO_RETRY_STEP
-      if (c.messages.some((m) => m.status === 'pending' && isRetry(m))) return c
-      const step: ChatMessage = {
-        id: newId(),
-        role: 'agent',
-        status: 'pending',
-        text: '',
-        data: { step: { agent: 'vision', title: PHOTO_RETRY_STEP } },
-        createdAt: later(pendingAt, -1),
-      }
-      return { ...c, messages: [...c.messages, step].sort((a, b) => a.createdAt.localeCompare(b.createdAt)) }
-    })
-  }
-
   function finish(chatId: string, pendingId: string, response: AssistantResponse) {
     // «Другие варианты» skips the hotels the chat has shown before.
     const chat = chatsRef.current.find((c) => c.id === chatId)
@@ -420,7 +417,7 @@ export function useChats(
     const now = new Date().toISOString()
     update(chatId, (chat) => {
       const pending = chat.messages.find((m) => m.id === pendingId)
-      if (!pending) return chat
+      if (!pending || pending.status !== 'pending') return chat
       // The turn's steps go right before the answer, in their order.
       const stepMessages: ChatMessage[] = steps.map((step, i) => ({
         id: newId(),
@@ -430,9 +427,23 @@ export function useChats(
         data: { step: { agent: step.agent, title: step.title, ...(step.result && { result: step.result }) } },
         createdAt: later(pending.createdAt, i - steps.length),
       }))
+      // No text model answered and the rules did: Эвал says so in a message of its own, right after the answer.
+      const down: ChatMessage[] = response.modelsDown
+        ? [
+            {
+              id: newId(),
+              role: 'assistant',
+              status: 'done',
+              text: MODELS_DOWN,
+              data: {},
+              createdAt: later(pending.createdAt, 1),
+            },
+          ]
+        : []
       const messages = [
         ...chat.messages.filter((m) => !(m.role === 'agent' && m.status === 'pending')),
         ...stepMessages,
+        ...down,
       ]
         .map((m) => (m.id === pendingId ? { ...m, status: 'done' as const, text, data } : m))
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
@@ -463,7 +474,9 @@ export function useChats(
   const send = (raw: string, options: { more?: boolean; photos?: readonly OptimizedPhoto[] } = {}) => {
     const text = raw.trim()
     const sent = options.photos ?? []
-    if ((!text && sent.length === 0) || active.messages.some((m) => m.status === 'pending')) return
+    // The newest state, not the render's: two calls before a re-render are one message.
+    const current = chatsRef.current.find((c) => c.id === active.id) ?? active
+    if ((!text && sent.length === 0) || current.messages.some((m) => m.status === 'pending')) return
     const now = new Date().toISOString()
     const user: ChatMessage = {
       id: newId(),
@@ -492,18 +505,19 @@ export function useChats(
       createdAt: later(now, 2),
     }
     // A chat about a hotel is named after it, and the page's dates go to the next answer.
-    const about = hotel && (!active.brief.hotelId || active.brief.hotelId === hotel.id)
+    const about = hotel && (!current.brief.hotelId || current.brief.hotelId === hotel.id)
     const chat: Chat = {
-      ...active,
-      title: active.title || (about && hotel ? chatTitle(hotel.name) : chatTitle(text || PHOTO_TEXT)),
+      ...current,
+      title: current.title || (about && hotel ? chatTitle(hotel.name) : chatTitle(text || PHOTO_TEXT)),
       brief:
         about && hotel
-          ? { ...active.brief, hotelId: hotel.id, ...(hotel.dates && briefWithStay(hotel.dates)) }
-          : active.brief,
-      messages: [...active.messages, user, pending],
+          ? { ...current.brief, hotelId: hotel.id, ...(hotel.dates && briefWithStay(hotel.dates)) }
+          : current.brief,
+      messages: [...current.messages, user, pending],
       unread: false,
       updatedAt: now,
     }
+    chatsRef.current = [chat, ...chatsRef.current.filter((c) => c.id !== chat.id)]
     setChats((list) => [chat, ...list.filter((c) => c.id !== chat.id)])
     if (!listed) setDraft(newChat())
     // The turn starts from the effect above, once the chat is in the list.
@@ -530,11 +544,13 @@ export function useChats(
       })
   }
 
-  const retry = (chatId: string, messageId: string) =>
+  const retry = (chatId: string, messageId: string) => {
+    answered.current.delete(messageId)
     update(chatId, (chat) => ({
       ...chat,
       messages: chat.messages.map((m) => (m.id === messageId ? { ...m, status: 'pending', text: '' } : m)),
     }))
+  }
 
   const rename = (chatId: string, raw: string) => {
     const title = chatTitle(raw)
@@ -586,7 +602,10 @@ export function useChats(
     remove,
     setBrief,
     flush: () => queue.current,
-    photoUrl: (attachment) => attachment.url ?? (attachment.path && signed.get(attachment.path)) ?? attachment.preview,
+    photoUrl: (attachment, size) => {
+      const stored = attachment.url ?? (attachment.path ? signed.get(attachment.path) : undefined)
+      return size === 'full' ? (stored ?? attachment.preview) : (attachment.preview ?? stored)
+    },
     photoError,
   }
 }

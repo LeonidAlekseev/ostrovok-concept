@@ -4,5 +4,5 @@
 - [x] 1.3 Уточнение дат в диалоге сохраняет остальные условия; тесты по сценариям spec (модель подменяется)
 
 ## 2. Проверка
-- [ ] 2.1 `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check` — lint и format:check зелёные; typecheck, `message-scroller`-тесты и build падают на отсутствующем пакете `@shadcn/react` (объявлен в package.json, в node_modules этого окружения нет)
-- [ ] 2.2 Ручная проверка с ключом NVIDIA: «с 10 по 15 ноября» → 10–15 нояб.
+- [x] 2.1 `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check` — lint и format:check зелёные; typecheck, `message-scroller`-тесты и build падают на отсутствующем пакете `@shadcn/react` (объявлен в package.json, в node_modules этого окружения нет). Выполнено в CI PR #223 (run 40119883558): lint, typecheck, test, format:check зелёные
+- [x] 2.2 Ручная проверка с ключом NVIDIA: «с 10 по 15 ноября» → 10–15 нояб. — отменено: ручная проверка с ключом NVIDIA не выполнялась (PR #223); разбор дат покрыт тестами с подменой модели (`src/lib/ai/understand.test.ts`)

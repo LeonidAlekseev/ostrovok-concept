@@ -25,7 +25,7 @@ const SLACK = 12
  * header) or of the hotel dialog. The current one is underlined: the one clicked, then, as the page scrolls,
  * the last section whose top has passed under the tabs.
  */
-export function HotelTabs({ hotel, className }: { hotel: Hotel; className?: string }) {
+export function HotelTabs({ hotel, className, inDialog }: { hotel: Hotel; className?: string; inDialog?: boolean }) {
   const sections = hotelSections(hotel)
   const ids = sections.map((s) => s.id).join(' ')
   const [active, setActive] = useState(sections[0].id)
@@ -71,13 +71,23 @@ export function HotelTabs({ hotel, className }: { hotel: Hotel; className?: stri
       row.scrollLeft = left - (row.clientWidth - tab.offsetWidth) / 2
   }, [active])
 
+  // On a phone the bar leaves the side insets of its container, and the inset returns inside the scrolling row, so
+  // the first tab stays on the content line and the row scrolls to the edge. From `lg` nothing changes.
+  const bleed = inDialog ? 'max-lg:-mx-4' : 'max-lg:-mx-(--page-x)'
+  const inset = inDialog ? 'max-lg:px-4' : 'max-lg:px-(--page-x)'
+
   return (
     <nav
       ref={nav}
       aria-label="Разделы отеля"
-      className={cn('sticky top-0 z-20 border-b border-border bg-(--decor-surface-soft)', className)}
+      className={cn('sticky top-0 z-20 border-b border-border bg-(--decor-surface-soft)', bleed, className)}
     >
-      <ul className="-mb-px flex gap-[clamp(16px,3vw,32px)] overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <ul
+        className={cn(
+          '-mb-px flex gap-[clamp(16px,3vw,32px)] overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+          inset,
+        )}
+      >
         {sections.map(({ id, label }) => (
           <li key={id} className="shrink-0">
             <button
