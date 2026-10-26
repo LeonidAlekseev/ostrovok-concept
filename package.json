@@ -22,6 +22,8 @@
     "db:rebuild:ota": "node --env-file-if-exists=.env.local scripts/rebuild-ota-hotels.ts",
     "db:embed": "node --env-file-if-exists=.env.local scripts/embed.ts",
     "db:features": "node --env-file-if-exists=.env.local scripts/hotel-features.ts",
+    "db:osm-places": "node --env-file-if-exists=.env.local scripts/load-osm-places.ts",
+    "db:city-places": "node --env-file-if-exists=.env.local scripts/load-city-places.ts",
     "db:clean:shared-photos": "node --env-file-if-exists=.env.local scripts/clean-shared-photos.ts"
   },
   "dependencies": {

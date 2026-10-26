@@ -568,6 +568,74 @@ export type Database = {
           },
         ]
       }
+      osm_place_areas: {
+        Row: {
+          area: unknown
+          categories: string[]
+          id: number
+          loaded_at: string
+          origin: string
+        }
+        ComputedFields: never
+        Insert: {
+          area: unknown
+          categories: string[]
+          id?: never
+          loaded_at?: string
+          origin: string
+        }
+        Update: {
+          area?: unknown
+          categories?: string[]
+          id?: never
+          loaded_at?: string
+          origin?: string
+        }
+        Relationships: []
+      }
+      osm_places: {
+        Row: {
+          attribution: string
+          categories: string[]
+          fetched_at: string
+          geom: unknown
+          lat: number
+          lon: number
+          name: string | null
+          origin: string
+          osm_id: number
+          osm_type: string
+          tags: NonNullable<Json>
+        }
+        ComputedFields: never
+        Insert: {
+          attribution?: string
+          categories: string[]
+          fetched_at?: string
+          geom: unknown
+          lat: number
+          lon: number
+          name?: string | null
+          origin: string
+          osm_id: number
+          osm_type: string
+          tags?: NonNullable<Json>
+        }
+        Update: {
+          attribution?: string
+          categories?: string[]
+          fetched_at?: string
+          geom?: unknown
+          lat?: number
+          lon?: number
+          name?: string | null
+          origin?: string
+          osm_id?: number
+          osm_type?: string
+          tags?: NonNullable<Json>
+        }
+        Relationships: []
+      }
       ota_hotels: {
         Row: {
           lat: number
@@ -710,6 +778,15 @@ export type Database = {
           ref_id: string
           similarity: number
         }[]
+      }
+      osm_place_area_add: {
+        Args: { categories: string[]; lat: number; lon: number; origin?: string; radius_m: number }
+        Returns: undefined
+      }
+      osm_places_named: { Args: { max_places?: number; q: string }; Returns: Json }
+      osm_places_near: {
+        Args: { lat: number; lon: number; per_category?: number; radius_m: number; wanted: string[] }
+        Returns: Json
       }
       rate_limit_hit: { Args: { hit_key: string; hit_limit: number; window_seconds: number }; Returns: boolean }
       similar_hotels: {

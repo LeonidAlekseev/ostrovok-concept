@@ -1,0 +1,18 @@
+[
+  {
+    "place_id": 294013039,
+    "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+    "osm_type": "way",
+    "osm_id": 5007139,
+    "lat": "39.4734917",
+    "lon": "-0.3789053",
+    "category": "amenity",
+    "type": "marketplace",
+    "place_rank": 30,
+    "importance": 0.3263790596244939,
+    "addresstype": "amenity",
+    "name": "Центральный рынок Валенсии",
+    "display_name": "Центральный рынок Валенсии, Plaça de la Ciutat de Bruges, Ciutat Vella, Валенсия, Comarca de València, Валенсия, 46001, Испания",
+    "boundingbox": ["39.4729955", "39.4740019", "-0.3795758", "-0.3782812"]
+  }
+]
