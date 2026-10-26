@@ -1,4 +1,5 @@
 import { bandLabel, type NoiseBand } from './features'
+import { isGeoQuestion } from './geo/questions'
 import { countRu } from './format'
 import { distanceLabel } from './hotelDetails'
 
@@ -10,6 +11,15 @@ import { distanceLabel } from './hotelDetails'
  */
 
 export type NoiseIndicator = 'Lden' | 'Lnight'
+
+/** A question about the noise: «шумно», «тихо», «громко», «децибелы» — not «стихи». */
+export const isNoiseQuestion = (text: string) => /(?<!\p{L})(?:бес|не)?(?:шум|тих|громк|децибел)/iu.test(text)
+
+/**
+ * A question of the hotel's chat for the geo calls (src/lib/ai/geoTurn.ts): about the places near the hotel or the way
+ * to one, and not about the noise — «Шумно ли рядом?» is answered from the noise data, «Есть ли бар рядом?» by the calls.
+ */
+export const isHotelGeoQuestion = (text: string) => !isNoiseQuestion(text) && isGeoQuestion(text)
 
 /** EEA's noise contours of the round 2022 (`geo_datasets.url` of `eea-noise-end2022-v01_r00`). */
 export const EEA_NOISE_URL =

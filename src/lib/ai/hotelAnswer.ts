@@ -7,7 +7,7 @@ import { nightsBetween } from '../dates'
 import type { HotelFeatures } from '../features'
 import { formatDecimal, formatPrice } from '../format'
 import { distanceLabel, factLines, NEARBY_SHOWN, REVIEW_SOURCE_LABEL, type HotelDetails } from '../hotelDetails'
-import { noiseLines, type HotelNoise } from '../noise'
+import { isNoiseQuestion, noiseLines, type HotelNoise } from '../noise'
 import { averageNight, stayTotal } from '../offer'
 import { MODEL_TIMEOUT_MS } from './understand'
 
@@ -40,7 +40,6 @@ export const NO_NEARBY_DATA = 'Сейчас не могу ответить: да
 const ROOMS = /номер|комнат|апартамент|спальн|кроват|проживани|цен|стоим/i
 const PARKING = /парков|машин|автомоб|припарков/i
 const PETS = /питомц|собак|кошк|животн|с питом/i
-const NOISE = /шум|тих|громк|децибел/i
 const NEARBY = /рядом|поблизости|недалеко|вокруг|окрестност|достопримечат|что посмотреть|куда сходить/i
 
 /** The price line of a room on the chat's dates, or the cheapest night without them. */
@@ -111,7 +110,7 @@ export function ruleAnswer(
           : 'В данных отеля парковка не указана. Уточните это у отеля до бронирования.',
     }
   }
-  if (NOISE.test(text)) {
+  if (isNoiseQuestion(text)) {
     const lines = noiseLines(noise)
     return {
       answer: lines.length

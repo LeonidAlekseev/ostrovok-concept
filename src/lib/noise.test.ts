@@ -4,6 +4,8 @@ import {
   dayEstimate,
   dayLabel,
   dayLevel,
+  isHotelGeoQuestion,
+  isNoiseQuestion,
   levelAt,
   loudestSource,
   noiseColor,
@@ -119,6 +121,17 @@ describe('the bands', () => {
     expect(noiseColor(35)).toBe('#1a9850')
     expect(noiseColor(57)).toBe('#fee08b')
     expect(noiseColor(80)).toBe('#a50026')
+  })
+})
+
+describe('the questions', () => {
+  it('tell the noise from the places near', () => {
+    for (const text of ['Тут шумно ночью?', 'Тихо ли рядом с отелем?', 'Громко ли вокруг?', 'Сколько децибел?'])
+      expect([isNoiseQuestion(text), isHotelGeoQuestion(text)]).toEqual([true, false])
+    for (const text of ['Есть ли рядом бар?', 'Сколько идти до аптеки?', 'Где ночные клубы?'])
+      expect([isNoiseQuestion(text), isHotelGeoQuestion(text)]).toEqual([false, true])
+    expect(isNoiseQuestion('Покажи стихи')).toBe(false)
+    expect(isHotelGeoQuestion('Есть ли парковка?')).toBe(false)
   })
 })
 

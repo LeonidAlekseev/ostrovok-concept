@@ -12,6 +12,9 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn(), push: nav.push }),
 }))
 
+// MapLibre needs WebGL: the map of an answer is a stand-in, the list under it is the real one.
+vi.mock('../AssistantPage/PlacesMap', () => ({ default: () => <div data-testid="places-map" /> }))
+
 const hotel = getHotel('prague-old-town-lantern')!
 const fetchMock = vi.fn<typeof fetch>()
 
@@ -88,6 +91,52 @@ describe('HotelAssistant', () => {
     expect(within(log).getByText('Не проверено')).toBeDefined()
     expect(bodyOf(0).messages.at(-1)).toEqual({ role: 'user', text: 'Что поесть неподалёку?' })
     expect(screen.getByLabelText<HTMLInputElement>('Вопрос об отеле').value).toBe('')
+  })
+
+  // assistant-geo, Requirement: Карта в ответе Эвала
+  it('shows the map of the places near with their list and keeps the steps of the tools (Scenario: Карта в чате)', async () => {
+    reply({
+      reply: 'По данным OpenStreetMap:\n• Больница: ближе всего — «Hospital La Fe», 1,2 км от отеля по прямой.',
+      steps: [
+        {
+          agent: 'geo',
+          title: 'Ищу рядом с отелем: больница — в радиусе 3,0 км',
+          status: 'done',
+          result: 'больница — 1',
+        },
+      ],
+      map: {
+        points: [
+          { kind: 'hotel', label: hotel.name, lat: 39.451, lon: -0.358 },
+          { kind: 'place', label: 'Hospital La Fe', category: 'больница', distanceM: 1203, lat: 39.444, lon: -0.376 },
+        ],
+        routes: [
+          {
+            mode: 'foot',
+            distanceM: 1328,
+            durationS: 1063,
+            coordinates: [
+              [-0.358, 39.451],
+              [-0.376, 39.444],
+            ],
+            to: 'Hospital La Fe',
+          },
+        ],
+        attribution: '© OpenStreetMap',
+      },
+    })
+    const { user } = renderPage()
+    await waitFor(() => expect(screen.getByPlaceholderText('Задайте любой вопрос…')).toBeDefined())
+    await user.type(screen.getByLabelText('Вопрос об отеле'), 'Есть ли рядом больница?{Enter}')
+    const log = await within(card()).findByRole('log', { name: 'Диалог с Эвалом' })
+    const places = await within(log).findByRole('list', { name: 'Места на карте' })
+    expect(places.textContent).toBe('1Hospital La Fe · больница · 1,2 км от отеляпешком 1,3 км, 18 мин')
+    expect(within(log).getByRole('link', { name: '© OpenStreetMap' })).toBeDefined()
+    expect(await within(log).findByTestId('places-map')).toBeDefined()
+    await waitFor(() => expect(saved()).toHaveLength(1))
+    const messages = saved()[0].messages
+    expect(messages.find((m) => m.role === 'agent')?.data.step).toMatchObject({ agent: 'geo', result: 'больница — 1' })
+    expect(messages.find((m) => m.role === 'assistant')?.data.map?.points).toHaveLength(2)
   })
 
   it('sends the page’s dates with the question', async () => {

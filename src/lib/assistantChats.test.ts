@@ -133,6 +133,24 @@ describe('the chats about a hotel', () => {
     expect(odd?.messages[0].data).toEqual({})
   })
 
+  // assistant-geo, Requirement: Карта в ответе Эвала
+  it('keeps the map of an answer and drops a damaged one', () => {
+    const map = {
+      points: [
+        { kind: 'hotel', label: 'Отель', lat: 39.45, lon: -0.36 },
+        { kind: 'place', label: 'Аптека', lat: 39.452, lon: -0.359 },
+      ],
+      routes: [],
+      attribution: '© OpenStreetMap',
+    }
+    const kept = parseChat(chatWith('2026-10-25T10:00:00Z', message('assistant', 'Рядом', { data: { map } as never })))
+    expect(kept?.messages[0].data).toEqual({ map })
+    const odd = parseChat(
+      chatWith('2026-10-25T10:00:00Z', message('assistant', 'x', { data: { map: { points: 'x' } } as never })),
+    )
+    expect(odd?.messages[0].data).toEqual({})
+  })
+
   it('keeps the hotel in the brief and finds the newest chat of a hotel', () => {
     const about = (updatedAt: string, hotelId: string, ...messages: ChatMessage[]): Chat => ({
       ...chatWith(updatedAt, ...messages),
