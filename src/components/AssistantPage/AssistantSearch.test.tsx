@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { destinations } from '../../data/destinations'
 import { makePlan } from '../../lib/assistant'
-import { CHATS_KEY } from '../../lib/assistantChats'
+import { CHATS_KEY, type Chat } from '../../lib/assistantChats'
 import { newHotels } from '../../lib/catalogGenerator'
 import { DIALOG_KEY } from '../../lib/assistantDialog'
 import { todayIso } from '../../lib/dates'
@@ -85,6 +85,23 @@ const lisbonHotelLinks = async () =>
       .getAllByRole('link')
       .filter((link) => link.getAttribute('href')?.startsWith('/hotels/lisbon-')),
   )
+/** Where the messages went: every stored chat with its messages, for a failure to tell the chat a message landed in. */
+const storedChats = () =>
+  JSON.stringify(
+    (JSON.parse(window.localStorage.getItem(CHATS_KEY) ?? '[]') as Chat[]).map((c) => ({
+      id: c.id,
+      title: c.title,
+      messages: c.messages.map((m) => `${m.role}: ${m.text}`),
+    })),
+    null,
+    1,
+  )
+/** The newest chat is open and empty: Эвал's greeting, no log. */
+const emptyChatOpen = async () => {
+  expect(await screen.findByText(/О каком путешествии вы мечтаете/)).toBeTruthy()
+  expect(screen.queryByRole('log', { name: 'Диалог с Эвалом' })).toBeNull()
+}
+
 const answer = (body: object) => Response.json({ source: 'model', ...body })
 
 /** A reply the test sends when it wants to. */
@@ -439,8 +456,11 @@ describe('AssistantSearch after a reload', () => {
       await user.type(input(), 'к морю{Enter}')
       await inLog(/Когда планируете поехать/)
       await user.click(newChatButton())
+      await emptyChatOpen()
       await user.type(input(), 'тихий отель{Enter}')
       await inLog(/Когда планируете поехать/)
+      // One question in the open chat: a second one means the message went to the old chat.
+      expect(within(log()).getAllByText(/Когда планируете поехать/), storedChats()).toHaveLength(1)
 
       unmount()
       render(view())
@@ -454,6 +474,31 @@ describe('AssistantSearch after a reload', () => {
     },
     HEAVY,
   )
+
+  it('opens an empty chat right after the answer and sends there (Scenario: Новый чат сразу после ответа)', async () => {
+    fetchMock.mockImplementation(async () => answer({ brief: { vibe: 'sea' } }))
+    const { user } = renderAssistant()
+    await user.type(input(), 'к морю{Enter}')
+    await inLog(/Когда планируете поехать/)
+
+    // At once: no pause between the answer and the click, nor between the click and the typing.
+    fireEvent.click(newChatButton())
+    await user.type(input(), 'тихий отель{Enter}')
+    await inLog(/Когда планируете поехать/)
+
+    expect(within(log()).getAllByText(/Когда планируете поехать/), storedChats()).toHaveLength(1)
+    expect(within(log()).queryByText('к морю')).toBeNull()
+    const stored = JSON.parse(window.localStorage.getItem(CHATS_KEY)!) as Chat[]
+    expect(
+      stored.map((c) => c.messages.map((m) => m.text)),
+      storedChats(),
+    ).toEqual([
+      ['тихий отель', expect.stringContaining('Когда планируете поехать')],
+      ['к морю', expect.stringContaining('Когда планируете поехать')],
+    ])
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(bodyOf(1).messages).toEqual([{ role: 'user', text: 'тихий отель' }])
+  })
 
   it('moves the dialog of an older version with a route into a chat (Scenario: Старый диалог с маршрутом)', async () => {
     const brief = { destinationId: 'lisbon', when: 9, party: 'solo' as const }
