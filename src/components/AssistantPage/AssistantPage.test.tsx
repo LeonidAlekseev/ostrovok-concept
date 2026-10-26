@@ -37,6 +37,21 @@ describe('AssistantPage', () => {
   })
 })
 
+// assistant-search, Requirement: Чат для долгих диалогов, Scenario: Длинный чат на компьютере
+describe('AssistantPage layout', () => {
+  it('takes the screen height from lg, and the columns scroll inside it', () => {
+    const { container } = render(<AssistantPage newHotels={newHotels} />)
+    const main = container.querySelector('main')
+    expect(main?.className).toContain('lg:h-dvh')
+    // A flex-1 page would take its height from the content (flex-basis 0%), not from the screen.
+    expect(main?.className).toContain('lg:flex-none')
+    const grid = container.querySelector('[data-assistant-app]')
+    expect(grid?.className).toContain('lg:h-full')
+    expect(grid?.className).toContain('min-h-0')
+    expect(container.querySelector('section[aria-label="Чат с Эвалом"]')?.className).toContain('min-h-0')
+  })
+})
+
 // search-modes, Requirement: Состояние поиска ассистента и выдачи, Scenario: Вариант ассистента
 describe('AssistantPage plan', () => {
   it('opens /search with the option’s dates and guests', async () => {
