@@ -51,8 +51,8 @@ const requestSchema = z.object({
   photos: z.array(z.string().max(MAX_PHOTO_URL_LENGTH).regex(PHOTO_DATA_URL)).max(MAX_PHOTOS).optional(),
 })
 
-/** The answer is due in 14 s: the client waits 15. The steps of the turn get what the model left. */
-const ANSWER_BUDGET_MS = 14_000
+/** The answer is due in 15 s: the client waits 16. The steps of the turn get what the model left. */
+const ANSWER_BUDGET_MS = 15_000
 /** With photos the models that see them take up to 18 s first: the answer is due in 28 s, the client waits 30. */
 const PHOTO_BUDGET_MS = 28_000
 /** The models that see photos leave this much of the answer's time for the text models and the search. */
