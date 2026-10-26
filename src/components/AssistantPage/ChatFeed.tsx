@@ -77,8 +77,12 @@ export function Feed({ chatId, messages, onChoose, onRetry, planActions, photoUr
   return (
     // A new provider per chat: each opens at its own end.
     <MessageScrollerProvider key={chatId} autoScroll defaultScrollPosition="end">
-      <MessageScroller className="flex-1">
-        <MessageScrollerViewport aria-label="Лента чата" className="px-0.5 pt-0.5 pb-1">
+      {/* On phones the feed spans the screen: the scrollbar sits on its edge, the messages keep the chat's inset. */}
+      <MessageScroller className="flex-1 max-lg:-mx-[clamp(12px,3vw,20px)] max-lg:w-auto">
+        <MessageScrollerViewport
+          aria-label="Лента чата"
+          className="px-0.5 pt-0.5 pb-1 max-lg:px-[calc(clamp(12px,3vw,20px)+0.125rem)]"
+        >
           <MessageScrollerContent aria-label="Диалог с Эвалом" className="gap-3">
             {messages.map((message) => (
               <MessageScrollerItem
