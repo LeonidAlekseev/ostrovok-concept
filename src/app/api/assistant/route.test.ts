@@ -422,6 +422,26 @@ describe('POST /api/assistant: the semantic search', () => {
     expect(spent).toBe(15_000)
   })
 
+  it('answers by the meaning within 15 s when the first embedding hangs and the retry finds the hotels', async () => {
+    setModel(undefined)
+    // The first try runs out of its own time; the retry asks the model anew and finds the hotels.
+    vi.mocked(semanticSearch)
+      .mockImplementationOnce(async (_, { timeoutMs = 0 }) => {
+        vi.setSystemTime(Date.now() + timeoutMs)
+        return { status: 'failed', reason: 'timeout' }
+      })
+      .mockResolvedValueOnce(found('prague-skyline-hostel'))
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const start = Date.now()
+    const body = await (await ask('тихо', complete)).json()
+    const spent = Date.now() - start
+    vi.useRealTimers()
+    expect(semanticSearch).toHaveBeenCalledTimes(2)
+    expect(body.matches.map((h: { id: string }) => h.id)).toEqual(['prague-skyline-hostel'])
+    expect(body.modelsDown).toBeUndefined()
+    expect(spent).toBeLessThanOrEqual(15_000)
+  })
+
   it('tries the search again when the first try fails, and the hotels found are no failure (Scenario: Повтор успел)', async () => {
     setModel(undefined)
     vi.mocked(semanticSearch)
