@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useEffectEvent, useState, type FormEvent } from 'react'
 import { Check, Copy, LoaderCircle, Share2 } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import {
@@ -14,7 +14,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { Chat } from '../../lib/assistantChats'
-import { SHARE_ERROR, shareChat, shareHref } from '../../lib/assistantShare'
+import { SHARE_ERROR, UNSHARE_ERROR, deleteShare, shareChat, shareHref } from '../../lib/assistantShare'
 import { getBrowserClient } from '../../lib/supabase/client'
 
 // The actions of a chat the header and the rows of the list share.
@@ -59,12 +59,24 @@ export function RenameForm({
 type ShareState =
   | { kind: 'idle' }
   | { kind: 'saving' }
-  | { kind: 'done'; url: string; copied: boolean }
+  | {
+      kind: 'done'
+      id: string
+      url: string
+      copied: boolean
+      /** «Удалить ссылку» pressed, waiting for the confirmation. */
+      confirming: boolean
+      removing: boolean
+      /** The link stays; the deletion failed. */
+      error?: string
+    }
+  | { kind: 'deleted' }
   | { kind: 'error'; message: string }
 
 /**
  * «Поделиться»: a signed-in user gets the link of a read-only snapshot, copied at once where the browser lets it;
- * a guest is offered to sign in. The snapshot is the chat as it is now; a new press makes a new one.
+ * a guest is offered to sign in. The snapshot is the chat as it is now; a new press makes a new one. The link can
+ * be deleted: its snapshot and photos go, and the link opens nothing.
  */
 function useShare(chat: Chat, signedIn: boolean) {
   const [state, setState] = useState<ShareState>({ kind: 'idle' })
@@ -74,14 +86,29 @@ function useShare(chat: Chat, signedIn: boolean) {
     if (!client) return setState({ kind: 'error', message: SHARE_ERROR })
     setState({ kind: 'saving' })
     try {
-      const url = new URL(shareHref(await shareChat(client, chat)), window.location.origin).toString()
+      const id = await shareChat(client, chat)
+      const url = new URL(shareHref(id), window.location.origin).toString()
       const copied = await navigator.clipboard?.writeText(url).then(
         () => true,
         () => false,
       )
-      setState({ kind: 'done', url, copied: copied ?? false })
+      setState({ kind: 'done', id, url, copied: copied ?? false, confirming: false, removing: false })
     } catch (error) {
       setState({ kind: 'error', message: error instanceof Error ? error.message : SHARE_ERROR })
+    }
+  }
+
+  /** The link is deleted after the confirmation; a failure keeps the link on the screen with the message. */
+  const remove = async (id: string) => {
+    const client = getBrowserClient()
+    setState((s) => (s.kind === 'done' ? { ...s, removing: true, error: undefined } : s))
+    try {
+      if (!client) throw new Error(UNSHARE_ERROR)
+      await deleteShare(client, id)
+      setState({ kind: 'deleted' })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : UNSHARE_ERROR
+      setState((s) => (s.kind === 'done' ? { ...s, removing: false, confirming: false, error: message } : s))
     }
   }
 
@@ -90,11 +117,11 @@ function useShare(chat: Chat, signedIn: boolean) {
     if (open && signedIn) void share()
     if (!open) setState({ kind: 'idle' })
   }
-  return { state, setState, toggle }
+  return { state, setState, toggle, remove }
 }
 
 function ShareBody({ share, signedIn }: { share: ReturnType<typeof useShare>; signedIn: boolean }) {
-  const { state, setState } = share
+  const { state, setState, remove } = share
   return (
     <>
       <p className="font-semibold">Поделиться чатом</p>
@@ -128,6 +155,56 @@ function ShareBody({ share, signedIn }: { share: ReturnType<typeof useShare>; si
               <Copy className="size-4" aria-hidden />
             </Button>
           </div>
+          {state.error && (
+            <p className="text-sm/[1.45] text-destructive" role="alert">
+              {state.error}
+            </p>
+          )}
+          {state.confirming ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm/[1.45] text-muted-foreground">
+                По ссылке чат перестанет открываться. Сам чат останется.
+              </p>
+              <div className="flex gap-2 self-start">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  shape="pill"
+                  disabled={state.removing}
+                  onClick={() => setState({ ...state, confirming: false })}
+                >
+                  Отмена
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  shape="pill"
+                  disabled={state.removing}
+                  onClick={() => void remove(state.id)}
+                >
+                  {state.removing && <LoaderCircle className="size-4 motion-safe:animate-spin" aria-hidden />}
+                  Удалить ссылку
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              shape="pill"
+              className="self-start text-destructive"
+              onClick={() => setState({ ...state, confirming: true, error: undefined })}
+            >
+              Удалить ссылку
+            </Button>
+          )}
+        </>
+      ) : state.kind === 'deleted' ? (
+        <>
+          <p className="font-semibold" aria-live="polite">
+            Ссылка удалена
+          </p>
+          <p className="text-sm/[1.45] text-muted-foreground">По ней чат больше не открывается.</p>
         </>
       ) : state.kind === 'error' ? (
         <p className="text-sm/[1.45] text-destructive" role="alert">
@@ -180,6 +257,11 @@ export function ShareDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const share = useShare(chat, signedIn)
+  // The parent opens the dialog (the row's menu item), so the link is made when it opens, not on a press here.
+  const onOpen = useEffectEvent(() => share.toggle(true))
+  useEffect(() => {
+    if (open) onOpen()
+  }, [open])
   return (
     <Dialog
       open={open}
