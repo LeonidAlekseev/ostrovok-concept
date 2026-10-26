@@ -13,7 +13,7 @@ import {
   type FeatureWish,
   type HotelFeatures,
 } from '@/lib/features'
-import { SEMANTIC_TIMEOUT_MS, semanticSearch } from './semantic'
+import { SEMANTIC_TIMEOUT_MS, semanticSearch, type SemanticResult } from './semantic'
 
 /**
  * Эвал's turn once the plan is due: a sequence of steps, each one of its agents. Now the search by meaning picks
@@ -42,6 +42,8 @@ export interface TurnState {
   semantic?: string[]
   features?: Record<string, HotelFeatures>
   missing?: Criterion[]
+  /** The search by meaning failed, its retry too: the rules picked the hotels and the answer says the models are down. */
+  semanticDown?: true
 }
 
 export interface Step {
@@ -54,25 +56,39 @@ export interface Step {
 
 /** Hotels a turn hands to the plan. */
 export const MATCHES = 6
-/** The search by meaning needs this much of the answer's time to be worth starting. */
+/** The search by meaning needs this much of the answer's time to be worth starting; so does its retry. */
 const MIN_SEMANTIC_MS = 1500
 
 const stayCount = (n: number) => countRu(n, ['отель', 'отеля', 'отелей'])
 
-/** Hotels for the traveller's words in the plan's cities; without the search by meaning the plan keeps its rules. */
+/** Failures a retry may fix; with `no-key`, `aborted` or an empty result the search is not down. */
+const retryable = (result: SemanticResult) =>
+  result.status === 'failed' && ['timeout', 'model', 'database'].includes(result.reason)
+
+/**
+ * Hotels for the traveller's words in the plan's cities; without the search by meaning the plan keeps its rules. A
+ * failed search is tried once more when the answer's time allows; when the retry fails too, the rules pick the hotels
+ * and the state says the models are down.
+ */
 export const searchStep: Step = {
   agent: 'search',
   title: () => 'Подбираю отели по вашему описанию',
   async run(context, state) {
-    const timeoutMs = Math.min(context.deadline - Date.now(), SEMANTIC_TIMEOUT_MS)
-    if (timeoutMs < MIN_SEMANTIC_MS) return 'подобрал по каталогу'
+    const left = context.deadline - Date.now()
+    if (left < MIN_SEMANTIC_MS) return 'подобрал по каталогу'
     const destinationIds = planCities(context.brief, context.today, context.destinations).map((d) => d.id)
-    const result = await semanticSearch(context.wish, {
-      destinationIds,
-      k: MATCHES,
-      timeoutMs,
-      signal: context.signal,
-    })
+    const search = (timeoutMs: number) =>
+      semanticSearch(context.wish, { destinationIds, k: MATCHES, timeoutMs, signal: context.signal })
+    // The first try leaves the retry its minimum: a try that times out still has time for the second one.
+    let result = await search(Math.min(SEMANTIC_TIMEOUT_MS, Math.max(left - MIN_SEMANTIC_MS, MIN_SEMANTIC_MS)))
+    if (retryable(result)) {
+      const retryMs = Math.min(SEMANTIC_TIMEOUT_MS, context.deadline - Date.now())
+      if (retryMs >= MIN_SEMANTIC_MS) result = await search(retryMs)
+    }
+    if (retryable(result)) {
+      state.semanticDown = true
+      return 'модель не ответила — подобрал по правилам'
+    }
     if (result.status !== 'found') return 'подобрал по каталогу'
     const byId = new Map((await context.summaries()).map((h) => [h.id, h]))
     const matches = result.hits.flatMap((hit) => byId.get(hit.id) ?? [])

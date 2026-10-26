@@ -413,9 +413,69 @@ describe('POST /api/assistant: the semantic search', () => {
     ).json()
     const spent = Date.now() - start
     vi.useRealTimers()
-    expect(semanticSearch).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ timeoutMs: 6000 }))
+    // The first try leaves 1.5 s for the retry, which the answer's time runs out on.
+    const [[, first], [, retry]] = vi.mocked(semanticSearch).mock.calls
+    expect(first.timeoutMs).toBe(4500)
+    expect(retry.timeoutMs).toBe(1500)
     expect(body.matches).toBeUndefined()
+    expect(body.steps[0]).toMatchObject({ agent: 'search', result: 'модель не ответила — подобрал по правилам' })
     expect(spent).toBe(15_000)
+  })
+
+  it('answers by the meaning within 15 s when the first embedding hangs and the retry finds the hotels', async () => {
+    setModel(undefined)
+    // The first try runs out of its own time; the retry asks the model anew and finds the hotels.
+    vi.mocked(semanticSearch)
+      .mockImplementationOnce(async (_, { timeoutMs = 0 }) => {
+        vi.setSystemTime(Date.now() + timeoutMs)
+        return { status: 'failed', reason: 'timeout' }
+      })
+      .mockResolvedValueOnce(found('prague-skyline-hostel'))
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const start = Date.now()
+    const body = await (await ask('тихо', complete)).json()
+    const spent = Date.now() - start
+    vi.useRealTimers()
+    expect(semanticSearch).toHaveBeenCalledTimes(2)
+    expect(body.matches.map((h: { id: string }) => h.id)).toEqual(['prague-skyline-hostel'])
+    expect(body.modelsDown).toBeUndefined()
+    expect(spent).toBeLessThanOrEqual(15_000)
+  })
+
+  it('tries the search again when the first try fails, and the hotels found are no failure (Scenario: Повтор успел)', async () => {
+    setModel(undefined)
+    vi.mocked(semanticSearch)
+      .mockResolvedValueOnce({ status: 'failed', reason: 'model' })
+      .mockResolvedValueOnce(found('prague-skyline-hostel'))
+    const body = await (await ask('тихо', complete)).json()
+    expect(semanticSearch).toHaveBeenCalledTimes(2)
+    expect(body.matches.map((h: { id: string }) => h.id)).toEqual(['prague-skyline-hostel'])
+    expect(body.modelsDown).toBeUndefined()
+    expect(body.steps[0]).toMatchObject({ agent: 'search', status: 'done', result: 'нашёл 1 отель' })
+  })
+
+  it('says the models are down once, when the search and its retry both fail (Scenario: Повтор не удался)', async () => {
+    setModel(undefined)
+    vi.mocked(semanticSearch).mockResolvedValue({ status: 'failed', reason: 'database' })
+    const body = await (await ask('тихо', complete)).json()
+    expect(semanticSearch).toHaveBeenCalledTimes(2)
+    expect(body.matches).toBeUndefined()
+    expect(body.modelsDown).toBe(true)
+    expect(body.steps[0]).toMatchObject({ agent: 'search', result: 'модель не ответила — подобрал по правилам' })
+  })
+
+  it('does not retry nor warn without a key or with an empty result', async () => {
+    setModel(undefined)
+    vi.mocked(semanticSearch).mockResolvedValue({ status: 'failed', reason: 'no-key' })
+    const noKey = await (await ask('тихо', complete)).json()
+    expect(semanticSearch).toHaveBeenCalledTimes(1)
+    expect(noKey.modelsDown).toBeUndefined()
+    expect(noKey.steps[0]).toMatchObject({ result: 'подобрал по каталогу' })
+
+    vi.mocked(semanticSearch).mockReset().mockResolvedValue({ status: 'empty' })
+    const empty = await (await ask('тихо', complete)).json()
+    expect(semanticSearch).toHaveBeenCalledTimes(1)
+    expect(empty.modelsDown).toBeUndefined()
   })
 })
 
@@ -652,7 +712,7 @@ describe('POST /api/assistant with photos', () => {
     const none = await (await withPhotos('найди похожий')).json()
     vi.useRealTimers()
     expect(none.photo.missed).toBeUndefined()
-    expect(none.steps[0]).toMatchObject({ status: 'done', result: 'похожих не нашёл' })
+    expect(none.steps.at(-1)).toMatchObject({ status: 'done', result: 'похожих не нашёл' })
 
     // A failure, however quick, is the search not answering.
     vi.mocked(semanticSearch).mockReset().mockResolvedValue({ status: 'failed', reason: 'no-key' })
