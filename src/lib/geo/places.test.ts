@@ -216,6 +216,48 @@ describe('the places the cache does not cover', () => {
   })
 })
 
+// assistant-geo, Requirement: Дальние категории в загруженной области
+describe('the far places', () => {
+  const box = { at: hotel, radiusM: 15_000, categories: ['airport', 'beach'] as PlaceCategory[] }
+  const airport = row(20, ['airport'], near(39.4893, -0.4816), 'Aeropuerto de Valencia')
+
+  // Scenario: Аэропорт в 20 км
+  it('count as checked when the point is in an area loaded for them', async () => {
+    const { store } = memoryStore([airport], [box])
+    const overpass = vi.fn()
+    const result = await nearbyPlaces(
+      hotel,
+      ['airport', 'beach'],
+      { radiusM: 20_000, perCategory: 1 },
+      { store, overpass, budget },
+    )
+    expect(overpass).not.toHaveBeenCalled()
+    expect(result.groups[0]).toMatchObject({ status: 'found', places: [{ osmId: 20 }] })
+    expect(result.groups[0].failure).toBeUndefined()
+    expect(result.groups[1]).toMatchObject({ status: 'none' })
+    expect(result.groups[1].failure).toBeUndefined()
+  })
+
+  it('are found without a failure when the cache has them beyond the loaded area', async () => {
+    const { store } = memoryStore([airport], [{ ...box, categories: ['beach'] }])
+    const result = await nearbyPlaces(
+      hotel,
+      ['airport'],
+      { radiusM: 20_000, perCategory: 1 },
+      { store, overpass: vi.fn(), budget },
+    )
+    expect(result.groups[0]).toMatchObject({ status: 'found', places: [{ osmId: 20 }] })
+    expect(result.groups[0].failure).toBeUndefined()
+  })
+
+  it('ask the area only for a radius beyond the online one', async () => {
+    const { store } = memoryStore([], [box])
+    const overpass = vi.fn(async () => ok([]))
+    await nearbyPlaces(hotel, ['bar'], { radiusM: 20_000, perCategory: 1 }, { store, overpass, budget })
+    expect(store.near).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('the geocoding', () => {
   const market: GeocodedPlace = {
     osmType: 'way',

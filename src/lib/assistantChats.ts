@@ -8,6 +8,7 @@ import {
   type TurnStep,
 } from './assistant'
 import { clearDialog, isBrief, isPlan, isQuestion, loadDialog } from './assistantDialog'
+import { parseChatMap, type ChatMap } from './geo/chatMap'
 
 /**
  * The chats with Эвал. A message has a role, a status and structured data, so the feed holds the steps of Эвал's
@@ -53,6 +54,8 @@ export interface MessageData {
   more?: true
   /** A chat about a hotel: the model's part of the answer from general knowledge, shown marked «Не проверено». */
   unverified?: string
+  /** A chat about a hotel: the places near it and the routes to them the geo steps found. */
+  map?: ChatMap
 }
 
 export interface ChatMessage {
@@ -183,6 +186,7 @@ export function parseData(value: unknown): MessageData | null {
     ...(value.step !== undefined && { step: value.step as AgentStep }),
     ...(value.more === true && { more: true as const }),
     ...(isString(value.unverified) && value.unverified && { unverified: value.unverified }),
+    ...(parseChatMap(value.map) && { map: parseChatMap(value.map) }),
   }
 }
 
