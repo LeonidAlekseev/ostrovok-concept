@@ -296,7 +296,8 @@ describe('SearchResultsPage filters', () => {
     await user.click(screen.getByRole('button', { name: 'Апартаменты' }))
     expect(window.location.search).toContain('types=hostel%2Capartments')
     expect(cards().length).toBeGreaterThan(0)
-    for (const card of cards()) expect(within(card).getByText(/^(Хостел|Апартаменты)$/)).toBeDefined()
+    // The kind of stay is on the hotel's page only, not on the card.
+    for (const card of cards()) expect(within(card).queryByText(/^(Хостел|Апартаменты)$/)).toBeNull()
   })
 
   it('filters by the workspace and the Wi‑Fi speed from', async () => {
