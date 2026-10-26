@@ -465,6 +465,25 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limit_hits: {
+        Row: {
+          count: number
+          key: string
+          reset_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          count: number
+          key: string
+          reset_at: string
+        }
+        Update: {
+          count?: number
+          key?: string
+          reset_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       hotel_room_views_named: {
@@ -506,6 +525,10 @@ export type Database = {
           ref_id: string
           similarity: number
         }[]
+      }
+      rate_limit_hit: {
+        Args: { hit_key: string; hit_limit: number; window_seconds: number }
+        Returns: boolean
       }
       similar_hotels: {
         Args: { hotel_id: string; match_count?: number; profile_ids?: string[] }

@@ -3,6 +3,7 @@ import { MockLanguageModelV4 } from 'ai/test'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ModelLink } from '@/lib/ai/chain'
 import { getTextModels, getVisionModels } from '@/lib/ai/model'
+import { allowVisionRequest } from '@/lib/ai/rateLimit'
 import { semanticSearch } from '@/lib/ai/semantic'
 import { loadHotelFeatures } from '@/lib/db/features'
 import type { HotelFeatures } from '@/lib/features'
@@ -787,10 +788,12 @@ describe('POST /api/assistant with photos', () => {
     setModel(undefined)
     sees({ description: 'Бассейн.' })
     const answers = []
-    for (let i = 0; i < 7; i++)
+    // The address has looked at 19 photos this minute: the 20th still passes, the 21st does not.
+    for (let i = 0; i < 19; i++) await allowVisionRequest('10.9.9.9')
+    for (let i = 0; i < 2; i++)
       answers.push((await (await withPhotos('найди похожий', [photo], {}, '10.9.9.9')).json()).photo)
-    expect(answers.slice(0, 6).every((p) => p.action === 'similar')).toBe(true)
-    expect(answers[6]).toEqual({ action: 'limited' })
+    expect(answers[0].action).toBe('similar')
+    expect(answers[1]).toEqual({ action: 'limited' })
   })
 
   it('takes at most four optimised photos', async () => {
