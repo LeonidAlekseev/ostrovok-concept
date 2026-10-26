@@ -934,7 +934,7 @@ describe('SearchResultsPage hotel dialog', () => {
     open(`${PRAGUE}&hotel=${hotel.id}`)
     await results()
 
-    expect(replace).toHaveBeenCalledWith(`/hotels/${hotel.id}?${STAY}`)
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(`/hotels/${hotel.id}?${STAY}`))
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 })

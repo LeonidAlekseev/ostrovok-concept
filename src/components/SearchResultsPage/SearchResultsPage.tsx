@@ -325,7 +325,7 @@ function Results({ query, target, initialFilters, hotelId }: ResultsProps) {
 
       {result && (
         <>
-          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_minmax(0,1fr)] 3xl:grid-cols-[15rem_minmax(0,1.6fr)_minmax(0,1fr)]">
+          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_minmax(0,1.25fr)] 3xl:grid-cols-[15rem_minmax(0,1.6fr)_minmax(0,1fr)]">
             {desktop && (
               <aside aria-label="Фильтры" className="lg:col-start-1 lg:row-start-1">
                 <FiltersPanel filters={filters} onChange={updateFilters} priceBounds={bounds ?? [0, 0]} />

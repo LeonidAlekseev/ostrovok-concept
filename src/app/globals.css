@@ -189,7 +189,7 @@
   --decor-rainbow-shadow: 0 12px 28px color-mix(in srgb, var(--decor-violet) 28%, transparent);
 
   --page-x: clamp(14px, 4vw, 40px);
-  --page-max: 1240px;
+  --page-max: 1440px;
   /* Wider page for /search on 3xl screens only. */
   --page-max-wide: 1760px;
   --header-height: clamp(60px, 15vw, 72px);
@@ -197,7 +197,7 @@
 
 /* Not static: Tailwind emits only the variables that utilities and var() in the CSS use. */
 @theme {
-  /* lg is the layout's desktop step; xl equals --page-max. */
+  /* lg is the layout's desktop step; xl is the first width with the three-column search. */
   --breakpoint-xs: 375px;
   --breakpoint-sm: 640px;
   --breakpoint-md: 768px;
