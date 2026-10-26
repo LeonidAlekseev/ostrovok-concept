@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { destinations } from '../../data/destinations'
@@ -41,6 +41,9 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  // Unmounted first: the hooks of this file run before the cleanup of src/test/setup.ts, and an unmount runs the
+  // effects still pending, so a chat saved by them would outlive the cleared storage and open in the next test.
+  cleanup()
   vi.restoreAllMocks()
   window.sessionStorage.clear()
   window.localStorage.clear()
@@ -565,6 +568,40 @@ describe('AssistantSearch after a reload', () => {
     expect(screen.queryByRole('log', { name: 'Диалог с Эвалом' })).toBeNull()
     expect(screen.getByText(/О каком путешествии вы мечтаете/)).toBeTruthy()
   })
+})
+
+// assistant-search, Requirement: Одна копия сообщения — the two tests go in this order.
+describe('AssistantSearch from one test to the next', () => {
+  it('ends right as the answer shows, before its chat is saved', async () => {
+    const reply = deferred()
+    fetchMock.mockReturnValueOnce(reply.promise)
+    const { user } = renderAssistant()
+    await user.type(input(), 'к морю{Enter}')
+    // The answer's render is in the page, the effect saving its chat has not run yet: no wait that lets a task pass.
+    const shown = new Promise<void>((resolve) => {
+      const observer = new MutationObserver(() => {
+        if (!document.body.textContent?.includes('Когда планируете поехать')) return
+        observer.disconnect()
+        resolve()
+      })
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true })
+    })
+    reply.resolve(answer({ brief: { vibe: 'sea' } }))
+    await shown
+  })
+
+  it(
+    'starts without the chats of the test before (Scenario: Один ввод)',
+    async () => {
+      expect(window.localStorage.getItem(CHATS_KEY), storedChats()).toBeNull()
+      fetchMock.mockImplementation(async () => answer({ brief: { vibe: 'sea' } }))
+      const { user } = renderAssistant()
+      await user.type(input(), 'к морю{Enter}')
+      await inLog(/Когда планируете поехать/)
+      expect(within(log()).getAllByText('к морю')).toHaveLength(1)
+    },
+    HEAVY,
+  )
 })
 
 // assistant-search, Requirement: Начальный экран
