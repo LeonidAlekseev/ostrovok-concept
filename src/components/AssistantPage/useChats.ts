@@ -207,6 +207,9 @@ export function useChats(
   useEffect(() => {
     let cancelled = false
     const guestMode = () => {
+      ;((globalThis as unknown as { __diag?: string[] }).__diag ??= []).push(
+        `guestMode ${new Date().toISOString()} stored=${window.localStorage.getItem('ostrovok:v1:assistant-chats')?.slice(0, 300)}`,
+      )
       saved.current.clear()
       setChats(loadGuestChats())
       setMode({ kind: 'guest' })
@@ -478,6 +481,10 @@ export function useChats(
     const current = chatsRef.current.find((c) => c.id === active.id) ?? active
     if ((!text && sent.length === 0) || current.messages.some((m) => m.status === 'pending')) return
     const now = new Date().toISOString()
+    // DIAG: every send, with the chat it lands in and the caller's stack.
+    ;((globalThis as unknown as { __diag?: string[] }).__diag ??= []).push(
+      `send ${now} text=${text} active=${active.id} listed=${!!listed} current=${current.id} msgs=[${current.messages.map((m) => `${m.role}:${m.status}:${m.text.slice(0, 20)}`).join(' | ')}] refHas=${chatsRef.current.some((c) => c.id === active.id)}\n${new Error('send').stack}`,
+    )
     const user: ChatMessage = {
       id: newId(),
       role: 'user',
