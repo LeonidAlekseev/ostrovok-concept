@@ -213,7 +213,7 @@ async function look(
 ): Promise<{ sight: PhotoSight; steps: TurnStep[] } | { failed: 'limited' | 'down'; steps: TurnStep[] } | null> {
   const until = deadline - VISION_RESERVE_MS
   if (until - Date.now() < MIN_VISION_MS) return null
-  if (!allowVisionRequest(ip)) return { failed: 'limited', steps: [] }
+  if (!(await allowVisionRequest(ip))) return { failed: 'limited', steps: [] }
   const models = await getVisionModels()
   if (!models) return null
   const result = await firstAnswer(models, (model, timeout) => seePhotos(model, photos, { signal: timeout }), {
