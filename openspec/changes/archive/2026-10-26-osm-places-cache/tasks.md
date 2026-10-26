@@ -5,7 +5,7 @@
 ## 2. База
 
 - [x] 2.1 Миграция `20261026130000_osm_places.sql`: `osm_places`, `osm_place_areas`, RLS, `osm_places_near`, `osm_place_area_add`; идемпотентна
-- [ ] 2.2 Применить к живой базе `npm run db:push`, обновить `src/lib/db/database.types.ts` (`npm run db:types`)
+- [x] 2.2 Применить к живой базе `npm run db:push`, обновить `src/lib/db/database.types.ts` (`npm run db:types`)
 
 ## 3. Ядро `src/lib/geo/`
 
@@ -21,9 +21,9 @@
 ## 4. Загрузка
 
 - [x] 4.1 Скрипт `scripts/load-osm-places.ts` (`npm run db:osm-places`), Overpass по группам или файл выгрузки (`scripts/osm-pbf-to-overpass.py` из Geofabrik)
-- [ ] 4.2 Загрузить Валенсию в живую базу, записать числа по категориям и размер таблиц
+- [x] 4.2 Загрузить Валенсию в живую базу, записать числа по категориям и размер таблиц — 2026-10-26 из выгрузки Geofabrik от 2026-10-25 (Overpass отвечал 502): 8962 места (7713 точек, 1176 многоугольников, 73 линии), `osm_places` 10 МБ с индексами, одна область `preload`
 
 ## 5. Проверка
 
 - [x] 5.1 Тесты Vitest без сети: гаверсинус, разбор Overpass/OSRM/Nominatim на фикстурах, «по прямой», дозапись, лимиты
-- [ ] 5.2 `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check`, `npm run build`
+- [x] 5.2 `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check`, `npm run build`
