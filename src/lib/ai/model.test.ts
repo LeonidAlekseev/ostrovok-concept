@@ -45,17 +45,13 @@ describe('getVisionModels', () => {
   it('gives the models that see photos with the key, the main one first', async () => {
     vi.mocked(getSecret).mockResolvedValue('test-key')
     const models = await getVisionModels()
-    expect(models?.map((m) => m.id)).toEqual([
-      'nvidia/nemotron-3.5-super-vl-120b-a12b',
-      'minimaxai/minimax-m3.1-flash',
-      'meta/llama-3.2-11b-vision-instruct',
-    ])
+    expect(models?.map((m) => m.id)).toEqual(['nvidia/nemotron-3.5-super-vl-120b-a12b', 'minimaxai/minimax-m3.1-flash'])
     expect(models?.[0].model).toMatchObject({ modelId: VISION_CHAIN[0].id, provider: 'nvidia.chat' })
   })
 })
 
 describe('the request of a chain model', () => {
-  /** The body each model of the vision chain sends for a request with `reasoning: 'none'`. */
+  /** The body each model of the vision chain sends for a request with `reasoning: 'none'`, in order. */
   async function bodies() {
     vi.mocked(getSecret).mockResolvedValue('test-key')
     const sent: Record<string, unknown>[] = []
@@ -74,11 +70,9 @@ describe('the request of a chain model', () => {
     return sent
   }
 
-  it('turns reasoning off, but sends no reasoning_effort to llama, which answers 400 to it', async () => {
-    const [main, spare, llama] = await bodies()
+  it('turns reasoning off in every model of the vision chain', async () => {
+    const [main, spare] = await bodies()
     expect(main).toMatchObject({ model: VISION_CHAIN[0].id, reasoning_effort: 'none' })
-    expect(spare).toMatchObject({ reasoning_effort: 'none' })
-    expect(llama.model).toBe('meta/llama-3.2-11b-vision-instruct')
-    expect(llama).not.toHaveProperty('reasoning_effort')
+    expect(spare).toMatchObject({ model: VISION_CHAIN[1].id, reasoning_effort: 'none' })
   })
 })
