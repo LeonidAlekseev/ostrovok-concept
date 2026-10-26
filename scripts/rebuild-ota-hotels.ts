@@ -1,5 +1,7 @@
-// Rebuilds the catalogue rows of the real hotels (`ota-*` in `hotels`) from their raw Ostrovok data in `ota_hotels`,
-// with no search JSON: the rooms of the rates only (not the directory `room_groups`), no generated reviews, section scores or guests' photos.
+// Rebuilds the catalogue rows of the real hotels (`ota-*` in `hotels`) from their raw Ostrovok data in `ota_hotels`
+// and their pages in `ota_hotel_pages` (`npm run db:load:ota-pages`), with no search JSON: the rooms of the rates only
+// (not the directory `room_groups`); the description, the check-in and check-out times and the workspace of the page;
+// no Wi‑Fi speed, no generated reviews, section scores or guests' photos.
 //   npm run db:rebuild:ota -- --dry-run   (reads only: prints what would change)
 //   npm run db:rebuild:ota                (writes the changed rows)
 // Idempotent: a row whose data is already the rebuilt one is left alone, so a second run writes nothing. Keeps the
@@ -25,6 +27,7 @@ registerHooks({
 const { REAL_HOTEL_ID_PREFIX } = await import('../src/lib/catalog.ts')
 const { otaHotel, searchStay } = await import('../src/lib/ota/hotel.ts')
 const { otaHotelSchema, otaMapHotelSchema } = await import('../src/lib/ota/search.ts')
+const { pageFields, pageFieldsRowSchema, PAGE_FIELDS_COLUMNS } = await import('../src/lib/ota/page.ts')
 
 const DESTINATION_ID = 'valencia'
 // Rows of jsonb a request: small enough for the database's short statement timeout.
@@ -88,8 +91,14 @@ const pins = new Map(
     return pin.success ? [[row.master_id, pin.data] as const] : []
   }),
 )
+const pages = new Map(
+  (await readAll<unknown>('ota_hotel_pages', PAGE_FIELDS_COLUMNS, 'master_id')).map((row) => {
+    const page = pageFieldsRowSchema.parse(row)
+    return [page.master_id, pageFields(page)] as const
+  }),
+)
 const stay = searchStay({ hotels: raws })
-const hotels = raws.map((raw) => otaHotel(raw, DESTINATION_ID, stay, pins.get(raw.master_id)))
+const hotels = raws.map((raw) => otaHotel(raw, DESTINATION_ID, stay, pins.get(raw.master_id), pages.get(raw.master_id)))
 
 const existing = new Map(
   (await readAll<HotelRow>('hotels', 'id,position,data', 'position'))
@@ -115,7 +124,8 @@ const priceChanged = hotels.filter(
 )
 
 console.log(`stay: ${stay.nights} nights from ${stay.checkIn}`)
-console.log(`ota_hotels: ${otaRows.length}, hotels ota-*: ${existing.size}`)
+console.log(`ota_hotels: ${otaRows.length}, hotels ota-*: ${existing.size}, pages: ${pages.size}`)
+console.log(`with a description: ${hotels.filter((hotel) => hotel.description).length}`)
 console.log(`rooms: ${before} now, ${rooms(hotels)} rebuilt (from the rates)`)
 console.log(`reviews left: ${hotels.reduce((sum, hotel) => sum + hotel.reviews.length, 0)}`)
 console.log(`priceFrom changes: ${priceChanged.length}`)

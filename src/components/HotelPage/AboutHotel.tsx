@@ -40,6 +40,7 @@ import {
   type Hotel,
 } from '@/lib/catalog'
 import { formatDecimal } from '@/lib/format'
+import { factLines, type HotelDetails } from '@/lib/hotelDetails'
 import { DialogButton } from './DialogButton'
 
 type Icon = ComponentType<{ className?: string; strokeWidth?: number; 'aria-hidden'?: boolean }>
@@ -92,6 +93,30 @@ const TILE_LABEL: Partial<Record<Amenity, string>> = {
 
 const iconOf = (amenity: Amenity) => AMENITY_ICON[amenity] ?? SECTION_ICON[AMENITIES[amenity].section]
 
+/** The section whose icon an Ostrovok amenity group takes, by the group's slug. */
+const GROUP_SECTION: Record<string, AmenitySection> = {
+  has_common_info: 'general',
+  has_internet: 'internet',
+  has_meal: 'food',
+  has_extra_services: 'services',
+  has_pets: 'pets',
+  has_in_rooms: 'rooms',
+  has_disabled_support: 'accessibility',
+  has_parking: 'parking',
+  has_languages: 'languages',
+  has_tours: 'services',
+  has_anticovid: 'general',
+  has_busyness: 'business',
+  has_pool: 'pool',
+  has_entertainment: 'entertainment',
+  has_shuttle: 'transfer',
+  has_barber_shop: 'wellness',
+  has_kids: 'kids',
+  has_fitness: 'sport',
+  has_winter_sports: 'sport',
+}
+const groupIcon = (slug: string): Icon => SECTION_ICON[GROUP_SECTION[slug]] ?? LayoutGrid
+
 /**
  * Kilometres to the centre, in a city with a metro to the metro and, where the city's airport is known, straight
  * to the airport: one white card, the tiles parted by lines.
@@ -139,21 +164,51 @@ function Paid() {
   )
 }
 
-/** The lines of "Все удобства": the Wi‑Fi speed and the workspace, then every amenity of the hotel. */
-const amenityCount = (hotel: Hotel) => workLabels(hotel).length + hotel.amenities.length
+/** The hotel's details, when its Ostrovok page has them; the synthetic hotels and the dialog before they come have none. */
+type Details = HotelDetails | null | undefined
 
-/** "Все удобства (N)": every amenity of the hotel by section, the icon on the section; `trigger` opens it. */
-function AmenitiesDialog({ hotel, trigger }: { hotel: Hotel; trigger?: ReactElement }) {
+/** The groups of Ostrovok's amenities of the page, or none. */
+const groupsOf = (details: Details) => details?.amenityGroups ?? []
+
+/**
+ * The lines of "Все удобства": the Wi‑Fi speed (when known) and the workspace, then every amenity of the hotel —
+ * Ostrovok's groups of its page, or the catalogue's amenities without them.
+ */
+const amenityCount = (hotel: Hotel, details: Details) =>
+  workLabels(hotel).length +
+  (groupsOf(details).length
+    ? groupsOf(details).reduce((sum, group) => sum + group.amenities.length, 0)
+    : hotel.amenities.length)
+
+/** A group of "Все удобства": its icon, its name and its lines. */
+function AmenityGroupList({ icon: GroupIcon, title, children }: { icon: Icon; title: string; children: ReactNode }) {
+  return (
+    <section aria-label={title} className="flex flex-col gap-2">
+      <h3 className="flex items-center gap-2 font-bold">
+        <GroupIcon className="size-5 shrink-0 text-success-foreground" aria-hidden />
+        {title}
+      </h3>
+      <ul className="flex flex-col gap-1.5 pl-7">{children}</ul>
+    </section>
+  )
+}
+
+/**
+ * "Все удобства (N)": every amenity of the hotel by section, the icon on the section — Ostrovok's groups as the page
+ * names them, or the catalogue's sections; `trigger` opens it.
+ */
+function AmenitiesDialog({ hotel, details, trigger }: { hotel: Hotel; details?: Details; trigger?: ReactElement }) {
+  const groups = groupsOf(details)
   const sections = (Object.keys(AMENITY_SECTIONS) as AmenitySection[])
     .map((section) => ({ section, items: hotel.amenities.filter((key) => AMENITIES[key].section === section) }))
     .filter(({ items }) => items.length > 0)
-  const [wifi, ...workspace] = workLabels(hotel)
+  const work = workLabels(hotel)
   return (
     <Dialog>
       {trigger ? (
         <DialogTrigger render={trigger} />
       ) : (
-        <DialogButton icon={LayoutGrid}>Все удобства ({amenityCount(hotel)})</DialogButton>
+        <DialogButton icon={LayoutGrid}>Все удобства ({amenityCount(hotel, details)})</DialogButton>
       )}
       <DialogContent
         showCloseButton={false}
@@ -161,32 +216,42 @@ function AmenitiesDialog({ hotel, trigger }: { hotel: Hotel; trigger?: ReactElem
       >
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4 sm:p-6">
           <DialogTitle className="text-heading font-bold">Удобства</DialogTitle>
-          <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
-            {sections.map(({ section, items }) => {
-              const SectionIcon = SECTION_ICON[section]
-              return (
-                <section key={section} aria-label={AMENITY_SECTIONS[section]} className="flex flex-col gap-2">
-                  <h3 className="flex items-center gap-2 font-bold">
-                    <SectionIcon className="size-5 shrink-0 text-success-foreground" aria-hidden />
-                    {AMENITY_SECTIONS[section]}
-                  </h3>
-                  <ul className="flex flex-col gap-1.5 pl-7">
-                    {section === 'internet' && <li>{wifi}</li>}
-                    {section === 'internet' && workspace.map((label) => <li key={label}>{label}</li>)}
-                    {items.map((key) => {
-                      const amenity: { label: string; paid?: true } = AMENITIES[key]
-                      return (
-                        <li key={key}>
-                          {amenity.label}
-                          {amenity.paid && <Paid />}
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </section>
-              )
-            })}
-          </div>
+          {groups.length > 0 ? (
+            <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+              {work.length > 0 && (
+                <AmenityGroupList icon={Briefcase} title="Для работы">
+                  {work.map((label) => (
+                    <li key={label}>{label}</li>
+                  ))}
+                </AmenityGroupList>
+              )}
+              {groups.map((group) => (
+                <AmenityGroupList key={`${group.slug}-${group.name}`} icon={groupIcon(group.slug)} title={group.name}>
+                  {group.amenities.map((name) => (
+                    <li key={name}>{name}</li>
+                  ))}
+                </AmenityGroupList>
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+              {sections.map(({ section, items }) => (
+                <AmenityGroupList key={section} icon={SECTION_ICON[section]} title={AMENITY_SECTIONS[section]}>
+                  {section === 'internet' && work.map((label) => <li key={label}>{label}</li>)}
+                  {items.map((key) => {
+                    const amenity: { label: string; paid?: true } = AMENITIES[key]
+                    return (
+                      <li key={key}>
+                        {amenity.label}
+                        {amenity.paid && <Paid />}
+                      </li>
+                    )
+                  })}
+                </AmenityGroupList>
+              ))}
+            </div>
+          )}
+          {groups.length > 0 && <p className="text-sm text-muted-foreground">По данным Островка.</p>}
         </div>
         <div className="flex justify-end border-t p-4">
           <DialogClose render={<Button variant="outline" />}>Закрыть</DialogClose>
@@ -201,12 +266,20 @@ const FOLD_FROM = 240
 
 /**
  * The overview: up to 7 tiles of the hotel's popular amenities with "Все удобства (N)" after them, of one width
- * across the row (below `lg` 3 and the last), "Об отеле" with the description (folded on a phone under "Читать полностью") and the
- * distances.
+ * across the row (below `lg` 3 and the last), "Об отеле" with the description (folded on a phone under "Читать
+ * полностью") — a real hotel's by the parts of its Ostrovok page, with its facts — and the distances. Without a
+ * description there is no "Об отеле".
  */
-export function AboutHotel({ hotel, children }: { hotel: Hotel; children?: ReactNode }) {
+export function AboutHotel({ hotel, details, children }: { hotel: Hotel; details?: Details; children?: ReactNode }) {
   const [unfolded, setUnfolded] = useState(false)
-  const folds = hotel.description.length > FOLD_FROM && !unfolded
+  const parts = details?.description.length
+    ? details.description
+    : hotel.description
+      ? [{ title: '', paragraphs: hotel.description.split(/\n{2,}/) }]
+      : []
+  const length = parts.reduce((sum, part) => sum + part.paragraphs.join(' ').length, 0)
+  const folds = length > FOLD_FROM && !unfolded
+  const facts = details ? factLines(details.facts, details.building) : []
   const tiles = POPULAR_AMENITIES.filter((key) => hotel.amenities.includes(key)).slice(0, TILES)
   // Every tile and "Все удобства" share the row: up to 8 columns from `lg`, up to 4 below it.
   const columns = { '--wide': tiles.length + 1, '--narrow': Math.min(tiles.length, 3) + 1 } as CSSProperties
@@ -234,49 +307,79 @@ export function AboutHotel({ hotel, children }: { hotel: Hotel; children?: React
           <li className="contents">
             <AmenitiesDialog
               hotel={hotel}
+              details={details}
               trigger={
                 <button type="button" className={cn(tile, 'transition-colors hover:bg-secondary')}>
                   <Plus className="size-6 shrink-0 text-primary" strokeWidth={1.8} aria-hidden />
-                  <span>Все удобства ({amenityCount(hotel)})</span>
+                  <span>Все удобства ({amenityCount(hotel, details)})</span>
                 </button>
               }
             />
           </li>
         </ul>
       </div>
-      <div className="flex flex-col gap-3">
-        <h2 id="about-title" className="text-heading font-bold">
-          Об отеле
-        </h2>
-        <p id="about-text" className={cn('max-w-3xl', folds && 'max-md:line-clamp-5')}>
-          {hotel.description}
-        </p>
-        {folds && (
-          <button
-            type="button"
-            aria-expanded={false}
-            aria-controls="about-text"
-            className="flex items-center gap-1 self-start font-semibold text-primary md:hidden"
-            onClick={() => setUnfolded(true)}
+      {parts.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <h2 id="about-title" className="text-heading font-bold">
+            Об отеле
+          </h2>
+          {/* Five lines of the parts, fading at the bottom: a clamp of lines works only on one block of text. */}
+          <div
+            id="about-text"
+            className={cn(
+              'flex max-w-3xl flex-col gap-3',
+              folds && 'max-md:max-h-[7.5lh] max-md:overflow-hidden max-md:mask-b-from-40%',
+            )}
           >
-            Читать полностью
-            <ChevronDown className="size-4" aria-hidden />
-          </button>
-        )}
-      </div>
+            {parts.map((part, index) => (
+              <div key={index} className="flex flex-col gap-1">
+                {part.title && <h3 className="font-bold">{part.title}</h3>}
+                {part.paragraphs.map((paragraph, i) => (
+                  <p key={i}>{paragraph}</p>
+                ))}
+              </div>
+            ))}
+          </div>
+          {folds && (
+            <button
+              type="button"
+              aria-expanded={false}
+              aria-controls="about-text"
+              className="flex items-center gap-1 self-start font-semibold text-primary md:hidden"
+              onClick={() => setUnfolded(true)}
+            >
+              Читать полностью
+              <ChevronDown className="size-4" aria-hidden />
+            </button>
+          )}
+          {facts.length > 0 && (
+            <ul aria-label="Факты об отеле" className="flex max-w-3xl flex-wrap gap-2">
+              {facts.map((fact) => (
+                <li key={fact} className="rounded-full bg-card px-3 py-1 text-sm shadow-(--shadow-card)">
+                  {fact}
+                </li>
+              ))}
+            </ul>
+          )}
+          {details?.description.length ? (
+            <p className="text-sm text-muted-foreground">Описание и факты — по данным Островка.</p>
+          ) : null}
+        </div>
+      )}
       <TravelTiles hotel={hotel} />
       {children}
     </section>
   )
 }
 
-/** "Удобства": the Wi‑Fi speed, the workspace and the first popular amenities with green icons, and all of them in a dialog. */
-export function HotelAmenities({ hotel }: { hotel: Hotel }) {
-  const [wifi, ...workspace] = workLabels(hotel)
-  const work = [
-    { key: 'wifi-speed', label: wifi, Icon: Wifi },
-    ...workspace.map((label) => ({ key: 'workspace', label, Icon: Briefcase })),
-  ]
+/**
+ * "Удобства": the Wi‑Fi speed (when known), the workspace and the first popular amenities with green icons, and all
+ * of them in a dialog.
+ */
+export function HotelAmenities({ hotel, details }: { hotel: Hotel; details?: Details }) {
+  const work = workLabels(hotel).map((label) =>
+    label === 'Рабочая зона' ? { key: 'workspace', label, Icon: Briefcase } : { key: 'wifi-speed', label, Icon: Wifi },
+  )
   const preview = POPULAR_AMENITIES.filter((key) => key !== 'wifi' && hotel.amenities.includes(key))
     .slice(0, PREVIEW - work.length)
     .map((key) => ({ key, label: AMENITIES[key].label, Icon: iconOf(key) }))
@@ -300,7 +403,7 @@ export function HotelAmenities({ hotel }: { hotel: Hotel }) {
           </li>
         ))}
       </ul>
-      <AmenitiesDialog hotel={hotel} />
+      <AmenitiesDialog hotel={hotel} details={details} />
     </section>
   )
 }

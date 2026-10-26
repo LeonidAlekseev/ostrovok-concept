@@ -158,10 +158,11 @@ describe('AboutHotel', () => {
   it('folds a long description on a phone until "Читать полностью"', async () => {
     const user = userEvent.setup()
     render(<AboutHotel hotel={{ ...hotel, description: 'Тихий отель. '.repeat(30) }} />)
-    const text = screen.getByText(/^Тихий отель/)
-    expect(text.className).toMatch(/\bmax-md:line-clamp-5\b/)
+    const text = document.getElementById('about-text')!
+    expect(screen.getByText(/^Тихий отель/)).toBeDefined()
+    expect(text.className).toMatch(/\bmax-md:max-h-\[7\.5lh\]/)
     await user.click(screen.getByRole('button', { name: 'Читать полностью' }))
-    expect(text.className).not.toMatch(/line-clamp/)
+    expect(text.className).not.toMatch(/max-h-/)
     expect(screen.queryByRole('button', { name: 'Читать полностью' })).toBeNull()
   })
 
@@ -436,7 +437,7 @@ describe('HotelPage', () => {
     render(<HotelPage hotel={hotel} />)
     expect(screen.queryByRole('region', { name: 'Отзывы' })).toBeNull()
     expect(document.getElementById('reviews')).toBeNull()
-    expect(screen.queryByText(hotel.reviews[0].pros)).toBeNull()
+    expect(screen.queryByText(hotel.reviews[0].pros!)).toBeNull()
     expect(screen.getByRole('button', { name: /^Читать отзывы \(/ })).toBeDefined()
   })
 
