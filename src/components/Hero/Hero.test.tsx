@@ -158,4 +158,24 @@ describe('Hero in the browser', () => {
     expect(cardLinks()[0].getAttribute('href')).not.toBe(first)
     expect(cardLinks()[0].getAttribute('href')).toMatch(/^\/hotels\/lisbon-/)
   })
+
+  // hero-globe, Requirement: Карточка отеля на глобусе, Scenario: Проявление
+  it('fades the card in at a new city', async () => {
+    const animate = vi.spyOn(Element.prototype, 'animate')
+    const user = setup()
+    await user.click(screen.getByRole('button', { name: 'Лиссабон, Португалия — отели' }))
+    expect(cardLinks()[0].getAttribute('href')).toMatch(/^\/hotels\/lisbon-/)
+    expect(animate).toHaveBeenCalledTimes(1)
+    expect(animate).toHaveBeenCalledWith({ opacity: [0, 1] }, expect.anything())
+  })
+
+  // hero-globe, Requirement: Карточка отеля на глобусе, Scenario: Проявление (при reduced motion — без анимации)
+  it('moves the card to a new city without animation with reduced motion', async () => {
+    setScreen(NARROW, { reducedMotion: true })
+    const animate = vi.spyOn(Element.prototype, 'animate')
+    const user = setup()
+    await user.click(screen.getByRole('button', { name: 'Лиссабон, Португалия — отели' }))
+    expect(cardLinks()[0].getAttribute('href')).toMatch(/^\/hotels\/lisbon-/)
+    expect(animate).not.toHaveBeenCalled()
+  })
 })

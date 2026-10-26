@@ -181,9 +181,9 @@ export const NOW = new Date(2026, 9, 19, 12)
 export const STAY = 'checkin=2026-10-20&checkout=2026-10-23&adults=2&rooms=1'
 export const PRAGUE = `destination=prague&${STAY}`
 
-export function open(search: string, { desktop = false } = {}) {
+export function open(search: string, { desktop = false, reducedMotion = false } = {}) {
   window.history.replaceState(null, '', `/search?${search}`)
-  setScreen(desktop ? WIDE : NARROW)
+  setScreen(desktop ? WIDE : NARROW, { reducedMotion })
   return render(<SearchResultsPage />)
 }
 
