@@ -215,7 +215,7 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
 
         {!started && (
           /* Eval's greeting: a grey cloud. */
-          <div className="max-w-[min(100%,34rem)] self-start rounded-3xl rounded-tl-md bg-muted px-4 py-3 text-base/[1.45] text-foreground">
+          <div className="max-w-[min(100%,34rem)] self-start rounded-[18px_18px_18px_6px] bg-muted px-4 py-3 text-base/[1.45] text-foreground">
             О каком путешествии вы мечтаете? <span aria-hidden>🌴</span> Я подберу идеальное жильё, направление и лучшие
             варианты для вашего отдыха <span aria-hidden>✨</span>
           </div>

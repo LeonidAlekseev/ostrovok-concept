@@ -39,11 +39,11 @@ import { formatPrice, guestsLabel } from '../../lib/format'
 import { HotelTile } from '../HotelTile/HotelTile'
 import { MessagePhotos, type PhotoUrl } from './ChatPhotos'
 
-/** The agent's bubble: no avatar beside it, the feed's full width at most. */
+/** The agent's bubble: flat light grey, no avatar beside it, the feed's full width at most. */
 const agentBubble =
-  'max-w-full *:data-[slot=bubble-content]:rounded-[18px_18px_18px_6px] *:data-[slot=bubble-content]:bg-(--decor-light) *:data-[slot=bubble-content]:px-3.5 *:data-[slot=bubble-content]:py-2.5 *:data-[slot=bubble-content]:text-base *:data-[slot=bubble-content]:shadow-[0_1px_3px_color-mix(in_srgb,var(--shadow-color)_8%,transparent)]'
-/** The shadow of the agent's cards and bubbles. */
-const cardShadow = 'shadow-[0_1px_3px_color-mix(in_srgb,var(--shadow-color)_8%,transparent)]'
+  'max-w-full *:data-[slot=bubble-content]:rounded-[18px_18px_18px_6px] *:data-[slot=bubble-content]:bg-muted *:data-[slot=bubble-content]:px-3.5 *:data-[slot=bubble-content]:py-2.5 *:data-[slot=bubble-content]:text-base'
+/** Secondary text on the grey: the muted grey is 4.2:1 there, this one 6.5:1. */
+const greyMutedText = 'text-[#475467]'
 const userBubble =
   'max-w-[85%] *:data-[slot=bubble-content]:rounded-[18px_18px_6px] *:data-[slot=bubble-content]:px-3.5 *:data-[slot=bubble-content]:py-2.5 *:data-[slot=bubble-content]:text-base'
 const messageTextClass = 'leading-[1.45] whitespace-pre-wrap'
@@ -207,7 +207,7 @@ const STEP_STATUS = {
     icon: LoaderCircle,
     label: 'выполняется',
     line: 'running',
-    circle: 'bg-muted text-muted-foreground [&_svg]:motion-safe:animate-spin',
+    circle: 'bg-card text-muted-foreground [&_svg]:motion-safe:animate-spin',
   },
   done: { icon: Check, label: 'готово', line: undefined, circle: 'bg-success-soft text-success-foreground' },
   failed: { icon: X, label: 'не удалось', line: 'error', circle: 'bg-destructive/10 text-destructive' },
@@ -217,7 +217,7 @@ const STEP_STATUS = {
 function StepItem({ status, step }: { status: ChatMessage['status']; step: NonNullable<ChatMessage['data']['step']> }) {
   const { icon: Icon, label, line, circle } = STEP_STATUS[status]
   return (
-    <Trace className={`rounded-2xl bg-card px-3 py-2.5 ${cardShadow}`}>
+    <Trace className="rounded-2xl bg-muted px-3 py-2.5">
       <TraceLine status={line} className="w-full gap-3 data-[status=error]:text-muted-foreground">
         <TraceIcon className={`size-8 rounded-full ${circle}`}>
           <Icon />
@@ -270,7 +270,7 @@ function PlanView({ plan, onChoose }: PlanProps) {
       <Bubble variant="muted" className={agentBubble}>
         <BubbleContent className="flex flex-col gap-1">
           <p className="flex flex-wrap items-center gap-x-2">
-            <span className="w-full text-xs/[normal] tracking-[0.06em] text-muted-foreground uppercase">
+            <span className={`w-full text-xs/[normal] tracking-[0.06em] uppercase ${greyMutedText}`}>
               Атмосфера поездки
             </span>
             <span className="text-xl/none" aria-hidden>
@@ -279,7 +279,7 @@ function PlanView({ plan, onChoose }: PlanProps) {
             <strong className="font-bold">{plan.atmosphere}</strong>
           </p>
           <p className={messageTextClass}>{plan.why}</p>
-          <p className="text-sm/[normal] text-muted-foreground">
+          <p className={`text-sm/[normal] ${greyMutedText}`}>
             {formatDateRange(plan.query.checkIn, plan.query.checkOut)} · {nightsLabel(plan.nights)} ·{' '}
             {guestsLabel(plan.query.guests)}
           </p>
@@ -452,7 +452,7 @@ function PlanComment({ plan, full }: { plan: Plan; full: ReadonlyMap<string, Hot
                 )}
               </p>
               {features.length > 0 && (
-                <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm/[1.35] text-muted-foreground">
+                <p className={`flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm/[1.35] ${greyMutedText}`}>
                   {features.map(({ icon: Icon, text }) => (
                     <span key={text} className="flex items-center gap-1.5">
                       <Icon className="size-4 flex-none" aria-hidden />
