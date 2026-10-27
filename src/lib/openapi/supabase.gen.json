@@ -601,6 +601,50 @@
         }
       }
     },
+    "/relations": {
+      "get": {
+        "operationId": "select_relations",
+        "tags": ["Таблицы"],
+        "summary": "relations",
+        "description": "Строки `relations` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/db/knowledge.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/relations"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tool_run_evidence": {
       "get": {
         "operationId": "select_tool_run_evidence",
@@ -1314,7 +1358,7 @@
         "tags": ["Функции"],
         "summary": "osm_places_near",
         "description": "Функция `osm_places_near` базы через PostgREST.",
-        "x-used-in": ["src/lib/db/noise.ts", "src/lib/db/view.ts", "src/lib/geo/store.ts"],
+        "x-used-in": ["src/lib/db/knowledge.ts", "src/lib/db/noise.ts", "src/lib/db/view.ts", "src/lib/geo/store.ts"],
         "requestBody": {
           "required": true,
           "content": {
@@ -1999,6 +2043,49 @@
           }
         },
         "required": ["created_at", "id", "name"]
+      },
+      "relations": {
+        "type": "object",
+        "properties": {
+          "claim_id": {
+            "type": ["string", "null"]
+          },
+          "confidence": {
+            "type": ["number", "null"]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "evidence_id": {
+            "type": ["string", "null"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "object_id": {
+            "type": "string"
+          },
+          "predicate": {
+            "type": "string"
+          },
+          "subject_id": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "claim_id",
+          "confidence",
+          "created_at",
+          "evidence_id",
+          "id",
+          "object_id",
+          "predicate",
+          "subject_id",
+          "updated_at"
+        ]
       },
       "tool_run_evidence": {
         "type": "object",

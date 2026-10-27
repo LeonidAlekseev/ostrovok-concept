@@ -92,6 +92,30 @@ write('view-map', { map: shortMap(viewMap.map as Json | null, 6000) })
 const noiseMap = await call(`/api/hotels/${HOTEL}/noise-map`)
 write('noise-map', { map: shortMap(noiseMap.map as Json | null, 8000) })
 
+const claimsQuery = { property: 'noise.lnight.', limit: 4 }
+write('claims', {
+  query: claimsQuery,
+  response: await call(`/api/hotels/${HOTEL}/claims?property=${claimsQuery.property}&limit=${claimsQuery.limit}`),
+})
+
+// A hotel with reviews about noise; the stemmer keeps «шум» and «шумно» apart, so the query lists both.
+const REVIEWS_HOTEL = 'ota-7857547'
+const searchQuery = { q: 'шумно or шум', limit: 3 }
+write('documents-search', {
+  query: searchQuery,
+  response: await call(
+    `/api/hotels/${REVIEWS_HOTEL}/documents/search?q=${encodeURIComponent(searchQuery.q)}&limit=${searchQuery.limit}`,
+  ),
+})
+
+const relationsQuery = { predicate: 'near', category: 'pharmacy', limit: 3 }
+write('relations', {
+  query: relationsQuery,
+  response: await call(
+    `/api/hotels/${HOTEL}/relations?predicate=${relationsQuery.predicate}&category=${relationsQuery.category}&limit=${relationsQuery.limit}`,
+  ),
+})
+
 const geoRequest = {
   messages: [{ role: 'user', text: 'Где рядом аптека и как до неё дойти?' }],
   brief: { hotelId: HOTEL },

@@ -65,9 +65,13 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
 /** The hotel route of a path: `/api/hotels/ota-1/view` → `['ota-1', 'view']`. */
-export function hotelRoute(path: string): { hotelId: string; part: 'view' | 'view-map' | 'noise-map' } | null {
-  const match = /^\/api\/hotels\/([^/]+)\/(view|view-map|noise-map)\/?$/.exec(path)
-  return match ? { hotelId: decodeURIComponent(match[1]), part: match[2] as 'view' | 'view-map' | 'noise-map' } : null
+export function hotelRoute(
+  path: string,
+): { hotelId: string; part: 'view' | 'view-map' | 'noise-map' | 'relations' } | null {
+  const match = /^\/api\/hotels\/([^/]+)\/(view|view-map|noise-map|relations)\/?$/.exec(path)
+  return match
+    ? { hotelId: decodeURIComponent(match[1]), part: match[2] as 'view' | 'view-map' | 'noise-map' | 'relations' }
+    : null
 }
 
 /** The colour of a line of sight by the floor it is seen from (the hotel page's tones). */
@@ -152,6 +156,32 @@ function noise(map: NoiseMap, hotel: GeoPoint | null): GeoAnswer {
   }
 }
 
+/** The places of the hotel's `near` edges, each labelled with its name and distance; a place without a point is left out. */
+function relations(list: readonly Record<string, unknown>[], hotel: GeoPoint | null): GeoAnswer {
+  return {
+    title: 'Места рядом с отелем',
+    features: [
+      ...list.flatMap((relation) => {
+        const object = isObject(relation.object) ? relation.object : {}
+        const claim = isObject(relation.claim) ? relation.claim : {}
+        const value = isObject(claim.value) && typeof claim.value.value === 'number' ? claim.value.value : null
+        if (typeof object.lat !== 'number' || typeof object.lon !== 'number') return []
+        const name = typeof object.name === 'string' ? object.name : String(object.ref)
+        return [
+          point(
+            { lat: object.lat, lon: object.lon },
+            'place',
+            PLACE_COLOR,
+            value === null ? name : `${name} · ${value} м`,
+          ),
+        ]
+      }),
+      ...(hotel ? [point(hotel, 'hotel', HOTEL_COLOR, 'Отель')] : []),
+    ],
+    sources: [],
+  }
+}
+
 function chatMap(map: ChatMap): GeoAnswer {
   return {
     title: 'Карта ответа Эвала',
@@ -166,7 +196,7 @@ function chatMap(map: ChatMap): GeoAnswer {
 }
 
 /**
- * The geo of an answer of `path` (`/api/hotels`, `/api/hotels/{id}/view|view-map|noise-map`, `/api/assistant`), or
+ * The geo of an answer of `path` (`/api/hotels`, `/api/hotels/{id}/view|view-map|noise-map|relations`, `/api/assistant`), or
  * `null` when it has none: an error, `{ view: null }`, an answer of Эвал without a map. `hotel` is the point of the
  * hotel of a hotel route, for its marker.
  */
@@ -181,6 +211,8 @@ export function geoOfResponse(path: string, body: unknown, hotel: GeoPoint | nul
     if (route?.part === 'view' && isObject(body.view)) answer = view(body.view as unknown as HotelView, hotel)
     else if (route?.part === 'view-map' && isObject(body.map)) answer = buildings(body.map as unknown as ViewMap, hotel)
     else if (route?.part === 'noise-map' && isObject(body.map)) answer = noise(body.map as unknown as NoiseMap, hotel)
+    else if (route?.part === 'relations' && Array.isArray(body.relations))
+      answer = relations(body.relations.filter(isObject), hotel)
   }
   return answer && answer.features.length > 0 ? answer : null
 }
