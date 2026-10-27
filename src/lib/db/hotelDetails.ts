@@ -40,7 +40,7 @@ const readDetails = unstable_cache(
     )
   },
   // v2: the building tells an estimated height apart.
-  [CATALOG_TAG, 'hotel-details-v2'],
+  [CATALOG_TAG, 'hotel-details-v3'],
   { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME },
 )
 

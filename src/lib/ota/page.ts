@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { SCORE_SECTIONS, type Review, type SectionScore } from '../catalog'
 import { isDoubtfulBuilding } from '../features'
+import { mergeOstrovok } from '../geo/samePlace'
 import { formatDecimal } from '../format'
 import type {
   AmenityGroup,
@@ -614,19 +615,23 @@ const TYPE_KIND: Record<string, string> = { SUBWAY: 'Станция', AIRPORT: '
 /** «Музей», «Станция», …; «Место» for a kind Ostrovok does not name. */
 export const placeKind = (type: string, subtype: string) => TYPE_KIND[type] ?? PLACE_KIND[subtype] ?? 'Место'
 
+/** The hotel's places, nearest first; a place Ostrovok names twice (`mergeOstrovok`) once, by its nearer name. */
 export const nearbyOf = (places: readonly PlaceRow[]): NearbyPlace[] =>
-  places
-    .map((place) => ({
-      id: place.region_id,
-      name: place.name || place.name_en,
-      kind: placeKind(place.type, place.subtype),
-      distanceM: place.distance_m,
-      bearingDeg: place.bearing_deg,
-      lat: place.lat,
-      lon: place.lon,
-      transport: place.is_transport_hub,
-    }))
-    .sort((a, b) => a.distanceM - b.distanceM || a.id - b.id)
+  mergeOstrovok(
+    places
+      .map((place) => ({
+        id: place.region_id,
+        name: place.name || place.name_en,
+        ...(place.name_en && place.name_en !== place.name && { nameEn: place.name_en }),
+        kind: placeKind(place.type, place.subtype),
+        distanceM: place.distance_m,
+        bearingDeg: place.bearing_deg,
+        lat: place.lat,
+        lon: place.lon,
+        transport: place.is_transport_hub,
+      }))
+      .sort((a, b) => a.distanceM - b.distanceM || a.id - b.id),
+  )
 
 /** The building at the hotel's point; none when it is lower than the floors the rooms take (`isDoubtfulBuilding`). */
 const buildingOf = (row: BuildingRow | null | undefined, roomFloors: number | null): HotelBuilding | null =>

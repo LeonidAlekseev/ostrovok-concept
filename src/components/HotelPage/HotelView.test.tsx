@@ -5,7 +5,7 @@ import { getHotel } from '@/lib/catalogGenerator'
 import type { HotelDetails } from '@/lib/hotelDetails'
 import { RAY_BEARINGS, type HotelView as HotelViewData, type SightLine } from '@/lib/view'
 import { HotelPage } from './HotelPage'
-import { HotelView } from './HotelView'
+import { HotelView, LANDMARKS_SHOWN } from './HotelView'
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
@@ -128,6 +128,35 @@ describe('HotelView', () => {
     expect(within(side).getByRole('list', { name: 'Что видно с этой стороны' }).textContent).toMatch(
       'Torres de Serranos',
     )
+  })
+
+  // hotel-page, Requirement: Ориентиры вида свёрнуты
+  it('shows eight landmarks of twenty and all of them under «Показать все»', async () => {
+    const twenty = Array.from({ length: 20 }, (_, i) => ({ ...view.landmarks[1], name: `Ориентир ${i + 1}` }))
+    fetchMock.mockImplementation(async (url: string) =>
+      url.includes('/view-map')
+        ? Response.json({ map: null })
+        : Response.json({ view: { ...view, landmarks: twenty } }),
+    )
+    render(<HotelView hotel={hotel} building={building} />)
+    const landmarks = await screen.findByRole('region', { name: 'Ориентиры до 3 км' })
+    const all = await within(landmarks).findByRole('button', { name: 'Показать все (20)' })
+    expect(within(landmarks).getAllByRole('listitem')).toHaveLength(LANDMARKS_SHOWN)
+    expect(all.getAttribute('aria-expanded')).toBe('false')
+    expect(all.getAttribute('aria-controls')).toBe('view-landmarks-list')
+    await userEvent.click(all)
+    expect(within(landmarks).getAllByRole('listitem')).toHaveLength(20)
+    const fold = within(landmarks).getByRole('button', { name: 'Свернуть' })
+    expect(fold.getAttribute('aria-expanded')).toBe('true')
+    await userEvent.click(fold)
+    expect(within(landmarks).getAllByRole('listitem')).toHaveLength(LANDMARKS_SHOWN)
+  })
+
+  it('has no button for eight landmarks or fewer', async () => {
+    render(<HotelView hotel={hotel} building={building} />)
+    const landmarks = await screen.findByRole('region', { name: 'Ориентиры до 3 км' })
+    await waitFor(() => expect(within(landmarks).getAllByRole('listitem')).toHaveLength(2))
+    expect(within(landmarks).queryByRole('button')).toBeNull()
   })
 
   it('asks the view of another floor', async () => {
