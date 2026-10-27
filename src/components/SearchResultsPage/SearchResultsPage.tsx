@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { List, LoaderCircle, MapPin, SlidersVertical } from 'lucide-react'
@@ -44,11 +44,19 @@ import { useDestinations } from '../Catalog/useDestinations'
 import { SearchForm } from '../SearchForm/SearchForm'
 import { FiltersPanel } from './FiltersPanel'
 import { FiltersSheet } from './FiltersSheet'
-import { HotelDialog } from './HotelDialog'
 import { Pagination } from './Pagination'
 import { ResultTile } from './ResultTile'
 import { MapUnavailable } from './MapUnavailable'
-import { saveCamera, saveView, searchViewKey, useSearchView } from './searchView'
+import {
+  entryState,
+  readSearchView,
+  saveCamera,
+  saveOpened,
+  saveScroll,
+  saveView,
+  searchViewKey,
+  useSearchView,
+} from './searchView'
 
 // MapLibre is loaded only here and only in the browser; a failed chunk load reads as an unavailable map.
 const SearchMap = dynamic(() => import('./SearchMap').catch(() => ({ default: MapUnavailable })), {
@@ -60,7 +68,7 @@ const SearchMap = dynamic(() => import('./SearchMap').catch(() => ({ default: Ma
 const TOP_TITLE = 'Лучшие по оценкам гостей'
 const TOP_TARGET: Selection = { kind: 'selection', hotels: [], title: TOP_TITLE }
 
-/** The hotel opened from the map, `?hotel=<id>`: one history entry, so "Назад" closes it. */
+/** A hotel of an older link to the results, `?hotel=<id>`: its page opens in place of the results. */
 const HOTEL_PARAM = 'hotel'
 
 /** The hotel page with the dates and guests of the search. */
@@ -109,7 +117,7 @@ export function SearchResultsPage() {
   const params = useSearchParams()
   const today = useToday()
   const destinations = useDestinations()
-  // The query part of the URL; the filters, the page and the opened hotel change without a new search.
+  // The query part of the URL; the filters and the page change without a new search.
   const request = useMemo(() => {
     const next = new URLSearchParams(params.toString())
     for (const name of [...FILTER_PARAMS, PAGE_PARAM, HOTEL_PARAM]) next.delete(name)
@@ -180,7 +188,7 @@ interface ResultsProps {
   query: SearchQuery
   target: SearchTarget | Selection
   initialFilters: Filters
-  /** The hotel opened from the map; an unknown id is ignored. */
+  /** The hotel of an older link, opened in place of the results; an unknown id is ignored. */
   hotelId: string | null
   /** A blank search: the visible hotels of every destination under an empty form. */
   top?: boolean
@@ -192,24 +200,28 @@ function Results({ query, target, initialFilters, hotelId, top = false }: Result
   const [status, setStatus] = useState<Status>({ state: 'loading' })
   const [filters, setFilters] = useState(initialFilters)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [activeId, setActiveId] = useState<string | null>(null)
-  // Whether the open hotel has its own history entry: closing then goes back to the results.
-  const pushedHotel = useRef(false)
   const desktop = useDesktop()
-  // The list or the map, and the camera, live outside the page: "Назад" from a hotel page returns to them.
-  // The key follows the filters of this render, not the URL that Next updates a moment later.
-  const viewKey = searchViewKey(setFilterParams(new URLSearchParams(params.toString()), filters), [HOTEL_PARAM])
+  // The list or the map, the camera, the scroll and the hotel opened live outside the page, by the entry of the
+  // history: "Назад" from a hotel page returns to them. The key follows the filters of this render, not the URL that
+  // Next updates a moment later; it leaves out the page, so the map keeps its camera from page to page.
+  const viewKey = searchViewKey(setFilterParams(new URLSearchParams(params.toString()), filters), [
+    PAGE_PARAM,
+    HOTEL_PARAM,
+  ])
   const kept = useSearchView(viewKey)
   const view = kept?.view ?? 'list'
+  // What "Назад" restores once, when the results show: the scroll and the hotel opened from them.
+  const [returned] = useState(() => readSearchView(viewKey))
+  const [activeId, setActiveId] = useState<string | null>(returned?.openedId ?? null)
 
   const destinations = useDestinations()
   const result = status.state === 'done' ? status.result : null
   // The opened hotel is one of the results: the browser has only the hotels of the searched cities or the selection.
   const openedHotel = hotelId ? result?.hotels.find((h) => h.id === hotelId) : undefined
 
-  // Narrow screens have no hotel dialog: a link with the hotel opens its page instead.
+  // A hotel is a page of its own: an older link with the hotel opens it in place of the results.
   useEffect(() => {
-    if (openedHotel && !isDesktop()) router.replace(hotelHref(openedHotel.id, query))
+    if (openedHotel) router.replace(hotelHref(openedHotel.id, query))
   }, [openedHotel, query, router])
 
   useEffect(() => {
@@ -238,9 +250,37 @@ function Results({ query, target, initialFilters, hotelId, top = false }: Result
   const visible = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
   const resultsRef = useRef<HTMLHeadingElement>(null)
 
-  // After a move to another page the list starts in view and the screen reader lands on the results heading.
-  const shownPage = useRef(page)
+  // Back from a hotel page the results come again from the network: the scroll is put back once they are shown,
+  // and only then is the scroll followed, so the short page of "Ищем варианты…" does not overwrite it.
+  const restored = useRef(false)
+  useLayoutEffect(() => {
+    if (!result || restored.current) return
+    restored.current = true
+    if (returned?.scrollY) window.scrollTo({ top: returned.scrollY, behavior: 'instant' })
+  }, [result, returned])
   useEffect(() => {
+    if (!result) return
+    let frame = 0
+    const follow = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        // The hotel page scrolls to its top after the results have gone: that scroll is not theirs.
+        if (window.location.pathname === '/search') saveScroll(viewKey, window.scrollY)
+      })
+    }
+    window.addEventListener('scroll', follow, { passive: true })
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', follow)
+    }
+  }, [result, viewKey])
+
+  // After a move to another page the list starts in view and the screen reader lands on the results heading. The
+  // page is known once the results are: until then `page=2` of the address reads as the first of no pages.
+  const shownPage = useRef<number | null>(null)
+  useEffect(() => {
+    if (!result) return
+    if (shownPage.current === null) shownPage.current = page
     if (shownPage.current === page) return
     shownPage.current = page
     const heading = resultsRef.current
@@ -248,7 +288,7 @@ function Results({ query, target, initialFilters, hotelId, top = false }: Result
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     heading.scrollIntoView?.({ behavior: reduced ? 'auto' : 'smooth', block: 'start' })
     heading.focus({ preventScroll: true })
-  }, [page])
+  }, [page, result])
 
   const pageHref = (target: number) => {
     const url = new URLSearchParams(params.toString())
@@ -264,31 +304,16 @@ function Results({ query, target, initialFilters, hotelId, top = false }: Result
     setFilters(next)
     const url = setFilterParams(new URLSearchParams(window.location.search), next)
     // The new filters are a new search for the kept view: the map stays, its camera frames the new list.
-    saveView(searchViewKey(url, [HOTEL_PARAM]), view)
-    window.history.replaceState(null, '', `?${url}`)
+    saveView(searchViewKey(url, [PAGE_PARAM, HOTEL_PARAM]), view)
+    window.history.replaceState(entryState(), '', `?${url}`)
   }
 
-  /** Opens a hotel over the results in a new history entry; narrow screens go to the hotel page. */
+  /** Remembers the hotel and the scroll before its page opens: "Назад" returns to them. */
+  const leaveFor = (id: string) => saveOpened(viewKey, id)
+  /** A marker of the map opens the hotel's page. */
   const openHotel = (id: string) => {
-    if (!desktop) {
-      router.push(hotelHref(id, query))
-      return
-    }
-    const url = new URLSearchParams(window.location.search)
-    url.set(HOTEL_PARAM, id)
-    pushedHotel.current = true
-    window.history.pushState(null, '', `?${url}`)
-  }
-  /** Goes back to the results; a hotel opened by its link drops the parameter instead. */
-  const closeHotel = () => {
-    if (pushedHotel.current) {
-      pushedHotel.current = false
-      window.history.back()
-      return
-    }
-    const url = new URLSearchParams(window.location.search)
-    url.delete(HOTEL_PARAM)
-    window.history.replaceState(null, '', `?${url}`)
+    leaveFor(id)
+    router.push(hotelHref(id, query))
   }
 
   const title =
@@ -378,6 +403,7 @@ function Results({ query, target, initialFilters, hotelId, top = false }: Result
                         stay={query}
                         active={item.hotel.id === activeId}
                         onActivate={setActiveId}
+                        onOpen={leaveFor}
                       />
                     </li>
                   ))}
@@ -410,7 +436,6 @@ function Results({ query, target, initialFilters, hotelId, top = false }: Result
         total={items.length}
         priceBounds={bounds ?? [0, 0]}
       />
-      <HotelDialog hotel={desktop ? openedHotel : undefined} stay={query} onClose={closeHotel} />
     </main>
   )
 }

@@ -1,7 +1,7 @@
 import { generateText } from 'ai'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getSecret } from '../secrets'
-import { TEXT_CHAIN, VISION_CHAIN, getTextModels, getVisionModels } from './model'
+import { REMARK_MODEL_ID, TEXT_CHAIN, VISION_CHAIN, getTextModels, getVisionModels } from './model'
 
 vi.mock('../secrets', () => ({ getSecret: vi.fn() }))
 
@@ -14,6 +14,10 @@ afterEach(() => {
 
 // semantic-search, Requirement: Модели через API NVIDIA
 describe('getTextModels', () => {
+  it('has the model of the geo remarks in the text chain', () => {
+    expect(TEXT_CHAIN.map((m) => m.id)).toContain(REMARK_MODEL_ID)
+  })
+
   it('gives no models without NVIDIA_API_KEY, so the rules answer', async () => {
     vi.mocked(getSecret).mockResolvedValue(undefined)
     expect(await getTextModels()).toBeUndefined()

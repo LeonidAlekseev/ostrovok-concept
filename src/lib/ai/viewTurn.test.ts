@@ -6,23 +6,34 @@ import { ATTRIBUTION, type Place, type PlaceStore } from '../geo/places'
 import { ok } from '../geo/result'
 import type { HotelDetails } from '../hotelDetails'
 import { isHotelGeoQuestion, isHotelViewQuestion, isNoiseQuestion } from '../noise'
-import { RAY_BEARINGS, type HotelView, type SightLine } from '../view'
+import { RAY_BEARINGS, type HotelView, type LineBlocker, type SightLine } from '../view'
 import { floorOf, placeQuery, viewTurn } from './viewTurn'
 
 const hotel = { id: 'ota-1', name: 'Hotel Turia', lat: 39.4735, lon: -0.3799 }
 
-const line = (over: Partial<SightLine> = {}): SightLine => ({
+const blocker = (over: Partial<LineBlocker> = {}): LineBlocker => ({
+  id: 'b1',
+  distanceM: 300,
+  heightM: 45,
+  estimated: true,
+  eyeM: 40,
+  eyeUpperM: 45,
+  ...over,
+})
+
+/** A line seen from every floor, or one in the way of the eyes up to `eyeUpperM` with its building. */
+const line = (over: Partial<SightLine> = {}, eyeM = -3, eyeUpperM = 0, blockers: LineBlocker[] = []): SightLine => ({
   distanceM: 1500,
   checked: true,
   crossed: 4,
-  maxAngle: -2,
-  maxAngleUpper: -1.5,
-  firstAboveM: null,
   coveredM: 1500,
-  blocker: { id: 'b1', distanceM: 300, heightM: 45, estimated: true },
+  eyes: [{ eyeM, eyeUpperM, blockers }],
   targetBuilding: null,
   ...over,
 })
+
+/** A ray of the horizon: the roofs and the sun. */
+const ray = (roofs: SightLine, sun: SightLine): SightLine => ({ ...roofs, eyes: [roofs.eyes[0], sun.eyes[0]] })
 
 const details = (over: Partial<HotelDetails> = {}): HotelDetails => ({
   description: [],
@@ -49,13 +60,17 @@ const details = (over: Partial<HotelDetails> = {}): HotelDetails => ({
   ...over,
 })
 
+// 12 floors of 3 m: the eyes at 1,5, 4,5, …, 34,5 m.
 const view: HotelView = {
-  observer: { floor: 12, floors: 12, heightM: 36, heightEstimated: true, eyeM: 34.5 },
-  floors: [],
+  window: { source: 'building', floors: 12, storeyM: 3, heightM: 36, estimated: true },
+  ownBuilding: 'own',
   // The west is closed: a building of 45 m 300 m away.
   rays: RAY_BEARINGS.map((bearing) => ({
     bearing,
-    line: bearing > 200 && bearing < 320 ? line({ maxAngle: 1.9, maxAngleUpper: 3 }) : line(),
+    line:
+      bearing > 200 && bearing < 320
+        ? ray(line({}, 40, 45, [blocker()]), line({}, 30, 36, [blocker({ eyeM: 30, eyeUpperM: 36 })]))
+        : ray(line(), line()),
   })),
   sea: [
     {
@@ -66,7 +81,10 @@ const view: HotelView = {
       lon: -0.331,
       distanceM: 4430,
       bearing: 110,
-      line: line({ distanceM: 4430, coveredM: 4430, maxAngle: -0.5, maxAngleUpper: -0.4 }),
+      // Seen above 23 m: from the 9th floor (25,5 m).
+      line: line({ distanceM: 4430, coveredM: 4430 }, 20, 23, [
+        blocker({ id: 's1', distanceM: 800, heightM: 40, eyeM: 20, eyeUpperM: 23 }),
+      ]),
     },
   ],
   seaChecked: true,
@@ -123,8 +141,8 @@ function store(): PlaceStore {
 }
 
 const loadView = vi.fn(async () => view)
-const checkPoints = vi.fn(async (_hotel: unknown, _eye: number, points: readonly LatLon[]) =>
-  points.map(() => line({ maxAngle: 0.5, maxAngleUpper: 1 })),
+const checkPoints = vi.fn(async (_hotel: unknown, points: readonly LatLon[]) =>
+  points.map(() => line({}, 40, 45, [blocker()])),
 )
 const options = (over: Partial<Parameters<typeof viewTurn>[2]> = {}) => ({
   deadline: Date.now() + 15_000,
@@ -148,32 +166,50 @@ afterEach(() => vi.restoreAllMocks())
 
 // assistant-geo, Requirement: Вид из окна в ответе Эвала
 describe('the view steps of a hotel question', () => {
-  it('tells whether the sea is seen, with the window, the reason and the guests’ words', async () => {
+  it('tells from which floor the sea is seen, with the window, the reason and the guests’ words', async () => {
     const outcome = await viewTurn(hotel, ask('Видно ли море из окна?'), options())
-    expect(outcome.steps.map((s) => [s.title, s.status])).toEqual([
-      ['Смотрю высоту здания отеля по EUBUCCO', 'done'],
-      ['Проверяю линии взгляда над зданиями', 'done'],
+    expect(outcome.steps.map((s) => [s.title, s.status, s.result])).toEqual([
+      [
+        'Смотрю этажи отеля: здание EUBUCCO и номера Островка',
+        'done',
+        'здание 12 этажей, ≈ 36 м (по оценке EUBUCCO); проверяю этажи с 1-го по 12-й',
+      ],
+      ['Проверяю линии взгляда над зданиями', 'done', '120 направлений, 1 точек берега, 1 ориентиров'],
     ])
-    expect(outcome.summary).toContain('Из окна (окно 12-го этажа, ≈ 34,5 м над землёй; здание 12 этажей, ≈ 36 м')
-    expect(outcome.summary).toContain('• Море (берег в 4,4 км, азимут 110° (восток)): вероятно видно.')
+    expect(outcome.summary).toContain(
+      'Из отеля (здание 12 этажей, ≈ 36 м (по оценке EUBUCCO); проверены этажи с 1-го по 12-й):',
+    )
+    expect(outcome.summary).toContain(
+      '• Море (берег в 4,4 км, азимут 110° (восток)): видно с 9-го этажа (ниже мешает здание ≈ 40 м (по оценке EUBUCCO) в 800 м от отеля).',
+    )
     expect(outcome.summary).toContain('Гость о виде (Анна): «Из окна видно море»')
     expect(outcome.map?.points.map((p) => [p.label, p.category])).toEqual([
       ['Hotel Turia', undefined],
-      ['Берег моря', 'море · вероятно видно'],
+      ['Берег моря', 'море · видно с 9-го этажа'],
     ])
   })
 
-  it('checks the sunset of the date from the floor asked', async () => {
+  it('checks the sunset of the date for every floor and from the floor asked', async () => {
     const outcome = await viewTurn(hotel, ask('А с 3 этажа закат видно?'), options())
-    expect(loadView).toHaveBeenCalledWith(hotel, expect.anything(), expect.anything(), 3)
-    expect(outcome.summary).toContain('• Закат 21 июня в 21:32, азимут 302° (северо-запад): возможны препятствия')
-    expect(outcome.summary).toContain('мешает здание ≈ 45 м (по оценке EUBUCCO) в 300 м от отеля')
+    expect(loadView).toHaveBeenCalledWith(hotel, expect.anything(), null, expect.anything())
+    expect(outcome.summary).toContain(
+      '• Закат 21 июня в 21:32, азимут 302° (северо-запад): не видно ни с одного этажа; с 3-го этажа — возможны препятствия: мешает здание ≈ 45 м (по оценке EUBUCCO) в 300 м от отеля',
+    )
+    expect(outcome.summary).toContain('проверены этажи с 1-го по 12-й, отдельно — 3-й')
+  })
+
+  it('checks the sunrise when asked', async () => {
+    const outcome = await viewTurn(hotel, ask('Увижу ли рассвет?'), options())
+    expect(outcome.summary).toMatch(/• Восход 21 июня в 06:35, азимут 58° \(северо-восток\): видно со всех этажей/)
+    expect(outcome.summary).not.toContain('• Закат')
   })
 
   it('finds a kind of place among the Ostrovok places first, then in OSM, and checks the lines to them', async () => {
     const outcome = await viewTurn(hotel, ask('Видна ли больница из номера?'), options())
-    expect(checkPoints.mock.calls[0].slice(1)).toMatchObject([34.5, [{ lat: 39.48, lon: -0.37 }]])
-    expect(outcome.summary).toMatch(/• «Hospital Clínico» \(больница, .*\): возможны препятствия/)
+    expect(checkPoints.mock.calls[0].slice(1)).toMatchObject([[{ lat: 39.48, lon: -0.37 }]])
+    expect(outcome.summary).toMatch(
+      /• «Hospital Clínico» \(больница, .*\): не видно ни с одного этажа — мешает здание ≈ 45 м/,
+    )
     expect(outcome.steps.at(-1)).toMatchObject({ title: 'Проверяю, видно ли из окна: «Hospital Clínico»' })
     const osm = await viewTurn(hotel, ask('Видна ли больница?'), options({ details: details({ nearby: [] }) }))
     expect(osm.steps.map((s) => s.title)).toContain('Ищу рядом с отелем: больница')
@@ -183,7 +219,9 @@ describe('the view steps of a hotel question', () => {
   it('names a landmark of the page without looking it up', async () => {
     const outcome = await viewTurn(hotel, ask('Видно ли Torres de Serranos?'), options())
     expect(checkPoints).not.toHaveBeenCalled()
-    expect(outcome.summary).toMatch(/• «Torres de Serranos» \(достопримечательность, 700 м, .*\): вероятно видно\./)
+    expect(outcome.summary).toMatch(
+      /• «Torres de Serranos» \(достопримечательность, 700 м, .*\): видно со всех этажей\./,
+    )
   })
 
   it('looks a named place up and checks the line to it', async () => {
@@ -209,12 +247,12 @@ describe('the view steps of a hotel question', () => {
     )
     expect(s.named).toHaveBeenCalledWith('Город искусств и наук', expect.anything())
     expect(outcome.steps.map((step) => step.title)).toEqual([
-      'Смотрю высоту здания отеля по EUBUCCO',
+      'Смотрю этажи отеля: здание EUBUCCO и номера Островка',
       'Проверяю линии взгляда над зданиями',
       'Ищу на карте «Город искусств и наук»',
       'Проверяю, видно ли из окна: «Ciutat de les Arts i les Ciències»',
     ])
-    expect(outcome.summary).toMatch(/• «Ciutat de les Arts i les Ciències» \(место, .*\): возможны препятствия/)
+    expect(outcome.summary).toMatch(/• «Ciutat de les Arts i les Ciències» \(место, .*\): не видно ни с одного этажа/)
   })
 
   it('says so when the named place is not found', async () => {
@@ -224,17 +262,30 @@ describe('the view steps of a hotel question', () => {
     expect(checkPoints).not.toHaveBeenCalled()
   })
 
-  it('says «недостаточно данных» without a reliable height of the building', async () => {
-    const outcome = await viewTurn(hotel, ask('Видно ли море?'), options({ details: details({ building: null }) }))
-    expect(loadView).not.toHaveBeenCalled()
-    expect(outcome.steps).toEqual([expect.objectContaining({ status: 'failed', result: 'нет надёжной высоты здания' })])
-    expect(outcome.summary).toMatch(/^Недостаточно данных: высоты здания отеля нет в EUBUCCO или она сомнительна/)
+  it('counts the floors the rooms take without exact data of the building, never comparing the two', async () => {
+    const rooms = details({ building: null, facts: { ...details().facts, roomFloors: 6 } })
+    const outcome = await viewTurn(hotel, ask('Видно ли море?'), options({ details: rooms }))
+    expect(loadView).toHaveBeenCalledWith(hotel, null, 6, expect.anything())
+    expect(outcome.steps[0].result).toBe(
+      'нет точных данных о здании, номера на 6 этажах (Островок); проверяю этажи с 1-го по 6-й',
+    )
+    expect(outcome.summary).not.toMatch(/больше этажей|сомнительн/)
   })
 
-  it('answers «какой вид» with the sea, the sunset and the landmarks seen', async () => {
+  it('says «нет точных данных» with neither the building nor the rooms’ floors', async () => {
+    const outcome = await viewTurn(hotel, ask('Видно ли море?'), options({ details: details({ building: null }) }))
+    expect(loadView).not.toHaveBeenCalled()
+    expect(outcome.steps).toEqual([expect.objectContaining({ status: 'failed', result: 'нет точных данных' })])
+    expect(outcome.summary).toBe(
+      'Нет точных данных о высоте здания отеля и его этажах — не могу проверить, что видно из окна.',
+    )
+  })
+
+  it('answers «какой вид» with the sea, the sunset, the sunrise and the landmarks seen', async () => {
     const outcome = await viewTurn(hotel, ask('Какой вид из окна?'), options())
     expect(outcome.summary).toContain('• Море (берег в 4,4 км')
     expect(outcome.summary).toContain('• Закат 21 июня')
+    expect(outcome.summary).toContain('• Восход 21 июня')
     expect(outcome.summary).toContain('«Torres de Serranos»')
   })
 })

@@ -77,6 +77,16 @@ export const NOISY_LABEL: Record<NoisyCategory, [string, string, string]> = {
   train_station: ['ж/д станция', 'ж/д станции', 'ж/д станций'],
 }
 
+/** The dots of the loud places on the map and in its legend, by group: the nightlife, the food and the rails. */
+export const NOISY_GROUPS: readonly { label: string; color: string; categories: readonly NoisyCategory[] }[] = [
+  { label: 'Бары и клубы', color: '#7c3aed', categories: ['nightclub', 'bar'] },
+  { label: 'Рестораны и фастфуд', color: '#ea580c', categories: ['restaurant', 'fast_food'] },
+  { label: 'Трамвай и ж/д', color: '#2563eb', categories: ['tram', 'train_station'] },
+]
+
+/** The group of a loud place's category. */
+export const noisyGroup = (category: NoisyCategory) => NOISY_GROUPS.find((g) => g.categories.includes(category))!
+
 /** The circle of the loud places, m, and the places a category at most. */
 export const NOISY_RADIUS_M = 200
 export const NOISY_PER_CATEGORY = 20
@@ -196,6 +206,14 @@ export function dayCurve(noise: Pick<HotelNoise, 'sources'>): DayCurve | null {
     middle === null ? (estimate.min + estimate.max) / 2 : Math.min(estimate.max, Math.max(estimate.min, middle))
   return { day, night, levels: Array.from({ length: 48 }, (_, i) => levelAt(i / 2 + 0.25, day, night)) }
 }
+
+/** The radius of the noise map, m: the streets around the hotel at ~100 KB a night layer. */
+export const NOISE_MAP_RADIUS_M = 300
+
+/**
+ * The `source` of the map's quiet: where the EEA layers map the ground and none reaches 40 dB (`hotel_noise_quiet`).
+ */
+export const QUIET_SOURCE = 'quiet'
 
 /** The bands of the legend and the map, quiet to loud: their lower bounds, the first open below. */
 export const LEGEND_STEPS = [40, 45, 50, 55, 60, 65, 70, 75] as const

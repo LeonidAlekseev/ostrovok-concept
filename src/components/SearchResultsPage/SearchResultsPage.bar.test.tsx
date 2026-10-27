@@ -1,4 +1,4 @@
-import { STAY, PRAGUE, open, results, markers, cards, nameOf, cardNames, prices } from './searchResultsTestKit'
+import { push, STAY, PRAGUE, open, results, markers, cards, nameOf, cardNames, prices } from './searchResultsTestKit'
 import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -154,17 +154,14 @@ describe('SearchResultsPage pages', () => {
     expect(screen.getByRole('button', { name: new RegExp(`^${name}, `) }).hasAttribute('data-active')).toBe(true)
   })
 
-  it('keeps the page when a hotel dialog opens and closes', async () => {
+  it('keeps the page in the address when a marker opens the hotel page', async () => {
     const user = userEvent.setup()
     open(`${EUROPE}&page=2`, { desktop: true })
     await results()
 
     await user.click((await markers())[0])
-    expect(await screen.findByRole('dialog')).toBeDefined()
-    expect(window.location.search).toMatch(/page=2.*hotel=|hotel=.*page=2/)
-
-    act(() => window.history.back())
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(push).toHaveBeenCalledWith(expect.stringMatching(/^\/hotels\//))
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(window.location.search).toContain('page=2')
   })
 })

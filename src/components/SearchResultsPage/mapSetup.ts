@@ -36,8 +36,28 @@ export function foldAttribution(map: MapLibreMap) {
   map.getContainer().querySelector<HTMLElement>('.maplibregl-compact-show > .maplibregl-ctrl-attrib-button')?.click()
 }
 
-// The attribution is a small white pill: "© OpenStreetMap" and a black round "i" on its right. MapLibre's
-// unlayered styles beat Tailwind's layers, hence the important flags.
+/**
+ * The attribution of every map: the style's sources credit no one (`silenceSourceAttribution`), the
+ * credit shows after the load and folds into its "i" after `ATTRIBUTION_SHOWN_MS` or on the first interaction. Call
+ * right after the map is made, with `ATTRIBUTION_CLASS` on its container; returns the cleanup.
+ */
+export function manageAttribution(map: MapLibreMap): () => void {
+  let foldTimer: ReturnType<typeof setTimeout> | undefined
+  const fold = () => {
+    clearTimeout(foldTimer)
+    foldAttribution(map)
+  }
+  map.on('styledata', () => silenceSourceAttribution(map))
+  map.once('load', () => {
+    foldTimer = setTimeout(fold, ATTRIBUTION_SHOWN_MS)
+    for (const type of ['mousedown', 'touchstart', 'wheel'] as const) map.once(type, fold)
+  })
+  return () => clearTimeout(foldTimer)
+}
+
+// The attribution of every map: a small white pill, the credit in medium black text, and one black round "i" on its
+// right, folded or not (MapLibre's own "i" is a ringed glyph on grey). MapLibre's unlayered styles beat Tailwind's
+// layers, hence the important flags.
 export const ATTRIBUTION_CLASS = [
   '[&_.maplibregl-ctrl-attrib]:m-2! [&_.maplibregl-ctrl-attrib]:rounded-full! [&_.maplibregl-ctrl-attrib]:bg-white! [&_.maplibregl-ctrl-attrib]:text-xs! [&_.maplibregl-ctrl-attrib]:leading-6!',
   '[&_.maplibregl-ctrl-attrib.maplibregl-compact]:min-h-6! [&_.maplibregl-ctrl-attrib.maplibregl-compact]:p-0! [&_.maplibregl-ctrl-attrib.maplibregl-compact]:pr-6!',

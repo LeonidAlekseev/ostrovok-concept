@@ -2,6 +2,7 @@ import 'server-only'
 import { createClient } from '@supabase/supabase-js'
 import { embed, rerank } from 'ai'
 import { isVisibleHotel } from '@/lib/catalog'
+import { loadHiddenHotelIds } from '@/lib/db/catalog'
 import type { Database } from '@/lib/db/database.types'
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/config'
 import { getSecret } from '../secrets'
@@ -110,7 +111,7 @@ export interface SemanticOptions {
 }
 
 /**
- * The `k` hotels shown (`isVisibleHotel`) closest in meaning to `text`, best first; `empty` when there are none,
+ * The `k` hotels shown (`isVisibleHotel`, not outside the noise maps: `loadHiddenHotelIds`) closest in meaning to `text`, best first; `empty` when there are none,
  * `failed` with the reason when the search could not answer.
  */
 export async function semanticSearch(
@@ -136,6 +137,7 @@ export async function semanticSearch(
     vector = queryVector(apiKey, query)
     const embedding = await untilAborted(vector, abortSignal)
     stage = 'database'
+    const hidden = loadHiddenHotelIds()
     const { data, error } = await database()
       .rpc('match_embeddings', {
         query_embedding: toVector(embedding),
@@ -146,7 +148,8 @@ export async function semanticSearch(
       .abortSignal(abortSignal)
     if (error) throw new Error(error.message)
     // The vectors cover the whole catalogue; only the hotels shown in this environment are found.
-    matches = (data ?? []).filter((m) => isVisibleHotel({ id: m.ref_id }))
+    const outside = await hidden
+    matches = (data ?? []).filter((m) => isVisibleHotel({ id: m.ref_id }) && !outside.has(m.ref_id))
   } catch (error) {
     warn('no vectors, using the rules', error)
     const reason = reasonOf(stage)

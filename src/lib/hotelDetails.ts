@@ -95,6 +95,10 @@ export interface NearbyPlace {
   /** Ostrovok's region id of the place. */
   id: number
   name: string
+  /** Ostrovok's English name, when it is another: it shares words with the names of OpenStreetMap. */
+  nameEn?: string
+  /** The names of the same place Ostrovok lists again (src/lib/geo/samePlace.ts `mergeOstrovok`); not shown. */
+  aliases?: string[]
   /** «Музей», «Метро», «Аэропорт», … */
   kind: string
   /** Ostrovok's distance from the hotel, m. */

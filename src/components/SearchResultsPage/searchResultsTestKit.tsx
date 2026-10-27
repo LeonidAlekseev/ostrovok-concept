@@ -185,8 +185,12 @@ export const NOW = new Date(2026, 9, 19, 12)
 export const STAY = 'checkin=2026-10-20&checkout=2026-10-23&adults=2&rooms=1'
 export const PRAGUE = `destination=prague&${STAY}`
 
-export function open(search: string, { desktop = false, reducedMotion = false } = {}) {
-  window.history.replaceState(null, '', `/search?${search}`)
+/**
+ * Mounts the results of `search` in a new entry of the history; `back` returns to the current entry instead, as
+ * "Назад" from a hotel page does: the entry keeps its state.
+ */
+export function open(search: string, { desktop = false, reducedMotion = false, back = false } = {}) {
+  window.history.replaceState(back ? window.history.state : null, '', `/search?${search}`)
   setScreen(desktop ? WIDE : NARROW, { reducedMotion })
   return render(<SearchResultsPage />)
 }

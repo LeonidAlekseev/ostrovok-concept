@@ -15,19 +15,18 @@ import { ShareButton } from './ShareButton'
 export const HOTEL_TITLE_ID = 'hotel-title'
 
 /**
- * The hotel above its photos: the name (the page's `h1`, or an `h2` with `titleId` inside a dialog) with
+ * The hotel above its photos: the name (the page's `h1`) with
  * the round favourite and "Поделиться", then the badge of the kind of stay (the filled stars with
  * "N-звёздочный отель", or a hostel, apartments, a villa) with the «generated» mark of a made-up hotel, the
  * address and the guests' score with its word and the count of reviews, which leads to the rating.
  */
-export function HotelHeader({ hotel, titleId }: { hotel: Hotel; titleId?: string }) {
-  const Title = titleId ? 'h2' : 'h1'
+export function HotelHeader({ hotel }: { hotel: Hotel }) {
   return (
     <header className="flex flex-col gap-3">
       <div className="flex items-start justify-between gap-4">
-        <Title id={titleId ?? HOTEL_TITLE_ID} className="min-w-0 text-title font-bold tracking-[-0.02em]">
+        <h1 id={HOTEL_TITLE_ID} className="min-w-0 text-title font-bold tracking-[-0.02em]">
           {hotel.name}
-        </Title>
+        </h1>
         <div className="flex shrink-0 gap-2">
           <FavoriteButton hotelId={hotel.id} className="size-11" />
           <ShareButton hotel={hotel} className="size-11" />

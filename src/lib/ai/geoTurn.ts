@@ -16,6 +16,7 @@ import {
 import { haversineMeters, type LatLon } from '../geo/distance'
 import { MAX_WALK_M, type DriveRoute, type WalkRoute } from '../geo/osrm'
 import { FAR_CATEGORIES, type Geocoded, type Nearby, type NearbyGroup, type Place } from '../geo/places'
+import { mergePlaces } from '../geo/samePlace'
 import { EVERYDAY, FAR_RADIUS_M, NEAR_RADIUS_M, questionCategories } from '../geo/questions'
 import type { GeoResult } from '../geo/result'
 import {
@@ -27,14 +28,18 @@ import {
   type GeoDeps,
 } from '../geo/tools'
 import { firstAnswer, type ModelLink } from './chain'
+import { checkedRemark, modelRemark } from './geoRemark'
+import { REMARK_MODEL_ID } from './model'
 
 /**
  * Эвал's geo steps in a chat about a hotel. A model of the chain chooses the calls of the geo tools (the rules do
  * without one); each call runs as a step of its own, with its own time and its own line in the feed; then the routes
  * to the nearest places are built, on foot or, far, by car. The hotel's Ostrovok places (`ota_hotel_places`) come
- * first, OpenStreetMap adds what they do not have. The answer tells what was found by rules — no model can add a place
- * or a distance — with the honest words of the services that failed, and the map of the message shows it. Only for a
- * hotel with Ostrovok places or in the OSM data loaded in advance.
+ * first, OpenStreetMap adds what they do not have, a place of both once (`mergePlaces`). The facts of the answer are
+ * written by rules — no model can add a place or a distance — with the honest words of the services that failed, and
+ * the map of the message shows them; a model adds one sentence over them, a conclusion or a piece of advice, kept only
+ * when it passes the checks of src/lib/ai/geoRemark.ts. Only for a hotel with Ostrovok places or in the OSM data loaded
+ * in advance.
  */
 
 export interface GeoHotel extends LatLon {
@@ -50,6 +55,10 @@ export interface GeoOutcome {
   planner: 'model' | 'rules'
   /** The models were asked and none chose the calls: the rules did. */
   modelsDown?: true
+  /** Эвал's remark over the facts, a sentence of the model that passed the checks (`checkedRemark`). */
+  remark?: string
+  /** A model gave a remark and the checks dropped it: the facts answer alone. */
+  remarkDropped?: true
 }
 
 export interface GeoTurnOptions {
@@ -69,6 +78,10 @@ export const PLAN_MS = 5000
 export const STEP_MS = 4000
 /** Left of the answer's time when the steps end: the answer and its way back. */
 export const ANSWER_RESERVE_MS = 1500
+/** The model's remark over the facts gets this much at most; the steps end this much sooner with the models. */
+export const REMARK_MS = 2500
+/** Left of the answer's time when the remark is due: the answer's way back. */
+export const REMARK_RESERVE_MS = 500
 /** A place found this near is the hotel itself: the model looked the hotel up. */
 const SELF_M = 150
 /** A step is not started with less than this left. */
@@ -311,59 +324,152 @@ interface Found {
   routes: Routed[]
 }
 
-/** The OSM groups the answer and the map show: the categories the Ostrovok places do not answer. */
-const osmShown = (found: Found) =>
-  shownGroups(found.groups.map((g) => g.group)).filter(
-    (group) => !found.ostrovok.some((hit) => hit.category === (group.category === 'sea' ? 'beach' : group.category)),
+/** A place the answer and the map show: of Ostrovok or of OSM, a place of both once, by Ostrovok. */
+export interface ShownPlace extends LatLon {
+  name: string
+  /** Ostrovok's distance, or the straight one of OSM to the place's shape. */
+  distanceM: number
+  /** Where a route to it ends. */
+  near: LatLon
+  source: 'ostrovok' | 'osm'
+  /** Ostrovok's kind: it names an airport by its city, «Валенсия» (аэропорт). */
+  kind?: string
+}
+
+/** A kind of place the answer has a line for. */
+export interface ShownKind {
+  category: PlaceCategory
+  /** `none` and `unchecked` are OSM's: Ostrovok's places are only what it lists. */
+  status: NearbyGroup['status']
+  places: ShownPlace[]
+  failure?: NearbyGroup['failure']
+  radiusM: number
+}
+
+/**
+ * The kinds the answer shows, in the order asked: the Ostrovok places of each and the OSM places that are not one of
+ * the hotel's Ostrovok places (`mergePlaces`), nearest first, `SHOWN_PER_CATEGORY` of each; the coastline only when
+ * no beach is near.
+ */
+export function shownKinds(
+  found: Pick<Found, 'ostrovok' | 'groups'>,
+  ostrovok: readonly NearbyPlace[],
+  asked: readonly PlaceCategory[],
+): ShownKind[] {
+  const groups = shownGroups(found.groups.map((g) => g.group))
+  const osm = groups.flatMap((group) =>
+    group.places.map((place) => ({
+      name: place.name,
+      category: group.category,
+      tags: place.tags,
+      osmType: place.osmType,
+      osmId: place.osmId,
+      lat: place.lat,
+      lon: place.lon,
+      place,
+    })),
   )
+  const merged = mergePlaces(ostrovok, osm)
+  // An OSM place that is an Ostrovok one is shown as the Ostrovok place, under the kind it was found for.
+  const twinOf = new Map(merged.ostrovok.flatMap((m) => m.osm.map((o) => [o.place, m.place] as const)))
+  const fromOstrovok = (place: NearbyPlace): ShownPlace => ({
+    name: place.name,
+    distanceM: place.distanceM,
+    lat: place.lat,
+    lon: place.lon,
+    near: { lat: place.lat, lon: place.lon },
+    source: 'ostrovok',
+    kind: place.kind,
+  })
+  const categories = [...new Set([...asked, ...groups.map((g) => g.category)])]
+  const kinds = categories.flatMap((category): ShownKind[] => {
+    const group = groups.find((g) => g.category === category)
+    const own = found.ostrovok.filter((hit) => hit.category === category).map((hit) => hit.place)
+    const twins = (group?.places ?? []).flatMap((p) => {
+      const twin = twinOf.get(p)
+      return twin && !own.includes(twin) ? [twin] : []
+    })
+    const places: ShownPlace[] = [
+      ...[...new Set([...own, ...twins])].map(fromOstrovok),
+      ...(group?.places ?? [])
+        .filter((p) => !twinOf.has(p))
+        .map((p) => ({
+          name: placeName(p, group!),
+          distanceM: p.distanceM,
+          lat: p.lat,
+          lon: p.lon,
+          near: p.near,
+          source: 'osm' as const,
+        })),
+    ]
+      .sort((a, b) => a.distanceM - b.distanceM)
+      .slice(0, SHOWN_PER_CATEGORY)
+    if (!places.length && !group) return []
+    return [
+      {
+        category,
+        status: places.length ? 'found' : group!.status,
+        places,
+        ...(!places.length && group?.failure && { failure: group.failure }),
+        radiusM: found.groups.find((g) => g.group.category === category)?.radiusM ?? NEAR_RADIUS_M,
+      },
+    ]
+  })
+  const beach = kinds.some((k) => k.category === 'beach' && k.status === 'found')
+  return kinds.filter((k) => k.category !== 'sea' || !beach)
+}
 
-const radiusOfGroup = (found: Found, category: PlaceCategory) =>
-  found.groups.find((g) => g.group.category === category)?.radiusM ?? NEAR_RADIUS_M
+/** «Валенсия» (аэропорт): Ostrovok's kind when the name does not say it. */
+const kindNote = (place: ShownPlace) =>
+  place.kind && !place.name.toLocaleLowerCase('ru').includes(place.kind.toLocaleLowerCase('ru'))
+    ? ` (${place.kind.toLocaleLowerCase('ru')})`
+    : ''
 
-/** Эвал's answer from what was found: a line a kind, the nearest place, the way to it and the next ones. */
-function summary(found: Found, hasMap: boolean): string {
+/** The lines of the answer from what was found: a line a kind, the nearest place, the way to it and the next ones. */
+function factsOf(found: Found, kinds: readonly ShownKind[]): { sources: string[]; lines: string[]; notes: string[] } {
   const way = (category?: PlaceCategory) => {
     const routed = found.routes.find((r) => r.target.category === category)
     return routed ? `; ${wayText(routed.route)}` : ''
   }
-  const kinds = new Set([...found.ostrovok.map((hit) => hit.category), ...osmShown(found).map((g) => g.category)])
   // A long answer of many kinds names the nearest place of each only.
-  const others = (names: string[]) => (names.length && kinds.size <= 2 ? ` Ещё: ${names.join(', ')}.` : '')
-  const ostrovok = [...new Set(found.ostrovok.map((hit) => hit.category))].map((category) => {
-    const [{ place }, ...rest] = found.ostrovok.filter((hit) => hit.category === category)
-    const more = rest.map((hit) => `«${hit.place.name}» — ${distanceText(hit.place.distanceM)}`)
-    // Ostrovok names an airport by its city: «Валенсия» (аэропорт).
-    const kind = place.name.toLocaleLowerCase('ru').includes(place.kind.toLocaleLowerCase('ru'))
-      ? ''
-      : ` (${place.kind.toLocaleLowerCase('ru')})`
-    return `• ${capital(kindLabel(category))}: ближе всего — «${place.name}»${kind}, ${distanceText(place.distanceM)} от отеля${way(category)}.${others(more)}`
-  })
-  const osm = osmShown(found).map((group) => {
-    const label = capital(group.category === 'sea' ? 'берег моря' : kindLabel(group.category))
-    if (group.status === 'unchecked') return `• ${label}: ${group.failure?.message ?? 'не удалось проверить.'}`
-    if (group.status === 'none')
-      return `• ${label}: в радиусе ${distanceText(radiusOfGroup(found, group.category))} нет.`
-    const [nearest, ...rest] = group.places
-    const more = rest.map((p) => `«${placeName(p, group)}» — ${distanceText(p.distanceM)}`)
-    return `• ${label}: ближе всего — «${placeName(nearest, group)}», ${distanceText(nearest.distanceM)} от отеля по прямой${way(group.category)}.${others(more)}`
+  const others = (names: string[]) => (names.length && kinds.length <= 2 ? ` Ещё: ${names.join(', ')}.` : '')
+  const straight = (place: ShownPlace) => (place.source === 'osm' ? ' по прямой' : '')
+  const kindLines = kinds.map((kind) => {
+    const label = capital(kind.category === 'sea' ? 'берег моря' : kindLabel(kind.category))
+    if (kind.status === 'unchecked') return `• ${label}: ${kind.failure?.message ?? 'не удалось проверить.'}`
+    if (kind.status === 'none') return `• ${label}: в радиусе ${distanceText(kind.radiusM)} нет.`
+    const [nearest, ...rest] = kind.places
+    const more = rest.map((p) => `«${p.name}» — ${distanceText(p.distanceM)}`)
+    return `• ${label}: ближе всего — «${nearest.name}»${kindNote(nearest)}, ${distanceText(nearest.distanceM)} от отеля${straight(nearest)}${way(kind.category)}.${others(more)}`
   })
   const place = found.geocoded
   const named = place
     ? [`• «${place.name ?? place.displayName}»: ${distanceText(place.distanceM)} от отеля по прямой${way(undefined)}.`]
     : []
-  const sources = [found.ostrovok.length && 'Островка', (osm.length || named.length) && 'OpenStreetMap'].filter(Boolean)
-  const lines = [...ostrovok, ...osm, ...named]
-  const notes = found.failures.filter((f) => !lines.some((line) => line.includes(f)))
+  const shown = kinds.flatMap((k) => k.places)
+  const sources = [
+    shown.some((p) => p.source === 'ostrovok') && 'Островка',
+    (shown.some((p) => p.source === 'osm') || kinds.some((k) => k.status !== 'found') || named.length) &&
+      'OpenStreetMap',
+  ].filter((source): source is string => Boolean(source))
+  const lines = [...kindLines, ...named]
+  return { sources, lines, notes: found.failures.filter((f) => !lines.some((line) => line.includes(f))) }
+}
+
+/** Эвал's answer: the facts of the data, Эвал's remark over them when it passed the checks, the map's line. */
+function summary(facts: ReturnType<typeof factsOf>, hasMap: boolean, remark?: string): string {
+  const { sources, lines, notes } = facts
   if (lines.length === 0) return notes.join(' ') || 'Не нашёл таких мест в данных.'
   return [
     `По данным ${sources.join(' и ')}:`,
     ...lines,
     ...notes,
+    ...(remark ? [remark] : []),
     ...(hasMap ? ['Места и маршруты — на карте ниже.'] : []),
   ].join('\n')
 }
 
-function chatMap(hotel: GeoHotel, found: Found): ChatMap | undefined {
+function chatMap(hotel: GeoHotel, found: Found, kinds: readonly ShownKind[]): ChatMap | undefined {
   const places: MapPoint[] = [
     ...(found.geocoded
       ? [
@@ -376,23 +482,15 @@ function chatMap(hotel: GeoHotel, found: Found): ChatMap | undefined {
           },
         ]
       : []),
-    ...found.ostrovok.map(({ category, place }) => ({
-      kind: 'place' as const,
-      label: place.name,
-      category: CATEGORY[category].label,
-      distanceM: Math.round(place.distanceM),
-      lat: place.lat,
-      lon: place.lon,
-      source: 'ostrovok' as const,
-    })),
-    ...osmShown(found).flatMap((group) =>
-      group.places.map((p) => ({
+    ...kinds.flatMap((kind) =>
+      kind.places.map((p) => ({
         kind: 'place' as const,
-        label: placeName(p, group),
-        category: group.label,
+        label: p.name,
+        category: CATEGORY[kind.category].label,
         distanceM: Math.round(p.distanceM),
         lat: p.lat,
         lon: p.lon,
+        ...(p.source === 'ostrovok' && { source: 'ostrovok' as const }),
       })),
     ),
   ]
@@ -412,6 +510,12 @@ function chatMap(hotel: GeoHotel, found: Found): ChatMap | undefined {
     attribution: MAP_ATTRIBUTION_TEXT,
   }
 }
+
+/** The chain for the remark: `REMARK_MODEL_ID` first, the rest in their order. */
+export const remarkModels = (models: readonly ModelLink[]) => [
+  ...models.filter((m) => m.id === REMARK_MODEL_ID),
+  ...models.filter((m) => m.id !== REMARK_MODEL_ID),
+]
 
 /** The step's line of the places near: «аптека — 3, бар или паб — нет». */
 function nearbyResult(nearby: Nearby): Pick<TurnStep, 'status' | 'result'> {
@@ -444,7 +548,7 @@ export async function geoTurn(
   messages: AssistantRequest['messages'],
   { deadline, signal, models, deps = serverGeoDeps(), ostrovok = [], onError }: GeoTurnOptions,
 ): Promise<GeoOutcome | null> {
-  const stepsUntil = deadline - ANSWER_RESERVE_MS
+  const stepsUntil = deadline - ANSWER_RESERVE_MS - (models?.length ? REMARK_MS : 0)
   const point = { lat: hotel.lat, lon: hotel.lon }
   const here = await deps.store.near(point, 1, PLACE_CATEGORIES, 1, { deadline: stepsUntil, signal })
   // A cache that cannot be read says nothing of the point: only the Ostrovok places answer then.
@@ -549,17 +653,12 @@ export async function geoTurn(
     }
   }
 
-  const fromOstrovok = [...new Set(found.ostrovok.map((hit) => hit.category))].map((category): Target => {
-    const { place } = found.ostrovok.find((hit) => hit.category === category)!
-    return { lat: place.lat, lon: place.lon, label: place.name, category }
-  })
+  const kinds = shownKinds(found, ostrovok, askedCategories(plan))
   const targets: Target[] = [
     ...(found.geocoded ? [{ ...found.geocoded, label: found.geocoded.name ?? found.geocoded.displayName }] : []),
-    ...fromOstrovok,
-    ...osmShown(found).flatMap((group): Target[] => {
-      const nearest = group.places[0]
-      if (group.status !== 'found' || !nearest) return []
-      return [{ ...nearest.near, label: placeName(nearest, group), category: group.category }]
+    ...kinds.flatMap((kind): Target[] => {
+      const nearest = kind.places[0]
+      return nearest ? [{ ...nearest.near, label: nearest.name, category: kind.category }] : []
     }),
   ].slice(0, MAX_ROUTES)
   for (const target of targets) {
@@ -578,12 +677,31 @@ export async function geoTurn(
     if (route) found.routes.push({ target, route })
   }
 
-  const map = chatMap(hotel, found)
+  const map = chatMap(hotel, found, kinds)
+  const facts = factsOf(found, kinds)
+  const factsText = summary(facts, false)
+  // The models that could not choose the calls are not asked again; the remark has its own time, never past the answer's.
+  const remark =
+    models?.length && !modelsDown && facts.lines.length
+      ? await firstAnswer(
+          remarkModels(models),
+          (model, timeout) => modelRemark(model, hotel, text, factsText, timeout),
+          {
+            deadline: Math.min(Date.now() + REMARK_MS, deadline - REMARK_RESERVE_MS),
+            signal,
+            onError,
+          },
+        )
+      : undefined
+  const kept = remark?.ok ? checkedRemark(remark.value, factsText) : undefined
+  if (remark?.ok && !kept) console.warn('assistant: a geo remark failed the checks, the facts answer alone')
   return {
     steps,
-    summary: summary(found, Boolean(map)),
+    summary: summary(facts, Boolean(map), kept),
     planner,
     ...(map && { map }),
+    ...(kept && { remark: kept }),
+    ...(remark?.ok && !kept && { remarkDropped: true as const }),
     ...(modelsDown && { modelsDown: true as const }),
   }
 }

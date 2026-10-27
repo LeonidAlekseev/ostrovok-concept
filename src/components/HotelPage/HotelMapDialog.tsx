@@ -1,11 +1,12 @@
 'use client'
 
-import { useMemo, type ReactElement } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import type { Hotel } from '@/lib/catalog'
 import { useHotels } from '@/hooks/useHotels'
+import { boxAround, boxParam, type MapBox } from '@/lib/mapBox'
 import { lowestPrice } from '@/lib/offer'
 import { setGuestParams, setStayParams } from '@/lib/search'
 import { todayIso } from '@/lib/dates'
@@ -19,25 +20,39 @@ const SearchMap = dynamic(
   { ssr: false, loading: () => <div className="size-full animate-pulse bg-muted" aria-hidden /> },
 )
 
-/** The streets around the hotel and the neighbouring hotels of the city. */
-const ZOOM = 12
+/** The blocks around the hotel. */
+const ZOOM = 15
+
+/** The pause after a move before the hotels of the new view are asked for, ms. */
+const VIEW_PAUSE_MS = 300
 
 /**
- * The results map around one hotel: the hotels of its city with the price of the page's stay, this one
- * ringed and above the rest. A marker opens that hotel with the same dates and guests.
+ * The results map around one hotel, at the zoom of its blocks: the hotels in view and a margin around it with the
+ * price of the page's stay, loaded box by box as the map moves (`GET /api/hotels?bbox=`) and kept once loaded; this
+ * one ringed and above the rest. A marker opens that hotel with the same dates and guests.
  */
 function HotelMap({ hotel }: { hotel: Hotel }) {
   const router = useRouter()
   const { stay, guests } = useHotelStay()
-  // The neighbours are loaded when the map opens; until then, or without them, the map shows this hotel alone.
-  const city = useHotels({ destinations: [hotel.destinationId] })
+  // The box of the view, set a pause after the map stops; until the first one the map shows this hotel alone.
+  const [box, setBox] = useState<MapBox | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(timer.current), [])
+  const onViewChange = useCallback((view: MapBox) => {
+    clearTimeout(timer.current)
+    timer.current = setTimeout(() => {
+      const next = boxAround(view)
+      setBox((current) => (current && boxParam(current) === boxParam(next) ? current : next))
+    }, VIEW_PAUSE_MS)
+  }, [])
+  const found = useHotels(box && { bbox: box })
+  // Every hotel loaded so far stays on the map.
+  const [known, setKnown] = useState<ReadonlyMap<string, Hotel>>(() => new Map([[hotel.id, hotel]]))
+  if (found.status === 'done' && found.hotels.some((h) => !known.has(h.id)))
+    setKnown(new Map([...known, ...found.hotels.map((h) => [h.id, h] as const)]))
   const hotels = useMemo(
-    () =>
-      (city.status === 'done' ? city.hotels : [hotel]).map((h) => ({
-        hotel: h,
-        price: lowestPrice(h, stay, guests.rooms, todayIso()),
-      })),
-    [city, hotel, stay, guests.rooms],
+    () => [...known.values()].map((h) => ({ hotel: h, price: lowestPrice(h, stay, guests.rooms, todayIso()) })),
+    [known, stay, guests.rooms],
   )
   const camera = useMemo<MapCamera>(() => ({ center: [hotel.lon, hotel.lat], zoom: ZOOM }), [hotel.lon, hotel.lat])
 
@@ -54,6 +69,8 @@ function HotelMap({ hotel }: { hotel: Hotel }) {
       currentId={hotel.id}
       onOpen={open}
       initialCamera={camera}
+      frame={false}
+      onViewChange={onViewChange}
       fallback={<HotelMapUnavailable />}
     />
   )

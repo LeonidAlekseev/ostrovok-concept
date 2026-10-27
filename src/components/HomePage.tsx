@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { FEATURED_DESTINATION_ID } from '@/data/destinations'
-import type { HotelSummary } from '../lib/catalog'
+import type { SpotlightHotel } from '../lib/catalog'
 import { useDestinations } from './Catalog/useDestinations'
 import { DrawSearch } from './DrawSearch/DrawSearch'
 import { Hero } from './Hero/Hero'
@@ -14,7 +14,7 @@ import { VibeSearch } from './VibeSearch/VibeSearch'
 
 interface Props {
   /** The "recently added" hotels: the globe's cards. */
-  newHotels: readonly HotelSummary[]
+  newHotels: readonly SpotlightHotel[]
   /** The hotels of each persona's tab. */
   selections: readonly PersonaSelection[]
 }
