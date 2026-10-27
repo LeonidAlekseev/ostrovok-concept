@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { useRef, useState, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from 'cn'
-import { Button } from '@/components/ui/button'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import type { Photo } from '@/lib/catalog'
 
@@ -24,12 +23,13 @@ interface Props {
   children?: ReactNode
 }
 
+// A bare chevron with a soft shadow, readable on any photo; the 44 px button around it takes the tap.
 const arrowClass =
-  'absolute top-[calc(50%-1.125rem)] text-foreground opacity-0 group-hover/carousel:opacity-100 focus-visible:opacity-100'
+  'absolute top-1/2 flex size-11 -translate-y-1/2 items-center justify-center text-(--decor-light) opacity-0 rounded-full outline-offset-[-4px] group-hover/carousel:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-ring [@media(hover:none)]:opacity-100 [&>svg]:size-7 [&>svg]:stroke-[2.5] [&>svg]:drop-shadow-[0_1px_2px_rgb(0_0_0/0.6)]'
 
 /**
- * Photos in a snapping strip: swiped on touch screens, turned by the arrows that show on hover and
- * focus elsewhere, with the "1 / N" counter in the bottom left corner.
+ * Photos in a snapping strip: swiped on touch screens and turned by the bare arrows at the edges, always shown on
+ * touch screens and on hover and focus elsewhere, with the "1 / N" counter in the bottom left corner.
  */
 export function PhotoCarousel({
   photos,
@@ -43,8 +43,6 @@ export function PhotoCarousel({
   const strip = useRef<HTMLDivElement>(null)
   const [index, setIndex] = useState(0)
   const count = photos.length
-  // Without swipe there is no other way to turn a photo, so the arrows stay on touch screens.
-  const arrowTouchClass = swipe ? '[@media(hover:none)]:hidden' : '[@media(hover:none)]:opacity-100'
 
   // The arrows go round; the strip scrolls smoothly unless reduced motion is asked for (motion-safe).
   const go = (to: number) => {
@@ -108,24 +106,22 @@ export function PhotoCarousel({
 
       {count > 1 && (
         <>
-          <Button
-            variant="outline"
-            size="icon-sm"
+          <button
+            type="button"
             aria-label="Предыдущее фото"
-            className={cn(arrowClass, arrowTouchClass, 'left-2')}
+            className={cn(arrowClass, 'left-0')}
             onClick={() => go(index - 1)}
           >
             <ChevronLeft aria-hidden />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon-sm"
+          </button>
+          <button
+            type="button"
             aria-label="Следующее фото"
-            className={cn(arrowClass, arrowTouchClass, 'right-2')}
+            className={cn(arrowClass, 'right-0')}
             onClick={() => go(index + 1)}
           >
             <ChevronRight aria-hidden />
-          </Button>
+          </button>
         </>
       )}
     </div>

@@ -552,12 +552,27 @@ function viewAboveForm(
   const radius = g.width / 2
   // The card keeps its place relative to the pin (below it on phones, beside it on wide screens);
   // the pair must end just above the form, which overlaps the bottom of the hero by a length set in `HomePage`.
-  const cardBottom = card?.getBoundingClientRect().bottom ?? 0
-  const hubY = g.top + (scene().hub.y / 100) * g.height
-  const form = document.getElementById('search')?.getBoundingClientRect().top
-  const formTop = form !== undefined && form > h.top && form < h.bottom ? form : h.bottom - h.height * FORM_OVERLAP
+  const c = card?.getBoundingClientRect()
+  const hub = scene().hub
+  const hubX = g.left + (hub.x / 100) * g.width
+  const hubY = g.top + (hub.y / 100) * g.height
   const x = h.left + h.width / 2
-  const y = formTop - Math.max(cardBottom - hubY, 0) - SELECTED_GAP
+  const search = document.getElementById('search')
+  // The figures of the search panel rise above it (on phones over the whole width): the card ends above
+  // those it will stand over, its place beside the pin kept.
+  const left = x + (c ? c.left - hubX : 0)
+  const right = x + (c ? c.right - hubX : 0)
+  const form = search
+    ? Math.min(
+        search.getBoundingClientRect().top,
+        ...[...search.querySelectorAll('img')]
+          .map((img) => img.getBoundingClientRect())
+          .filter((r) => r.right > left && r.left < right)
+          .map((r) => r.top),
+      )
+    : undefined
+  const formTop = form !== undefined && form > h.top && form < h.bottom ? form : h.bottom - h.height * FORM_OVERLAP
+  const y = formTop - Math.max((c?.bottom ?? 0) - hubY, 0) - SELECTED_GAP
   const u = (x - g.left - radius) / radius
   const v = (g.top + radius - y) / radius
   // Far north a city cannot reach every spot of the disc: move the spot towards the centre until it can.

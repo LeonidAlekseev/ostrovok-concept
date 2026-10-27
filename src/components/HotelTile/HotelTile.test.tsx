@@ -23,24 +23,24 @@ afterEach(() => localStorage.clear())
 
 // hotel-tile, Requirement: Метки под фото карточки
 describe('HotelTile badges', () => {
-  it('leaves the photos to the counter and lays the heart, the rating, the stars and the free cancellation under them', () => {
+  it('lays the counter and the stars over the photos, and the heart, the rating and the free cancellation under them', () => {
     render(<HotelTile hotel={hotel} href={`/hotels/${hotel.id}`} />)
     const card = screen.getByRole('article')
     const photos = within(card).getByRole('group', { name: 'Фото отеля' })
     const carousel = photos.parentElement!
     expect(card.firstElementChild).toBe(carousel)
     expect(carousel.className).toMatch(/\brounded-xl\b/)
-    expect(within(carousel).getByText('1 / 5').parentElement!.className).toMatch(/\bbottom-2\b/)
+    const counter = within(carousel).getByText('1 / 5').parentElement!
+    expect(counter.className).toMatch(/\bbottom-2\b/)
+    expect(counter.className).toMatch(/\bleft-2\b/)
+    const stars = within(carousel).getByRole('img', { name: countRu(hotel.stars, ['звезда', 'звезды', 'звёзд']) })
+    expect(stars.className).toMatch(/\bbottom-2\b/)
+    expect(stars.className).toMatch(/\bright-2\b/)
+    expect(within(card).getAllByRole('img', { name: /звезд|звёзд/ })).toHaveLength(1)
 
-    const stars = countRu(hotel.stars, ['звезда', 'звезды', 'звёзд'])
     const button = within(card).getByRole('button', { name: 'Добавить в избранное' })
     const rating = within(card).getByText(formatDecimal(hotel.rating))
-    for (const badge of [
-      button,
-      rating,
-      within(card).getByRole('img', { name: stars }),
-      screen.getByText('Бесплатная отмена'),
-    ])
+    for (const badge of [button, rating, screen.getByText('Бесплатная отмена')])
       expect(carousel.contains(badge)).toBe(false)
     expect(rating.textContent).toBe(`Оценка гостей ${formatDecimal(hotel.rating)}`)
 
@@ -51,9 +51,8 @@ describe('HotelTile badges', () => {
     expect(button.closest('a')).toBeNull()
     const line = rating.parentElement!
     expect(name.parentElement!.nextElementSibling).toBe(line)
-    expect([...line.children].map((el) => el.textContent || el.getAttribute('aria-label'))).toEqual([
+    expect([...line.children].map((el) => el.textContent)).toEqual([
       `Оценка гостей ${formatDecimal(hotel.rating)}`,
-      stars,
       'Бесплатная отмена',
     ])
   })

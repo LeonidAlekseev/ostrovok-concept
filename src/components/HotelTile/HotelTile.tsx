@@ -12,6 +12,7 @@ import { GuruLogo } from '../GuruLogo/GuruLogo'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import { PhotoCarousel } from '../PhotoCarousel/PhotoCarousel'
 import { FavoriteButton } from '../FavoriteButton/FavoriteButton'
+import { PhotoStars } from './PhotoStars'
 import { TileBadges } from './TileBadges'
 
 interface Props extends Omit<ComponentProps<'article'>, 'children'> {
@@ -28,11 +29,11 @@ interface Props extends Omit<ComponentProps<'article'>, 'children'> {
 }
 
 /**
- * The hotel card of the vibe, the stars, favourites and search results: the photo carousel, then the name with
- * the favourite toggle, the guest rating, the stars and the free cancellation, the distance to the city centre
- * and the regular and GURU prices. The kind of stay is shown on the hotel's page only. The plain card has the
- * first photo alone and no badges or toggle. Nothing lies on the photos but the «generated» mark of a made-up
- * hotel, in both.
+ * The hotel card of the vibe, the stars, favourites and search results: the photo carousel with the counter,
+ * the arrows and the stars, then the name with the favourite toggle, the guest rating and the free cancellation,
+ * the distance to the city centre and the regular and GURU prices. The kind of stay is shown on the hotel's page
+ * only. The plain card has the first photo alone and no badges or toggle. Both have the «generated» mark of a
+ * made-up hotel on the photo.
  */
 export function HotelTile({
   hotel,
@@ -71,6 +72,7 @@ export function HotelTile({
           href={href}
           className="@container z-10 aspect-[4/3] w-full rounded-xl"
         >
+          <PhotoStars hotel={hotel} className="absolute right-2 bottom-2" />
           <GeneratedBadge hotel={hotel} className="absolute bottom-3 left-1/2 -translate-x-1/2" />
         </PhotoCarousel>
       )}

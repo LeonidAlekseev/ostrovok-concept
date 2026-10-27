@@ -37,26 +37,23 @@ describe('PhotoCarousel', () => {
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Предыдущее фото' }))
   })
 
-  it('shows the arrows on hover and focus only, and none on touch screens', () => {
+  it('has bare arrows of 44 px, shown on touch screens and on hover and focus elsewhere', () => {
     render(<PhotoCarousel photos={photos} />)
     for (const name of ['Предыдущее фото', 'Следующее фото']) {
       const arrow = screen.getByRole('button', { name })
+      expect(arrow.className).toMatch(/\bsize-11\b/)
+      expect(arrow.className).not.toMatch(/\b(bg-|border)/)
+      expect(arrow.className).toMatch(/drop-shadow/)
       expect(arrow.className).toMatch(/(^|\s)opacity-0(\s|$)/)
       expect(arrow.className).toMatch(/group-hover\/carousel:opacity-100/)
       expect(arrow.className).toMatch(/focus-visible:opacity-100/)
-      expect(arrow.className).toMatch(/\[@media\(hover:none\)\]:hidden/)
+      expect(arrow.className).toMatch(/\[@media\(hover:none\)\]:opacity-100/)
     }
   })
 
-  // home-page, Requirement: Фото в ленте подборок
-  it('without swipe, keeps the strip from scrolling by touch and shows the arrows on touch screens', () => {
+  it('without swipe, keeps the strip from scrolling by touch', () => {
     render(<PhotoCarousel photos={photos} swipe={false} />)
     expect(screen.getByRole('group').className).toMatch(/overflow-x-hidden/)
-    for (const name of ['Предыдущее фото', 'Следующее фото']) {
-      const className = screen.getByRole('button', { name }).className
-      expect(className).toMatch(/\[@media\(hover:none\)\]:opacity-100/)
-      expect(className).not.toMatch(/\[@media\(hover:none\)\]:hidden/)
-    }
   })
 
   it('has no arrows for a single photo', () => {
