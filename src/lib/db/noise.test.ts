@@ -1,5 +1,30 @@
-import { describe, expect, it } from 'vitest'
-import { noiseMapOf, placesOf, sourcesOf } from './noise'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { loadNoiseMap, noiseMapOf, placesOf, sourcesOf } from './noise'
+
+/** The answers of the database's functions by name, and the names asked. */
+const db = vi.hoisted(() => ({
+  answers: {} as Record<string, { data: unknown; error: { message: string } | null }>,
+  asked: [] as string[],
+}))
+vi.mock('@/lib/supabase/config', () => ({
+  isSupabaseConfigured: true,
+  supabaseUrl: 'https://project.supabase.test',
+  supabaseAnonKey: 'anon',
+}))
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: () => ({
+    rpc: async (name: string) => {
+      db.asked.push(name)
+      return db.answers[name] ?? { data: null, error: { message: `no ${name}` } }
+    },
+  }),
+}))
+vi.mock('next/cache', () => ({ unstable_cache: (read: unknown) => read }))
+
+beforeEach(() => {
+  db.answers = {}
+  db.asked = []
+})
 
 // hotel-page, Requirement: Шум и окружение настоящего отеля
 describe('sourcesOf', () => {
@@ -21,7 +46,26 @@ describe('sourcesOf', () => {
 })
 
 describe('noiseMapOf', () => {
-  it('keeps the noise contours with rounded coordinates and drops the buildings', () => {
+  const geometry = { type: 'Polygon', coordinates: [] }
+  const band = (source: string, indicator: string, db_min: number | null, db_max: number | null) => ({
+    type: 'Feature',
+    geometry,
+    properties: { layer: 'noise', source, indicator, db_min, db_max },
+  })
+  const piece = (lden: [number, number | null], lnight: [number | null, number | null]) => ({
+    type: 'Feature',
+    geometry,
+    properties: {
+      layer: 'noise',
+      source: 'roadsInAgglomeration',
+      lden_min: lden[0],
+      lden_max: lden[1],
+      lnight_min: lnight[0],
+      lnight_max: lnight[1],
+    },
+  })
+
+  it('keeps the Lnight contours with rounded coordinates and drops Lden and the buildings', () => {
     const map = noiseMapOf([
       {
         type: 'Feature',
@@ -35,8 +79,9 @@ describe('noiseMapOf', () => {
             ],
           ],
         },
-        properties: { layer: 'noise', source: 'roadsInAgglomeration', indicator: 'Lden', db_min: 60, db_max: 64 },
+        properties: { layer: 'noise', source: 'roadsInAgglomeration', indicator: 'Lnight', db_min: 55, db_max: 59 },
       },
+      band('roadsInAgglomeration', 'Lden', 60, 64),
       {
         type: 'Feature',
         geometry: { type: 'Polygon', coordinates: [] },
@@ -56,24 +101,39 @@ describe('noiseMapOf', () => {
             ],
           ],
         },
-        properties: { source: 'roadsInAgglomeration', indicator: 'Lden', db_min: 60, db_max: 64 },
+        properties: { source: 'roadsInAgglomeration', indicator: 'Lnight', db_min: 55, db_max: 59, level: 55 },
       },
     ])
   })
-  it('drops the bands below 40 dB of the layers and adds the quiet of hotel_noise_quiet', () => {
-    const geometry = { type: 'Polygon', coordinates: [] }
-    const band = (source: string, db_min: number | null, db_max: number | null) => ({
-      type: 'Feature',
-      geometry,
-      properties: { layer: 'noise', source, indicator: 'Lnight', db_min, db_max },
-    })
+
+  it('drops the bands below 40 dB of the layers and adds the quiet, Lden’s as the day’s', () => {
     const map = noiseMapOf(
-      [band('industryInAgglomeration', null, 39), band('roadsInAgglomeration', 55, 59)],
-      [band('quiet', null, 39), band('roadsInAgglomeration', null, 39)],
+      [band('industryInAgglomeration', 'Lnight', null, 39), band('roadsInAgglomeration', 'Lnight', 55, 59)],
+      [
+        band('quiet', 'Lden', null, 39),
+        band('quiet', 'Lnight', null, 39),
+        band('roadsInAgglomeration', 'Lnight', null, 39),
+      ],
     )
-    expect(map.features.map((f) => [f.properties.source, f.properties.db_min])).toEqual([
-      ['roadsInAgglomeration', 55],
-      ['quiet', null],
+    expect(map.features.map((f) => [f.properties.source, f.properties.indicator, f.properties.level])).toEqual([
+      ['roadsInAgglomeration', 'Lnight', 55],
+      ['quiet', 'Lday', null],
+      ['quiet', 'Lnight', null],
+    ])
+  })
+
+  it('gives each piece of hotel_noise_day the day estimate of its two bands', () => {
+    const map = noiseMapOf(
+      [],
+      [],
+      [piece([65, 69], [55, 59]), piece([40, 44], [null, 39]), piece([75, null], [65, 69]), piece([55, 59], [55, 59])],
+    )
+    expect(map.features.map((f) => f.properties)).toEqual([
+      { source: 'roadsInAgglomeration', indicator: 'Lday', db_min: 59, db_max: 69, level: 64 },
+      { source: 'roadsInAgglomeration', indicator: 'Lday', db_min: 34, db_max: 45, level: 39.2 },
+      { source: 'roadsInAgglomeration', indicator: 'Lday', db_min: 69, db_max: null, level: 68.6 },
+      // A night of 55 dB alone is louder than an Lden below 60: no day fits.
+      { source: 'roadsInAgglomeration', indicator: 'Lday', db_min: null, db_max: null, level: null },
     ])
   })
 })
@@ -110,5 +170,42 @@ describe('placesOf', () => {
 
   it('has nothing for an answer it cannot read', () => {
     expect(placesOf(null)).toEqual({ places: [], placesCovered: [] })
+  })
+})
+
+// geo-data, Requirement: Готовые карты шума отелей
+describe('loadNoiseMap', () => {
+  const hotel = { id: 'ota-1', lat: 39.47, lon: -0.37 }
+  const night = {
+    type: 'Feature',
+    geometry: { type: 'Polygon', coordinates: [] },
+    properties: { layer: 'noise', source: 'roadsInAgglomeration', indicator: 'Lnight', db_min: 55, db_max: 59 },
+  }
+  const quiet = {
+    type: 'Feature',
+    geometry: { type: 'Polygon', coordinates: [] },
+    properties: { layer: 'noise', source: 'quiet', indicator: 'Lnight', db_min: null, db_max: 39 },
+  }
+
+  it('reads the map computed ahead in one call', async () => {
+    db.answers.hotel_noise_map = { data: { contours: [night], quiet: [quiet], day: [] }, error: null }
+    const map = await loadNoiseMap(hotel)
+    expect(db.asked).toEqual(['hotel_noise_map'])
+    expect(map).toEqual(noiseMapOf([night], [quiet], []))
+  })
+
+  it('computes the map when the point has none yet (Scenario: Новый отель до пересчёта)', async () => {
+    db.answers.hotel_noise_map = { data: null, error: null }
+    db.answers.hotel_geo_features = { data: { features: [night] }, error: null }
+    db.answers.hotel_noise_quiet = { data: { features: [quiet] }, error: null }
+    db.answers.hotel_noise_day = { data: { features: [] }, error: null }
+    const map = await loadNoiseMap(hotel)
+    expect(db.asked).toEqual(['hotel_noise_map', 'hotel_geo_features', 'hotel_noise_quiet', 'hotel_noise_day'])
+    expect(map).toEqual(noiseMapOf([night], [quiet], []))
+  })
+
+  it('reads no map for a synthetic hotel without asking', async () => {
+    expect(await loadNoiseMap({ ...hotel, id: 'prague-old-town-lantern' })).toBeNull()
+    expect(db.asked).toEqual([])
   })
 })

@@ -38,6 +38,8 @@ export const isBrief = (value: unknown): value is Brief =>
   (value.quiet === undefined || value.quiet === true) &&
   (value.height === undefined || isString(value.height)) &&
   (value.view === undefined || isString(value.view)) &&
+  (value.seaMaxM === undefined || isNumber(value.seaMaxM)) &&
+  (value.guests === undefined || isObject(value.guests)) &&
   (value.hotelId === undefined || isString(value.hotelId))
 
 export const isQuestion = (value: unknown): value is Question =>

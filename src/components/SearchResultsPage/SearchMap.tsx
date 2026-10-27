@@ -22,7 +22,7 @@ import { hasStars, isRated, type Hotel } from '../../lib/catalog'
 import { countRu, formatDecimal, formatPrice } from '../../lib/format'
 import { clusterPoints, expansionZoom, type MapCluster } from '../../lib/mapClusters'
 import { ATTRIBUTION_CLASS, MAP_ATTRIBUTION, MAP_STYLE, manageAttribution } from './mapSetup'
-import { MapUnavailable } from './MapUnavailable'
+import { MapUnavailable, SEARCH_MAP_HINT } from '@/components/MapUnavailable/MapUnavailable'
 import type { MapCamera } from './searchView'
 import type { MapBox } from '../../lib/mapBox'
 
@@ -77,7 +77,7 @@ export default function SearchMap({
   activeId,
   onActivate,
   currentId,
-  fallback = <MapUnavailable />,
+  fallback = <MapUnavailable hint={SEARCH_MAP_HINT} />,
   onOpen,
   initialCamera,
   onCameraChange,

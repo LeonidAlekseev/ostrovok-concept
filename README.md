@@ -75,7 +75,10 @@ RLS): `loadDestinations`, `loadHotelSummaries`, `loadNewHotels`, `loadHotel`, `l
 (`src/app/error.tsx`, `global-error.tsx`), API — 503. Клиент получает только нужное: направления — из корневого
 layout (`CatalogProvider`, `useDestinations`), главная — новые отели и подборки пропсами, «Поиск вайба» и «Звёзды
 подскажут» считают на сервере (server actions), остальное — `GET /api/hotels?ids=a,b` (избранное, поездки, бронь) или
-`?destinations=x,y` (результаты): до 60 `id`, полные отели, `Cache-Control: s-maxage=300`. Карта «Показать на карте»
+`?destinations=x,y` (результаты): до 60 `id`, полные отели, `Cache-Control: s-maxage=300`. Общее у маршрутов
+`src/app/api` — `src/lib/api.ts`: заголовок кэша CDN, ошибка `{ error }` с коротким английским текстом (браузер
+смотрит только на статус) и отель маршрута `[hotelId]`, показанный в этом окружении. Общее у читателей `src/lib/db` —
+`src/lib/db/anon.ts`: anon-клиент без сессии, проверка настоящего отеля, кэш каталога и «прочитать или `null`». Карта «Показать на карте»
 открывается на кварталах вокруг отеля и грузит отели видимой области с запасом — `?bbox=west,south,east,north`
 (`src/lib/mapBox.ts`: сторона до 0,1°, сетка 0,005°, до 200 отелей), уже загруженные остаются. Отель,
 добавленный в базу после сборки, открывается без пересборки: `/hotels/<id>` рендерится при первом запросе и
@@ -87,7 +90,8 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 
 - `npm run db:types` — `scripts/db-types.mjs`: `supabase gen types typescript` по базе (`SUPABASE_DB_URL` из `.env.local`, схема
   только читается) в `src/lib/db/database.types.ts`, затем Prettier. Клиенты Supabase типизированы `Database`. **Перегенерируйте
-  после каждой миграции** (`db:push`) и коммитьте файл вместе с ней.
+  после каждой миграции** (`db:push`) и коммитьте файл вместе с ней. Следом скрипт обновляет раздел Supabase документации API
+  (`npm run docs:supabase`, см. «Документация API»).
 - `npm run db:push` — применяет миграции (`supabase db push --db-url "$SUPABASE_DB_URL"`, строка из `.env.local`).
   Прямой адрес `db.<ref>.supabase.co` доступен только по IPv6; без IPv6 подставьте строку пулера
   (Dashboard → Connect → Transaction pooler, порт 6543) в `SUPABASE_DB_URL` окружения.
@@ -110,11 +114,18 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
   команда заменяет свою таблицу в одной транзакции; затем `npm run db:features`. Чтение: `hotel_geo(lat, lon)` —
   здание и шум в точке, `hotel_geo_features(lat, lon, radius_m)` — GeoJSON зданий (для `fill-extrusion`) и зон шума
   в круге, радиус 300 м по умолчанию, не больше 500 м; `hotel_noise_quiet(lat, lon, radius_m)` — тихая зона того же
-  круга: где слои EEA размечены и ни один не достигает 40 дБ.
+  круга: где слои EEA размечены и ни один не достигает 40 дБ; `hotel_noise_day(lat, lon, radius_m)` — куски, где
+  полоса Lden встречает полосу Lnight того же слоя (для оценки дня); `hotel_noise_map(lat, lon, radius_m)` — те же
+  три части карты, посчитанные заранее (`hotel_noise_maps`, см. `db:features`), или `null`.
 - `npm run db:features [-- --dry-run]` — `scripts/hotel-features.ts`: свойства настоящих отелей для Эвала — здание и
   шум по `hotel_geo` в `hotel_features` с их происхождением (наборы данных, источник и границы высоты и этажности),
-  вид из номеров по названиям групп номеров `ota_hotels` в `hotel_room_views`.
-  Сырые данные не копирует, повторный запуск ничего не меняет; `--dry-run` только считает. Затем — `npm run db:embed`.
+  вид из номеров по названиям групп номеров `ota_hotels` в `hotel_room_views`, и карты шума вокруг каждого отеля в
+  `hotel_noise_maps` (`hotel_noise_map_refresh` по 4 точки параллельно, ~3 мин на 220 точек; карты точек без отеля
+  удаляет `hotel_noise_maps_prune`). Карту на лету считать дорого: пересечения полигонов EEA в круге 300 м под
+  нагрузкой занимали до 5,8 с при лимите anon 3 с, готовая читается за ~0,05 с. **После каждой перезагрузки
+  геоданных** (`load-valencia-geo.py`) запускайте `db:features`, иначе карты останутся по старым контурам; отель без
+  готовой карты получает карту, посчитанную на лету. Сырые данные не копирует, повторный запуск ничего не меняет в
+  `hotel_features` и `hotel_room_views`; `--dry-run` только считает. Затем — `npm run db:embed`.
 - `npm run db:city-places -- --city <город> --pbf-url <выгрузка Geofabrik>` — `scripts/load-city-places.ts`: места
   OpenStreetMap города для гео-инструментов Эвала (`src/lib/geo`), вся загрузка одним шагом — см. «Загрузка мест
   другого города». Шаг записи отдельно — `npm run db:osm-places -- --bbox <s,w,n,e> [--centre <lat,lon>] [--file
@@ -131,6 +142,32 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 - `npm run db:clean:shared-photos [-- --delete]` — `scripts/clean-shared-photos.ts`: фото снимков «Поделиться» в
   публичном bucket без снимка (удалён вместе с аккаунтом или вручную); без `--delete` только показывает папки и число
   файлов. Папки моложе часа не трогает. Нужен `SUPABASE_SERVICE_ROLE_KEY`.
+
+**Скрипты `scripts/`.** Исходные файлы данных вне репозитория, поэтому скрипты загрузки — единственный способ
+восстановить базу; не удаляйте их. TypeScript-скрипты исполняет Node и начинают с `scripts/lib/node.ts`: он
+разрешает импорты модулей приложения без расширения, даёт `required()` (переменная `.env.local` или ошибка с её
+именем) и `serviceClient()` (клиент с сервисным ключом).
+
+| Скрипт                                                                                | Назначение                                                                                         |
+| ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `seed.ts` (`db:seed`)                                                                 | каталог генератора и демо-аккаунт                                                                  |
+| `seed-valencia.ts` (`db:seed:valencia`)                                               | выдача Островка по Валенсии: `ota_hotels`, `ota_searches`, отели каталога                          |
+| `load-ota-pages.ts` (`db:load:ota-pages`)                                             | страницы отелей Островка: `ota_hotel_pages`, `ota_pois`, `ota_hotel_pois`, `ota_rate_spec_tags`    |
+| `rebuild-ota-hotels.ts` (`db:rebuild:ota`)                                            | строки каталога настоящих отелей из `ota_hotels` и страниц                                         |
+| `load-valencia-geo.py`                                                                | здания EUBUCCO, шум EEA и покрытие `geo_coverage`                                                  |
+| `load-city-places.ts` (`db:city-places`)                                              | места OSM города одним шагом: выгрузка Geofabrik → `osm-pbf-to-overpass.py` → `load-osm-places.ts` |
+| `load-osm-places.ts` (`db:osm-places`)                                                | шаг записи мест OSM в `osm_places` и `osm_place_areas`                                             |
+| `osm-pbf-to-overpass.py`                                                              | выгрузка `.osm.pbf` → ответ Overpass, когда Overpass недоступен                                    |
+| `hotel-features.ts` (`db:features`)                                                   | свойства отелей, вид номеров, готовые карты шума                                                   |
+| `embed.ts` (`db:embed`)                                                               | векторы поиска по смыслу                                                                           |
+| `semantic-eval.ts`                                                                    | качество поиска по смыслу на живой базе                                                            |
+| `clean-shared-photos.ts` (`db:clean:shared-photos`)                                   | фото снимков без снимка                                                                            |
+| `db-push.mjs`, `db-types.mjs` (`db:push`, `db:types`)                                 | миграции и типы `Database`                                                                         |
+| `secrets.mjs` (`secrets:*`)                                                           | ключи `.env.local.secret`                                                                          |
+| `screenshots.mjs`                                                                     | визуальная проверка страниц                                                                        |
+| `openapi-supabase.ts` (`docs:supabase`)                                               | раздел Supabase документации API из `database.types.ts`                                            |
+| `openapi-examples.ts` (`docs:examples`)                                               | реальные примеры ответов документации API с запущенного сайта                                      |
+| `build-images.py`, `build-star-assets.mjs`, `build-draw-images.mjs`, `build-globe.py` | изображения и глобус из исходников вне репозитория (см. «Изображения»)                             |
 
 ### Загрузка мест другого города
 
@@ -327,7 +364,7 @@ node scripts/screenshots.mjs --label after --against before --mask canvas / /sea
 
 Шапка (`src/components/Header`) и подвал (`src/components/Footer`) рендерятся в
 `src/app/layout.tsx` на каждой странице; страница сама рендерит свой `main`. Сейчас есть `/`,
-`/search` (результаты поиска), `/hotels/<id>`, `/hotels/<id>/rooms`, `/booking`, `/booking/confirmation`, `/login`, `/register`, `/trips`, `/trips/booking`, `/favorites`, `/help`, `/legal/terms`, `/legal/privacy`, `/legal/cookies`, `/auth/callback` (обработчик ссылки из письма) и страница 404 (`src/app/not-found.tsx`). Шапка и подвал ссылаются на разделы. Все страницы пререндерятся статически и перестраиваются в фоне раз в час (каталог, см. «Supabase»).
+`/search` (результаты поиска), `/hotels/<id>`, `/hotels/<id>/rooms`, `/booking`, `/booking/confirmation`, `/login`, `/register`, `/trips`, `/trips/booking`, `/favorites`, `/help`, `/api/docs` (документация API), `/legal/terms`, `/legal/privacy`, `/legal/cookies`, `/auth/callback` (обработчик ссылки из письма) и страница 404 (`src/app/not-found.tsx`). Шапка и подвал ссылаются на разделы. Все страницы пререндерятся статически и перестраиваются в фоне раз в час (каталог, см. «Supabase»).
 
 ### Каталог
 
@@ -394,7 +431,8 @@ Escape, фокус возвращается на фото), название с 
 (`src/lib/rates.ts`).
 
 «Шум и окружение» (`HotelNoise`, вкладка «Шум») — у настоящего отеля Валенсии: плоская карта MapLibre с контурами
-шума EEA END 2022 вокруг отеля (`GET /api/hotels/<id>/noise-map`, `hotel_geo_features` и `hotel_noise_quiet` на 300 м;
+шума EEA END 2022 вокруг отеля (`GET /api/hotels/<id>/noise-map`: готовая карта `hotel_noise_map` на 300 м, без неё —
+`hotel_geo_features`, `hotel_noise_quiet` и `hotel_noise_day`;
 Lden или Lnight, ниже 40 дБ — зелёным) и шумными местами OpenStreetMap (точка открывает название, тип и расстояние;
 экранирование зданиями не считается), полосы Lden и Lnight в точке отеля (`hotel_geo`) по
 источникам, дневной уровень по формуле директивы 2002/49/EC (допущения: вечер равен дню, день не тише ночи), график
@@ -403,15 +441,21 @@ EEA», а не «тихо». Те же строки (`noiseLines` в `src/lib/no
 
 «Вид из отеля» (`HotelView`, вкладка «Вид») — у настоящего отеля Валенсии: с какого этажа видно море, закат и восход
 на дату, достопримечательности OSM и места Островка до 3 км — по линиям взгляда над зданиями EUBUCCO
-(`hotel_view_eyes`, миграция `20261027150000_hotel_view_eyes.sql`: для каждой линии одним запросом — самая низкая
-высота глаза, с которой она проходит над всеми зданиями, с кривизной Земли и рефракцией, верхней границей высоты и
-покрытием данных). Из какого окна смотрит номер, неизвестно, поэтому итог цели — «видно со всех этажей», «видно с N-го
+(`hotel_view_eyes`, миграции `20261027150000_hotel_view_eyes.sql` и `20261027170000_hotel_view_coverage.sql`: для
+каждой линии одним запросом — самая низкая высота глаза, с которой она проходит над всеми зданиями, с кривизной Земли и
+рефракцией, по высоте EUBUCCO и обеим границам её интервала). Данные о зданиях есть по всему муниципалитету València
+(`geo_coverage`, граница OpenStreetMap по IGN, `uv run scripts/load-valencia-geo.py coverage`): линия без зданий над
+морем или парком — «видно», «нет данных» — только если линия без помех уходит в соседний муниципалитет. Из какого окна
+смотрит номер, неизвестно, поэтому итог цели — «видно со всех этажей», «видно с N-го этажа», «возможно, видно с N-го
 этажа», «не видно ни с одного этажа» или «нет данных»; ползунок этажа (1…N: этажи здания EUBUCCO, а без точных данных
-о здании — этажи номеров Островка с этажом 3 м) показывает на карте и в списках, что видно с выбранного этажа
-(«вероятно видно», «возможны препятствия», «нет данных»). Без здания и этажей номеров — «нет точных данных».
-Высота-оценка модели — «≈». Компас выбирает сторону окон (данных о ней пока нет — `RoomWindowSide`), карта MapLibre
-ставит здания EUBUCCO в 3D по высоте в 250 м (`GET /api/hotels/<id>/view-map`, дальше — 3D-здания стиля), отель синим,
-мешающие с выбранного этажа — оранжевым, и поворачивается к стороне; данные всех этажей — `GET /api/hotels/<id>/view`.
+о здании — этажи номеров Островка с этажом 3 м) показывает на карте и в списках итог с выбранного этажа: «видно»,
+«частично закрыто» (солнце на 2° видно, ниже — крыши), «закрыто» (здание выше линии взгляда даже по нижней границе
+высоты), «вероятно, закрыто» (по оценке), «возможно, закрыто» (только по верхней границе), «нет данных» — с причиной;
+все блоки и Эвал говорят это одними функциями `src/lib/view.ts`. Без здания и этажей номеров — «нет точных данных».
+Высота-оценка модели — «≈». «Положение окна» — этаж и сторона окон на компасе (данных о ней пока нет —
+`RoomWindowSide`); карта MapLibre ставит здания EUBUCCO в 3D по высоте в 250 м (`GET /api/hotels/<id>/view-map`, дальше
+— 3D-здания стиля), отель синим, закрывающие вид с выбранного этажа — оранжевым, и поворачивается к стороне; легенда —
+«Окно на 2-м этаже на юго-восток» и обозначения по группам; данные всех этажей — `GET /api/hotels/<id>/view`.
 Ту же проверку делает Эвал на «видно ли море / закат / рассвет / больницу из окна» (`src/lib/ai/viewTurn.ts`, места —
 через гео-инструменты). Ориентиров показано 8, остальные — по «Показать все (N)».
 
@@ -493,6 +537,25 @@ Supabase; `src/proxy.ts` обновляет её на запросах с это
 сообщение; номер бронирования необязателен) только проверяет поля и показывает «Обращение
 отправлено (демо)»: данные не отправляются и не сохраняются.
 
+### Документация API
+
+`/api/docs` (ссылка «API» в меню, во всех окружениях): интерактивная документация Scalar
+(`@scalar/api-reference-react`, грузится только на этой странице) двух документов OpenAPI 3.1 и карта MapLibre ответа
+гео-маршрута рядом с ответом «Try it» (`src/components/ApiDocs`). «Try it» шлёт запрос в то окружение, где открыта
+страница (сервер документа — `/`).
+
+- `GET /api/openapi.json` — маршруты `src/app/api`. Схемы zod запроса и ответа лежат рядом с каждым маршрутом
+  (`schema.ts`): маршрут разбирает ими запрос, его ответ — `satisfies` схемы, а схема сверяется с доменным типом
+  (`sameType<z.output<…>, Hotel>()` падает на `npm run typecheck`, если поле есть только в одном). Документ собирает
+  `src/lib/openapi/document.ts` через `z.toJSONSchema` (JSON Schema 2020-12); новый маршрут добавьте в `API_OPERATIONS` —
+  тест падает, если `route.ts` или его метод не описан. Примеры — реальные ответы по отелю ota-9096882 с сокращёнными
+  массивами: `npm run dev`, затем `npm run docs:examples [-- http://localhost:3000]`.
+- `GET /api/openapi/supabase.json` — таблицы, представления и функции Supabase, которые вызывает код `src` (`.from`,
+  `.rpc`), со схемами из `database.types.ts`; файл `src/lib/openapi/supabase.gen.json` пишет `npm run docs:supabase`
+  (без ключей: свой OpenAPI PostgREST отдаёт только ключу service role). Тест сверяет файл с типами и кодом.
+- Ключей в документах нет: `POST /api/revalidate` описан со схемой bearer без значения, у Supabase `apikey` вводится
+  вручную.
+
 `/legal/terms`, `/legal/privacy`, `/legal/cookies`: тексты-шаблоны лежат в `src/data/legal.ts`,
 разметку даёт общий `src/components/LegalPage` (дата обновления, демо-пометка, оглавление по
 `h2` с якорями). Страница cookie перечисляет cookie сессии Supabase и ключи `ostrovok:v1:*`. Все страницы статические.
@@ -511,7 +574,9 @@ Supabase; `src/proxy.ts` обновляет её на запросах с это
 Готовые файлы лежат в `public/images` (источники и лицензии — `public/images/CREDITS.md`):
 
 ```bash
-uv run --with pillow python scripts/build-images.py <папка-с-исходниками>
+uv run --with pillow python scripts/build-images.py <папка-с-исходниками>   # фото «Поиска вайба», небо «Звёзд»
+node scripts/build-star-assets.mjs <папка с orb.png, modal-bg.jpeg, button.jpeg>   # шар, окно и кнопка «Звёзд»
+node scripts/build-draw-images.mjs <папка с section-bg.png, canvas-drawing.png, result-image.png>   # «Нарисуй»
 ```
 
 Геометрия глобуса собирается из Natural Earth 1:50m (`ne_50m_land.geojson`,

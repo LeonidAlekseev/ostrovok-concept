@@ -19,7 +19,6 @@ import {
   bearingLabel,
   clampFloor,
   eyeOf,
-  lineVerdict,
   localTime,
   reachLabel,
   reachOf,
@@ -28,8 +27,8 @@ import {
   sunReach,
   sunriseOf,
   sunsetOf,
-  VERDICT_LABEL,
   verdictReason,
+  verdictText,
   windowLabel,
   windowOf,
   type HotelView,
@@ -46,9 +45,9 @@ import { modelPlan, ostrovokHits, tidyPlan, type GeoHotel, type GeoOutcome } fro
  * отеля» (src/lib/view.ts, `hotel_view_eyes`) for every floor — from which floor each target is seen — and from the
  * floor the question names, if it does. The sea, the sunset and the sunrise come from the page's data; a kind of place («больница») is the nearest of the hotel's Ostrovok places or of
  * OSM (`nearbyPlaces`), a named one is a place of the page's landmarks or is looked up (`geocode`, the model choosing the
- * call when one answers). Each is told «видно со всех этажей», «видно с N-го этажа», «не видно ни с одного этажа» or
- * «нет данных» with the reason; never more. A hotel with neither a building's height nor the floors its rooms take gets
- * «нет точных данных».
+ * call when one answers). Each is told «видно со всех этажей», «видно с N-го этажа», «возможно, видно с N-го этажа»,
+ * «не видно ни с одного этажа» or «нет данных» with the reason, in the words of the page (`verdictText`); never more.
+ * A hotel with neither a building's height nor the floors its rooms take gets «нет точных данных».
  */
 
 export interface ViewTurnOptions {
@@ -112,24 +111,22 @@ interface Checked {
 const capital = (text: string) => text.charAt(0).toLocaleUpperCase('ru') + text.slice(1)
 
 /**
- * Why, after the reach: from the floor asked, its verdict and reason; else the building in the way of the floor below
- * the one it is seen from, or of the top floor when it is not seen.
+ * Why, after the reach, in the page's words: from the floor asked, its verdict with the reason; else the verdict of the
+ * floor below the one it is seen from, the building that may be higher for «возможно, видно», and the reason of the top
+ * floor when it is not seen.
  */
 function why(c: Pick<Checked, 'line' | 'angle' | 'reach'>, window: ViewWindow, floor: number | null): string {
-  if (floor) {
-    const eyeM = eyeOf(window, floor)
-    const verdict = lineVerdict(c.line, eyeM, c.angle)
-    const reason = verdictReason(c.line, verdict, eyeM, c.angle)
-    return `; с ${floor}-го этажа — ${VERDICT_LABEL[verdict]}${reason ? `: ${reason}` : ''}`
-  }
-  if (c.reach.kind === 'all') return ''
-  const below = c.reach.kind === 'from' ? c.reach.floor - 1 : window.floors
-  const eyeM = eyeOf(window, below)
-  const reason = verdictReason(c.line, lineVerdict(c.line, eyeM, c.angle), eyeM, c.angle)
-  return reason ? (c.reach.kind === 'from' ? ` (ниже ${reason})` : ` — ${reason}`) : ''
+  if (floor) return `; с ${floor}-го этажа — ${verdictText(c.line, eyeOf(window, floor), c.angle)}`
+  const { reach } = c
+  if (reach.kind === 'all') return ''
+  if (reach.kind === 'from') return ` (ниже — ${verdictText(c.line, eyeOf(window, reach.floor - 1), c.angle)})`
+  const eyeM = eyeOf(window, reach.kind === 'maybe' ? reach.floor : window.floors)
+  if (reach.kind === 'none') return ` — ${verdictText(c.line, eyeM, c.angle)}`
+  const reason = verdictReason(c.line, eyeM, c.angle)
+  return reason ? (reach.kind === 'maybe' ? ` (${reason})` : ` — ${reason}`) : ''
 }
 
-/** «• «Hospital La Fe» (больница, 1,2 км, азимут 210° (юго-запад)): видно с 5-го этажа (ниже мешает здание …).» */
+/** «• «Hospital La Fe» (больница, 1,2 км, азимут 210° (юго-запад)): видно с 5-го этажа (ниже — закрыто зданием …).» */
 const lineOf = (c: Checked, hotel: LatLon, window: ViewWindow, floor: number | null) =>
   `• «${c.label}» (${c.category}, ${distanceText(c.distanceM)}, азимут ${bearingLabel(bearingDeg(hotel, c.point))}): ${reachLabel(c.reach)}${why(c, window, floor)}.`
 

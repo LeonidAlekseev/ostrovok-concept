@@ -1,8 +1,5 @@
 import 'server-only'
-import { createClient } from '@supabase/supabase-js'
-import { unstable_cache } from 'next/cache'
 import { z } from 'zod'
-import type { Database } from '@/lib/db/database.types'
 import type { NoiseBand } from '@/lib/features'
 import {
   NOISY_CATEGORIES,
@@ -10,25 +7,24 @@ import {
   NOISY_RADIUS_M,
   NOISE_MAP_RADIUS_M,
   QUIET_SOURCE,
+  dayColorLevel,
+  dayEstimate,
   louderSource,
   type HotelNoise,
+  type NoiseMapIndicator,
   type NoisyCategory,
   type SourceNoise,
 } from '@/lib/noise'
-import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/config'
-import { CATALOG_LIFETIME, CATALOG_TAG } from './catalog'
+import { anonClient, catalogCached, readOrNull, warnShort, type AnonClient, type HotelPoint } from './anon'
 
 /**
  * «Шум и окружение» of a real hotel for its page and for Эвал (`HotelNoise`): the EEA bands at its point by layer
- * (`hotel_geo`) and the loud places of the OSM cache around it (`osm_places_near`), and the noise contours around it
- * for the map (`hotel_geo_features`). Read with the anon key and cached with the catalogue; a synthetic hotel, a
- * database without the functions or a failure read as `null`, and the page and Эвал say they do not know.
+ * (`hotel_geo`) and the loud places of the OSM cache around it (`osm_places_near`), and the noise around it for the
+ * map: the day estimate of the pieces of `hotel_noise_day`, the Lnight contours of `hotel_geo_features` and the quiet of
+ * `hotel_noise_quiet`, computed ahead into `hotel_noise_maps` (`hotel_noise_map`) and computed now only for a point
+ * without one. Read with the anon key and cached with the catalogue; a synthetic hotel, a database without the
+ * functions or a failure read as `null`, and the page and Эвал say they do not know.
  */
-
-const database = () =>
-  createClient<Database>(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } })
-
-const isRealHotel = (id: string) => isSupabaseConfigured && /^ota-\d{1,15}$/.test(id)
 
 /** A row of `hotel_geo().noise`. */
 const geoBand = z.object({
@@ -99,9 +95,10 @@ export function placesOf(answer: unknown): Pick<HotelNoise, 'places' | 'placesCo
   return { places, placesCovered: parsed.data.covered.filter((c): c is NoisyCategory => NOISY.has(c)) }
 }
 
-const readNoise = unstable_cache(
+const readNoise = catalogCached(
+  ['hotel-noise'],
   async (_hotelId: string, lat: number, lon: number): Promise<HotelNoise> => {
-    const db = database()
+    const db = anonClient()
     const [geo, near] = await Promise.all([
       db.rpc('hotel_geo', { lat, lon }),
       db.rpc('osm_places_near', {
@@ -116,30 +113,28 @@ const readNoise = unstable_cache(
     // Without the places the bands still stand: the page says it has no data of OSM.
     return { sources: sourcesOf(hotelGeo.parse(geo.data).noise), ...placesOf(near.error ? null : near.data) }
   },
-  [CATALOG_TAG, 'hotel-noise'],
-  { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME },
 )
 
-const warn = (what: string, error: unknown) =>
-  // The kind and the provider's short message only.
-  console.warn(`${what} (${String((error as { message?: unknown })?.message ?? error).slice(0, 200)})`)
-
 /** The noise of the real hotel, or `null` when it cannot be read. */
-export async function loadHotelNoise(hotel: { id: string; lat: number; lon: number }): Promise<HotelNoise | null> {
-  if (!isRealHotel(hotel.id)) return null
-  try {
-    return await readNoise(hotel.id, hotel.lat, hotel.lon)
-  } catch (error) {
-    warn(`hotel noise: none for ${hotel.id}`, error)
-    return null
-  }
-}
+export const loadHotelNoise = (hotel: HotelPoint): Promise<HotelNoise | null> =>
+  readOrNull(hotel.id, 'hotel noise', () => readNoise(hotel.id, hotel.lat, hotel.lon))
 
-/** A contour of the map: one band of one layer and indicator, cut to the circle. */
+/**
+ * A shape of the map, cut to the circle: a band of a layer's Lnight; a piece of a layer with one Lden and one Lnight
+ * band and the day estimate of the two (`db_max` `null` for an estimate open at the top, both bounds `null` when the
+ * pair fits no day); or the quiet below 40 dB (`source` `quiet`). `level` is the dB the shape is coloured by: the band's
+ * lower bound or the estimate's `dayColorLevel`, `null` for the quiet and for a piece without an estimate.
+ */
 export interface NoiseMapFeature {
   type: 'Feature'
   geometry: { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown }
-  properties: { source: string; indicator: 'Lden' | 'Lnight'; db_min: number | null; db_max: number | null }
+  properties: {
+    source: string
+    indicator: NoiseMapIndicator
+    db_min: number | null
+    db_max: number | null
+    level: number | null
+  }
 }
 
 export interface NoiseMap {
@@ -147,14 +142,27 @@ export interface NoiseMap {
   features: NoiseMapFeature[]
 }
 
+const geometry = z.object({ type: z.enum(['Polygon', 'MultiPolygon']), coordinates: z.unknown() })
+const db = z.number().nullable()
 const mapFeature = z.object({
-  geometry: z.object({ type: z.enum(['Polygon', 'MultiPolygon']), coordinates: z.unknown() }),
+  geometry,
   properties: z.object({
     layer: z.literal('noise'),
     source: z.string(),
     indicator: z.enum(['Lden', 'Lnight']),
-    db_min: z.number().nullable(),
-    db_max: z.number().nullable(),
+    db_min: db,
+    db_max: db,
+  }),
+})
+const dayPiece = z.object({
+  geometry,
+  properties: z.object({
+    layer: z.literal('noise'),
+    source: z.string(),
+    lden_min: db,
+    lden_max: db,
+    lnight_min: db,
+    lnight_max: db,
   }),
 })
 
@@ -162,59 +170,112 @@ const mapFeature = z.object({
 const rounded = (value: unknown): unknown =>
   Array.isArray(value) ? value.map(rounded) : typeof value === 'number' ? Math.round(value * 1e5) / 1e5 : value
 
-const featureOf = (value: unknown): NoiseMapFeature[] => {
+const shape = (
+  { type, coordinates }: z.infer<typeof geometry>,
+  properties: NoiseMapFeature['properties'],
+): NoiseMapFeature => ({ type: 'Feature', geometry: { type, coordinates: rounded(coordinates) }, properties })
+
+/** The Lnight bands from 40 dB of `hotel_geo_features` (the buildings, Lden and the bands below 40 dB left out). */
+const nightOf = (value: unknown): NoiseMapFeature[] => {
   const parsed = mapFeature.safeParse(value)
   if (!parsed.success) return []
-  const { geometry, properties } = parsed.data
-  const { source, indicator, db_min, db_max } = properties
-  return [
-    {
-      type: 'Feature' as const,
-      geometry: { type: geometry.type, coordinates: rounded(geometry.coordinates) },
-      properties: { source, indicator, db_min, db_max },
-    },
-  ]
+  const { source, indicator, db_min, db_max } = parsed.data.properties
+  if (indicator !== 'Lnight' || db_min === null) return []
+  return [shape(parsed.data.geometry, { source, indicator, db_min, db_max, level: db_min })]
 }
 
 /**
- * The map's contours: the bands from 40 dB of `hotel_geo_features().features` (the buildings and the layers' bands
- * below 40 dB, which cover the louder bands of the other layers, are left out) and the quiet of `hotel_noise_quiet()`.
+ * The quiet of `hotel_noise_quiet`: Lnight's as it is; Lden's as the day's, for the day level is below the Lden when
+ * the evening is as loud as the day (`dayLevel`), so below 40 dB where the Lden is.
  */
-export function noiseMapOf(contours: readonly unknown[], quiet: readonly unknown[] = []): NoiseMap {
+const quietOf = (value: unknown): NoiseMapFeature[] => {
+  const parsed = mapFeature.safeParse(value)
+  if (!parsed.success || parsed.data.properties.source !== QUIET_SOURCE) return []
+  const { indicator, db_max } = parsed.data.properties
+  return [
+    shape(parsed.data.geometry, {
+      source: QUIET_SOURCE,
+      indicator: indicator === 'Lden' ? 'Lday' : 'Lnight',
+      db_min: null,
+      db_max,
+      level: null,
+    }),
+  ]
+}
+
+const band = (min: number | null, max: number | null): NoiseBand | undefined =>
+  min === null && max === null ? undefined : { ...(min !== null && { min }), ...(max !== null && { max }) }
+
+/** A piece of `hotel_noise_day` with the day estimate of its two bands, rounded to whole dB. */
+const dayOf = (value: unknown): NoiseMapFeature[] => {
+  const parsed = dayPiece.safeParse(value)
+  if (!parsed.success) return []
+  const { source, lden_min, lden_max, lnight_min, lnight_max } = parsed.data.properties
+  const day = dayEstimate(band(lden_min, lden_max), band(lnight_min, lnight_max))
+  return [
+    shape(parsed.data.geometry, {
+      source,
+      indicator: 'Lday',
+      db_min: day && Math.round(day.min),
+      db_max: day && Number.isFinite(day.max) ? Math.round(day.max) : null,
+      level: day && Math.round(dayColorLevel(day) * 10) / 10,
+    }),
+  ]
+}
+
+/** The map's shapes: the day pieces, the Lnight bands from 40 dB and the quiet of both. */
+export function noiseMapOf(
+  contours: readonly unknown[],
+  quiet: readonly unknown[] = [],
+  day: readonly unknown[] = [],
+): NoiseMap {
   return {
     type: 'FeatureCollection',
-    features: [
-      ...contours.flatMap(featureOf).filter((f) => f.properties.db_min !== null),
-      ...quiet.flatMap(featureOf).filter((f) => f.properties.source === QUIET_SOURCE),
-    ],
+    features: [...day.flatMap(dayOf), ...contours.flatMap(nightOf), ...quiet.flatMap(quietOf)],
   }
 }
 
-const readNoiseMap = unstable_cache(
+const features = z.object({ features: z.array(z.unknown()) })
+/** A map of `hotel_noise_map`: the three parts as their functions give them. */
+const storedMap = z.object({ contours: z.array(z.unknown()), quiet: z.array(z.unknown()), day: z.array(z.unknown()) })
+
+/** The map computed from the contours on this request: three intersections of the EEA polygons, a second or more. */
+async function computeNoiseMap(db: AnonClient, lat: number, lon: number): Promise<NoiseMap> {
+  const args = { lat, lon, radius_m: NOISE_MAP_RADIUS_M }
+  const [contours, quiet, day] = await Promise.all([
+    db.rpc('hotel_geo_features', args),
+    db.rpc('hotel_noise_quiet', args),
+    db.rpc('hotel_noise_day', args),
+  ])
+  // The day is the map's default: a map without it is not cached, the next request asks again.
+  if (contours.error) throw contours.error
+  if (day.error) throw day.error
+  // Without the quiet the louder shapes still stand: the map leaves the quiet uncoloured.
+  if (quiet.error) warnShort('noise map: no quiet', quiet.error)
+  return noiseMapOf(
+    features.parse(contours.data).features,
+    quiet.error ? [] : (features.safeParse(quiet.data).data?.features ?? []),
+    features.parse(day.data).features,
+  )
+}
+
+/**
+ * The map of `hotel_noise_maps`, computed ahead by `npm run db:features` (a few ms instead of seconds under load), or
+ * the one computed now when the point has none yet (a new hotel, one that moved) or the database has no such function.
+ * Both give the same shapes: the stored contours are the Lnight bands `nightOf` keeps anyway.
+ */
+const readNoiseMap = catalogCached(
+  ['hotel-noise-map', 'day'],
   async (_hotelId: string, lat: number, lon: number): Promise<NoiseMap> => {
-    const db = database()
-    const args = { lat, lon, radius_m: NOISE_MAP_RADIUS_M }
-    const [contours, quiet] = await Promise.all([db.rpc('hotel_geo_features', args), db.rpc('hotel_noise_quiet', args)])
-    if (contours.error) throw contours.error
-    const features = z.object({ features: z.array(z.unknown()) })
-    // Without the quiet the louder bands still stand: the map leaves the quiet uncoloured.
-    if (quiet.error) warn('noise map: no quiet', quiet.error)
-    return noiseMapOf(
-      features.parse(contours.data).features,
-      quiet.error ? [] : (features.safeParse(quiet.data).data?.features ?? []),
-    )
+    const db = anonClient()
+    const { data, error } = await db.rpc('hotel_noise_map', { lat, lon, radius_m: NOISE_MAP_RADIUS_M })
+    const stored = error ? null : storedMap.safeParse(data).data
+    if (stored) return noiseMapOf(stored.contours, stored.quiet, stored.day)
+    if (error) warnShort('noise map: none stored, computing', error)
+    return computeNoiseMap(db, lat, lon)
   },
-  [CATALOG_TAG, 'hotel-noise-map', 'quiet'],
-  { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME },
 )
 
 /** The noise contours around the real hotel, or `null` when they cannot be read. */
-export async function loadNoiseMap(hotel: { id: string; lat: number; lon: number }): Promise<NoiseMap | null> {
-  if (!isRealHotel(hotel.id)) return null
-  try {
-    return await readNoiseMap(hotel.id, hotel.lat, hotel.lon)
-  } catch (error) {
-    warn(`noise map: none for ${hotel.id}`, error)
-    return null
-  }
-}
+export const loadNoiseMap = (hotel: HotelPoint): Promise<NoiseMap | null> =>
+  readOrNull(hotel.id, 'noise map', () => readNoiseMap(hotel.id, hotel.lat, hotel.lon))

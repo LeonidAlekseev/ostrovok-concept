@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { destinations } from '../../data/destinations'
 import { makePlan } from '../../lib/assistant'
 import { CHATS_KEY, type Chat } from '../../lib/assistantChats'
-import { newHotels } from '../../lib/catalogGenerator'
+import { hotels, newHotels } from '../../lib/catalogGenerator'
 import { DIALOG_KEY } from '../../lib/assistantDialog'
 import { todayIso } from '../../lib/dates'
 import { catalogFetch } from '../../test/catalog'
@@ -123,7 +123,11 @@ describe('AssistantSearch with the model', () => {
 
       await user.type(input(), 'хочу туда, где тепло и можно поплавать с маской{Enter}')
 
-      expect(await inLog('Записал: море · до 40 000 ₽. Когда планируете поехать?')).toBeTruthy()
+      // What the answer saved is a card of its own; the words are the next question.
+      expect(await inLog('Когда планируете поехать?')).toBeTruthy()
+      expect(within(log()).getByText('Сохранил в память сессии')).toBeTruthy()
+      expect(within(log()).getByText('Тема: море')).toBeTruthy()
+      expect(within(log()).getByText('Бюджет: до 40 000 ₽')).toBeTruthy()
       const [url] = fetchMock.mock.calls[0]
       expect(url).toBe('/api/assistant')
       expect(bodyOf(0)).toEqual({
@@ -150,7 +154,7 @@ describe('AssistantSearch with the model', () => {
       expect(bodyOf(1)).toEqual({
         messages: [
           { role: 'user', text: 'к морю' },
-          { role: 'assistant', text: 'Записал: море. Когда планируете поехать?' },
+          { role: 'assistant', text: 'Когда планируете поехать?' },
           { role: 'user', text: 'осенью, в октябре' },
         ],
         brief: { vibe: 'sea' },
@@ -174,9 +178,8 @@ describe('AssistantSearch with the model', () => {
 
     await user.type(input(), 'Хочу на море в октябре, бюджет до 70 000 ₽{Enter}')
 
-    expect(
-      await inLog('Записал: море · в октябре · до 70 000 ₽. С кем едете? Так я подберу номер и формат отдыха.'),
-    ).toBeTruthy()
+    expect(await inLog('С кем едете? Так я подберу номер и формат отдыха.')).toBeTruthy()
+    expect(within(log()).getByText('Когда: в октябре')).toBeTruthy()
     expect(log().textContent).not.toMatch(/ошибк/i)
     expect(screen.queryByRole('button', { name: 'Повторить' })).toBeNull()
   })
@@ -187,7 +190,7 @@ describe('AssistantSearch with the model', () => {
 
     await user.type(input(), 'в горы{Enter}')
 
-    expect(await inLog('Записал: горы. Когда планируете поехать?')).toBeTruthy()
+    expect(await inLog('Когда планируете поехать?')).toBeTruthy()
   })
 
   it('caps the message at 500 characters', () => {
@@ -264,7 +267,7 @@ describe('AssistantSearch composer and feed', () => {
     fireEvent.wheel(feed)
     fireEvent.scroll(feed)
     reply.resolve(answer({ brief: { vibe: 'sea', when: 9 } }))
-    await inLog(/Записал/)
+    await inLog(/С кем едете/)
 
     await waitFor(() => expect(toNew().dataset.active).toBe('true'))
     expect(scrollTo).not.toHaveBeenCalled()
@@ -290,23 +293,31 @@ describe('AssistantSearch steps of the agents', () => {
     const { user } = renderAssistant()
 
     await user.type(input(), 'Лиссабон в октябре, один{Enter}')
-    // The rules already see a complete brief: the search step shows while Eval works.
+    // The rules already see a complete brief: «Ищу подходящие варианты…» shows while Eval works, the answer waits unseen.
     expect(
-      within(log())
-        .getByText(/Подбираю отели по вашему описанию/)
-        .closest<HTMLElement>('[data-message-id]')?.dataset.step,
+      within(log()).getByRole('status', { name: 'Ищу подходящие варианты…' }).closest<HTMLElement>('[data-message-id]')
+        ?.dataset.step,
     ).toBe('pending')
+    expect(within(log()).queryByLabelText('Эвал думает')).toBeNull()
 
     reply.resolve(
       answer({
         brief: { destinationId: 'lisbon', when: 9, party: 'solo' },
         steps: [
-          { agent: 'search', title: 'Подбираю отели по вашему описанию', status: 'done', result: 'нашёл 3 отеля' },
+          {
+            agent: 'search',
+            title: 'Подбираю отели по вашему описанию',
+            params: 'Лиссабон',
+            status: 'done',
+            result: 'нашёл 3 отеля',
+          },
         ],
       }),
     )
 
-    const step = await inLog('Подбираю отели по вашему описанию — нашёл 3 отеля')
+    // The card of the call: what was called, with what, and what came of it.
+    const step = await inLog('Подбираю отели по вашему описанию')
+    expect(within(log()).getByText('Лиссабон · нашёл 3 отеля')).toBeTruthy()
     expect(step.closest<HTMLElement>('[data-message-id]')?.dataset.step).toBe('done')
     const items = [...log().querySelectorAll<HTMLElement>('[data-message-id]')]
     const stepAt = items.findIndex((li) => li.contains(step))
@@ -392,7 +403,7 @@ describe('AssistantSearch chats', () => {
     expect(screen.getByText(/О каком путешествии вы мечтаете/)).toBeTruthy()
     const previous = within(chatList()).getByRole('button', { name: /^(?!Действия).*(?:к морю)/ })
     await user.click(previous)
-    expect(await inLog('Записал: море. Когда планируете поехать?')).toBeTruthy()
+    expect(await inLog('Когда планируете поехать?')).toBeTruthy()
   })
 
   it('has one «Новый чат» in the list, floating on phones and in the column from lg', () => {
@@ -420,7 +431,7 @@ describe('AssistantSearch chats', () => {
     expect(screen.queryByRole('log', { name: 'Диалог с Эвалом' })).toBeNull()
 
     await user.click(waiting)
-    expect(await inLog('Записал: море. Когда планируете поехать?')).toBeTruthy()
+    expect(await inLog('Когда планируете поехать?')).toBeTruthy()
     expect(within(chatList()).getByRole('button', { name: /^(?!Действия).*(?:к морю)/ }).textContent).not.toContain(
       'новое',
     )
@@ -437,12 +448,12 @@ describe('AssistantSearch after a reload', () => {
         .mockResolvedValueOnce(answer({ brief: { vibe: 'sea', when: 9 } }))
       const { user, unmount } = renderAssistant()
       await user.type(input(), 'к морю{Enter}')
-      await inLog('Записал: море. Когда планируете поехать?')
+      await inLog('Когда планируете поехать?')
 
       unmount()
       render(view())
 
-      expect(await inLog('Записал: море. Когда планируете поехать?')).toBeTruthy()
+      expect(await inLog('Когда планируете поехать?')).toBeTruthy()
       expect(screen.queryByLabelText('Эвал думает')).toBeNull()
       await user.type(input(), 'в октябре{Enter}')
       await inLog(/С кем едете/)
@@ -460,7 +471,7 @@ describe('AssistantSearch after a reload', () => {
     unmount()
     render(view())
 
-    expect(await inLog('Записал: море. Когда планируете поехать?')).toBeTruthy()
+    expect(await inLog('Когда планируете поехать?')).toBeTruthy()
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(bodyOf(1)).toEqual(bodyOf(0))
   })
@@ -511,7 +522,7 @@ describe('AssistantSearch after a reload', () => {
     expect(within(log()).queryByText('к морю')).toBeNull()
     const stored = JSON.parse(window.localStorage.getItem(CHATS_KEY)!) as Chat[]
     expect(
-      stored.map((c) => c.messages.map((m) => m.text)),
+      stored.map((c) => c.messages.filter((m) => m.role !== 'agent').map((m) => m.text)),
       storedChats(),
     ).toEqual([
       ['тихий отель', expect.stringContaining('Когда планируете поехать')],
@@ -651,4 +662,98 @@ describe('AssistantSearch start screen', () => {
     expect(bodyOf(0).messages).toEqual([{ role: 'user', text: 'В горы' }])
     expect(screen.queryByRole('list', { name: 'Идеи для поездки' })).toBeNull()
   })
+})
+
+// assistant-search, Requirements: Память сессии в ленте, Ничего не нашёл, Правка параметров сессии
+describe('AssistantSearch memory of the session', () => {
+  const november = { checkIn: '2026-11-25', checkOut: '2026-11-30' }
+
+  it(
+    'shows what the answer saved in a card of its own, only when something changed (Scenario: Даты сохранены)',
+    async () => {
+      fetchMock
+        .mockResolvedValueOnce(answer({ brief: { vibe: 'sea', seaMaxM: 1000 } }))
+        .mockResolvedValueOnce(answer({ brief: { vibe: 'sea', seaMaxM: 1000, dates: november, when: 10, nights: 5 } }))
+        .mockResolvedValueOnce(answer({ brief: { vibe: 'sea', seaMaxM: 1000, dates: november, when: 10, nights: 5 } }))
+      const { user } = renderAssistant()
+
+      await user.type(input(), 'Я хочу ближе к морю{Enter}')
+      await inLog('Когда планируете поехать?')
+      expect(within(log()).getByText('Расстояние до моря: до 1 км')).toBeTruthy()
+      await user.type(input(), 'С 25 по 30 ноября{Enter}')
+      expect(await inLog('Даты: 25–30 нояб.')).toBeTruthy()
+      expect(await inLog('С кем едете? Так я подберу номер и формат отдыха.')).toBeTruthy()
+      // The header's line follows the saved parameters.
+      expect(screen.getByText('25–30 нояб.')).toBeTruthy()
+      await user.type(input(), 'а?{Enter}')
+      // Nothing new: the question again with what is understood, no second card.
+      await waitFor(() => expect(within(log()).getAllByText(/С кем едете\?/)).toHaveLength(2))
+      expect(within(log()).getAllByText('Сохранил в память сессии')).toHaveLength(2)
+      // The cards are the agent's: the model does not read them.
+      expect(bodyOf(2).messages.map((m: { text: string }) => m.text)).not.toContain('')
+    },
+    HEAVY,
+  )
+
+  it(
+    'offers the parameters when nothing is found, and looks again after one is changed (Scenario: Расширить расстояние)',
+    async () => {
+      const brief = { vibe: 'sea', destinationId: 'lisbon', dates: november, when: 10, nights: 5, party: 'solo' }
+      const lisbon = hotels.filter((h) => h.destinationId === 'lisbon').slice(0, 2)
+      fetchMock
+        .mockResolvedValueOnce(
+          answer({
+            brief: { ...brief, seaMaxM: 300 },
+            steps: [
+              {
+                agent: 'features',
+                title: 'Проверяю данные о расстоянии до моря',
+                params: 'до моря до 300 м',
+                status: 'done',
+                result: 'ни одного ближе 300 м к морю',
+              },
+            ],
+          }),
+        )
+        .mockResolvedValueOnce(
+          answer({
+            brief: { ...brief, seaMaxM: 1000 },
+            matches: lisbon,
+            features: { [lisbon[0].id]: { views: [], seaM: 640 } },
+          }),
+        )
+      const { user } = renderAssistant()
+
+      await user.type(input(), 'Лиссабон, один, до моря не больше 300 м{Enter}')
+      expect(
+        await inLog('Пока не нашёл точных совпадений. Давайте расширим поиск — можно изменить параметры.'),
+      ).toBeTruthy()
+      const card = within(log()).getByRole('list', { name: 'Параметры поиска' })
+      expect(
+        within(card)
+          .getAllByRole('listitem')
+          .map((li) => li.textContent),
+      ).toEqual([
+        'Даты25–30 нояб.',
+        'Гости1 взрослый',
+        'Номера1 номер',
+        'ГородЛиссабон',
+        'Темаморе',
+        'Расстояние до морядо 300 м',
+      ])
+
+      await user.click(within(card).getByRole('button', { name: 'Расстояние до моря: до 300 м. Изменить' }))
+      await user.click(within(card).getByRole('button', { name: 'до 1 км' }))
+
+      // The session's memory is updated, and the search goes again by the brief, without a message of the traveller.
+      expect(await inLog('Расстояние до моря: до 1 км')).toBeTruthy()
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+      expect(bodyOf(1)).toMatchObject({ rerun: true, brief: { seaMaxM: 1000, destinationId: 'lisbon' } })
+      expect(bodyOf(1).messages.at(-1).role).toBe('assistant')
+      // The hotel within the new distance, and no new message of the traveller.
+      expect(await within(log()).findByText(/до моря 640 м/)).toBeTruthy()
+      expect(within(log()).getAllByText('Лиссабон, один, до моря не больше 300 м')).toHaveLength(1)
+    },
+    HEAVY,
+  )
 })

@@ -57,7 +57,7 @@ export function SharedChat({ share }: { share: Share }) {
             Спросить Эвал
           </Link>
         </header>
-        <Feed chatId={share.id} messages={share.messages} onChoose={searchFor} />
+        <Feed chatId={share.id} messages={share.messages} onChoose={searchFor} destinations={destinations} />
       </section>
     </main>
   )

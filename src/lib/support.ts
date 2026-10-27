@@ -1,3 +1,4 @@
+/** The support form of the help centre (`/help`): its values and their check, with the booking form's rules. */
 import { validateEmail, validateName, type FormErrors } from './booking'
 
 export interface SupportValues {

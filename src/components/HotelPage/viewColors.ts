@@ -1,11 +1,12 @@
-import type { Verdict } from '@/lib/view'
+import type { Tone } from '@/lib/view'
 
 /** The colours of the map of «Вид из отеля», shared with its legend (the map itself loads only in the browser). */
 
-/** The lines to the targets by their verdict from the chosen floor. */
-export const VERDICT_COLOR: Record<Verdict, string> = {
-  visible: '#16a34a',
-  obstructed: '#d97706',
+/** The lines to the targets by the tone of their verdict from the chosen floor (`VERDICT_TONE`). */
+export const TONE_COLOR: Record<Tone, string> = {
+  seen: '#16a34a',
+  partly: '#d97706',
+  closed: '#dc2626',
   unknown: '#94a3b8',
 }
 

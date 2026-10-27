@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
-import { isVisibleHotel } from '@/lib/catalog'
-import { loadHotel } from '@/lib/db/catalog'
+import { CDN_CACHE_HEADERS, loadVisibleHotel } from '@/lib/api'
 import { loadNoiseMap } from '@/lib/db/noise'
+import type { NoiseMapResponse } from './schema'
 
 /**
  * The EEA noise contours around a real hotel for the map of «Шум и окружение» (`NoiseMap`, GeoJSON): `{ map: null }`
@@ -9,11 +9,7 @@ import { loadNoiseMap } from '@/lib/db/noise'
  */
 export async function GET(_request: NextRequest, context: { params: Promise<{ hotelId: string }> }) {
   const { hotelId } = await context.params
-  const hotel = isVisibleHotel({ id: hotelId }) ? await loadHotel(hotelId) : null
+  const hotel = await loadVisibleHotel(hotelId)
   const map = hotel ? await loadNoiseMap(hotel) : null
-  return Response.json(
-    { map },
-    // A short CDN life: the server cache, unlike the CDN, is dropped by POST /api/revalidate.
-    { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600' } },
-  )
+  return Response.json({ map } satisfies NoiseMapResponse, { headers: CDN_CACHE_HEADERS })
 }

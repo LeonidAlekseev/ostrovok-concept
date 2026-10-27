@@ -495,7 +495,13 @@ describe('POST /api/assistant: the steps and the hotel features', () => {
     setModel(undefined)
     const body = await (await ask('подбери что-нибудь', complete)).json()
     expect(body.steps).toEqual([
-      { agent: 'search', title: 'Подбираю отели по вашему описанию', status: 'done', result: 'подобрал по каталогу' },
+      {
+        agent: 'search',
+        title: 'Подбираю отели по вашему описанию',
+        params: 'Лиссабон',
+        status: 'done',
+        result: 'подобрал по каталогу',
+      },
     ])
     expect((await (await ask('море')).json()).steps).toBeUndefined()
   })
@@ -515,6 +521,7 @@ describe('POST /api/assistant: the steps and the hotel features', () => {
     expect(body.steps.at(-1)).toEqual({
       agent: 'features',
       title: 'Проверяю данные о шуме',
+      params: 'тихо ночью',
       status: 'done',
       result: `подходят 3 отеля из ${(await lisbon()).length}`,
     })
@@ -978,5 +985,103 @@ describe('POST /api/assistant with photos', () => {
     expect((await withPhotos('найди похожий', ['data:image/svg+xml;base64,AAAA'])).status).toBe(400)
     expect((await withPhotos('найди похожий', ['https://example.com/a.webp'])).status).toBe(400)
     expect((await withPhotos('найди похожий', [`data:image/webp;base64,${'A'.repeat(1_500_000)}`])).status).toBe(400)
+  })
+})
+
+// assistant-search, Requirement: Подбор у моря
+describe('POST /api/assistant: «близко к морю»', () => {
+  const november = {
+    vibe: 'sea',
+    seaMaxM: 1000,
+    dates: { checkIn: '2026-11-25', checkOut: '2026-11-30' },
+    when: 10,
+    nights: 5,
+  }
+
+  async function withDistances(distances: Record<string, number>) {
+    const { hotels } = await import('@/lib/catalogGenerator')
+    const ids = Object.keys(distances)
+    for (const id of ids) expect(hotels.some((h) => h.id === id)).toBe(true)
+    vi.mocked(loadHotelFeatures).mockResolvedValue(
+      new Map(ids.map((id) => [id, { views: [], seaM: distances[id] } satisfies HotelFeatures])),
+    )
+  }
+
+  it('finds the hotels by the sea in November, the nearest first (the bug: none were found)', async () => {
+    setModel(undefined)
+    const { hotels } = await import('@/lib/catalogGenerator')
+    const [a, b, c] = hotels.filter((h) => h.destinationId === 'barcelona')
+    const [d] = hotels.filter((h) => h.destinationId === 'lisbon')
+    await withDistances({ [a.id]: 850, [b.id]: 2400, [c.id]: 220, [d.id]: 640 })
+    const response = await post({
+      messages: [
+        { role: 'user', text: 'Я хочу ближе к морю' },
+        { role: 'assistant', text: 'С кем едете?' },
+        { role: 'user', text: 'Один' },
+      ],
+      brief: november,
+    })
+    const body = await response.json()
+    expect(body.brief).toMatchObject({ seaMaxM: 1000, party: 'solo' })
+    // The winter's warm beaches no longer drop the other cities by the sea.
+    const [, options] = vi.mocked(semanticSearch).mock.calls[0]
+    expect(options?.destinationIds).toEqual(expect.arrayContaining(['valencia', 'barcelona', 'lisbon']))
+    expect(body.matches.map((h: { id: string }) => h.id)).toEqual([c.id, d.id, a.id])
+    expect(Object.values(body.features).map((f) => (f as HotelFeatures).seaM)).toEqual([220, 640, 850])
+    expect(body.steps).toContainEqual({
+      agent: 'features',
+      title: 'Проверяю данные о расстоянии до моря',
+      params: 'до моря до 1 км',
+      status: 'done',
+      result: expect.stringMatching(/^подходят 3 отеля из \d+$/),
+    })
+    expect(body.steps[0]).toMatchObject({ agent: 'search', params: 'Барселона, Лиссабон, Афины и ещё 10' })
+    expect(body).not.toHaveProperty('missing')
+  })
+
+  it('says no hotel is within the distance instead of letting the sea go', async () => {
+    setModel(undefined)
+    const { hotels } = await import('@/lib/catalogGenerator')
+    const [a] = hotels.filter((h) => h.destinationId === 'barcelona')
+    await withDistances({ [a.id]: 2400 })
+    const body = await (await post({ messages: [{ role: 'user', text: 'Один' }], brief: november })).json()
+    expect(body.features).toBeUndefined()
+    expect(body.steps).toContainEqual(
+      expect.objectContaining({ agent: 'features', result: 'ни одного ближе 1 км к морю' }),
+    )
+  })
+
+  it('looks again by the brief changed by hand without reading the dialog (rerun)', async () => {
+    const model = new MockLanguageModelV4({ doGenerate: answer({ vibe: 'sea' }) })
+    setModel(model)
+    const { hotels } = await import('@/lib/catalogGenerator')
+    const [a, b] = hotels.filter((h) => h.destinationId === 'barcelona')
+    await withDistances({ [a.id]: 1800, [b.id]: 2600 })
+    const body = await (
+      await post({
+        messages: [
+          { role: 'user', text: 'Только близко к морю' },
+          { role: 'assistant', text: 'Пока не нашёл точных совпадений.' },
+        ],
+        brief: { ...november, party: 'solo', seaMaxM: 2000 },
+        rerun: true,
+      })
+    ).json()
+    // «Только близко к морю» is not read again: it would take the 2 km back to 1 km.
+    expect(model.doGenerateCalls).toHaveLength(0)
+    expect(body.brief.seaMaxM).toBe(2000)
+    expect(body.matches.map((h: { id: string }) => h.id)).toEqual([a.id])
+    expect(vi.mocked(semanticSearch).mock.calls[0][0]).toBe('Только близко к морю')
+  })
+
+  it('still wants the traveller’s message last without a rerun', async () => {
+    const response = await post({
+      messages: [
+        { role: 'user', text: 'Один' },
+        { role: 'assistant', text: 'Хорошо' },
+      ],
+      brief: november,
+    })
+    expect(response.status).toBe(400)
   })
 })

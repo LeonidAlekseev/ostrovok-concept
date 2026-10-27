@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { apiError } from '@/lib/api'
 import { firstAnswer } from '@/lib/ai/chain'
 import { geoTurn } from '@/lib/ai/geoTurn'
 import { viewTurn } from '@/lib/ai/viewTurn'
@@ -11,8 +11,6 @@ import { MATCHES, runTurn, type TurnContext } from '@/lib/ai/turn'
 import { MODEL_TIMEOUT_MS, understandWish } from '@/lib/ai/understand'
 import {
   INTENT_TIMEOUT_MS,
-  MAX_PHOTO_URL_LENGTH,
-  PHOTO_DATA_URL,
   modelPhotoIntent,
   ownWords,
   photoIntent,
@@ -23,9 +21,7 @@ import {
   type PhotoSight,
 } from '@/lib/ai/vision'
 import {
-  MAX_HISTORY,
   MAX_MESSAGE_LENGTH,
-  MAX_PHOTOS,
   foldBrief,
   mergeBrief,
   nextQuestion,
@@ -44,17 +40,7 @@ import { loadHotelNoise } from '@/lib/db/noise'
 import { isHotelGeoQuestion, isHotelViewQuestion } from '@/lib/noise'
 import { todayIso, type IsoDate } from '@/lib/dates'
 import type { Hotel } from '@/lib/catalog'
-
-const requestSchema = z.object({
-  messages: z
-    .array(z.object({ role: z.enum(['user', 'assistant']), text: z.string().trim().min(1).max(MAX_MESSAGE_LENGTH) }))
-    .min(1)
-    .max(MAX_HISTORY)
-    .refine((messages) => messages.at(-1)?.role === 'user', 'The last message is the traveller’s'),
-  brief: z.record(z.string(), z.unknown()).default({}),
-  // About 4 × 300 KB of optimised photos: the body stays within the 4.5 MB of a Vercel function.
-  photos: z.array(z.string().max(MAX_PHOTO_URL_LENGTH).regex(PHOTO_DATA_URL)).max(MAX_PHOTOS).optional(),
-})
+import { assistantRequestSchema } from './schema'
 
 /** The answer is due in 15 s: the client waits 16. The steps of the turn get what the model left. */
 const ANSWER_BUDGET_MS = 15_000
@@ -243,6 +229,22 @@ async function wishTurn({ messages, brief, today, destinations, deadline, signal
 }
 
 /**
+ * The parameters were changed by hand after «ничего не нашёл»: the hotels by the brief as it is, nothing of the
+ * dialog is read again (the newest message would take back what was changed). The wish's words still lead the search.
+ */
+async function rerunTurn({ messages, brief, today, destinations, deadline, signal }: WishContext) {
+  const wish = messages
+    .filter((m) => m.role === 'user')
+    .map((m) => m.text)
+    .join('. ')
+  return {
+    brief,
+    source: 'rules',
+    ...(await planTurn({ brief, wish, today, destinations, deadline, signal })),
+  } satisfies AssistantResponse
+}
+
+/**
  * What the photos show, by the models that see photos in turn (each with the same photos), with the step of the
  * switch when the first failed; `null` without the models or the time for them; `limited` over the limit (ours, or
  * the provider's 429 of every model); `failed` when none answered (an error, a timeout, an answer not in Russian).
@@ -382,14 +384,14 @@ async function photoTurn(photos: readonly string[], ip: string, context: WishCon
  */
 export async function POST(request: Request) {
   const ip = clientIp(request)
-  if (!(await allowRequest(ip))) return Response.json({ error: 'Too many requests' }, { status: 429 })
-  const parsedBody = requestSchema.safeParse(await request.json().catch(() => null))
-  if (!parsedBody.success) return Response.json({ error: 'Invalid request' }, { status: 400 })
+  if (!(await allowRequest(ip))) return apiError(429, 'Too many requests')
+  const parsedBody = assistantRequestSchema.safeParse(await request.json().catch(() => null))
+  if (!parsedBody.success) return apiError(400, 'Invalid request')
 
-  const { messages, photos = [] } = parsedBody.data
+  const { messages, photos = [], rerun } = parsedBody.data
   const deadline = Date.now() + (photos.length > 0 ? PHOTO_BUDGET_MS : ANSWER_BUDGET_MS)
   const destinations = await loadDestinations().catch(() => null)
-  if (!destinations) return Response.json({ error: 'Catalog unavailable' }, { status: 503 })
+  if (!destinations) return apiError(503, 'Catalog unavailable')
   const brief = normalizeBrief(parsedBody.data.brief, destinations)
   const today = todayIso()
   // A chat about a hotel answers about it; an id the catalogue does not know is a chat like any other.
@@ -397,5 +399,6 @@ export async function POST(request: Request) {
   if (brief.hotelId && !hotel) delete brief.hotelId
   if (hotel) return hotelTurn(hotel, { brief, messages, signal: request.signal, deadline })
   const context: WishContext = { messages, brief, today, destinations, deadline, signal: request.signal }
+  if (rerun) return Response.json(await rerunTurn(context))
   return Response.json(photos.length > 0 ? await photoTurn(photos, ip, context) : await wishTurn(context))
 }

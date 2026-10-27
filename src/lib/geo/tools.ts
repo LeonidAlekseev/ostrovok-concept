@@ -143,5 +143,3 @@ export function geoTools(
     }),
   }
 }
-
-export type GeoTools = ReturnType<typeof geoTools>

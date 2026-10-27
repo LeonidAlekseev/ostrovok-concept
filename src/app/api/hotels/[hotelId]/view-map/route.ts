@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
-import { isVisibleHotel } from '@/lib/catalog'
-import { loadHotel } from '@/lib/db/catalog'
+import { CDN_CACHE_HEADERS, loadVisibleHotel } from '@/lib/api'
 import { loadViewMap } from '@/lib/db/view'
+import type { ViewMapResponse } from './schema'
 
 /**
  * The buildings of EUBUCCO around a real hotel for the map of «Вид из отеля» (`ViewMap`, GeoJSON with the heights):
@@ -9,11 +9,7 @@ import { loadViewMap } from '@/lib/db/view'
  */
 export async function GET(_request: NextRequest, context: { params: Promise<{ hotelId: string }> }) {
   const { hotelId } = await context.params
-  const hotel = isVisibleHotel({ id: hotelId }) ? await loadHotel(hotelId) : null
+  const hotel = await loadVisibleHotel(hotelId)
   const map = hotel ? await loadViewMap(hotel) : null
-  return Response.json(
-    { map },
-    // A short CDN life: the server cache, unlike the CDN, is dropped by POST /api/revalidate.
-    { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600' } },
-  )
+  return Response.json({ map } satisfies ViewMapResponse, { headers: CDN_CACHE_HEADERS })
 }

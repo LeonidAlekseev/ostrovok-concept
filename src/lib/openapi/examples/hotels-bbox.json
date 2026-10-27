@@ -1,0 +1,208 @@
+{
+  "query": {
+    "bbox": "-0.345,39.375,-0.32,39.39"
+  },
+  "response": {
+    "hotels": [
+      {
+        "id": "ota-9096882",
+        "lat": 39.3833,
+        "lon": -0.33254,
+        "name": "You & Co. Saler Beach Boutique Hotel",
+        "isNew": false,
+        "metro": null,
+        "rooms": [
+          {
+            "id": "room-3202",
+            "area": 20,
+            "beds": "двуспальная кровать",
+            "name": "Номер Standard",
+            "rates": [
+              {
+                "id": "rate-1",
+                "meal": "none",
+                "payment": "now",
+                "cancellation": {
+                  "kind": "free",
+                  "daysBefore": 4
+                },
+                "pricePerNight": 9600
+              }
+            ],
+            "photos": [
+              {
+                "id": "room-1",
+                "tone": 0,
+                "caption": "Номер Standard"
+              }
+            ],
+            "capacity": 2
+          }
+        ],
+        "stars": 3,
+        "photos": [
+          {
+            "id": "photo-1",
+            "url": "https://cdn.ostrovok.ru/t/{size}/content/07/3e/073e735bba54b575932b4454e91beb4be685911c.jpeg",
+            "tone": 0,
+            "caption": "You & Co. Saler Beach Boutique Hotel, фото 1"
+          },
+          {
+            "id": "photo-2",
+            "url": "https://cdn.ostrovok.ru/t/{size}/content/cf/fe/cffe0431127d7bcef61b778d64ddad90c885f986.jpeg",
+            "tone": 1,
+            "caption": "You & Co. Saler Beach Boutique Hotel, фото 2"
+          }
+        ],
+        "rating": 9.5,
+        "address": "Avinguda dels Pinars 8, Валенсия",
+        "reviews": [],
+        "stayType": "hotel",
+        "wifiMbps": null,
+        "amenities": ["wifi", "air-conditioning", "accessible", "restaurant", "shuttle", "family", "pets"],
+        "priceFrom": 9600,
+        "workspace": false,
+        "distanceKm": 10.3,
+        "checkInTime": "15:00",
+        "description": "«You & Co. Saler Beach Boutique Hotel» располагается в Валенсии. Этот бутик-отель находится в 10 км от центра города. Рядом с бутик-отелем — La Casa de la Demanà, Platja de l'Arbre del Gos и Океанографический парк.\n\nСкоротать вечер или приятно провести время перед сном в уютной атмосфере можно в баре. Для гостей работает ресторан. Кафе бутик-отеля — удобное место для перекуса. Хотите оставаться на связи? В бутик-отеле есть бесплатный Wi-Fi.\n\nТакже для гостей в бутик-отеле: врач. Чтобы забронировать экскурсию, обратитесь в экскурсионное бюро бутик-отеля. Берите питомца с собой. В бутик-отеле возможно размещение с домашним любимцем. Сотрудники бутик-отеля по запросу организуют гостям трансфер.\n\nУдобно для гостей с ограниченными возможностями: на верхние этажи гостей поднимает лифт. А ещё в распоряжении гостей сейф и консьерж. Персонал бутик-отеля говорит на английском, испанском и итальянском.",
+        "guestPhotos": [],
+        "reviewCount": 2,
+        "checkOutTime": "12:00",
+        "destinationId": "valencia",
+        "sectionScores": []
+      },
+      {
+        "id": "ota-7841442",
+        "lat": 39.387024,
+        "lon": -0.3327275,
+        "name": "Bungalows Park Albufera",
+        "isNew": false,
+        "metro": null,
+        "rooms": [
+          {
+            "id": "room-A002706",
+            "area": 40,
+            "beds": "2 двуспальные кровати, 3 отдельные кровати и диван",
+            "name": "Шестиместное бунгало",
+            "rates": [
+              {
+                "id": "rate-1",
+                "meal": "none",
+                "payment": "now",
+                "cancellation": {
+                  "kind": "non-refundable"
+                },
+                "pricePerNight": 7500
+              }
+            ],
+            "photos": [
+              {
+                "id": "room-1",
+                "tone": 0,
+                "caption": "Шестиместное бунгало"
+              }
+            ],
+            "capacity": 2
+          }
+        ],
+        "stars": 2,
+        "photos": [
+          {
+            "id": "photo-1",
+            "url": "https://cdn.ostrovok.ru/t/{size}/content/20/18/2018484e58ca4b9743d9ccd23f737ff4f42d79db.jpeg",
+            "tone": 0,
+            "caption": "Bungalows Park Albufera, фото 1"
+          },
+          {
+            "id": "photo-2",
+            "url": "https://cdn.ostrovok.ru/t/{size}/content/22/5d/225de73551f744e33d2a3590687035a5c6497bd3.JPEG",
+            "tone": 1,
+            "caption": "Bungalows Park Albufera, фото 2"
+          }
+        ],
+        "rating": 4.8,
+        "address": "Carrera del Riu, 556, 556, Валенсия",
+        "reviews": [],
+        "stayType": "hotel",
+        "wifiMbps": null,
+        "amenities": ["wifi", "accessible", "restaurant", "shuttle", "parking", "pool", "family", "pets"],
+        "priceFrom": 7500,
+        "workspace": false,
+        "distanceKm": 9.9,
+        "checkInTime": "12:30",
+        "description": "Трехзвездочный отель Cabanas Albufera располагается на пляже в городе Валенсия. Музей науки принца Филиппа и Дворец искусств королевы Софии находятся недалеко от отеля. Забронировав номер в этом отеле, можно чудесно провести время в Национальном парке.\n\nКомфортабельный 3-звездочный отель Cabanas Albufera прекрасно подойдет для деловых людей и путешествующих семей. К услугам гостей есть открытый бассейн сезонного использования и детский бассейн. Предоставляются конференц-залы с аудио- и видеотехникой. В этом отеле можно воспользоваться бесплатным доступом в Интернет. Гостям с автомобилем предоставляется бесплатная парковка.\n\nОтель Cabanas Albufera предлагает 23 комфортабельных номеров с меблированными балконами. В номерах есть кухня с холодильником и кухонными принадлежностями. В раздельной ванной комнате вы найдете зеркало для макияжа и бритья. Номера оборудованы телевизором с возможностью просмотра спутниковых каналов.",
+        "guestPhotos": [],
+        "reviewCount": 62,
+        "checkOutTime": "10:00",
+        "destinationId": "valencia",
+        "sectionScores": []
+      },
+      {
+        "id": "ota-7859624",
+        "lat": 39.38321,
+        "lon": -0.33295,
+        "name": "Hostal Andrés",
+        "isNew": false,
+        "metro": null,
+        "rooms": [
+          {
+            "id": "room-3202302",
+            "area": 15,
+            "beds": "двуспальная кровать",
+            "name": "Двухместный номер Standard",
+            "rates": [
+              {
+                "id": "rate-1",
+                "meal": "none",
+                "payment": "now",
+                "cancellation": {
+                  "kind": "non-refundable"
+                },
+                "pricePerNight": 7200
+              }
+            ],
+            "photos": [
+              {
+                "id": "room-1",
+                "tone": 0,
+                "caption": "Двухместный номер Standard"
+              }
+            ],
+            "capacity": 2
+          }
+        ],
+        "stars": 1,
+        "photos": [
+          {
+            "id": "photo-1",
+            "url": "https://cdn.ostrovok.ru/t/{size}/content/1e/c2/1ec2c7b528cff24f5f9b1f2f4eb3c335880b9aad.jpeg",
+            "tone": 0,
+            "caption": "Hostal Andrés, фото 1"
+          },
+          {
+            "id": "photo-2",
+            "url": "https://cdn.ostrovok.ru/t/{size}/content/82/df/82df413b9f890916fec13ee56b4597ec4813a833.jpeg",
+            "tone": 1,
+            "caption": "Hostal Andrés, фото 2"
+          }
+        ],
+        "rating": 5.2,
+        "address": "Anguilera, 7, Валенсия",
+        "reviews": [],
+        "stayType": "hostel",
+        "wifiMbps": null,
+        "amenities": ["wifi", "air-conditioning", "restaurant", "spa", "family"],
+        "priceFrom": 7200,
+        "workspace": false,
+        "distanceKm": 10.3,
+        "checkInTime": "13:00",
+        "description": "«Hostal Andrés» находится в Валенсии. Этот хостел расположен В 10 км от центра города. Рядом с хостелом — La Casa de la Demanà, Platja de l'Arbre del Gos и Океанографический парк.\n\nСкоротать вечер или приятно провести время перед сном в уютной атмосфере можно в баре. Для гостей работает ресторан. Хотите оставаться на связи? В хостеле есть бесплатный Wi-Fi. Если планируете экскурсии, обратите внимание на экскурсионное бюро хостела.\n\nГостям доступны и другие услуги. Например, пресса и сейф. Сотрудники хостела поддержат беседу на английском, испанском, итальянском и французском.\n\nНомер уютно обставлен и оснащён необходимым, чтобы отдохнуть после долгого и насыщенного дня. Имеются телевизор. Перечисленные услуги есть не во всех номерах.",
+        "guestPhotos": [],
+        "reviewCount": 68,
+        "checkOutTime": "11:30",
+        "destinationId": "valencia",
+        "sectionScores": []
+      }
+    ]
+  }
+}

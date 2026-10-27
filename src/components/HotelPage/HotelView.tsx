@@ -1,13 +1,15 @@
 'use client'
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import dynamic from 'next/dynamic'
 import { Building2, ChevronDown, Landmark, Sunrise, Sunset, Waves } from 'lucide-react'
 import { cn } from 'cn'
+import { MapUnavailable } from '@/components/MapUnavailable/MapUnavailable'
 import { Slider } from '@/components/ui/slider'
 import type { Hotel } from '@/lib/catalog'
 import type { ViewMap as ViewMapData } from '@/lib/db/view'
 import { todayIso } from '@/lib/dates'
+import { countRu } from '@/lib/format'
 import { distanceLabel, type HotelBuilding } from '@/lib/hotelDetails'
 import {
   bearingLabel,
@@ -20,8 +22,9 @@ import {
   localTime,
   RAY_LENGTH_M,
   reachLabel,
-  reachVerdict,
+  reachTone,
   seaReach,
+  seaSeen,
   sideOf,
   sideSummary,
   SIDES,
@@ -34,30 +37,31 @@ import {
   sunsetOf,
   sunsetRange,
   targetReach,
-  VERDICT_LABEL,
-  verdictReason,
+  VERDICT_TONE,
+  verdictText,
   VIEW_ASSUMPTIONS,
   windowLabel,
   windowOf,
+  windowSideLabel,
   type HotelView as HotelViewData,
   type Reach,
   type SideId,
   type SightLine,
-  type Verdict,
+  type Tone,
   type ViewTarget,
 } from '@/lib/view'
-import { HotelMapUnavailable } from './HotelMapUnavailable'
+import { useHotelJson } from './useHotelJson'
 import {
   BLOCKER_COLOR,
   HOTEL_BUILDING_COLOR,
   SECTOR_COLOR,
   SUNRISE_COLOR,
   SUNSET_COLOR,
-  VERDICT_COLOR,
+  TONE_COLOR,
 } from './viewColors'
 
 // MapLibre is loaded only in the browser.
-const ViewMap = dynamic(() => import('./ViewMap').catch(() => ({ default: () => <HotelMapUnavailable /> })), {
+const ViewMap = dynamic(() => import('./ViewMap').catch(() => ({ default: () => <MapUnavailable /> })), {
   ssr: false,
   loading: () => <div className="size-full animate-pulse bg-muted" aria-hidden />,
 })
@@ -66,9 +70,10 @@ const card = 'flex flex-col gap-3 rounded-2xl bg-card p-5 shadow-(--shadow-card)
 /** The landmarks shown before «Показать все»: a hotel in the centre has up to 20. */
 export const LANDMARKS_SHOWN = 8
 
-const VERDICT_CLASS: Record<Verdict, string> = {
-  visible: 'bg-success-soft text-success-foreground',
-  obstructed: 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200',
+const TONE_CLASS: Record<Tone, string> = {
+  seen: 'bg-success-soft text-success-foreground',
+  partly: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
+  closed: 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200',
   unknown: 'bg-muted text-muted-foreground',
 }
 
@@ -81,42 +86,9 @@ const COMPASS: (SideId | null)[] = ['nw', 'n', 'ne', 'w', null, 'e', 'sw', 's', 
 /** «254° (запад)» kept on one line. */
 const unbroken = (text: string) => text.replace(/ /g, ' ')
 
-/** The view from every floor (`GET /api/hotels/<id>/view`): `null` while it comes and when there is none. */
-function useView(hotelId: string, enabled: boolean) {
-  const [state, setState] = useState<{ key: string; view: HotelViewData | null } | null>(null)
-  useEffect(() => {
-    if (!enabled) return
-    const controller = new AbortController()
-    fetch(`/api/hotels/${encodeURIComponent(hotelId)}/view`, { signal: controller.signal })
-      .then((response) => (response.ok ? (response.json() as Promise<{ view: HotelViewData | null }>) : null))
-      .then((body) => setState({ key: hotelId, view: body?.view ?? null }))
-      .catch(() => {
-        if (!controller.signal.aborted) setState({ key: hotelId, view: null })
-      })
-    return () => controller.abort()
-  }, [hotelId, enabled])
-  return { view: state?.view ?? null, loading: enabled && state?.key !== hotelId }
-}
-
-/** The buildings around the hotel (`GET /api/hotels/<id>/view-map`): `null` until they come and on a failure. */
-function useViewMap(hotelId: string) {
-  const [map, setMap] = useState<ViewMapData | null>(null)
-  useEffect(() => {
-    const controller = new AbortController()
-    fetch(`/api/hotels/${encodeURIComponent(hotelId)}/view-map`, { signal: controller.signal })
-      .then((response) => (response.ok ? (response.json() as Promise<{ map: ViewMapData | null }>) : null))
-      .then((body) => setMap(body?.map ?? null))
-      .catch(() => {})
-    return () => controller.abort()
-  }, [hotelId])
-  return map
-}
-
 function ReachBadge({ reach }: { reach: Reach }) {
   return (
-    <span
-      className={cn('shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold', VERDICT_CLASS[reachVerdict(reach)])}
-    >
+    <span className={cn('shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold', TONE_CLASS[reachTone(reach)])}>
       {reachLabel(reach)}
     </span>
   )
@@ -152,20 +124,30 @@ function Row({
   )
 }
 
-/** «С 12-го этажа — возможны препятствия: мешает здание …». */
-function floorLine(line: SightLine | null | undefined, floor: number, eyeM: number, angle = 0) {
-  const verdict = lineVerdict(line, eyeM, angle)
-  const reason = verdictReason(line ?? null, verdict, eyeM, angle)
+/** «Со 2-го этажа»: the start of a line about a floor. */
+const fromFloorTitle = (floor: number) => {
   const from = fromFloor(floor)
-  return `${from.charAt(0).toLocaleUpperCase('ru')}${from.slice(1)} этажа — ${VERDICT_LABEL[verdict]}${reason ? `: ${reason}` : ''}`
+  return `${from.charAt(0).toLocaleUpperCase('ru')}${from.slice(1)} этажа`
 }
+
+/** «Со 2-го этажа — закрыто зданием ≈ 17,2 м (по оценке EUBUCCO) в 80 м от отеля». */
+const floorLine = (line: SightLine | null | undefined, floor: number, eyeM: number, angle = 0) =>
+  `${fromFloorTitle(floor)} — ${verdictText(line, eyeM, angle)}`
 
 const targetLines = (target: ViewTarget, floor: number, eyeM: number) => [
   `${target.category} · ${distanceLabel(target.distanceM)} · азимут ${unbroken(bearingLabel(target.bearing))}`,
   floorLine(target.line, floor, eyeM),
 ]
 
-/** The legend of the map, over it on a wide screen and above it on a narrow one. */
+/** The tones of the lines of sight in the legend, as the map colours them. */
+const TONE_LEGEND: { tone: Tone; label: string }[] = [
+  { tone: 'seen', label: 'видно' },
+  { tone: 'partly', label: 'частично или возможно' },
+  { tone: 'closed', label: 'закрыто' },
+  { tone: 'unknown', label: 'нет данных' },
+]
+
+/** The legend of the map, over it on a wide screen and above it on a narrow one: the window, then a row a kind. */
 function Legend({ side, floor }: { side: SideId; floor: number | null }) {
   const lineItem = (color: string, label: string, dashed = false) => (
     <li key={label} className="flex items-center gap-1.5">
@@ -183,22 +165,25 @@ function Legend({ side, floor }: { side: SideId; floor: number | null }) {
       {label}
     </li>
   )
+  const group = (title: string, items: ReactNode) => (
+    <div className="flex flex-col gap-0.5">
+      <span className="font-medium">{title}</span>
+      <ul className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">{items}</ul>
+    </div>
+  )
   return (
-    <div className="flex flex-col gap-1.5 rounded-xl bg-card p-2.5 text-xs text-foreground shadow-sm md:pointer-events-none md:absolute md:top-2 md:left-2 md:max-w-64 md:bg-white/90 md:dark:bg-card/90">
-      <span className="font-semibold">
-        Вверху — {sideOf(side).label.toLocaleLowerCase('ru')}
-        {floor ? `, вид ${fromFloor(floor)} этажа` : ''}
-      </span>
-      <ul className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
-        {boxItem(SECTOR_COLOR, 'сторона окон', 0.3)}
-        {lineItem(SUNSET_COLOR, 'закат')}
-        {lineItem(SUNRISE_COLOR, 'восход')}
-        {lineItem(VERDICT_COLOR.visible, 'видно', true)}
-        {lineItem(VERDICT_COLOR.obstructed, 'есть помехи', true)}
-        {lineItem(VERDICT_COLOR.unknown, 'нет данных', true)}
-        {boxItem(HOTEL_BUILDING_COLOR, 'отель')}
-        {boxItem(BLOCKER_COLOR, 'здание мешает')}
-      </ul>
+    <div className="flex flex-col gap-2 rounded-xl bg-card p-2.5 text-xs text-foreground shadow-sm md:pointer-events-none md:absolute md:top-2 md:left-2 md:max-w-72 md:bg-white/90 md:dark:bg-card/90">
+      <span className="text-sm font-semibold">{windowSideLabel(side, floor)}</span>
+      {group(
+        'Линия взгляда',
+        TONE_LEGEND.map(({ tone, label }) => lineItem(TONE_COLOR[tone], label, true)),
+      )}
+      {group('Солнце', [lineItem(SUNSET_COLOR, 'закат'), lineItem(SUNRISE_COLOR, 'восход')])}
+      {group('Здания и сектор', [
+        boxItem(HOTEL_BUILDING_COLOR, 'отель'),
+        boxItem(BLOCKER_COLOR, 'закрывает вид'),
+        boxItem(SECTOR_COLOR, 'сектор окна', 0.3),
+      ])}
     </div>
   )
 }
@@ -207,8 +192,10 @@ function Legend({ side, floor }: { side: SideId; floor: number | null }) {
  * «Вид из отеля» of a real hotel: from which floor the sea, the sunset and the sunrise of a date and the attractions of
  * OSM and the places of Ostrovok are seen, by the lines of sight over the buildings of EUBUCCO; the slider picks a
  * floor (1 to the top one: EUBUCCO's building, else the floors the rooms take) and the map and the lists show what is
- * seen from it; the compass picks the side of the windows, which no data gives yet. The map stands EUBUCCO's buildings
- * around the hotel, turned to the side. With neither a building's height nor the rooms' floors: «нет точных данных».
+ * seen from it; the compass beside it («Положение окна») picks the side of the windows, which no data gives yet. The
+ * map stands EUBUCCO's buildings around the hotel, turned to the side, with the lines to the sea and the landmarks of
+ * the side. Every block says the verdicts of the same functions (src/lib/view.ts). With neither a building's height
+ * nor the rooms' floors: «нет точных данных».
  */
 export function HotelView({
   hotel,
@@ -222,8 +209,10 @@ export function HotelView({
   const viewWindow = windowOf(building, roomFloors)
   const [picked, setPickedFloor] = useState<number | null>(null)
   const floor = viewWindow ? Math.min(picked ?? viewWindow.floors, viewWindow.floors) : null
-  const { view, loading } = useView(hotel.id, Boolean(viewWindow))
-  const buildings = useViewMap(hotel.id)
+  // The view from every floor, asked only when the floors of the window are known.
+  const { value: view, loading } = useHotelJson<HotelViewData>(hotel.id, 'view', 'view', Boolean(viewWindow))
+  // The buildings around the hotel for the map.
+  const { value: buildings } = useHotelJson<ViewMapData>(hotel.id, 'view-map', 'map')
   const [failed, setFailed] = useState(false)
   // The date is the visitor's today in the browser (the prerendered page has none) until one is picked.
   const today = useSyncExternalStore(noChanges, todayIso, () => '')
@@ -244,6 +233,7 @@ export function HotelView({
   const sunsetSun = ready && sunset ? sunReach(ready, sunset.checkAzimuth) : null
   const sunriseSun = ready && sunrise ? sunReach(ready, sunrise.checkAzimuth) : null
   const sea = ready ? seaReach(ready) : null
+  const seaShown = ready ? seaSeen(ready, eyeM) : null
   const sideSea = ready ? seaReach(ready, shownSide) : null
   const landmarks = useMemo(
     () => (ready ? ready.landmarks.map((target) => ({ target, reach: targetReach(target, ready.window) })) : []),
@@ -254,7 +244,7 @@ export function HotelView({
   const mapTargets = [...(sideSea?.point ? [sideSea.point] : []), ...inView.map(({ target }) => target)].map((t) => ({
     lat: t.lat,
     lon: t.lon,
-    verdict: lineVerdict(t.line, eyeM),
+    tone: VERDICT_TONE[lineVerdict(t.line, eyeM)],
   }))
   const blockers = [
     ...sunBlockers(sunsetSun?.ray, eyeM),
@@ -262,8 +252,6 @@ export function HotelView({
     ...(sideSea?.point ? blockersAt(sideSea.point.line, eyeM) : []),
     ...inView.flatMap(({ target }) => blockersAt(target.line, eyeM)),
   ].map((b) => b.id)
-  const sunInSide = sunset && inSide(sunset.azimuth, shownSide)
-  const riseInSide = sunrise && inSide(sunrise.azimuth, shownSide)
   const unknown: Reach = { kind: 'unknown' }
 
   return (
@@ -282,7 +270,7 @@ export function HotelView({
         {!failed && <Legend side={shownSide} floor={ready ? floor : null} />}
         <div className="relative h-[clamp(18rem,55vw,28rem)] overflow-hidden rounded-2xl bg-muted md:order-first">
           {failed ? (
-            <HotelMapUnavailable />
+            <MapUnavailable />
           ) : (
             <ViewMap
               center={{ lat: hotel.lat, lon: hotel.lon }}
@@ -300,48 +288,94 @@ export function HotelView({
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <section aria-labelledby="view-window-title" className={card}>
+        <section aria-labelledby="view-window-title" className={cn(card, 'md:col-span-2')}>
           <h3 id="view-window-title" className="text-lg font-bold">
-            Окно
+            Положение окна
           </h3>
-          {viewWindow && floor ? (
-            <>
-              <p className="flex gap-3">
-                <Building2 className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
-                <span className="flex flex-col">
-                  <b>{windowLabel(viewWindow)}</b>
-                  <span className="text-sm text-muted-foreground">{floorLabel(viewWindow, floor)}</span>
-                </span>
-              </p>
-              {viewWindow.floors > 1 && (
-                <div className="flex flex-col gap-1">
-                  <span className="flex items-center justify-between gap-3 text-sm">
-                    <span>Этаж</span>
-                    <b>
-                      {floor}-й{floor === viewWindow.floors ? ' (верхний)' : ''}
-                    </b>
+          <div className="grid gap-4 md:grid-cols-2">
+            {viewWindow && floor ? (
+              <div className="flex flex-col gap-3">
+                <p className="flex gap-3">
+                  <Building2 className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="flex flex-col">
+                    <b>{windowLabel(viewWindow)}</b>
+                    <span className="text-sm text-muted-foreground">{floorLabel(viewWindow, floor)}</span>
                   </span>
-                  <Slider
-                    min={1}
-                    max={viewWindow.floors}
-                    step={1}
-                    value={[floor]}
-                    thumbLabels={['Этаж']}
-                    onValueChange={(value) => setPickedFloor((value as number[])[0])}
-                  />
-                  <span className="flex justify-between text-xs text-muted-foreground" aria-hidden>
-                    <span>1</span>
-                    <span>{viewWindow.floors}</span>
-                  </span>
-                </div>
-              )}
-              <p className="text-xs text-pretty text-muted-foreground">
-                Из какого окна смотрит номер, неизвестно: проверяем каждый этаж и пишем, с какого видна цель.
-              </p>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">Нет точных данных.</p>
-          )}
+                </p>
+                {viewWindow.floors > 1 && (
+                  <div className="flex flex-col gap-1">
+                    <span className="flex items-center justify-between gap-3 text-sm">
+                      <span>Этаж</span>
+                      <b>
+                        {floor}-й{floor === viewWindow.floors ? ' (верхний)' : ''}
+                      </b>
+                    </span>
+                    <Slider
+                      min={1}
+                      max={viewWindow.floors}
+                      step={1}
+                      value={[floor]}
+                      thumbLabels={['Этаж']}
+                      onValueChange={(value) => setPickedFloor((value as number[])[0])}
+                    />
+                    <span className="flex justify-between text-xs text-muted-foreground" aria-hidden>
+                      <span>1</span>
+                      <span>{viewWindow.floors}</span>
+                    </span>
+                  </div>
+                )}
+                <p className="text-xs text-pretty text-muted-foreground">
+                  Из какого окна смотрит номер, неизвестно: проверяем каждый этаж и пишем, с какого видна цель.
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Нет точных данных.</p>
+            )}
+            <div className="flex items-start gap-4">
+              <div role="group" aria-label="Сторона света" className="grid shrink-0 grid-cols-3 gap-1">
+                {COMPASS.map((id, i) =>
+                  id ? (
+                    <button
+                      key={id}
+                      type="button"
+                      aria-pressed={id === shownSide}
+                      title={sideOf(id).label}
+                      onClick={() => setSide(id)}
+                      className={cn(
+                        'size-10 rounded-full text-sm font-semibold',
+                        id === shownSide
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-secondary text-secondary-foreground hover:bg-secondary-hover',
+                      )}
+                    >
+                      {sideOf(id).short}
+                    </button>
+                  ) : (
+                    <span
+                      key={i}
+                      className="flex size-10 items-center justify-center text-muted-foreground"
+                      aria-hidden
+                    >
+                      <Building2 className="size-5" />
+                    </span>
+                  ),
+                )}
+              </div>
+              <div className="flex flex-col gap-2 text-sm">
+                <p className="text-pretty text-muted-foreground">
+                  На какую сторону выходят окна номеров, ни отель, ни Островок не указывают. Выберите сторону — карта
+                  повернётся к ней ({sideOf(shownSide).label.toLocaleLowerCase('ru')},{' '}
+                  {SIDES.find((s) => s.id === shownSide)!.bearing}° ± 22,5°).
+                </p>
+                {ready && summary && floor && (
+                  <p>
+                    Поверх крыш до {distanceLabel(RAY_LENGTH_M)} {fromFloor(floor)} этажа: {summary.open} из{' '}
+                    {summary.rays} направлений этой стороны.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
         </section>
 
         <section aria-labelledby="view-sun-title" className={card}>
@@ -408,97 +442,15 @@ export function HotelView({
                 title={`Берег в ${distanceLabel(sea.point.distanceM)}`}
                 reach={sea.reach}
                 lines={[
-                  `Азимут ${unbroken(bearingLabel(sea.point.bearing))}; проверено ${ready.sea.length} направлений на берег.`,
+                  `Азимут ${unbroken(bearingLabel(sea.point.bearing))}.`,
                   floorLine(sea.point.line, floor, eyeM),
+                  seaShown &&
+                    `${fromFloorTitle(floor)} море видно в ${seaShown.seen} из ${countRu(seaShown.of, ['направления', 'направлений', 'направлений'])} на берег.`,
                 ]}
               />
             </ul>
           ) : (
             <p className="text-sm text-muted-foreground">Берега моря ближе 6 км по OpenStreetMap нет.</p>
-          )}
-        </section>
-
-        <section aria-labelledby="view-side-title" className={card}>
-          <h3 id="view-side-title" className="text-lg font-bold">
-            Сторона окон
-          </h3>
-          <div className="flex items-start gap-4">
-            <div role="group" aria-label="Сторона света" className="grid shrink-0 grid-cols-3 gap-1">
-              {COMPASS.map((id, i) =>
-                id ? (
-                  <button
-                    key={id}
-                    type="button"
-                    aria-pressed={id === shownSide}
-                    title={sideOf(id).label}
-                    onClick={() => setSide(id)}
-                    className={cn(
-                      'size-10 rounded-full text-sm font-semibold',
-                      id === shownSide
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-secondary text-secondary-foreground hover:bg-secondary-hover',
-                    )}
-                  >
-                    {sideOf(id).short}
-                  </button>
-                ) : (
-                  <span key={i} className="flex size-10 items-center justify-center text-muted-foreground" aria-hidden>
-                    <Building2 className="size-5" />
-                  </span>
-                ),
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground">
-              На какую сторону выходят окна номеров, ни отель, ни Островок не указывают. Выберите сторону — покажем, что
-              видно с неё ({sideOf(shownSide).label.toLocaleLowerCase('ru')},{' '}
-              {SIDES.find((s) => s.id === shownSide)!.bearing}° ± 22,5°).
-            </p>
-          </div>
-          {ready && summary && floor && (
-            <p className="text-sm">
-              Поверх крыш до {distanceLabel(RAY_LENGTH_M)} {fromFloor(floor)} этажа: {summary.open} из {summary.rays}{' '}
-              направлений.
-            </p>
-          )}
-          {ready && floor && (
-            <ul aria-label="Что видно с этой стороны" className="flex flex-col gap-3">
-              {sideSea?.point && (
-                <Row
-                  icon={Waves}
-                  title="Море"
-                  reach={sideSea.reach}
-                  lines={[`берег в ${distanceLabel(sideSea.point.distanceM)}`]}
-                />
-              )}
-              {sunInSide && sunset && (
-                <Row
-                  icon={Sunset}
-                  title="Закат"
-                  reach={sunsetSun?.reach ?? unknown}
-                  lines={[`азимут ${Math.round(sunset.azimuth)}°`]}
-                />
-              )}
-              {riseInSide && sunrise && (
-                <Row
-                  icon={Sunrise}
-                  title="Восход"
-                  reach={sunriseSun?.reach ?? unknown}
-                  lines={[`азимут ${Math.round(sunrise.azimuth)}°`]}
-                />
-              )}
-              {inView.map(({ target, reach }, i) => (
-                <Row
-                  key={`${target.kind}-${target.name}-${i}`}
-                  icon={Landmark}
-                  title={target.name}
-                  reach={reach}
-                  lines={[`${target.category} · ${distanceLabel(target.distanceM)}`]}
-                />
-              ))}
-              {!sideSea?.point && !sunInSide && !riseInSide && inView.length === 0 && (
-                <li className="text-sm text-muted-foreground">Моря, солнца и ориентиров с этой стороны нет.</li>
-              )}
-            </ul>
           )}
         </section>
       </div>

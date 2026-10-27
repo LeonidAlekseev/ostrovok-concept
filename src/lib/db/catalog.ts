@@ -1,11 +1,10 @@
 import 'server-only'
-import { createClient, type PostgrestError } from '@supabase/supabase-js'
-import { unstable_cache } from 'next/cache'
+import type { PostgrestError } from '@supabase/supabase-js'
 import type { Destination } from '@/data/destinations'
-import type { Database } from '@/lib/db/database.types'
 import { isVisibleHotel, type Hotel, type HotelSummary, type Photo, type SpotlightHotel } from '@/lib/catalog'
 import type { MapBox } from '@/lib/mapBox'
-import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/config'
+import { isSupabaseConfigured } from '@/lib/supabase/config'
+import { anonClient, catalogCached, warnShort } from './anon'
 
 /**
  * The one way into the catalogue: pages, route handlers and server actions read destinations and hotels
@@ -16,10 +15,6 @@ import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supaba
  * maps (`hotels_outside_noise`), and only the destinations with such hotels; the cache keeps the whole catalogue, so
  * a build of another environment reads the same entries.
  */
-
-export const CATALOG_TAG = 'catalog'
-/** Seconds a cached read lives before the next request refreshes it. */
-export const CATALOG_LIFETIME = 3600
 
 /** The catalogue could not be read: no settings at build time or the database failed. */
 export class CatalogUnavailableError extends Error {
@@ -34,9 +29,7 @@ function database() {
     throw new CatalogUnavailableError(
       'нет NEXT_PUBLIC_SUPABASE_URL или NEXT_PUBLIC_SUPABASE_ANON_KEY: npm run secrets:reveal',
     )
-  return createClient<Database>(supabaseUrl, supabaseAnonKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
+  return anonClient()
 }
 
 function rowsOf<T>({ data, error }: { data: T[] | null; error: PostgrestError | null }): T[] {
@@ -45,7 +38,7 @@ function rowsOf<T>({ data, error }: { data: T[] | null; error: PostgrestError | 
 }
 
 const cached = <Args extends unknown[], Result>(name: string, read: (...args: Args) => Promise<Result>) =>
-  unstable_cache(read, [CATALOG_TAG, name], { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME })
+  catalogCached([name], read)
 
 /**
  * The summary columns of a hotel; the full hotel is its `data`. The stars come from `data` too: the column allows
@@ -72,9 +65,6 @@ export async function loadDestinations(): Promise<Destination[]> {
   return destinations.filter((d) => shown.has(d.id))
 }
 
-export const loadDestination = async (id: string): Promise<Destination | undefined> =>
-  (await loadDestinations()).find((d) => d.id === id)
-
 const readHotelSummaries = cached('summaries', async (): Promise<HotelSummary[]> =>
   rowsOf(
     await database()
@@ -98,7 +88,7 @@ export async function loadHiddenHotelIds(): Promise<ReadonlySet<string>> {
   try {
     return new Set(await readOutsideNoise())
   } catch (error) {
-    console.warn(`catalog: no hotels outside the noise maps (${String((error as Error)?.message).slice(0, 200)})`)
+    warnShort('catalog: no hotels outside the noise maps', error)
     return new Set()
   }
 }

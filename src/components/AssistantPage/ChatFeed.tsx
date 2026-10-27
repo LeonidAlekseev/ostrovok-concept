@@ -1,18 +1,6 @@
 import Link from 'next/link'
-import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
-import {
-  ArrowDown,
-  Car,
-  Check,
-  ChevronRight,
-  Eye,
-  LoaderCircle,
-  MapPin,
-  RotateCcw,
-  Search,
-  TriangleAlert,
-  X,
-} from 'lucide-react'
+import { Fragment, useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react'
+import { ArrowDown, Car, CheckCheck, ChevronRight, Eye, MapPin, RotateCcw, Search, TriangleAlert } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -25,28 +13,30 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from '@/components/ui/message-scroller'
-import { Trace, TraceIcon, TraceLine, TraceTitle } from '@/components/ui/trace'
 import type { HotelSearch } from '@/hooks/useHotelSearch'
 import { useHotels } from '@/hooks/useHotels'
 import type { Hotel } from '@/lib/catalog'
 import { VIEW_LABEL } from '@/lib/features'
 import { hotelHref } from '@/lib/search'
-import type { AssistantOption, Plan } from '../../lib/assistant'
+import type { Destination } from '@/data/destinations'
+import type { AssistantOption, Brief, Plan } from '../../lib/assistant'
 import { messageTime, nightsLabel } from '../../lib/assistantChatList'
 import type { ChatMessage } from '../../lib/assistantChats'
-import { formatDateRange } from '../../lib/dates'
+import { formatDateRange, type IsoDate } from '../../lib/dates'
 import { formatPrice, guestsLabel } from '../../lib/format'
 import { HotelTile } from '../HotelTile/HotelTile'
+import { MemoryCard, SessionParamsCard, ToolCard, WorkingRow } from './ChatCards'
 import { MessagePhotos, type PhotoUrl } from './ChatPhotos'
 import { MapMessage } from './MapMessage'
 
-/** The agent's bubble: flat light grey, no avatar beside it, the feed's full width at most. */
+/** The agent's bubble: flat light grey on the left, no avatar beside it, the feed's full width at most. */
 const agentBubble =
-  'max-w-full *:data-[slot=bubble-content]:rounded-[18px_18px_18px_6px] *:data-[slot=bubble-content]:bg-muted *:data-[slot=bubble-content]:px-3.5 *:data-[slot=bubble-content]:py-2.5 *:data-[slot=bubble-content]:text-base'
+  'max-w-full *:data-[slot=bubble-content]:rounded-[20px] *:data-[slot=bubble-content]:bg-muted *:data-[slot=bubble-content]:px-4 *:data-[slot=bubble-content]:py-3 *:data-[slot=bubble-content]:text-base'
 /** Secondary text on the grey: the muted grey is 4.2:1 there, this one 6.5:1. */
 const greyMutedText = 'text-muted-foreground-strong'
+/** The traveller's bubble: the project's blue on the right. */
 const userBubble =
-  'max-w-[85%] *:data-[slot=bubble-content]:rounded-[18px_18px_6px] *:data-[slot=bubble-content]:px-3.5 *:data-[slot=bubble-content]:py-2.5 *:data-[slot=bubble-content]:text-base'
+  'max-w-[85%] *:data-[slot=bubble-content]:rounded-[20px] *:data-[slot=bubble-content]:px-4 *:data-[slot=bubble-content]:py-3 *:data-[slot=bubble-content]:text-base'
 const messageTextClass = 'leading-[1.45] whitespace-pre-wrap'
 const timeClass = 'px-1 text-xs/[normal] text-muted-foreground'
 
@@ -66,6 +56,15 @@ interface FeedProps {
   planActions?: (plan: Plan) => ReactNode
   /** What shows a photo of a message; a shared chat has the public links. */
   photoUrl?: PhotoUrl
+  /**
+   * The parameters of the newest «ничего не нашёл» changed: saved to the session and looked for again. Absent in a
+   * shared chat: the card is read only.
+   */
+  onResearch?: (brief: Brief) => void
+  /** Eval is answering: the parameters wait. */
+  busy?: boolean
+  destinations?: readonly Destination[]
+  today?: IsoDate
 }
 
 /**
@@ -73,8 +72,23 @@ interface FeedProps {
  * message only while the traveller is at the end, and the traveller's own message settles at the top. Reading the
  * older messages, they get a button to the new one instead of a jump.
  */
-export function Feed({ chatId, messages, onChoose, onRetry, planActions, photoUrl = sharedPhotoUrl }: FeedProps) {
+export function Feed({
+  chatId,
+  messages,
+  onChoose,
+  onRetry,
+  planActions,
+  photoUrl = sharedPhotoUrl,
+  onResearch,
+  busy,
+  destinations = [],
+  today,
+}: FeedProps) {
   const lastPlanId = messages.findLast((m) => m.role === 'assistant' && m.data.plan?.options.length)?.id
+  const lastNotFoundId = messages.findLast((m) => m.role === 'assistant' && m.data.notFound)?.id
+  // A step at work shows what Eval is doing: the pending answer itself waits unseen.
+  const working = messages.some((m) => m.role === 'agent' && m.status === 'pending')
+  const shown = working ? messages.filter((m) => !(m.role === 'assistant' && m.status === 'pending')) : messages
   return (
     // A new provider per chat: each opens at its own end.
     <MessageScrollerProvider key={chatId} autoScroll defaultScrollPosition="end">
@@ -85,7 +99,7 @@ export function Feed({ chatId, messages, onChoose, onRetry, planActions, photoUr
           className="px-0.5 pt-0.5 pb-1 max-lg:px-[calc(clamp(12px,3vw,20px)+0.125rem)]"
         >
           <MessageScrollerContent aria-label="Диалог с Эвалом" className="gap-3">
-            {messages.map((message) => (
+            {shown.map((message) => (
               <MessageScrollerItem
                 key={message.id}
                 messageId={message.id}
@@ -99,16 +113,25 @@ export function Feed({ chatId, messages, onChoose, onRetry, planActions, photoUr
                   onChoose={onChoose}
                   onRetry={onRetry && (() => onRetry(message.id))}
                   actions={message.id === lastPlanId && message.data.plan ? planActions?.(message.data.plan) : null}
+                  params={
+                    message.data.notFound && {
+                      destinations,
+                      today: today ?? message.createdAt.slice(0, 10),
+                      onChange: message.id === lastNotFoundId ? onResearch : undefined,
+                      disabled: busy,
+                    }
+                  }
                 />
               </MessageScrollerItem>
             ))}
           </MessageScrollerContent>
         </MessageScrollerViewport>
         <MessageScrollerButton
-          render={<Button variant="secondary" size="sm" shape="pill" />}
-          className="bottom-2 w-auto bg-(--decor-light) shadow-(--shadow-card) data-[direction=end]:bottom-2"
+          render={<Button variant="secondary" size="icon" shape="pill" />}
+          aria-label="К новому сообщению"
+          className="bottom-2 size-12 bg-card text-foreground shadow-(--shadow-card) data-[direction=end]:bottom-2"
         >
-          <ArrowDown className="size-4" aria-hidden />К новому сообщению
+          <ArrowDown className="size-6" aria-hidden />
         </MessageScrollerButton>
       </MessageScroller>
     </MessageScrollerProvider>
@@ -121,17 +144,31 @@ interface MessageProps {
   onChoose: ChooseSearch
   onRetry?: () => void
   actions?: ReactNode
+  /** The card of the parameters of «ничего не нашёл». */
+  params?: Omit<ComponentProps<typeof SessionParamsCard>, 'brief'> | false | undefined
 }
 
 function MessageTime({ iso, align }: { iso: string; align?: 'end' }) {
+  if (align === 'end')
+    // The traveller's message: sent and read, the double tick of the messengers.
+    return (
+      <span className={`flex items-center gap-1 self-end ${timeClass}`}>
+        <time dateTime={iso}>{messageTime(iso)}</time>
+        <CheckCheck className="size-4 text-primary" aria-label="Доставлено" />
+      </span>
+    )
   return (
-    <time dateTime={iso} className={`${timeClass} ${align === 'end' ? 'self-end' : ''}`}>
+    <time dateTime={iso} className={timeClass}>
       {messageTime(iso)}
     </time>
   )
 }
 
-function MessageItem({ message, photoUrl, onChoose, onRetry, actions }: MessageProps) {
+/** What a step at work says: the search looks for the variants, the others tell their own title. */
+const workingText = (step: NonNullable<ChatMessage['data']['step']>) =>
+  step.agent === 'search' ? 'Ищу подходящие варианты…' : `${step.title}…`
+
+function MessageItem({ message, photoUrl, onChoose, onRetry, actions, params }: MessageProps) {
   const { role, status, text, data, createdAt } = message
   if (role === 'user')
     return (
@@ -149,18 +186,38 @@ function MessageItem({ message, photoUrl, onChoose, onRetry, actions }: MessageP
         </MessageContent>
       </Message>
     )
-  if (role === 'agent' && data.step) return <StepItem status={status} step={data.step} />
+  if (role === 'agent' && data.memory)
+    return (
+      <Message>
+        <MessageContent className="gap-1">
+          <MemoryCard params={data.memory} />
+          <MessageTime iso={createdAt} />
+        </MessageContent>
+      </Message>
+    )
+  if (role === 'agent' && data.step)
+    return (
+      <Message>
+        <MessageContent className="gap-1">
+          {status === 'pending' ? (
+            <WorkingRow
+              text={workingText(data.step)}
+              icon={data.step.agent === 'geo' ? (data.step.title.includes('видно') ? Eye : MapPin) : undefined}
+            />
+          ) : (
+            <>
+              <ToolCard step={data.step} failed={status === 'failed'} />
+              <MessageTime iso={createdAt} />
+            </>
+          )}
+        </MessageContent>
+      </Message>
+    )
   if (status === 'pending')
     return (
       <Message>
         <MessageContent>
-          <Bubble variant="muted" className={agentBubble}>
-            <BubbleContent aria-label="Эвал думает">
-              <span className="shimmer motion-reduce:shimmer-none" aria-hidden>
-                Эвал думает…
-              </span>
-            </BubbleContent>
-          </Bubble>
+          <WorkingRow text="Эвал думает…" label="Эвал думает" />
         </MessageContent>
       </Message>
     )
@@ -168,12 +225,22 @@ function MessageItem({ message, photoUrl, onChoose, onRetry, actions }: MessageP
     <Message>
       <MessageContent className="gap-1">
         {role === 'owner' && <MessageHeader className="px-0">Владелец отеля</MessageHeader>}
-        {text && (
-          <Bubble variant="muted" className={agentBubble}>
-            <BubbleContent>
-              <p className={messageTextClass}>{text}</p>
+        {data.notFound && params ? (
+          // «Ничего не нашёл»: the words and the parameters of the session in one bubble.
+          <Bubble variant="muted" className={`${agentBubble} w-full sm:w-[min(100%,36rem)]`}>
+            <BubbleContent className="flex w-full flex-col gap-3 px-2! pb-2!">
+              {text && <p className={`${messageTextClass} px-2`}>{text}</p>}
+              <SessionParamsCard brief={data.notFound} {...params} />
             </BubbleContent>
           </Bubble>
+        ) : (
+          text && (
+            <Bubble variant="muted" className={agentBubble}>
+              <BubbleContent>
+                <p className={messageTextClass}>{text}</p>
+              </BubbleContent>
+            </Bubble>
+          )
         )}
         {data.unverified && (
           <Bubble variant="muted" className={agentBubble}>
@@ -201,41 +268,6 @@ function MessageItem({ message, photoUrl, onChoose, onRetry, actions }: MessageP
         {actions}
       </MessageContent>
     </Message>
-  )
-}
-
-const STEP_STATUS = {
-  pending: {
-    icon: LoaderCircle,
-    label: 'выполняется',
-    line: 'running',
-    circle: 'bg-card text-muted-foreground [&_svg]:motion-safe:animate-spin',
-  },
-  done: { icon: Check, label: 'готово', line: undefined, circle: 'bg-success-soft text-success-foreground' },
-  failed: { icon: X, label: 'не удалось', line: 'error', circle: 'bg-destructive/10 text-destructive' },
-} as const
-
-/** A step of one of Eval's agents: a card of the tool with its status in a circle, the feed's width. */
-function StepItem({ status, step }: { status: ChatMessage['status']; step: NonNullable<ChatMessage['data']['step']> }) {
-  const { icon: Icon, label, line, circle } = STEP_STATUS[status]
-  return (
-    <Trace className="rounded-2xl bg-muted px-3 py-2.5">
-      <TraceLine status={line} className="w-full gap-3 data-[status=error]:text-muted-foreground">
-        <TraceIcon className={`size-8 rounded-full ${circle}`}>
-          <Icon />
-        </TraceIcon>
-        <span className="flex min-w-0 flex-col gap-0.5">
-          <span className="text-[11px]/[normal] font-semibold tracking-[0.06em] uppercase">Инструмент</span>
-          <span className="sr-only">Шаг {label}: </span>
-          <TraceTitle
-            className={`text-sm/[1.35] whitespace-normal text-foreground ${status === 'pending' ? 'shimmer' : ''}`}
-          >
-            {step.title}
-            {status === 'pending' ? '…' : step.result ? ` — ${step.result}` : ''}
-          </TraceTitle>
-        </span>
-      </TraceLine>
-    </Trace>
   )
 }
 

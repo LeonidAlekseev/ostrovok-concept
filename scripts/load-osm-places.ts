@@ -11,22 +11,8 @@
 // same rows and records the rectangle once; nothing is deleted. Needs NEXT_PUBLIC_SUPABASE_URL and
 // SUPABASE_SERVICE_ROLE_KEY; prints counts, never the keys. The places are © OpenStreetMap contributors, ODbL 1.0.
 import { readFile } from 'node:fs/promises'
-import { registerHooks } from 'node:module'
 import { parseArgs } from 'node:util'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '../src/lib/db/database.types.ts'
-
-// The app's modules import each other without extensions, as the bundler allows; Node needs `.ts`.
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    try {
-      return nextResolve(specifier, context)
-    } catch (error) {
-      if (specifier.startsWith('.') && !/\.[cm]?[jt]s$/.test(specifier)) return nextResolve(`${specifier}.ts`, context)
-      throw error
-    }
-  },
-})
+import { serviceClient } from './lib/node.ts'
 
 const { PLACE_CATEGORIES } = await import('../src/lib/geo/categories.ts')
 const { bboxPolygon, formatBbox, keepOneCentre, parseBbox, parseLatLon } = await import('../src/lib/geo/cityLoad.ts')
@@ -64,12 +50,6 @@ const { values } = parseArgs({
 function fail(message: string): never {
   console.error(`load-osm-places: ${message}`)
   process.exit(1)
-}
-
-function required(name: string): string {
-  const value = process.env[name]
-  if (!value) fail(`${name} is not set: run npm run secrets:reveal`)
-  return value
 }
 
 if (!values.bbox) fail('--bbox south,west,north,east is required (see scripts/load-city-places.ts)')
@@ -125,9 +105,7 @@ console.log(`rectangle ${formatBbox(bbox)}: ${rows.length} places`)
 for (const [category, count] of Object.entries(countBy(rows))) console.log(`  ${category}: ${count}`)
 if (values['dry-run']) process.exit(0)
 
-const supabase = createClient<Database>(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
-  auth: { persistSession: false, autoRefreshToken: false },
-})
+const supabase = serviceClient()
 if (!(await saveRows(supabase, rows, 'preload'))) fail('osm_places: the upsert failed')
 
 // The rectangle once: a second run finds the same polygon with all the categories and adds none.

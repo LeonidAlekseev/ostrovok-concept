@@ -1,9 +1,10 @@
-import { countRu } from './format'
+import { countRu, formatMeters } from './format'
 
 /**
  * What Эвал picks hotels by beyond the catalogue (`hotel_features`, `hotel_room_views`, filled by
- * `npm run db:features`): the building's floors and height, the noise at the hotel and the views of its room types.
- * Only Valencia has the data; a hotel without it has no entry, and Эвал says so instead of guessing.
+ * `npm run db:features`): the building's floors and height, the noise at the hotel and the views of its room types;
+ * the distance to the sea (`hotel_sea_distances`, over the coastline of OpenStreetMap). Only Valencia has the data; a
+ * hotel without it has no entry, and Эвал says so instead of guessing.
  */
 
 export type ViewKind =
@@ -47,6 +48,8 @@ export interface HotelFeatures {
    * (`isDoubtfulBuilding`), so its floors and height are dropped.
    */
   buildingDoubtful?: true
+  /** From the hotel's point to the nearest coastline of OpenStreetMap, m; absent where the coast is not loaded. */
+  seaM?: number
 }
 
 /**
@@ -74,22 +77,29 @@ export function withoutDoubtfulBuildings(
 }
 
 /** What the traveller asked of the hotel. */
-export type Criterion = 'quiet' | 'height' | 'view'
+export type Criterion = 'sea' | 'quiet' | 'height' | 'view'
 
 export const CRITERION_LABEL: Record<Criterion, string> = {
+  sea: 'расстоянии до моря',
   quiet: 'шуме',
   height: 'этажности',
   view: 'виде из окна',
 }
 
-/** The criteria of a request: a quiet place, a taller or a lower building, a view from the window. */
+/**
+ * The criteria of a request: the sea within so many metres, a quiet place, a taller or a lower building, a view from
+ * the window.
+ */
 export interface FeatureWish {
+  seaMaxM?: number
   quiet?: true
   height?: 'high' | 'low'
   view?: ViewKind | 'any'
 }
 
+/** The sea comes first: the turn lets the last criteria go first when no hotel meets them all, the sea last of all. */
 export const criteriaOf = (wish: FeatureWish): Criterion[] => [
+  ...(wish.seaMaxM ? (['sea'] as const) : []),
   ...(wish.quiet ? (['quiet'] as const) : []),
   ...(wish.height ? (['height'] as const) : []),
   ...(wish.view ? (['view'] as const) : []),
@@ -131,8 +141,13 @@ export const matchingViews = (features: HotelFeatures | undefined, view: Feature
         view === 'any' ? v.view !== 'street' : v.view === view || (view === 'water' && v.view === 'sea'),
       )
 
+/** The hotel has the data of the criterion: for the sea, a known distance, near or far. */
+const known = (features: HotelFeatures | undefined, criterion: Criterion, wish: FeatureWish): boolean =>
+  criterion === 'sea' ? features?.seaM !== undefined : has(features, criterion, wish)
+
 const has = (features: HotelFeatures | undefined, criterion: Criterion, wish: FeatureWish): boolean => {
   if (!features) return false
+  if (criterion === 'sea') return features.seaM !== undefined && features.seaM <= wish.seaMaxM!
   if (criterion === 'quiet') return features.lnight !== undefined
   if (criterion === 'height') return features.floors !== undefined
   return matchingViews(features, wish.view).length > 0
@@ -144,6 +159,8 @@ const has = (features: HotelFeatures | undefined, criterion: Criterion, wish: Fe
  */
 export function featureReasons(features: HotelFeatures | undefined, wish: FeatureWish): string[] {
   return criteriaOf(wish).map((criterion) => {
+    if (criterion === 'sea')
+      return features?.seaM !== undefined ? `до моря ${formatMeters(features.seaM)}` : 'нет данных о расстоянии до моря'
     if (!has(features, criterion, wish))
       // A hotel with data had its room names read: none of them tells of the view.
       return criterion === 'view' && features
@@ -161,9 +178,9 @@ export function featureReasons(features: HotelFeatures | undefined, wish: Featur
 }
 
 /**
- * The hotels of `ids` that have the data for every criterion of the wish, best first: a room with the view, then the
- * quietest night band, then the tallest (or the lowest) building; ties keep the order of `ids` (the search by
- * meaning's). Empty when no criteria were asked.
+ * The hotels of `ids` that have the data for every criterion of the wish (for the sea: within its distance), best
+ * first: a room with the view, then the quietest night band, then the tallest (or the lowest) building, then the
+ * nearest to the sea; ties keep the order of `ids` (the search by meaning's). Empty when no criteria were asked.
  */
 export function rankByFeatures(
   ids: readonly string[],
@@ -186,6 +203,10 @@ export function rankByFeatures(
         const d = (fb.floors! - fa.floors!) * (wish.height === 'high' ? 1 : -1)
         if (d) return d
       }
+      if (wish.seaMaxM) {
+        const d = fa.seaM! - fb.seaM!
+        if (d) return d
+      }
       if (wish.quiet && fa.lden && fb.lden) {
         const d = loudness(fa.lden) - loudness(fb.lden)
         if (d) return d
@@ -199,7 +220,7 @@ export const missingCriteria = (
   ids: readonly string[],
   features: ReadonlyMap<string, HotelFeatures>,
   wish: FeatureWish,
-): Criterion[] => criteriaOf(wish).filter((c) => !ids.some((id) => has(features.get(id), c, wish)))
+): Criterion[] => criteriaOf(wish).filter((c) => !ids.some((id) => known(features.get(id), c, wish)))
 
 /** The lines of the hotel's text for the search by meaning: what a traveller asks about, without guessing. */
 export function featureLines(features: HotelFeatures | undefined): string[] {
@@ -267,5 +288,15 @@ export function featuresOf(
     features.views.push({ roomName: room_name, view: view as ViewKind })
     byId.set(hotel_id, features)
   }
+  return byId
+}
+
+/** The features with the hotels' distances to the sea; a hotel with a distance only gets an entry of its own. */
+export function withSeaDistances(
+  features: ReadonlyMap<string, HotelFeatures>,
+  rows: readonly { hotel_id: string; sea_m: number }[],
+): Map<string, HotelFeatures> {
+  const byId = new Map(features)
+  for (const { hotel_id, sea_m } of rows) byId.set(hotel_id, { ...(byId.get(hotel_id) ?? { views: [] }), seaM: sea_m })
   return byId
 }

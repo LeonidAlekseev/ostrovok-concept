@@ -1,12 +1,8 @@
 import 'server-only'
-import { createClient } from '@supabase/supabase-js'
-import { unstable_cache } from 'next/cache'
 import { z } from 'zod'
-import type { Database } from '@/lib/db/database.types'
 import { haversineMeters } from '@/lib/geo/distance'
 import { mergePlaces } from '@/lib/geo/samePlace'
 import type { HotelBuilding, NearbyPlace } from '@/lib/hotelDetails'
-import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/config'
 import {
   LANDMARK_RADIUS_M,
   pointAt,
@@ -19,10 +15,11 @@ import {
   seaPoints,
   windowOf,
   type HotelView,
+  type LineBlocker,
   type SightLine,
   type ViewTarget,
 } from '@/lib/view'
-import { CATALOG_LIFETIME, CATALOG_TAG } from './catalog'
+import { anonClient, catalogCached, readOrNull, type AnonClient, type HotelPoint } from './anon'
 
 /**
  * «Вид из отеля» of a real hotel for its page and for Эвал (`HotelView`, src/lib/view.ts): the lines of sight of
@@ -33,26 +30,24 @@ import { CATALOG_LIFETIME, CATALOG_TAG } from './catalog'
  * and Эвал say «нет данных».
  */
 
-const database = () =>
-  createClient<Database>(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } })
-
-type Db = ReturnType<typeof database>
-
-const isRealHotel = (id: string) => isSupabaseConfigured && /^ota-\d{1,15}$/.test(id)
-
 /** At most this many lines a call of `hotel_view_eyes`. */
 const LINES_PER_CALL = 160
 
+// The bounds of the height and the lower eye came with 20261027170000: before it, the height and `eye_m` stand for them.
 const blockerRow = z.object({
   id: z.string(),
   distance_m: z.number(),
   height: z.number(),
+  height_lower: z.number().optional(),
+  height_upper: z.number().optional(),
   height_source: z.string().nullable(),
   eye_m: z.number(),
+  eye_lower_m: z.number().optional(),
   eye_upper_m: z.number(),
 })
 const eyeRow = z.object({
   eye_m: z.number().nullable(),
+  eye_lower_m: z.number().nullable().optional(),
   eye_upper_m: z.number().nullable(),
   blockers: z.array(blockerRow),
 })
@@ -85,12 +80,16 @@ export function linesOf(answer: unknown, count: number): (SightLine | null)[] {
       coveredM: r.covered_m,
       eyes: r.eyes.map((eye) => ({
         eyeM: eye.eye_m,
+        eyeLowerM: eye.eye_lower_m === undefined ? eye.eye_m : eye.eye_lower_m,
         eyeUpperM: eye.eye_upper_m,
         blockers: eye.blockers.map((b) => ({
           id: b.id,
           distanceM: b.distance_m,
           heightM: b.height,
+          heightLowerM: b.height_lower ?? b.height,
+          heightUpperM: b.height_upper ?? b.height,
           estimated: b.height_source === 'estimated',
+          eyeLowerM: b.eye_lower_m ?? b.eye_m,
           eyeM: b.eye_m,
           eyeUpperM: b.eye_upper_m,
         })),
@@ -117,7 +116,7 @@ interface Point {
 }
 
 /** The lines from the hotel's point to the points, a call per `LINES_PER_CALL`, and the hotel's own building. */
-async function measure(db: Db, hotel: Point, points: readonly Point[]) {
+async function measure(db: AnonClient, hotel: Point, points: readonly Point[]) {
   const batches: Point[][] = []
   for (let i = 0; i < points.length; i += LINES_PER_CALL) batches.push(points.slice(i, i + LINES_PER_CALL))
   const answers = await Promise.all(
@@ -139,12 +138,25 @@ async function measure(db: Db, hotel: Point, points: readonly Point[]) {
   return { lines: answers.flatMap((a) => a.lines), own: answers.find((a) => a.own)?.own ?? null }
 }
 
-/** A ray keeps the 2 buildings of the highest eyes of each angle: the answer of 120 rays stays ~70 KB. */
+/**
+ * A ray keeps, of each angle, the 2 buildings of the highest upper eyes and the ones of the highest eye and lower eye
+ * (the surest in the way, `blockersAt`): the answer of 120 rays stays ~80 KB.
+ */
 const RAY_BLOCKERS = 2
+
+const highest = (blockers: readonly LineBlocker[], eye: (b: LineBlocker) => number) =>
+  blockers.reduce<LineBlocker | undefined>((best, b) => (!best || eye(b) > eye(best) ? b : best), undefined)
 
 const trimmed = (line: SightLine): SightLine => ({
   ...line,
-  eyes: line.eyes.map((eye) => ({ ...eye, blockers: eye.blockers.slice(0, RAY_BLOCKERS) })),
+  eyes: line.eyes.map((eye) => {
+    const kept = [
+      ...eye.blockers.slice(0, RAY_BLOCKERS),
+      highest(eye.blockers, (b) => b.eyeM),
+      highest(eye.blockers, (b) => b.eyeLowerM),
+    ]
+    return { ...eye, blockers: eye.blockers.filter((b) => kept.includes(b)) }
+  }),
 })
 
 const nearPlace = z.object({
@@ -229,9 +241,11 @@ export function viewLandmarks(
 
 type Measured = Omit<HotelView, 'window' | 'windowSides'>
 
-const readView = unstable_cache(
+// The version in the key goes up with every change of `Measured`.
+const readView = catalogCached(
+  ['hotel-view-v5'],
   async (_hotelId: string, lat: number, lon: number, ostrovok: Landmark[]): Promise<Measured> => {
-    const db = database()
+    const db = anonClient()
     const hotel = { lat, lon }
     const rayPoints = RAY_BEARINGS.map((bearing) => ({
       ...pointAt(hotel, bearing, RAY_LENGTH_M),
@@ -272,13 +286,7 @@ const readView = unstable_cache(
       landmarks: measured.filter((t) => t.kind !== 'sea').sort((a, b) => a.distanceM - b.distanceM),
     }
   },
-  [CATALOG_TAG, 'hotel-view-v4'],
-  { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME },
 )
-
-const warn = (what: string, error: unknown) =>
-  // The kind and the provider's short message only.
-  console.warn(`${what} (${String((error as { message?: unknown })?.message ?? error).slice(0, 200)})`)
 
 /**
  * The view from every floor of the real hotel (`windowOf`: EUBUCCO's building, else the floors the rooms take), or
@@ -286,34 +294,27 @@ const warn = (what: string, error: unknown) =>
  * the lines cannot be read.
  */
 export async function loadHotelView(
-  hotel: { id: string; lat: number; lon: number },
+  hotel: HotelPoint,
   building: HotelBuilding | null | undefined,
   roomFloors: number | null | undefined,
   nearby: readonly NearbyPlace[],
 ): Promise<HotelView | null> {
   const window = windowOf(building, roomFloors)
-  if (!isRealHotel(hotel.id) || !window) return null
-  try {
-    const measured = await readView(hotel.id, hotel.lat, hotel.lon, ostrovokLandmarks(nearby))
-    return { window, ...measured, windowSides: [] }
-  } catch (error) {
-    warn(`hotel view: none for ${hotel.id}`, error)
-    return null
-  }
+  if (!window) return null
+  return readOrNull(hotel.id, 'hotel view', async () => ({
+    window,
+    ...(await readView(hotel.id, hotel.lat, hotel.lon, ostrovokLandmarks(nearby))),
+    windowSides: [],
+  }))
 }
 
 /** The lines from the hotel to places found by Эвал's geo tools; `null` when they cannot be read. */
 export async function checkViewPoints(
-  hotel: { id: string; lat: number; lon: number },
+  hotel: HotelPoint,
   points: readonly { lat: number; lon: number }[],
 ): Promise<(SightLine | null)[] | null> {
-  if (!isRealHotel(hotel.id) || points.length === 0) return null
-  try {
-    return (await measure(database(), hotel, points)).lines
-  } catch (error) {
-    warn(`hotel view: no lines for ${hotel.id}`, error)
-    return null
-  }
+  if (points.length === 0) return null
+  return readOrNull(hotel.id, 'hotel view lines', async () => (await measure(anonClient(), hotel, points)).lines)
 }
 
 export { VIEW_MAP_RADIUS_M }
@@ -367,23 +368,15 @@ export function viewMapOf(features: readonly unknown[]): ViewMap {
   }
 }
 
-const readViewMap = unstable_cache(
+const readViewMap = catalogCached(
+  ['hotel-view-map'],
   async (_hotelId: string, lat: number, lon: number): Promise<ViewMap> => {
-    const { data, error } = await database().rpc('hotel_geo_features', { lat, lon, radius_m: VIEW_MAP_RADIUS_M })
+    const { data, error } = await anonClient().rpc('hotel_geo_features', { lat, lon, radius_m: VIEW_MAP_RADIUS_M })
     if (error) throw error
     return viewMapOf(z.object({ features: z.array(z.unknown()) }).parse(data).features)
   },
-  [CATALOG_TAG, 'hotel-view-map'],
-  { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME },
 )
 
 /** The buildings around the real hotel for the map of the view, or `null` when they cannot be read. */
-export async function loadViewMap(hotel: { id: string; lat: number; lon: number }): Promise<ViewMap | null> {
-  if (!isRealHotel(hotel.id)) return null
-  try {
-    return await readViewMap(hotel.id, hotel.lat, hotel.lon)
-  } catch (error) {
-    warn(`view map: none for ${hotel.id}`, error)
-    return null
-  }
-}
+export const loadViewMap = (hotel: HotelPoint): Promise<ViewMap | null> =>
+  readOrNull(hotel.id, 'view map', () => readViewMap(hotel.id, hotel.lat, hotel.lon))

@@ -282,6 +282,42 @@ export type Database = {
           },
         ]
       }
+      geo_coverage: {
+        Row: {
+          covered: unknown
+          dataset: string
+          loaded_at: string
+          name: string
+          source: string
+          uncovered: unknown
+        }
+        ComputedFields: never
+        Insert: {
+          covered: unknown
+          dataset: string
+          loaded_at?: string
+          name: string
+          source: string
+          uncovered: unknown
+        }
+        Update: {
+          covered?: unknown
+          dataset?: string
+          loaded_at?: string
+          name?: string
+          source?: string
+          uncovered?: unknown
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'geo_coverage_dataset_fkey'
+            columns: ['dataset']
+            isOneToOne: true
+            referencedRelation: 'geo_datasets'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       geo_datasets: {
         Row: {
           extract: string
@@ -467,6 +503,37 @@ export type Database = {
             referencedColumns: ['id']
           },
         ]
+      }
+      hotel_noise_maps: {
+        Row: {
+          computed_at: string
+          contours: NonNullable<Json>
+          day: NonNullable<Json>
+          lat: number
+          lon: number
+          quiet: NonNullable<Json>
+          radius_m: number
+        }
+        ComputedFields: never
+        Insert: {
+          computed_at?: string
+          contours: NonNullable<Json>
+          day: NonNullable<Json>
+          lat: number
+          lon: number
+          quiet: NonNullable<Json>
+          radius_m: number
+        }
+        Update: {
+          computed_at?: string
+          contours?: NonNullable<Json>
+          day?: NonNullable<Json>
+          lat?: number
+          lon?: number
+          quiet?: NonNullable<Json>
+          radius_m?: number
+        }
+        Relationships: []
       }
       hotel_room_views: {
         Row: {
@@ -947,9 +1014,19 @@ export type Database = {
       }
       hotel_geo: { Args: { lat: number; lon: number }; Returns: Json }
       hotel_geo_features: { Args: { lat: number; lon: number; radius_m?: number }; Returns: Json }
+      hotel_noise_day: { Args: { lat: number; lon: number; radius_m?: number }; Returns: Json }
+      hotel_noise_map: { Args: { lat: number; lon: number; radius_m?: number }; Returns: Json }
+      hotel_noise_map_refresh: { Args: { lat: number; lon: number; radius_m?: number }; Returns: number }
+      hotel_noise_maps_prune: { Args: { radius_m?: number }; Returns: number }
       hotel_noise_quiet: { Args: { lat: number; lon: number; radius_m?: number }; Returns: Json }
+      hotel_sea_distances: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          hotel_id: string
+          sea_m: number
+        }[]
+      }
       hotel_view_eyes: { Args: { lat: number; lon: number; targets: Json }; Returns: Json }
-      hotel_view_lines: { Args: { eye_m: number; lat: number; lon: number; targets: Json }; Returns: Json }
       hotels_outside_noise: { Args: Record<PropertyKey, never>; Returns: string[] }
       match_embeddings: {
         Args: { destination_ids?: string[]; match_count?: number; match_kind: string; query_embedding: unknown }
@@ -970,15 +1047,6 @@ export type Database = {
         Returns: Json
       }
       rate_limit_hit: { Args: { hit_key: string; hit_limit: number; window_seconds: number }; Returns: boolean }
-      similar_hotels: {
-        Args: { hotel_id: string; match_count?: number; profile_ids?: string[] }
-        Returns: {
-          profile_similarity: number
-          ref_id: string
-          score: number
-          similarity: number
-        }[]
-      }
     }
     Enums: {
       [_ in never]: never

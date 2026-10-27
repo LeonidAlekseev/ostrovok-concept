@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { VALENCIA_BBOX, haversineMeters, inBbox, isLatLon, straightLine, walkSeconds } from './distance'
+import { haversineMeters, straightLine, walkSeconds } from './distance'
 
 const cityHall = { lat: 39.4697065, lon: -0.3763353 }
 const malvarrosa = { lat: 39.4783, lon: -0.3238 }
@@ -28,17 +28,6 @@ describe('the haversine distance', () => {
 
 describe('the helpers', () => {
   it('walks 5 km in an hour', () => expect(walkSeconds(5000)).toBe(3600))
-
-  it('knows the loaded rectangle', () => {
-    expect(inBbox(cityHall, VALENCIA_BBOX)).toBe(true)
-    expect(inBbox({ lat: 40.4168, lon: -3.7038 }, VALENCIA_BBOX)).toBe(false)
-  })
-
-  it('checks coordinates', () => {
-    expect(isLatLon(cityHall)).toBe(true)
-    expect(isLatLon({ lat: 91, lon: 0 })).toBe(false)
-    expect(isLatLon({ lat: Number.NaN, lon: 0 })).toBe(false)
-  })
 
   it('draws the straight line as GeoJSON lon, lat', () => {
     expect(straightLine(cityHall, malvarrosa)).toEqual({

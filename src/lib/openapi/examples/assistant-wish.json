@@ -1,0 +1,380 @@
+{
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "text": "Тихий отель у моря в Валенсии с 10 по 14 ноября"
+      },
+      {
+        "role": "assistant",
+        "text": "С кем едете?"
+      },
+      {
+        "role": "user",
+        "text": "Вдвоём"
+      }
+    ],
+    "brief": {
+      "vibe": "sea",
+      "destinationId": "valencia",
+      "quiet": true,
+      "seaMaxM": 1000,
+      "dates": {
+        "checkIn": "2026-11-10",
+        "checkOut": "2026-11-14"
+      },
+      "when": 10,
+      "nights": 4
+    }
+  },
+  "response": {
+    "brief": {
+      "vibe": "sea",
+      "destinationId": "valencia",
+      "when": 10,
+      "nights": 4,
+      "dates": {
+        "checkIn": "2026-11-10",
+        "checkOut": "2026-11-14"
+      },
+      "quiet": true,
+      "seaMaxM": 1000,
+      "party": "couple"
+    },
+    "source": "model",
+    "matches": [
+      {
+        "id": "ota-9763824",
+        "destinationId": "valencia",
+        "name": "Отель Atarazanas",
+        "stayType": "hotel",
+        "stars": 4,
+        "rating": 8,
+        "reviewCount": 2,
+        "priceFrom": 11300,
+        "wifiMbps": null,
+        "workspace": true,
+        "isNew": false
+      },
+      {
+        "id": "ota-7851403",
+        "destinationId": "valencia",
+        "name": "Hostal Balcón al mar",
+        "stayType": "hostel",
+        "stars": 3,
+        "rating": 8.2,
+        "reviewCount": 102,
+        "priceFrom": 13000,
+        "wifiMbps": null,
+        "workspace": false,
+        "isNew": false
+      },
+      {
+        "id": "ota-7568446",
+        "destinationId": "valencia",
+        "name": "Hotel Sol Playa",
+        "stayType": "hotel",
+        "stars": 2,
+        "rating": 7.6,
+        "reviewCount": 301,
+        "priceFrom": 13400,
+        "wifiMbps": null,
+        "workspace": false,
+        "isNew": false
+      }
+    ],
+    "features": {
+      "ota-9763824": {
+        "floors": 9,
+        "heightM": 23.4,
+        "lden": {
+          "min": 55,
+          "max": 59
+        },
+        "lnight": {
+          "max": 39
+        },
+        "views": [],
+        "seaM": 186
+      },
+      "ota-7851403": {
+        "floors": 6,
+        "heightM": 18.2,
+        "lden": {
+          "min": 65,
+          "max": 69
+        },
+        "lnight": {
+          "max": 39
+        },
+        "views": [],
+        "seaM": 207
+      },
+      "ota-7568446": {
+        "floors": 3,
+        "heightM": 16.1,
+        "lden": {
+          "max": 39
+        },
+        "lnight": {
+          "max": 39
+        },
+        "views": [
+          {
+            "roomName": "Номер Standard с видом на город",
+            "view": "city"
+          },
+          {
+            "roomName": "Номер Standard с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Номер Standard с видом на воду",
+            "view": "water"
+          },
+          {
+            "roomName": "Номер Standard с красивым видом из окна",
+            "view": "nice"
+          },
+          {
+            "roomName": "Одноместный номер Standard с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Одноместный номер Standard с видом на воду",
+            "view": "water"
+          },
+          {
+            "roomName": "Трёхместный номер Standard с видом на внутренний двор",
+            "view": "courtyard"
+          },
+          {
+            "roomName": "Трёхместный номер Standard с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Трёхместный номер Standard с видом на воду",
+            "view": "water"
+          },
+          {
+            "roomName": "Четырёхместный номер Standard с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Четырёхместный номер Standard с видом на воду",
+            "view": "water"
+          },
+          {
+            "roomName": "Одноместный номер Standard с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Двухместный номер Standard с видом на город",
+            "view": "city"
+          },
+          {
+            "roomName": "Двухместный номер Standard с видом на внутренний двор",
+            "view": "courtyard"
+          },
+          {
+            "roomName": "Двухместный номер Standard с частичным видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Двухместный номер Standard с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Двухместный номер Standard с красивым видом из окна",
+            "view": "nice"
+          },
+          {
+            "roomName": "Трёхместный номер Standard с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Четырёхместный номер Standard с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Пятиместный номер Standard с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Одноместный номер Business с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Номер Superior с видом на реку",
+            "view": "water"
+          },
+          {
+            "roomName": "Номер Superior с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Одноместный номер Superior с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Одноместный номер Superior с видом на воду",
+            "view": "water"
+          },
+          {
+            "roomName": "Трёхместный номер Superior с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Трёхместный номер Superior с видом на воду",
+            "view": "water"
+          },
+          {
+            "roomName": "Четырёхместный номер Superior с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Четырёхместный номер Superior с видом на воду",
+            "view": "water"
+          },
+          {
+            "roomName": "Одноместный номер Superior с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Двухместный номер Superior с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Двухместный номер Superior с частичным видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Трёхместный номер Superior с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Четырёхместный номер Superior с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Номер Deluxe с видом на воду",
+            "view": "water"
+          },
+          {
+            "roomName": "Номер Classic с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Люкс с видом на город",
+            "view": "city"
+          },
+          {
+            "roomName": "Люкс с видом на сад",
+            "view": "garden"
+          },
+          {
+            "roomName": "Люкс с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Двухместный люкс с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Люкс Superior с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Люкс Superior с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Апартаменты с видом на город",
+            "view": "city"
+          },
+          {
+            "roomName": "Апартаменты с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Апартаменты с видом на воду",
+            "view": "water"
+          },
+          {
+            "roomName": "Двухместные апартаменты c 1 комнатой с видом на город",
+            "view": "city"
+          },
+          {
+            "roomName": "Двухместные апартаменты c 1 комнатой с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Двухместные апартаменты Standard c 1 комнатой с видом на город",
+            "view": "city"
+          },
+          {
+            "roomName": "Апартаменты Classic с видом на город",
+            "view": "city"
+          },
+          {
+            "roomName": "Апартаменты Classic с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Апартаменты Classic с красивым видом из окна",
+            "view": "nice"
+          },
+          {
+            "roomName": "Двухместные апартаменты Classic с видом на город",
+            "view": "city"
+          },
+          {
+            "roomName": "Двухместные апартаменты Classic с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Студия с видом на сад",
+            "view": "garden"
+          },
+          {
+            "roomName": "Студия с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Студия Superior с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Коттедж с видом на воду",
+            "view": "water"
+          },
+          {
+            "roomName": "Коттедж с красивым видом из окна",
+            "view": "nice"
+          },
+          {
+            "roomName": "Коттедж Superior с видом на воду",
+            "view": "water"
+          }
+        ],
+        "seaM": 283
+      }
+    },
+    "steps": [
+      {
+        "agent": "search",
+        "title": "Подбираю отели по вашему описанию",
+        "params": "Валенсия",
+        "status": "done",
+        "result": "нашёл 6 отелей"
+      },
+      {
+        "agent": "features",
+        "title": "Проверяю данные о расстоянии до моря, шуме",
+        "params": "до моря до 1 км · тихо ночью",
+        "status": "done",
+        "result": "подходят 40 отелей из 205"
+      }
+    ]
+  }
+}

@@ -11,8 +11,14 @@ import {
 } from 'maplibre-gl'
 import { cn } from 'cn'
 import type { ViewMap as ViewMapData } from '@/lib/db/view'
-import { pointAt, SIDE_HALF_WIDTH_DEG, VIEW_MAP_RADIUS_M, type Verdict } from '@/lib/view'
-import { ATTRIBUTION_CLASS, MAP_ATTRIBUTION, MAP_STYLE, manageAttribution } from '../SearchResultsPage/mapSetup'
+import { pointAt, SIDE_HALF_WIDTH_DEG, VIEW_MAP_RADIUS_M, type Tone } from '@/lib/view'
+import {
+  ATTRIBUTION_CLASS,
+  EUBUCCO_ATTRIBUTION,
+  MAP_ATTRIBUTION,
+  MAP_STYLE,
+  manageAttribution,
+} from '../SearchResultsPage/mapSetup'
 import {
   BLOCKER_COLOR,
   BUILDING_COLOR,
@@ -21,12 +27,8 @@ import {
   SECTOR_COLOR,
   SUNRISE_COLOR,
   SUNSET_COLOR,
-  VERDICT_COLOR,
+  TONE_COLOR,
 } from './viewColors'
-
-/** EUBUCCO's credit for the buildings' heights, next to OpenStreetMap's. */
-const EUBUCCO_ATTRIBUTION =
-  '<a href="https://eubucco.com/data/download/v0.2" target="_blank" rel="noopener">© EUBUCCO v0.2</a>'
 
 /** The blocks around the hotel, tilted so the buildings stand. */
 const ZOOM = 16
@@ -51,7 +53,7 @@ const buildingColor = (blockers: readonly string[], hotel: string | null): Expre
 export interface MapTarget {
   lat: number
   lon: number
-  verdict: Verdict
+  tone: Tone
 }
 
 const empty = { type: 'FeatureCollection' as const, features: [] }
@@ -74,7 +76,7 @@ function sector(center: { lat: number; lon: number }, bearing: number): Data {
 /**
  * The buildings of EUBUCCO around the hotel standing by their heights (OpenFreeMap's own 3D buildings beyond them), the
  * hotel's and the ones in the way from the chosen floor coloured, the fan of the chosen side with the map turned to it,
- * the lines to the places coloured by their verdict from the floor and the sun's lines at the sunset and the sunrise.
+ * the lines to the places coloured by the tone of their verdict from the floor and the sun's lines at the sunset and the sunrise.
  * `onFail` when the map cannot load (no WebGL, no tiles).
  */
 export default function ViewMap({
@@ -226,7 +228,7 @@ export default function ViewMap({
       type: 'FeatureCollection',
       features: targets.map((t) => ({
         type: 'Feature',
-        properties: { color: VERDICT_COLOR[t.verdict] },
+        properties: { color: TONE_COLOR[t.tone] },
         geometry: {
           type: 'LineString',
           coordinates: [

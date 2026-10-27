@@ -8,28 +8,34 @@ import { cn } from 'cn'
 import type { NoiseMap as NoiseMapData } from '@/lib/db/noise'
 import { distanceLabel } from '@/lib/hotelDetails'
 import {
-  EEA_NOISE_URL,
   LEGEND_STEPS,
   NOISE_COLORS,
+  NOISE_UNKNOWN_COLOR,
   NOISY_LABEL,
+  QUIET_SOURCE,
   noisyGroup,
-  type NoiseIndicator,
+  type NoiseMapIndicator,
   type NoisyPlace,
 } from '@/lib/noise'
-import { ATTRIBUTION_CLASS, MAP_ATTRIBUTION, MAP_STYLE, manageAttribution } from '../SearchResultsPage/mapSetup'
-
-/** EEA's credit for the contours, next to OpenStreetMap's. */
-export const EEA_ATTRIBUTION = `<a href="${EEA_NOISE_URL}" target="_blank" rel="noopener">© EEA, END 2022</a>`
+import {
+  ATTRIBUTION_CLASS,
+  EEA_ATTRIBUTION,
+  MAP_ATTRIBUTION,
+  MAP_STYLE,
+  manageAttribution,
+} from '../SearchResultsPage/mapSetup'
 
 /** The streets around the hotel, seen from above. */
 const ZOOM = 16.3
 
-/** The colour of a contour by its band's lower bound; the quiet (below 40 dB) has none. */
+/** The colour of a shape by its `level`; the quiet (below 40 dB) the first, a day piece without an estimate grey. */
 const FILL_COLOR: ExpressionSpecification = [
-  'step',
-  ['coalesce', ['get', 'db_min'], 0],
+  'case',
+  ['==', ['typeof', ['get', 'level']], 'number'],
+  ['step', ['get', 'level'], NOISE_COLORS[0], ...LEGEND_STEPS.flatMap((step, i) => [step, NOISE_COLORS[i + 1]])],
+  ['==', ['get', 'source'], QUIET_SOURCE],
   NOISE_COLORS[0],
-  ...LEGEND_STEPS.flatMap((step, i) => [step, NOISE_COLORS[i + 1]] as const),
+  NOISE_UNKNOWN_COLOR,
 ]
 
 const empty: NoiseMapData = { type: 'FeatureCollection', features: [] }
@@ -37,8 +43,8 @@ const empty: NoiseMapData = { type: 'FeatureCollection', features: [] }
 const placeName = (place: NoisyPlace) => place.name ?? 'Без названия'
 
 /**
- * The EEA contours of `indicator` around the hotel on the city's flat map, the quiet below 40 dB green and the louder
- * above, under the labels; the hotel's pin and the loud places of OSM as dots, each opening its name, kind and
+ * The noise of `indicator` around the hotel on the city's flat map — the day estimate's pieces or EEA's Lnight bands —,
+ * the quiet below 40 dB green and the louder above, under the labels; the hotel's pin and the loud places of OSM as dots, each opening its name, kind and
  * distance when pressed. `onFail` when the map cannot load (no WebGL, no tiles).
  */
 export default function NoiseMap({
@@ -50,7 +56,7 @@ export default function NoiseMap({
 }: {
   center: { lat: number; lon: number }
   contours: NoiseMapData | null
-  indicator: NoiseIndicator
+  indicator: NoiseMapIndicator
   places: NoisyPlace[]
   onFail: () => void
 }) {
@@ -126,12 +132,12 @@ export default function NoiseMap({
     [center.lat, center.lon],
   )
 
-  // The contours of the indicator, the quiet first and the louder above.
+  // The shapes of the indicator, the quiet and the unknown first and the louder above.
   useEffect(() => {
     if (!map) return
     const features = (contours ?? empty).features
       .filter((f) => f.properties.indicator === indicator)
-      .sort((a, b) => (a.properties.db_min ?? 0) - (b.properties.db_min ?? 0))
+      .sort((a, b) => (a.properties.level ?? 0) - (b.properties.level ?? 0))
     map
       .getSource<GeoJSONSource>('noise')
       ?.setData({ type: 'FeatureCollection', features } as Parameters<GeoJSONSource['setData']>[0])

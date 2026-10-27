@@ -10,15 +10,11 @@ import { buildCatalog, fullHotelsIn, getHotel, hotels, newHotels } from '@/lib/c
  * only the hotels `isVisibleHotel` shows: all of the generator's outside production (src/test/env.ts).
  */
 
-export const CATALOG_TAG = 'catalog'
-export const CATALOG_LIFETIME = 3600
-
 export class CatalogUnavailableError extends Error {}
 
 /** The generator has no hotels outside the noise maps. */
 export const loadHiddenHotelIds = async (): Promise<ReadonlySet<string>> => new Set<string>()
 export const loadDestinations = async () => destinations
-export const loadDestination = async (id: string) => destinations.find((d) => d.id === id)
 export const loadHotelSummaries = async () => hotels.filter(isVisibleHotel)
 export const loadNewHotels = async () => newHotels.filter(isVisibleHotel)
 export const loadHotel = async (id: string) => (isVisibleHotel({ id }) ? getHotel(id) : undefined)

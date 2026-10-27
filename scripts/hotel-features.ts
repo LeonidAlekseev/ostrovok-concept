@@ -1,30 +1,20 @@
 // Derives the hotels' features for Эвал: the building and the noise at each real hotel (`public.hotel_geo`), with
 // their provenance (the datasets, the sources and the bounds of the height and the floors), into
 // `hotel_features`, the views of its room groups, one per `room_group_id` (the names of `ota_hotels.static_vm.room_groups`) into
-// `hotel_room_views`. Copies no raw data: only the derived values and the reference to the source.
+// `hotel_room_views`, and the noise map around each hotel computed ahead into `hotel_noise_maps` (the day pieces, the
+// quiet and the Lnight contours: too slow to compute on every request, see 20261027210000_hotel_noise_maps.sql).
+// Copies no raw data: only the derived values and the reference to the source. Run it after every reload of the
+// geodata (scripts/load-valencia-geo.py), or the noise maps stay those of the old contours.
 //   npm run db:features [-- --dry-run]   (Node runs the TypeScript itself; the keys come from .env.local)
 // `--dry-run` reads and counts, and writes nothing.
 // Idempotent: writes only the new and changed rows and deletes the stale ones, so a second run over the same data
 // changes nothing. Only the real hotels (`ota-<master_id>`) are read; nothing is made up for the others. Needs
 // NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY; prints counts, never the keys. Afterwards: npm run db:embed.
-import { registerHooks } from 'node:module'
 import { parseArgs } from 'node:util'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '../src/lib/db/database.types.ts'
-
-// The app's modules import each other without extensions, as the bundler allows; Node needs `.ts`.
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    try {
-      return nextResolve(specifier, context)
-    } catch (error) {
-      if (specifier.startsWith('.') && !/\.[cm]?[jt]s$/.test(specifier)) return nextResolve(`${specifier}.ts`, context)
-      throw error
-    }
-  },
-})
+import { serviceClient, type Table } from './lib/node.ts'
 
 const { diffRows, featureRow, viewRows } = await import('../src/lib/featureRows.ts')
+const { NOISE_MAP_RADIUS_M } = await import('../src/lib/noise.ts')
 type FeatureRow = import('../src/lib/featureRows.ts').FeatureRow
 type ViewRow = import('../src/lib/featureRows.ts').ViewRow
 type HotelGeo = import('../src/lib/featureRows.ts').HotelGeo
@@ -34,21 +24,13 @@ const { values: options } = parseArgs({ options: { 'dry-run': { type: 'boolean',
 const dryRun = options['dry-run']
 
 const PAGE = 1000
-/** A table of the schema, for the helpers that take its name. */
-type Table = keyof Database['public']['Tables']
 const BATCH = 200
 /** `hotel_geo` calls at a time. */
 const PARALLEL = 8
+/** Noise maps computed at a time: each intersects the EEA polygons for a second or so. */
+const MAP_PARALLEL = 4
 
-function required(name: string): string {
-  const value = process.env[name]
-  if (!value) throw new Error(`${name} is not set: run npm run secrets:reveal`)
-  return value
-}
-
-const supabase = createClient<Database>(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
-  auth: { persistSession: false, autoRefreshToken: false },
-})
+const supabase = serviceClient()
 
 async function readAll<T>(
   table: Table | 'hotel_room_views_named',
@@ -147,3 +129,30 @@ console.log(
   `hotels: ${hotels.length} real; with floors ${count(features, (r) => r.floors)}, with night noise ${count(features, (r) => r.lnight_max ?? r.lnight_min)}; ` +
     `with a view ${new Set(views.map((v) => v.hotel_id)).size} (${new Set(views.map((v) => `${v.hotel_id}:${v.rg_hash}`)).size} room groups)`,
 )
+
+// The noise maps of the hotels' points, recomputed every run: the contours may have been reloaded.
+const points = [...new Map(hotels.map((h) => [`${h.lat},${h.lon}`, { lat: h.lat, lon: h.lon }])).values()]
+if (dryRun) console.log(`hotel_noise_maps: would compute ${points.length} maps and delete those of no hotel`)
+else {
+  const start = performance.now()
+  let shapes = 0
+  for (let i = 0; i < points.length; i += MAP_PARALLEL) {
+    const counts = await Promise.all(
+      points.slice(i, i + MAP_PARALLEL).map(async ({ lat, lon }) => {
+        const { data, error } = await supabase.rpc('hotel_noise_map_refresh', {
+          lat,
+          lon,
+          radius_m: NOISE_MAP_RADIUS_M,
+        })
+        if (error) throw new Error(`hotel_noise_map_refresh: ${error.message}`)
+        return data
+      }),
+    )
+    shapes += counts.reduce((sum, n) => sum + n, 0)
+  }
+  const { data: pruned, error } = await supabase.rpc('hotel_noise_maps_prune', { radius_m: NOISE_MAP_RADIUS_M })
+  if (error) throw new Error(`hotel_noise_maps_prune: ${error.message}`)
+  console.log(
+    `hotel_noise_maps: ${points.length} maps, ${shapes} shapes, ${pruned} stale deleted, ${((performance.now() - start) / 1000).toFixed(0)} s`,
+  )
+}

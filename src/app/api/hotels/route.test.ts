@@ -69,7 +69,7 @@ describe('GET /api/hotels', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     const response = await get('ids=prague-old-town-lantern')
     expect(response.status).toBe(503)
-    expect(await response.json()).toEqual({ error: 'Каталог временно недоступен' })
+    expect(await response.json()).toEqual({ error: 'Catalog unavailable' })
   })
 })
 

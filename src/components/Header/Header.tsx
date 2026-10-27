@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useSession } from '@/hooks/useStore'
 import { signOut } from '@/lib/session'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 
 // The header's look follows the page content, not the pathname: `usePathname()` is not reliable in the server
 // HTML of a prerendered page, and React does not fix attributes at hydration. The body is `group/page`; the home
@@ -120,6 +120,11 @@ export function Header() {
                   <li>
                     <Link className={menuItemClass} href="/help" onClick={close}>
                       Поддержка
+                    </Link>
+                  </li>
+                  <li>
+                    <Link className={menuItemClass} href="/api/docs" onClick={close}>
+                      API
                     </Link>
                   </li>
                   {!session && (

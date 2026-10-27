@@ -5,26 +5,17 @@
 // A folder younger than an hour is left: its snapshot may be being shared right now. Needs NEXT_PUBLIC_SUPABASE_URL
 // and SUPABASE_SERVICE_ROLE_KEY (.env.local); prints counts and paths, never the keys.
 import { parseArgs } from 'node:util'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '../src/lib/db/database.types.ts'
 import {
   SHARED_PHOTO_BUCKET,
   orphanSharedPhotos,
   removeSharedPhotos,
   sharedPhotoOwners,
 } from '../src/lib/sharedPhotos.ts'
+import { serviceClient } from './lib/node.ts'
 
 const { values: options } = parseArgs({ options: { delete: { type: 'boolean', default: false } } })
 
-function required(name: string): string {
-  const value = process.env[name]
-  if (!value) throw new Error(`${name} is not set: run npm run secrets:reveal`)
-  return value
-}
-
-const supabase = createClient<Database>(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
-  auth: { persistSession: false, autoRefreshToken: false },
-})
+const supabase = serviceClient()
 
 const PAGE = 1000
 /** Every snapshot there is, by its owner. */
