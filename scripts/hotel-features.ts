@@ -1,10 +1,11 @@
-// Derives the hotels' features for Эвал: the building and the noise at each real hotel (`public.hotel_geo`), with
+// Derives the hotels' features for Эвал: the building at each real hotel (`public.hotel_geo`) and the noise at its facade
+// (`public.hotel_noise_facade` and the estimate of noise-estimate-v1 with the loud OSM places), with
 // their provenance (the datasets, the sources and the bounds of the height and the floors), into
 // `hotel_features`, the views of its room groups, one per `room_group_id` (the names of `ota_hotels.static_vm.room_groups`) into
 // `hotel_room_views`, and the noise map around each hotel computed ahead into `hotel_noise_maps` (the day pieces, the
 // quiet and the Lnight contours: too slow to compute on every request, see 20261027210000_hotel_noise_maps.sql).
 // And the store of claims (src/lib/claimRows.ts, scripts/lib/claims-store.ts): EEA's bands at each hotel and the day
-// estimate from them, the loud OSM places within 200 m, the pharmacies, shops, hospitals, stops, beaches and parks
+// estimate from them, the estimate of noise-estimate-v1 at the facade (`noise.estimate.*`), the loud OSM places within 200 m, the pharmacies, shops, hospitals, stops, beaches and parks
 // within 1 km (Ostrovok's places first), the nearest building of EUBUCCO, the guests' reviews and their words about
 // noise and quiet, each with its evidence, calculation and the confidence of src/lib/confidence.ts. Copies no raw data: only the derived values and the reference to the source. Run it after every reload of the
 // geodata (scripts/load-valencia-geo.py), or the noise maps stay those of the old contours.
@@ -24,6 +25,9 @@ const {
   NEARBY_PER_CATEGORY,
   NEARBY_RADIUS_M,
   buildingStore,
+  estimateOf,
+  estimateStore,
+  facadeDataset,
   mergeStores,
   nearbyStore,
   noiseStore,
@@ -133,8 +137,9 @@ const around = { radiusM: NEARBY_RADIUS_M, perCategory: NEARBY_PER_CATEGORY }
 for (let i = 0; i < hotels.length; i += PARALLEL) {
   const rows = await Promise.all(
     hotels.slice(i, i + PARALLEL).map(async (hotel) => {
-      const [geo, places, everyday] = await Promise.all([
+      const [geo, facade, places, everyday] = await Promise.all([
         supabase.rpc('hotel_geo', { lat: hotel.lat, lon: hotel.lon }),
+        supabase.rpc('hotel_noise_facade', { lat: hotel.lat, lon: hotel.lon }),
         supabase.rpc('osm_places_near', {
           lat: hotel.lat,
           lon: hotel.lon,
@@ -151,14 +156,18 @@ for (let i = 0; i < hotels.length; i += PARALLEL) {
         }),
       ])
       if (geo.error) throw new Error(`hotel_geo: ${geo.error.message}`)
+      if (facade.error) throw new Error(`hotel_noise_facade: ${facade.error.message}`)
       if (places.error) throw new Error(`osm_places_near: ${places.error.message}`)
       if (everyday.error) throw new Error(`osm_places_near: ${everyday.error.message}`)
       const data = (geo.data ?? {}) as HotelGeo & { noise?: unknown }
+      const { bands, estimate } = estimateOf(facade.data, places.data)
+      const buildingDataset = typeof data.building?.dataset === 'string' ? data.building.dataset : null
       // The places of everyday need after the loud ones: a tram stop of both keeps the edge of `placesStore`.
       return {
-        row: featureRow(hotel.id, data),
+        row: featureRow(hotel.id, data, { sources: bands.sources, dataset: facadeDataset(facade.data), estimate }),
         stores: [
           noiseStore(hotel, Array.isArray(data.noise) ? data.noise : [], datasets),
+          estimateStore(hotel, facade.data, places.data, datasets, buildingDataset),
           buildingStore(hotel, data.building, datasets),
           nearbyStore(hotel, places.data, near),
           placesStore(hotel, everyday.data, placesOf.get(hotel.id) ?? [], around),
@@ -208,7 +217,8 @@ async function stored<T>(table: Table | 'hotel_room_views_named', columns: strin
 const FEATURE_COLUMNS =
   'hotel_id, building_id, height_m, floors, lden_min, lden_max, lden_source, lnight_min, lnight_max, lnight_source, ' +
   'building_dataset, geometry_source, height_source, height_lower_m, height_upper_m, floors_source, floors_lower, ' +
-  'floors_upper, noise_dataset'
+  'floors_upper, noise_dataset, noise_method, noise_zone, street_lday_min, street_lday_max, street_lnight_min, ' +
+  'street_lnight_max, yard_lday_min, yard_lday_max, yard_lnight_min, yard_lnight_max'
 await write<FeatureRow>(
   'hotel_features',
   ['hotel_id'],
@@ -233,7 +243,8 @@ const hotelsWith = (pick: (property: string) => boolean) =>
   new Set(store.claims.filter((c) => pick(c.property)).map((c) => c.entity)).size
 await writeClaims(supabase, store, dryRun)
 console.log(
-  `claims: hotels with EEA bands ${hotelsWith((p) => /^noise\.l(den|night)\./.test(p))}, with a day estimate ` +
+  `claims: hotels with EEA bands ${hotelsWith((p) => /^noise\.l(den|night)\./.test(p))}, with the facade estimate ` +
+    `${hotelsWith((p) => p.startsWith('noise.estimate.street.'))} (with places counted ${hotelsWith((p) => p.startsWith('noise.estimate.venues.'))}), with a day estimate ` +
     `${hotelsWith((p) => p.startsWith('noise.lday.'))}, with loud places nearby ${hotelsWith((p) => p === 'noise.nearby.distance')}, ` +
     `with places within ${NEARBY_RADIUS_M} m ${hotelsWith((p) => p === 'nearby.distance')}, with a building ${hotelsWith((p) => p === 'building.nearest.distance')}, ` +
     `with reviews ${new Set(store.documents.map((d) => d.hotel_id)).size} (${store.documents.length}), with mentions of noise ` +

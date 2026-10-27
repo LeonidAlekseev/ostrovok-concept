@@ -143,7 +143,7 @@ describe('HotelView', () => {
     render(<HotelView hotel={hotel} building={building} roomFloors={null} />)
     expect(screen.getByRole('heading', { level: 2, name: 'Вид из отеля' })).toBeTruthy()
     const window = screen.getByRole('region', { name: 'Положение окна' })
-    expect(within(window).getByText('здание 12 этажей, ≈ 36 м (по оценке EUBUCCO)')).toBeTruthy()
+    expect(within(window).getByText('здание 12 этажей, ≈ 36 м')).toBeTruthy()
     expect(within(window).getByText('окно 12-го этажа, ≈ 34,5 м над землёй')).toBeTruthy()
     expect(floorSlider().getAttribute('aria-valuenow')).toBe('12')
     const sea = screen.getByRole('region', { name: 'Море' })
@@ -155,9 +155,7 @@ describe('HotelView', () => {
     expect(within(landmarks).getByText('Torres de Serranos')).toBeTruthy()
     expect(within(landmarks).getByText('не видно ни с одного этажа')).toBeTruthy()
     expect(within(landmarks).getByText('видно со всех этажей')).toBeTruthy()
-    expect(
-      within(landmarks).getByText('С 12-го этажа — закрыто зданием ≈ 45 м (по оценке EUBUCCO) в 40 м от отеля'),
-    ).toBeTruthy()
+    expect(within(landmarks).getByText('С 12-го этажа — закрыто зданием ≈ 45 м в 40 м от отеля')).toBeTruthy()
     // The sun's ray of the west is closed: its building is in the way.
     await waitFor(() => expect(screen.getByTestId('view-map').textContent).toMatch(/^90 3 \[b1\] own/))
     expect(fetchMock).toHaveBeenCalledWith('/api/hotels/ota-1/view', expect.anything())
@@ -170,9 +168,7 @@ describe('HotelView', () => {
     await waitFor(() => expect(within(sea).getByText('С 12-го этажа — видно')).toBeTruthy())
     fireEvent.change(floorSlider(), { target: { value: '3' } })
     expect(screen.getByText('окно 3-го этажа, ≈ 7,5 м над землёй')).toBeTruthy()
-    expect(
-      within(sea).getByText('С 3-го этажа — закрыто зданием ≈ 40 м (по оценке EUBUCCO) в 800 м от отеля'),
-    ).toBeTruthy()
+    expect(within(sea).getByText('С 3-го этажа — закрыто зданием ≈ 40 м в 800 м от отеля')).toBeTruthy()
     expect(within(sea).getByText('С 3-го этажа море видно в 0 из 1 направления на берег.')).toBeTruthy()
     // The reach of a target is the same from any floor.
     expect(within(sea).getByText('видно с 9-го этажа')).toBeTruthy()

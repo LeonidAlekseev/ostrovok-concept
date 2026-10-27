@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { diffRows, featureRow, viewRows, type FeatureRow, type ViewRow } from './featureRows'
+import { noiseEstimate, type HotelNoise } from './noise'
 
 const geo = {
   building: {
@@ -18,30 +19,28 @@ const geo = {
     floors_confidence_upper: null,
   },
   noise: [],
-  loudest: {
-    Lden: {
-      source: 'roadsInAgglomeration',
-      db_min: 65,
-      db_max: 69,
-      band_db: 5,
-      category: 'Lden6569',
-      dataset: 'eea-noise-end2022-v01_r00',
-    },
-    Lnight: {
-      source: 'roadsInAgglomeration',
-      db_min: null,
-      db_max: 39,
-      band_db: null,
-      category: 'LnightLowerThan40',
-      dataset: 'eea-noise-end2022-v01_r00',
-    },
-  },
 }
 
+/** The facade of the hotel: the roads to the street, the estimate of noise-estimate-v1 from them and a bar. */
+const sources: HotelNoise['sources'] = [
+  { source: 'roadsInAgglomeration', lden: { min: 65, max: 69 }, lnight: { max: 39 } },
+  { source: 'industryInAgglomeration', lden: { max: 39 } },
+]
+const facadeNoise: HotelNoise = {
+  sources,
+  yard: [{ source: 'roadsInAgglomeration', lden: { max: 39 }, lnight: { max: 39 } }],
+  zone: { kind: 'building', buildingId: 'b-1', bufferM: 5 },
+  places: [{ category: 'bar', name: 'Homenaje', distanceM: 40, lat: 0, lon: 0 }],
+  placesCovered: [],
+}
+const estimate = noiseEstimate(facadeNoise)!
+const facade = { sources, dataset: 'eea-noise-end2022-v01_r00', estimate }
+const round = (value: number) => (Number.isFinite(value) ? Math.round(value * 10) / 10 : null)
+
 describe('featureRow', () => {
-  // geo-data, Requirement: Происхождение значений отеля
-  it('keeps the derived values and the sources, the floors rounded', () => {
-    expect(featureRow('ota-1', geo)).toEqual({
+  // geo-data, Requirement: Происхождение значений отеля; hotel-knowledge, Requirement: Оценка шума у фасада
+  it('keeps the derived values and the sources, the floors rounded, the loudest band and the estimate at the facade', () => {
+    expect(featureRow('ota-1', geo, facade)).toEqual({
       hotel_id: 'ota-1',
       building_id: 'b-1',
       height_m: 25.8,
@@ -61,7 +60,19 @@ describe('featureRow', () => {
       floors_lower: null,
       floors_upper: null,
       noise_dataset: 'eea-noise-end2022-v01_r00',
+      noise_method: 'noise-estimate-v1',
+      noise_zone: 'building',
+      street_lday_min: round(estimate.street.lday!.min),
+      street_lday_max: round(estimate.street.lday!.max),
+      street_lnight_min: round(estimate.street.lnight!.min),
+      street_lnight_max: round(estimate.street.lnight!.max),
+      yard_lday_min: round(estimate.yard.lday!.min),
+      yard_lday_max: round(estimate.yard.lday!.max),
+      yard_lnight_min: round(estimate.yard.lnight!.min),
+      yard_lnight_max: round(estimate.yard.lnight!.max),
     })
+    // The bar at 40 m is the only sound of the yard by night: 62 − 20·lg(4) ≈ 50 dB, over the roads below 40 dB.
+    expect(round(estimate.yard.lnight!.min)).toBe(50)
   })
 
   it('a floor bound of 0 is kept, a negative or missing one is not', () => {
@@ -71,7 +82,7 @@ describe('featureRow', () => {
       floors_confidence_upper: 2.5,
       height_confidence_lower: -1,
     }
-    expect(featureRow('ota-1', { ...geo, building })).toMatchObject({
+    expect(featureRow('ota-1', { ...geo, building }, facade)).toMatchObject({
       floors_lower: 0,
       floors_upper: 2.5,
       height_lower_m: null,
@@ -79,17 +90,25 @@ describe('featureRow', () => {
   })
 
   it('gives no row outside the data (another city)', () => {
-    expect(featureRow('ota-2', { building: null, loudest: {} })).toBeNull()
+    expect(featureRow('ota-2', { building: null }, { sources: [], dataset: null, estimate: null })).toBeNull()
   })
 
   it('keeps the noise of a point without a building nearby', () => {
-    expect(featureRow('ota-3', { building: null, loudest: { Lnight: geo.loudest.Lnight } })).toMatchObject({
+    expect(
+      featureRow(
+        'ota-3',
+        { building: null },
+        { sources: [{ source: 'roadsInAgglomeration', lnight: { max: 39 } }], dataset: facade.dataset, estimate: null },
+      ),
+    ).toMatchObject({
       building_id: null,
       floors: null,
       building_dataset: null,
       height_source: null,
       lnight_max: 39,
       noise_dataset: 'eea-noise-end2022-v01_r00',
+      noise_method: null,
+      street_lnight_max: null,
     })
   })
 })
@@ -141,7 +160,7 @@ describe('diffRows', () => {
   })
 
   it('deletes the rows gone from the data and rewrites the changed ones', () => {
-    const before = featureRow('ota-1', geo)!
+    const before = featureRow('ota-1', geo, facade)!
     const after: FeatureRow = { ...before, lnight_min: 40, lnight_max: 44 }
     // float4 comes back rounded.
     expect(diffRows([{ ...before, height_m: 25.799999 }], [before], (r) => r.hotel_id).upsert).toEqual([])

@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
   dayColorLevel,
-  dayCurve,
   dayEstimate,
   dayLabel,
   dayLevel,
+  energySum,
+  facadeOf,
   isHotelGeoQuestion,
   isNoiseQuestion,
-  levelAt,
+  ldenOf,
   loudestSource,
+  noiseEstimate,
+  venueLevel,
   noiseColor,
   noiseLines,
   placeLines,
@@ -26,12 +29,17 @@ const roads: HotelNoise = {
     { source: 'industryInAgglomeration', lden: { max: 39 }, lnight: { max: 39 } },
     { source: 'roadsInAgglomeration', lden: { min: 65, max: 69 }, lnight: { min: 55, max: 59 } },
   ],
+  yard: [
+    { source: 'industryInAgglomeration', lden: { max: 39 }, lnight: { max: 39 } },
+    { source: 'roadsInAgglomeration', lden: { max: 39 }, lnight: { max: 39 } },
+  ],
+  zone: { kind: 'building', buildingId: 'b-1', bufferM: 5 },
   places: [
     { category: 'bar', name: 'Homenaje', distanceM: 91.9, lat: 39.47, lon: -0.376 },
     { category: 'tram', name: null, distanceM: 120, lat: 39.47, lon: -0.377 },
     { category: 'bar', name: 'Sereno', distanceM: 150, lat: 39.47, lon: -0.378 },
   ],
-  placesCovered: ['nightclub', 'bar', 'restaurant', 'fast_food', 'tram', 'train_station'],
+  placesCovered: ['nightclub', 'bar', 'restaurant', 'cafe', 'fast_food', 'tram', 'train_station'],
 }
 
 // hotel-page, Requirement: Шум и окружение настоящего отеля
@@ -95,36 +103,6 @@ describe('dayEstimate', () => {
   })
 })
 
-describe('the day curve', () => {
-  it('is the night at night, the day by day and smooth between', () => {
-    expect(levelAt(3, 60, 50)).toBe(50)
-    expect(levelAt(12, 60, 50)).toBe(60)
-    expect(levelAt(20, 60, 50)).toBe(60)
-    expect(levelAt(7, 60, 50)).toBeCloseTo(55, 6)
-    expect(levelAt(23, 60, 50)).toBeCloseTo(55, 6)
-    expect(levelAt(6.5, 60, 50)).toBeGreaterThan(50)
-    expect(levelAt(6.5, 60, 50)).toBeLessThan(55)
-  })
-
-  it('draws the layer of the loudest Lden in half-hours', () => {
-    const curve = dayCurve(roads)!
-    expect(curve.levels).toHaveLength(48)
-    expect(curve.night).toBe(57.5)
-    expect(curve.levels[0]).toBe(57.5)
-    expect(curve.day).toBeCloseTo(dayLevel(67.5, 57.5)!, 6)
-    expect(curve.levels[24]).toBeCloseTo(curve.day, 6)
-  })
-
-  it('is not drawn for open bands', () => {
-    expect(
-      dayCurve({ sources: [{ source: 'roadsInAgglomeration', lden: { min: 75 }, lnight: { min: 65, max: 69 } }] }),
-    ).toBeNull()
-    expect(
-      dayCurve({ sources: [{ source: 'roadsInAgglomeration', lden: { min: 40, max: 44 }, lnight: { max: 39 } }] }),
-    ).toBeNull()
-  })
-})
-
 describe('the bands', () => {
   it('pick the loudest layer', () => {
     expect(loudestSource(roads, 'Lden')?.source).toBe('roadsInAgglomeration')
@@ -168,33 +146,145 @@ describe('the questions', () => {
 })
 
 describe('noiseLines', () => {
-  it('state the day estimate, the bands, the layers and the places, the day and the night first like the switch', () => {
+  it('state the estimate at the facade to the street and to the yard, the places, the layers and the places nearby', () => {
     const lines = noiseLines(roads)
-    expect(lines[0]).toBe(
-      'Днём (07:00–19:00): 59–69 дБ, громче всего — дороги города; это оценка из Lden и Lnight карты шума EEA 2022 по директиве ЕС 2002/49/EC (вечер принят равным дню, день — не тише ночи).',
+    expect(lines[0]).toMatch(
+      /^Оценка шума у фасада на улицу \(noise-estimate-v1: карты шума EEA 2022 и шумные места OpenStreetMap\): днём 59–69 дБ, вечером 59–69 дБ, ночью 55–60 дБ, за сутки \(Lden\) 65–70 дБ\.$/,
     )
-    expect(lines[1]).toMatch(/^Ночью \(Lnight, 23:00–07:00\): 55–59 дБ/)
-    expect(lines[2]).toBe(
-      'За сутки (Lden) по карте шума EEA 2022: 65–69 дБ, громче всего — дороги города; выше рекомендации ВОЗ (53 дБ за сутки).',
+    expect(lines[1]).toMatch(/^Окна во двор \(самые тихие полосы EEA у здания и те же места\): днём /)
+    expect(lines[2]).toBe('Вклад заведений рядом (2 места в 200 м): днём ≈40 дБ, вечером ≈47 дБ, ночью ≈44 дБ.')
+    expect(lines[3]).toBe(
+      'Карты шума EEA у фасада на улицу: Промышленность ниже 40 дБ за сутки ниже 40 дБ ночью; Дороги города 65–69 дБ за сутки 55–59 дБ ночью; ночью выше рекомендации ВОЗ (45 дБ ночью).',
     )
-    expect(lines[3]).toMatch(/^Источники EEA у отеля: Промышленность ниже 40 дБ за сутки/)
     expect(lines[4]).toBe(
       'Шумные места OpenStreetMap в 200 м: 2 бара, ближайшее место «Homenaje» — 90 м; 1 остановка трамвая, ближайшее место — 120 м.',
     )
   })
 
   it('say there is no EEA data, never that it is quiet', () => {
-    const lines = noiseLines({ sources: [], places: [], placesCovered: [] })
+    const lines = noiseLines({ sources: [], yard: [], zone: null, places: [], placesCovered: [] })
     expect(lines).toEqual([expect.stringMatching(/^Нет данных EEA/)])
     expect(lines.join(' ')).not.toMatch(/тих/i)
   })
 
   it('tell no loud places only when OSM covers every category', () => {
-    expect(noiseLines({ ...roads, places: [] }).at(-1)).toMatch(/^Баров, клубов.*нет\.$/)
+    expect(noiseLines({ ...roads, places: [] }).at(-1)).toMatch(/^Баров, клубов, ресторанов, кафе.*нет\.$/)
     expect(placeLines({ places: [] })).toEqual([])
   })
 
   it('are none without the data', () => {
     expect(noiseLines(null)).toEqual([])
+  })
+})
+
+// hotel-knowledge, Requirement: Оценка шума у фасада
+describe('noise-estimate-v1', () => {
+  it('lets a place fall by 20·lg(d/10) from its level at 10 m, no closer than 3 m', () => {
+    expect(venueLevel(60, 10)).toBe(60)
+    expect(venueLevel(60, 100)).toBeCloseTo(40, 6)
+    expect(venueLevel(62, 1)).toBeCloseTo(venueLevel(62, 3), 6)
+    expect(venueLevel(62, 3)).toBeCloseTo(62 + 10.46, 2)
+  })
+
+  it('sums by energy, an open end open', () => {
+    expect(energySum([60, 60])).toBeCloseTo(63.01, 2)
+    expect(energySum([70, -Infinity])).toBe(70)
+    expect(energySum([-Infinity])).toBe(-Infinity)
+    expect(energySum([])).toBe(-Infinity)
+    expect(energySum([50, Infinity])).toBe(Infinity)
+    expect(ldenOf(60, 60, 50)).toBeCloseTo(lden(60, 60, 50), 6)
+    expect(ldenOf(60, -Infinity, -Infinity)).toBeCloseTo(10 * Math.log10(0.5 * 10 ** 6), 6)
+  })
+
+  // The hotel ota-9741622 of Valencia, BirdHouse: the street at its door is 70–74 dB, its point only in industry.
+  const birdhouse: HotelNoise = {
+    sources: [
+      { source: 'roadsInAgglomeration', lden: { min: 70, max: 74 }, lnight: { min: 65, max: 69 } },
+      { source: 'industryInAgglomeration', lden: { max: 39 }, lnight: { max: 39 } },
+      { source: 'railwaysInAgglomeration', lden: { max: 39 }, lnight: { max: 39 } },
+    ],
+    yard: [
+      { source: 'industryInAgglomeration', lden: { max: 39 }, lnight: { max: 39 } },
+      { source: 'railwaysInAgglomeration', lden: { max: 39 }, lnight: { max: 39 } },
+      { source: 'roadsInAgglomeration', lden: { max: 39 }, lnight: { max: 39 } },
+    ],
+    zone: { kind: 'building', buildingId: '21adf97303954791-16', bufferM: 5 },
+    places: [
+      { category: 'cafe', name: 'Cerveceria Tamesis', distanceM: 47.6, lat: 0, lon: 0 },
+      { category: 'restaurant', name: 'Pasión turca', distanceM: 52.7, lat: 0, lon: 0 },
+      { category: 'cafe', name: 'Cervecería Taxi-Driver', distanceM: 75.2, lat: 0, lon: 0 },
+      { category: 'bar', name: 'cerveceria tames', distanceM: 85.5, lat: 0, lon: 0 },
+      { category: 'tram', name: null, distanceM: 90, lat: 0, lon: 0 },
+    ],
+    placesCovered: [],
+  }
+
+  it('reads the street at the facade, not the industry at the point', () => {
+    const estimate = noiseEstimate(birdhouse)!
+    expect(estimate.eea.street.lden).toEqual({ min: 70, max: expect.closeTo(75, 1) })
+    expect(estimate.eea.street.lnight!.min).toBe(65)
+    expect(estimate.eea.street.lnight!.max).toBeCloseTo(70, 1)
+    expect(estimate.street.lday!.min).toBeGreaterThan(65)
+    expect(estimate.street.lday!.max).toBeCloseTo(73.15, 1)
+    expect(dayLabel(estimate.street.lnight!)).toBe('65–70 дБ')
+    // The tram stop is no venue; the bar is the only one open at night: 62 − 20·lg(8.55).
+    expect(estimate.counted.map((v) => v.category)).toEqual(['cafe', 'restaurant', 'cafe', 'bar'])
+    expect(estimate.venues.lnight).toBeCloseTo(venueLevel(62, 85.5), 6)
+    expect(estimate.venues.lday).toBeCloseTo(
+      energySum([venueLevel(60, 47.6), venueLevel(60, 52.7), venueLevel(60, 75.2), venueLevel(58, 85.5)]),
+      6,
+    )
+    // The yard: the quietest bands below 40 dB, the places on top of them (no screening).
+    expect(estimate.yard.lnight!.min).toBeCloseTo(venueLevel(62, 85.5), 6)
+    expect(estimate.yard.lnight!.max).toBeCloseTo(energySum([40, 40, 40, venueLevel(62, 85.5)]), 6)
+  })
+
+  it('keeps an open band open at the top', () => {
+    const estimate = noiseEstimate({
+      ...birdhouse,
+      sources: [{ source: 'roadsInAgglomeration', lden: { min: 75 }, lnight: { min: 70 } }],
+    })!
+    expect(estimate.street.lnight!.max).toBe(Infinity)
+    expect(dayLabel(estimate.street.lnight!)).toBe('от 70 дБ')
+    expect(estimate.street.lday!.max).toBe(Infinity)
+  })
+
+  it('makes no estimate without an EEA band at the facade, and leaves out a layer without a day', () => {
+    expect(noiseEstimate({ ...birdhouse, sources: [], yard: [] })).toBeNull()
+    const airport = noiseEstimate({
+      ...birdhouse,
+      sources: [{ source: 'majorAirportsIncludingAgglomeration', lden: { min: 55, max: 59 } }],
+      places: [],
+    })!
+    expect(airport.noDay).toEqual(['majorAirportsIncludingAgglomeration'])
+    expect(airport.street.lday).toBeNull()
+    expect(airport.venues).toEqual({ lday: null, levening: null, lnight: null, lden: null })
+  })
+
+  it('reads the answer of hotel_noise_facade, the louder layer first', () => {
+    const facade = facadeOf({
+      zone: { kind: 'building', building_id: 'b-1', buffer_m: 5 },
+      bands: [
+        { side: 'street', source: 'industryInAgglomeration', indicator: 'Lden', db_min: null, db_max: 39 },
+        { side: 'street', source: 'roadsInAgglomeration', indicator: 'Lden', db_min: 70, db_max: 74 },
+        { side: 'street', source: 'roadsInAgglomeration', indicator: 'Lnight', db_min: 65, db_max: 69 },
+        { side: 'yard', source: 'roadsInAgglomeration', indicator: 'Lnight', db_min: null, db_max: 39 },
+        { side: 'street', source: 'bad source', indicator: 'Lden', db_min: 50, db_max: 54 },
+        { side: 'roof', source: 'roadsInAgglomeration', indicator: 'Lden', db_min: 50, db_max: 54 },
+      ],
+    })
+    expect(facade).toEqual({
+      sources: [
+        { source: 'roadsInAgglomeration', lden: { min: 70, max: 74 }, lnight: { min: 65, max: 69 } },
+        { source: 'industryInAgglomeration', lden: { max: 39 } },
+      ],
+      yard: [{ source: 'roadsInAgglomeration', lnight: { max: 39 } }],
+      zone: { kind: 'building', buildingId: 'b-1', bufferM: 5 },
+    })
+    expect(facadeOf({ zone: { kind: 'circle', radius_m: 25 }, bands: [] }).zone).toEqual({
+      kind: 'circle',
+      radiusM: 25,
+    })
+    expect(facadeOf(null)).toEqual({ sources: [], yard: [], zone: null })
   })
 })

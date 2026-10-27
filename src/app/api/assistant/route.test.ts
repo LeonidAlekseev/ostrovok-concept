@@ -703,7 +703,7 @@ describe('POST /api/assistant: a question about a hotel', () => {
       {
         agent: 'features',
         title: 'Анализ шума',
-        params: 'карты шума EEA, места OpenStreetMap, отзывы гостей',
+        params: 'оценка шума у фасада (карты шума EEA и места OpenStreetMap), отзывы гостей',
         status: 'done',
         result: sampleResult.summary,
         run: { id: expect.stringMatching(/^[0-9a-f-]{36}$/), result: sampleResult },

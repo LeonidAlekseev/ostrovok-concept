@@ -44,320 +44,92 @@
     "source": "model",
     "matches": [
       {
-        "id": "ota-9763824",
+        "id": "ota-7539056",
         "destinationId": "valencia",
-        "name": "Отель Atarazanas",
+        "name": "Parador de El Saler",
         "stayType": "hotel",
-        "stars": 4,
-        "rating": 8,
-        "reviewCount": 2,
-        "priceFrom": 11300,
-        "wifiMbps": null,
-        "workspace": true,
-        "isNew": false
-      },
-      {
-        "id": "ota-7851403",
-        "destinationId": "valencia",
-        "name": "Hostal Balcón al mar",
-        "stayType": "hostel",
-        "stars": 3,
-        "rating": 8.2,
-        "reviewCount": 102,
-        "priceFrom": 13000,
+        "stars": 5,
+        "rating": 8.4,
+        "reviewCount": 1368,
+        "priceFrom": 16200,
         "wifiMbps": null,
         "workspace": false,
         "isNew": false
       },
       {
-        "id": "ota-7568446",
+        "id": "ota-13178053",
         "destinationId": "valencia",
-        "name": "Hotel Sol Playa",
+        "name": "Gran Apartamento, un lujo en playa El Saler - Valencia",
         "stayType": "hotel",
-        "stars": 2,
-        "rating": 7.6,
-        "reviewCount": 301,
-        "priceFrom": 13400,
+        "stars": 4,
+        "rating": 0,
+        "reviewCount": 0,
+        "priceFrom": 23700,
+        "wifiMbps": null,
+        "workspace": false,
+        "isNew": false
+      },
+      {
+        "id": "ota-10552223",
+        "destinationId": "valencia",
+        "name": "Pamphylia Hotel",
+        "stayType": "hotel",
+        "stars": 3,
+        "rating": 0,
+        "reviewCount": 0,
+        "priceFrom": 16300,
         "wifiMbps": null,
         "workspace": false,
         "isNew": false
       }
     ],
     "features": {
-      "ota-9763824": {
-        "floors": 9,
-        "heightM": 23.4,
+      "ota-7539056": {
+        "floors": 3,
+        "heightM": 10.7,
+        "lden": {
+          "min": 50,
+          "max": 54
+        },
+        "lnight": {
+          "min": 40,
+          "max": 44
+        },
+        "views": [],
+        "seaM": 311
+      },
+      "ota-13178053": {
+        "floors": 14,
+        "heightM": 27.9,
+        "lden": {
+          "min": 50,
+          "max": 54
+        },
+        "lnight": {
+          "min": 40,
+          "max": 44
+        },
+        "views": [],
+        "seaM": 343
+      },
+      "ota-10552223": {
+        "floors": 4,
+        "heightM": 17,
         "lden": {
           "min": 55,
           "max": 59
         },
         "lnight": {
-          "max": 39
-        },
-        "views": [],
-        "seaM": 186
-      },
-      "ota-7851403": {
-        "floors": 6,
-        "heightM": 18.2,
-        "lden": {
-          "min": 65,
-          "max": 69
-        },
-        "lnight": {
-          "max": 39
-        },
-        "views": [],
-        "seaM": 207
-      },
-      "ota-7568446": {
-        "floors": 3,
-        "heightM": 16.1,
-        "lden": {
-          "max": 39
-        },
-        "lnight": {
-          "max": 39
+          "min": 45,
+          "max": 49
         },
         "views": [
           {
-            "roomName": "Номер Standard с видом на город",
-            "view": "city"
-          },
-          {
-            "roomName": "Номер Standard с видом на море",
+            "roomName": "Двухместный номер Deluxe с видом на море",
             "view": "sea"
-          },
-          {
-            "roomName": "Номер Standard с видом на воду",
-            "view": "water"
-          },
-          {
-            "roomName": "Номер Standard с красивым видом из окна",
-            "view": "nice"
-          },
-          {
-            "roomName": "Одноместный номер Standard с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Одноместный номер Standard с видом на воду",
-            "view": "water"
-          },
-          {
-            "roomName": "Трёхместный номер Standard с видом на внутренний двор",
-            "view": "courtyard"
-          },
-          {
-            "roomName": "Трёхместный номер Standard с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Трёхместный номер Standard с видом на воду",
-            "view": "water"
-          },
-          {
-            "roomName": "Четырёхместный номер Standard с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Четырёхместный номер Standard с видом на воду",
-            "view": "water"
-          },
-          {
-            "roomName": "Одноместный номер Standard с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Двухместный номер Standard с видом на город",
-            "view": "city"
-          },
-          {
-            "roomName": "Двухместный номер Standard с видом на внутренний двор",
-            "view": "courtyard"
-          },
-          {
-            "roomName": "Двухместный номер Standard с частичным видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Двухместный номер Standard с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Двухместный номер Standard с красивым видом из окна",
-            "view": "nice"
-          },
-          {
-            "roomName": "Трёхместный номер Standard с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Четырёхместный номер Standard с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Пятиместный номер Standard с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Одноместный номер Business с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Номер Superior с видом на реку",
-            "view": "water"
-          },
-          {
-            "roomName": "Номер Superior с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Одноместный номер Superior с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Одноместный номер Superior с видом на воду",
-            "view": "water"
-          },
-          {
-            "roomName": "Трёхместный номер Superior с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Трёхместный номер Superior с видом на воду",
-            "view": "water"
-          },
-          {
-            "roomName": "Четырёхместный номер Superior с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Четырёхместный номер Superior с видом на воду",
-            "view": "water"
-          },
-          {
-            "roomName": "Одноместный номер Superior с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Двухместный номер Superior с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Двухместный номер Superior с частичным видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Трёхместный номер Superior с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Четырёхместный номер Superior с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Номер Deluxe с видом на воду",
-            "view": "water"
-          },
-          {
-            "roomName": "Номер Classic с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Люкс с видом на город",
-            "view": "city"
-          },
-          {
-            "roomName": "Люкс с видом на сад",
-            "view": "garden"
-          },
-          {
-            "roomName": "Люкс с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Двухместный люкс с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Люкс Superior с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Люкс Superior с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Апартаменты с видом на город",
-            "view": "city"
-          },
-          {
-            "roomName": "Апартаменты с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Апартаменты с видом на воду",
-            "view": "water"
-          },
-          {
-            "roomName": "Двухместные апартаменты c 1 комнатой с видом на город",
-            "view": "city"
-          },
-          {
-            "roomName": "Двухместные апартаменты c 1 комнатой с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Двухместные апартаменты Standard c 1 комнатой с видом на город",
-            "view": "city"
-          },
-          {
-            "roomName": "Апартаменты Classic с видом на город",
-            "view": "city"
-          },
-          {
-            "roomName": "Апартаменты Classic с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Апартаменты Classic с красивым видом из окна",
-            "view": "nice"
-          },
-          {
-            "roomName": "Двухместные апартаменты Classic с видом на город",
-            "view": "city"
-          },
-          {
-            "roomName": "Двухместные апартаменты Classic с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Студия с видом на сад",
-            "view": "garden"
-          },
-          {
-            "roomName": "Студия с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Студия Superior с видом на море",
-            "view": "sea"
-          },
-          {
-            "roomName": "Коттедж с видом на воду",
-            "view": "water"
-          },
-          {
-            "roomName": "Коттедж с красивым видом из окна",
-            "view": "nice"
-          },
-          {
-            "roomName": "Коттедж Superior с видом на воду",
-            "view": "water"
           }
         ],
-        "seaM": 283
+        "seaM": 291
       }
     },
     "steps": [

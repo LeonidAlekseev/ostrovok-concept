@@ -131,7 +131,7 @@ const fromFloorTitle = (floor: number) => {
   return `${from.charAt(0).toLocaleUpperCase('ru')}${from.slice(1)} этажа`
 }
 
-/** «Со 2-го этажа — закрыто зданием ≈ 17,2 м (по оценке EUBUCCO) в 80 м от отеля». */
+/** «Со 2-го этажа — закрыто зданием ≈ 17,2 м в 80 м от отеля». */
 const floorLine = (line: SightLine | null | undefined, floor: number, eyeM: number, angle = 0) =>
   `${fromFloorTitle(floor)} — ${verdictText(line, eyeM, angle)}`
 
@@ -279,8 +279,7 @@ export function HotelView({
           Вид из отеля
         </h2>
         <p className="text-muted-foreground">
-          С какого этажа видно море, закат, восход и места рядом — по высотам зданий EUBUCCO и линии взгляда над
-          крышами.
+          С какого этажа видно море, закат, восход и места рядом — по высотам зданий и линии взгляда над крышами.
         </p>
       </div>
 

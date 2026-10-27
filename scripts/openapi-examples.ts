@@ -98,6 +98,17 @@ write('claims', {
   response: await call(`/api/hotels/${HOTEL}/claims?property=${claimsQuery.property}&limit=${claimsQuery.limit}`),
 })
 
+// The estimate at the facade of a hotel whose point lies in no contour of the roads, the street at its door 70 dB.
+const ESTIMATE_HOTEL = 'ota-9741622'
+const estimateQuery = { property: 'noise.estimate.street.', limit: 4 }
+write('claims-estimate', {
+  hotel: ESTIMATE_HOTEL,
+  query: estimateQuery,
+  response: await call(
+    `/api/hotels/${ESTIMATE_HOTEL}/claims?property=${estimateQuery.property}&limit=${estimateQuery.limit}`,
+  ),
+})
+
 // A hotel with reviews about noise; the stemmer keeps «шум» and «шумно» apart, so the query lists both.
 const REVIEWS_HOTEL = 'ota-7857547'
 const searchQuery = { q: 'шумно or шум', limit: 3 }

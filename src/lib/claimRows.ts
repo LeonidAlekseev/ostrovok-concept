@@ -1,5 +1,24 @@
 import { confidenceFor, type ConfidenceKind } from './confidence'
-import { NOISY_CATEGORIES, dayEstimate } from './noise'
+import {
+  FACADE_BUFFER_M,
+  FACADE_CIRCLE_M,
+  NOISE_ESTIMATE_METHOD,
+  NOISY_CATEGORIES,
+  NOISY_RADIUS_M,
+  VENUE_LEVELS,
+  VENUE_MIN_DISTANCE_M,
+  VENUE_REFERENCE_M,
+  dayEstimate,
+  facadeOf,
+  isVenue,
+  noiseEstimate,
+  noisyRank,
+  type LevelRange,
+  type NoisePeriod,
+  type NoisyCategory,
+  type SideLevels,
+  type SourceNoise,
+} from './noise'
 import type { NoiseBand } from './features'
 import { mergePlaces, type OsmLike, type OstrovokLike } from './geo/samePlace'
 import { placeKind } from './ota/page'
@@ -463,6 +482,231 @@ export function nearbyStore(
     })
   }
   return store
+}
+
+export const ESTIMATE_METHOD =
+  'Оценка шума у фасада: самые громкие (улица) и самые тихие (двор) полосы карт шума EEA у контура здания, энергетическая сумма слоёв и шумных мест OpenStreetMap как точечных источников'
+
+/** What the estimate of noise-estimate-v1 does not take into account, for its calculation and the API's docs. */
+export const ESTIMATE_LIMITATIONS = [
+  'Модель, а не измерение: полосы стратегической карты шума EEA (END, раунд 2022) и типовые уровни заведений',
+  'Экранирование зданиями не учитывается: шум заведения доходит до фасада и двора без препятствий',
+  'Уровни снаружи у стены: окна, стены и звукоизоляция номеров не учитываются',
+  'Уровни заведений — типовые для вида (терраса, открытая дверь), а не измерение конкретного места; часы работы не проверяются',
+  'Расстояние до заведения — от точки отеля по прямой; заведения, которых нет в OpenStreetMap, не учтены',
+  'Дневной и вечерний уровни из Lden и Lnight при допущениях «вечер = день» и «день не тише ночи»',
+]
+
+/** The parameters of noise-estimate-v1, for the calculation's rows and the API's docs. */
+export const ESTIMATE_PARAMETERS = {
+  facade_buffer_m: FACADE_BUFFER_M,
+  circle_radius_m: FACADE_CIRCLE_M,
+  places_radius_m: NOISY_RADIUS_M,
+  reference_distance_m: VENUE_REFERENCE_M,
+  min_distance_m: VENUE_MIN_DISTANCE_M,
+  venue_levels_db: VENUE_LEVELS,
+  attenuation: 'L = Lref − 20·lg(d/10)',
+  sum: '10·lg Σ10^(L/10)',
+  lday: 'Директива ЕС 2002/49/EC, приложение I: Lday из Lden и Lnight (вечер = день, день не тише ночи)',
+  periods: 'день 07–19, вечер 19–23, ночь 23–07',
+} as const
+
+/** A bound of an estimate, to 0.1 dB; an infinite one is an open end. */
+const estimateBound = (value: number) => (Number.isFinite(value) ? Math.round(value * 10) / 10 : null)
+
+const bandsJson = (sources: readonly SourceNoise[]): JsonObject =>
+  Object.fromEntries(
+    sources.map((s) => [
+      s.source,
+      {
+        lden: s.lden ? { min: s.lden.min ?? null, max: s.lden.max ?? null } : null,
+        lnight: s.lnight ? { min: s.lnight.min ?? null, max: s.lnight.max ?? null } : null,
+      },
+    ]),
+  )
+
+const PERIOD_PROPERTY = ['lday', 'levening', 'lnight', 'lden'] as const satisfies readonly (keyof SideLevels)[]
+
+/** The EEA dataset of a `hotel_noise_facade` answer: all its bands come from one. */
+export function facadeDataset(facade: unknown): string | null {
+  const bands = facade && typeof facade === 'object' ? (facade as { bands?: unknown }).bands : null
+  for (const band of Array.isArray(bands) ? bands : []) {
+    const id = band && typeof band === 'object' ? text((band as { dataset?: unknown }).dataset) : null
+    if (id) return id
+  }
+  return null
+}
+
+/**
+ * The estimate of noise-estimate-v1 (`noiseEstimate`) from the answers of `hotel_noise_facade` and `osm_places_near`
+ * over `NOISY_CATEGORIES`, with the facade's bands and the loud places read, each place once (nearest first, under
+ * the first of its categories), as the page reads them.
+ */
+export function estimateOf(facade: unknown, near: unknown) {
+  const bands = facadeOf(facade)
+  const answer = near && typeof near === 'object' ? (near as { places?: unknown }).places : null
+  const seen = new Set<string>()
+  const places = (Array.isArray(answer) ? answer.map((p) => nearPlace(p)).filter((p) => p !== null) : [])
+    .sort(
+      (a, b) => a.distance - b.distance || noisyRank(a.category) - noisyRank(b.category) || a.ref.localeCompare(b.ref),
+    )
+    .filter((p) => !seen.has(p.ref) && Boolean(seen.add(p.ref)))
+  const estimate = noiseEstimate({
+    ...bands,
+    places: places.map((p) => ({
+      category: p.category as NoisyCategory,
+      name: p.name,
+      distanceM: p.distance,
+      lat: p.lat ?? 0,
+      lon: p.lon ?? 0,
+    })),
+  })
+  return { bands, places, estimate }
+}
+
+/**
+ * The estimate of noise-estimate-v1 at the hotel's facade (`noiseEstimate`) from `hotel_noise_facade` and the loud
+ * places of `osm_places_near`: `noise.estimate.street.<period>` and `noise.estimate.yard.<period>` (the facade to the
+ * street and the windows to the yard, the EEA layers and the places summed), `noise.estimate.facade.<period>` (the
+ * EEA layers alone, street side) and `noise.estimate.venues.<period>` (the places alone), all `derived` from one
+ * calculation with the datasets of EEA and EUBUCCO and the places of OSM as its inputs. Nothing without an EEA band
+ * at the facade.
+ */
+export function estimateStore(
+  hotel: ClaimHotel,
+  facade: unknown,
+  near: unknown,
+  datasets: readonly Dataset[],
+  buildingDataset: string | null,
+): Store {
+  const empty: Store = { entities: [], evidence: [], calculations: [], claims: [], relations: [], documents: [] }
+  const { bands, places, estimate } = estimateOf(facade, near)
+  if (!estimate) return empty
+  const byId = new Map(datasets.map((d) => [d.id, d]))
+  const evidence: EvidenceRow[] = []
+  const eea = facade && typeof facade === 'object' ? (facade as { bands?: unknown }).bands : null
+  const eeaIds = new Set(
+    (Array.isArray(eea) ? eea : []).flatMap((b) => {
+      const id = b && typeof b === 'object' ? text((b as { dataset?: unknown }).dataset) : null
+      return id ? [id] : []
+    }),
+  )
+  for (const id of eeaIds) {
+    const dataset = byId.get(id)
+    if (dataset) evidence.push(datasetEvidence(dataset, EEA))
+  }
+  const building = estimate.zone?.kind === 'building' && buildingDataset ? byId.get(buildingDataset) : undefined
+  if (building) evidence.push(datasetEvidence(building, EUBUCCO))
+  // The places `noiseEstimate` counts: the loud kinds of `VENUE_LEVELS` within the radius. A level of the places cites
+  // the places open in its period; the others cite the datasets, and their calculation lists the places.
+  const counted = places.filter((p) => isVenue(p.category) && p.distance <= NOISY_RADIUS_M)
+  const placeEvidence = counted.map(osmEvidence)
+  const asInputs = (rows: readonly EvidenceRow[]) =>
+    rows.map((e) => ({ evidence: evidenceKey(e), role: 'input' as const }))
+  const datasetInputs = asInputs(evidence)
+  const openIn = (period: NoisePeriod) =>
+    asInputs(counted.filter((p) => isVenue(p.category) && period in VENUE_LEVELS[p.category]).map(osmEvidence))
+  const key = `noise.estimate:${hotel.id}`
+  const hotelKey = entityKey(hotelEntity(hotel))
+  const claims: ClaimRow[] = []
+  const claim = (
+    property: string,
+    value: { min: number | null; max: number | null } | number,
+    kind: ConfidenceKind,
+    inputs = datasetInputs,
+  ) => {
+    const range = typeof value === 'number' ? null : value
+    if (range && range.min === null && range.max === null) return
+    claims.push({
+      entity: hotelKey,
+      property,
+      source_key: '',
+      value_numeric: typeof value === 'number' ? Math.round(value * 10) / 10 : null,
+      value_min: range?.min ?? null,
+      value_max: range?.max ?? null,
+      value_text: null,
+      unit: 'dB',
+      epistemic_status: 'derived',
+      ...rated(kind, { name: NOISE_ESTIMATE_METHOD }),
+      calculation: key,
+      observed_at: null,
+      limitations: [],
+      evidence: inputs,
+    })
+  }
+  const bounds = (range: LevelRange) => ({ min: estimateBound(range.min), max: estimateBound(range.max) })
+  const withPlaces = estimate.counted.length > 0
+  for (const side of ['street', 'yard'] as const)
+    for (const period of PERIOD_PROPERTY) {
+      const range = estimate[side][period]
+      const day = period === 'lday' || period === 'levening'
+      if (range)
+        claim(
+          `noise.estimate.${side}.${period}`,
+          bounds(range),
+          withPlaces
+            ? day
+              ? 'noise_estimate_day'
+              : 'noise_estimate'
+            : day
+              ? 'noise_estimate_no_places_day'
+              : 'noise_estimate_no_places',
+        )
+    }
+  for (const period of PERIOD_PROPERTY) {
+    const range = estimate.eea.street[period]
+    if (range)
+      claim(
+        `noise.estimate.facade.${period}`,
+        bounds(range),
+        period === 'lday' || period === 'levening' ? 'facade_day' : 'facade_band',
+      )
+  }
+  for (const [period, of] of [
+    ['lday', 'day'],
+    ['levening', 'evening'],
+    ['lnight', 'night'],
+  ] as const) {
+    const level = estimate.venues[period]
+    if (level !== null) claim(`noise.estimate.venues.${period}`, level, 'venue_level', openIn(of))
+  }
+  const zone: Json =
+    estimate.zone?.kind === 'building'
+      ? { kind: 'building', building_id: estimate.zone.buildingId, buffer_m: estimate.zone.bufferM }
+      : estimate.zone
+        ? { kind: 'circle', radius_m: estimate.zone.radiusM }
+        : null
+  return {
+    entities: [hotelEntity(hotel)],
+    evidence: [...evidence, ...placeEvidence],
+    calculations: [
+      {
+        key,
+        method: ESTIMATE_METHOD,
+        version: NOISE_ESTIMATE_METHOD,
+        inputs: {
+          hotel_id: hotel.id,
+          zone,
+          street_bands: bandsJson(bands.sources),
+          yard_bands: bandsJson(bands.yard),
+          places: estimate.counted.map((v) => ({
+            category: v.category,
+            name: v.name,
+            distance_m: v.distanceM,
+            levels_db: Object.fromEntries(
+              Object.entries(v.levels).map(([period, level]) => [period, Math.round(level * 10) / 10]),
+            ),
+          })),
+          ...(estimate.noDay.length > 0 && { no_day_layers: estimate.noDay }),
+        },
+        parameters: ESTIMATE_PARAMETERS as unknown as JsonObject,
+        limitations: ESTIMATE_LIMITATIONS,
+      },
+    ],
+    claims,
+    relations: [],
+    documents: [],
+  }
 }
 
 /** The categories of src/lib/geo/categories.ts a guest needs near the hotel: a pharmacy, a shop, a doctor, a stop. */

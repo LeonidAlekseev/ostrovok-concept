@@ -94,7 +94,7 @@ describe('HotelPage of a real hotel with its Ostrovok page', () => {
       expect(within(overview).getByText(text)).toBeDefined()
     const facts = within(overview).getByRole('list', { name: 'Факты об отеле' })
     expect(within(facts).getByText('Номера занимают 6 этажей (по данным отеля)')).toBeDefined()
-    expect(within(facts).getByText('В здании 19 этажей (EUBUCCO)')).toBeDefined()
+    expect(within(facts).getByText('В здании 19 этажей')).toBeDefined()
   })
 
   it('shows no Wi‑Fi speed and the amenities by Ostrovok’s groups', async () => {
