@@ -103,15 +103,15 @@ describe('HotelNoise', () => {
     expect(screen.getByText('Lnight, дБ (ночью)')).toBeTruthy()
   })
 
-  it('greys out in the legend the day pieces whose bands fit no day, only when there are some', async () => {
+  it('says in the legend only that no colour means no EEA contour or beyond the radius', async () => {
     fetchMock.mockResolvedValue(
       Response.json({
         map: { type: 'FeatureCollection', features: [shape('quiet', 'Lday', null), shape('roads', 'Lday', null)] },
       }),
     )
     render(<HotelNoise hotel={hotel} noise={loud} />)
-    expect(await screen.findByText(/^Серым — полосы Lden и Lnight не сходятся/)).toBeTruthy()
-    await userEvent.click(screen.getByRole('button', { name: 'Ночью' }))
+    expect(await screen.findByText(/^Без цвета — нет контура EEA/)).toBeTruthy()
+    expect(screen.queryByText(/середина оценки дня/)).toBeNull()
     expect(screen.queryByText(/^Серым/)).toBeNull()
   })
 

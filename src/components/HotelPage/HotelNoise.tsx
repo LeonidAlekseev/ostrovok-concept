@@ -23,14 +23,12 @@ import {
   NOISE_COLORS,
   NOISE_MAP_LABEL,
   NOISE_MAP_RADIUS_M,
-  NOISE_UNKNOWN_COLOR,
   noiseColor,
   noiseSourceLabel,
   NOISY_CATEGORIES,
   NOISY_GROUPS,
   NOISY_LABEL,
   NOISY_RADIUS_M,
-  QUIET_SOURCE,
   whoLine,
   type HotelNoise as HotelNoiseData,
   type NoiseIndicator,
@@ -68,23 +66,10 @@ const MAP_TITLE: Record<NoiseMapIndicator, string> = {
 /** The places of OSM shown in the list. */
 const PLACES_SHOWN = 6
 
-/** A day piece on the map whose two bands fit no day level. */
-const isUnknown = (f: NoiseMapData['features'][number]) =>
-  f.properties.indicator === 'Lday' && f.properties.level === null && f.properties.source !== QUIET_SOURCE
-
 /**
- * The legend of the map: the colours of the bands, the quiet below 40 dB first, each under its lower bound, the grey of
- * the day pieces without an estimate when there are any, and the dots of the loud places shown.
+ * The legend of the map: the colours of the bands, the quiet below 40 dB first, each under its lower bound, and the dots of the loud places shown.
  */
-function Legend({
-  indicator,
-  places,
-  unknown,
-}: {
-  indicator: NoiseMapIndicator
-  places: readonly NoisyPlace[]
-  unknown: boolean
-}) {
+function Legend({ indicator, places }: { indicator: NoiseMapIndicator; places: readonly NoisyPlace[] }) {
   const groups = NOISY_GROUPS.filter((g) => places.some((p) => g.categories.includes(p.category)))
   return (
     <div className="flex flex-col gap-1.5 rounded-xl bg-card p-2.5 text-xs text-foreground shadow-sm sm:bg-white/90 sm:dark:bg-card/90">
@@ -114,15 +99,6 @@ function Legend({
           ))}
         </ul>
       )}
-      {indicator === 'Lday' && (
-        <span className="text-[0.625rem] text-muted-foreground">Цвет — середина оценки дня</span>
-      )}
-      {unknown && (
-        <span className="flex items-center gap-1.5 text-[0.625rem] text-muted-foreground">
-          <span className="h-2 w-7 shrink-0" style={{ backgroundColor: NOISE_UNKNOWN_COLOR }} aria-hidden />
-          Серым — полосы Lden и Lnight не сходятся, оценки нет
-        </span>
-      )}
       <span className="text-[0.625rem] text-muted-foreground">
         Без цвета — нет контура EEA или дальше {NOISE_MAP_RADIUS_M} м от отеля
       </span>
@@ -140,11 +116,7 @@ function NoiseMapCard({ hotel, noise }: { hotel: Hotel; noise: HotelNoiseData })
     <div className="flex flex-col gap-2 sm:relative">
       {!failed && (
         <div className="flex flex-wrap items-start justify-between gap-2 sm:pointer-events-none sm:absolute sm:inset-x-2 sm:top-2 sm:z-1">
-          <Legend
-            indicator={indicator}
-            places={noise.places}
-            unknown={indicator === 'Lday' && Boolean(contours?.features.some(isUnknown))}
-          />
+          <Legend indicator={indicator} places={noise.places} />
           <div
             role="group"
             aria-label="Показатель шума"
