@@ -3,7 +3,9 @@
 // `hotel_features`, the views of its room groups, one per `room_group_id` (the names of `ota_hotels.static_vm.room_groups`) into
 // `hotel_room_views`, and the noise map around each hotel computed ahead into `hotel_noise_maps` (the day pieces, the
 // quiet and the Lnight contours: too slow to compute on every request, see 20261027210000_hotel_noise_maps.sql).
-// Copies no raw data: only the derived values and the reference to the source. Run it after every reload of the
+// And the store of claims (src/lib/claimRows.ts, scripts/lib/claims-store.ts): EEA's bands at each hotel and the day
+// estimate from them, the loud OSM places within 200 m, the guests' reviews and their words about noise and quiet,
+// each with its evidence and calculation. Copies no raw data: only the derived values and the reference to the source. Run it after every reload of the
 // geodata (scripts/load-valencia-geo.py), or the noise maps stay those of the old contours.
 //   npm run db:features [-- --dry-run]   (Node runs the TypeScript itself; the keys come from .env.local)
 // `--dry-run` reads and counts, and writes nothing.
@@ -12,9 +14,13 @@
 // NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY; prints counts, never the keys. Afterwards: npm run db:embed.
 import { parseArgs } from 'node:util'
 import { serviceClient, type Table } from './lib/node.ts'
+import { writeClaims } from './lib/claims-store.ts'
 
 const { diffRows, featureRow, viewRows } = await import('../src/lib/featureRows.ts')
-const { NOISE_MAP_RADIUS_M } = await import('../src/lib/noise.ts')
+const { NOISE_MAP_RADIUS_M, NOISY_CATEGORIES, NOISY_PER_CATEGORY, NOISY_RADIUS_M } = await import('../src/lib/noise.ts')
+const { mergeStores, nearbyStore, noiseStore, reviewStore } = await import('../src/lib/claimRows.ts')
+type Store = import('../src/lib/claimRows.ts').Store
+type Dataset = import('../src/lib/claimRows.ts').Dataset
 type FeatureRow = import('../src/lib/featureRows.ts').FeatureRow
 type ViewRow = import('../src/lib/featureRows.ts').ViewRow
 type HotelGeo = import('../src/lib/featureRows.ts').HotelGeo
@@ -69,21 +75,56 @@ async function write<T extends object>(table: Table, keys: (keyof T & string)[],
   console.log(`${table}: ${next.length} rows, ${upsert.length} written, ${remove.length} deleted`)
 }
 
-const hotels = await readAll<{ id: string; lat: number; lon: number }>('hotels', 'id, lat, lon', ['id'], (q) =>
-  q.like('id', 'ota-%'),
+const hotels = await readAll<{ id: string; name: string | null; lat: number; lon: number }>(
+  'hotels',
+  'id, name:data->>name, lat, lon',
+  ['id'],
+  (q) => q.like('id', 'ota-%'),
 )
+const datasets = await readAll<Dataset>('geo_datasets', 'id, name, version, url, extract, processing, loaded_at', [
+  'id',
+])
 
-// The building and the noise of each hotel.
+// The building and the noise of each hotel, and the claims of its noise and of the loud places around it.
 const features: FeatureRow[] = []
+const stores: Store[] = []
+const near = { radiusM: NOISY_RADIUS_M, perCategory: NOISY_PER_CATEGORY }
 for (let i = 0; i < hotels.length; i += PARALLEL) {
   const rows = await Promise.all(
     hotels.slice(i, i + PARALLEL).map(async (hotel) => {
-      const { data, error } = await supabase.rpc('hotel_geo', { lat: hotel.lat, lon: hotel.lon })
-      if (error) throw new Error(`hotel_geo: ${error.message}`)
-      return featureRow(hotel.id, (data ?? {}) as HotelGeo)
+      const [geo, places] = await Promise.all([
+        supabase.rpc('hotel_geo', { lat: hotel.lat, lon: hotel.lon }),
+        supabase.rpc('osm_places_near', {
+          lat: hotel.lat,
+          lon: hotel.lon,
+          radius_m: near.radiusM,
+          wanted: [...NOISY_CATEGORIES],
+          per_category: near.perCategory,
+        }),
+      ])
+      if (geo.error) throw new Error(`hotel_geo: ${geo.error.message}`)
+      if (places.error) throw new Error(`osm_places_near: ${places.error.message}`)
+      const data = (geo.data ?? {}) as HotelGeo & { noise?: unknown }
+      stores.push(
+        noiseStore(hotel, Array.isArray(data.noise) ? data.noise : [], datasets),
+        nearbyStore(hotel, places.data, near),
+      )
+      return featureRow(hotel.id, data)
     }),
   )
   features.push(...rows.filter((row) => row !== null))
+}
+
+// The reviews of the hotels' pages.
+const pages = await readAll<{ master_id: number; updated_at: string; list: unknown[] | null }>(
+  'ota_hotel_pages',
+  'master_id, updated_at, list:reviews->list',
+  ['master_id'],
+)
+const byId = new Map(hotels.map((h) => [h.id, h]))
+for (const page of pages) {
+  const hotel = byId.get(`ota-${page.master_id}`)
+  if (hotel) stores.push(reviewStore(hotel, { ...page, list: page.list ?? [] }))
 }
 
 // The views of the room types of the hotels in the catalogue.
@@ -128,6 +169,17 @@ const count = (rows: FeatureRow[], pick: (row: FeatureRow) => unknown) => rows.f
 console.log(
   `hotels: ${hotels.length} real; with floors ${count(features, (r) => r.floors)}, with night noise ${count(features, (r) => r.lnight_max ?? r.lnight_min)}; ` +
     `with a view ${new Set(views.map((v) => v.hotel_id)).size} (${new Set(views.map((v) => `${v.hotel_id}:${v.rg_hash}`)).size} room groups)`,
+)
+
+const store = mergeStores(stores)
+const hotelsWith = (pick: (property: string) => boolean) =>
+  new Set(store.claims.filter((c) => pick(c.property)).map((c) => c.entity)).size
+await writeClaims(supabase, store, dryRun)
+console.log(
+  `claims: hotels with EEA bands ${hotelsWith((p) => /^noise\.l(den|night)\./.test(p))}, with a day estimate ` +
+    `${hotelsWith((p) => p.startsWith('noise.lday.'))}, with loud places nearby ${hotelsWith((p) => p === 'noise.nearby.distance')}, ` +
+    `with reviews ${new Set(store.documents.map((d) => d.hotel_id)).size} (${store.documents.length}), with mentions of noise ` +
+    `${hotelsWith((p) => p === 'noise.review.mention')} (${new Set(store.claims.filter((c) => c.property === 'noise.review.mention').map((c) => c.source_key.split(':')[0])).size} reviews)`,
 )
 
 // The noise maps of the hotels' points, recomputed every run: the contours may have been reloaded.
