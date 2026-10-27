@@ -5,22 +5,8 @@
 // SUPABASE_SERVICE_ROLE_KEY; prints counts, never the keys. The site sees the hotels after its catalogue cache
 // expires (an hour) or after `POST /api/revalidate`.
 import { readFile } from 'node:fs/promises'
-import { registerHooks } from 'node:module'
 import { parseArgs } from 'node:util'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '../src/lib/db/database.types.ts'
-
-// The app's modules import each other without extensions, as the bundler allows; Node needs `.ts`.
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    try {
-      return nextResolve(specifier, context)
-    } catch (error) {
-      if (specifier.startsWith('.') && !/\.[cm]?[jt]s$/.test(specifier)) return nextResolve(`${specifier}.ts`, context)
-      throw error
-    }
-  },
-})
+import { serviceClient, type Table } from './lib/node.ts'
 
 const { destinations } = await import('../src/data/destinations.ts')
 const { buildCatalog } = await import('../src/lib/catalogGenerator.ts')
@@ -30,21 +16,11 @@ const { otaSearchSchema } = await import('../src/lib/ota/search.ts')
 const DESTINATION_ID = 'valencia'
 // Rows of jsonb a request: small enough for the database's short statement timeout.
 const BATCH = 50
-/** A table of the schema, for the helpers that take its name. */
-type Table = keyof Database['public']['Tables']
 
 const { positionals } = parseArgs({ allowPositionals: true })
 if (positionals.length !== 1) throw new Error('usage: npm run db:seed:valencia -- <search.json>')
 
-function required(name: string): string {
-  const value = process.env[name]
-  if (!value) throw new Error(`${name} is not set: run npm run secrets:reveal`)
-  return value
-}
-
-const supabase = createClient<Database>(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
-  auth: { persistSession: false, autoRefreshToken: false },
-})
+const supabase = serviceClient()
 
 async function upsert(table: Table, key: string, rows: Record<string, unknown>[]) {
   for (let i = 0; i < rows.length; i += BATCH) {

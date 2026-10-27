@@ -4,22 +4,11 @@
 // `--plain-query` embeds the queries as documents (`input_type: passage`), to see what the asymmetric mode gives.
 // Needs NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY and NVIDIA_API_KEY; at most 40 requests a minute,
 // a 429 waits and tries again; prints no keys.
-import { registerHooks } from 'node:module'
 import { parseArgs } from 'node:util'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '../src/lib/db/database.types.ts'
 import { embed, rerank } from 'ai'
-
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    try {
-      return nextResolve(specifier, context)
-    } catch (error) {
-      if (specifier.startsWith('.') && !/\.[cm]?[jt]s$/.test(specifier)) return nextResolve(`${specifier}.ts`, context)
-      throw error
-    }
-  },
-})
+import { required } from './lib/node.ts'
 
 const { embeddingModel, toVector } = await import('../src/lib/ai/embedding.ts')
 const { NVIDIA_KEY, pacer, withRetry } = await import('../src/lib/ai/nvidia.ts')
@@ -32,12 +21,6 @@ const { values: options } = parseArgs({ options: { 'plain-query': { type: 'boole
 
 const TOP = 5
 const CANDIDATES = 30
-
-function required(name: string): string {
-  const value = process.env[name]
-  if (!value) throw new Error(`${name} is not set: run npm run secrets:reveal`)
-  return value
-}
 
 const apiKey = required(NVIDIA_KEY)
 const supabase = createClient<Database>(

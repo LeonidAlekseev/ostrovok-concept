@@ -7,22 +7,8 @@
 // Idempotent: writes only the new and changed rows and deletes the stale ones, so a second run over the same data
 // changes nothing. Only the real hotels (`ota-<master_id>`) are read; nothing is made up for the others. Needs
 // NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY; prints counts, never the keys. Afterwards: npm run db:embed.
-import { registerHooks } from 'node:module'
 import { parseArgs } from 'node:util'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '../src/lib/db/database.types.ts'
-
-// The app's modules import each other without extensions, as the bundler allows; Node needs `.ts`.
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    try {
-      return nextResolve(specifier, context)
-    } catch (error) {
-      if (specifier.startsWith('.') && !/\.[cm]?[jt]s$/.test(specifier)) return nextResolve(`${specifier}.ts`, context)
-      throw error
-    }
-  },
-})
+import { serviceClient, type Table } from './lib/node.ts'
 
 const { diffRows, featureRow, viewRows } = await import('../src/lib/featureRows.ts')
 type FeatureRow = import('../src/lib/featureRows.ts').FeatureRow
@@ -34,21 +20,11 @@ const { values: options } = parseArgs({ options: { 'dry-run': { type: 'boolean',
 const dryRun = options['dry-run']
 
 const PAGE = 1000
-/** A table of the schema, for the helpers that take its name. */
-type Table = keyof Database['public']['Tables']
 const BATCH = 200
 /** `hotel_geo` calls at a time. */
 const PARALLEL = 8
 
-function required(name: string): string {
-  const value = process.env[name]
-  if (!value) throw new Error(`${name} is not set: run npm run secrets:reveal`)
-  return value
-}
-
-const supabase = createClient<Database>(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
-  auth: { persistSession: false, autoRefreshToken: false },
-})
+const supabase = serviceClient()
 
 async function readAll<T>(
   table: Table | 'hotel_room_views_named',

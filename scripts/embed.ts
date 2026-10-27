@@ -4,22 +4,8 @@
 // Batches of BATCH texts, at most 40 requests a minute (the NVIDIA key's limit); a 429 or a 5xx is retried with a
 // pause. Needs NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and NVIDIA_API_KEY; prints counts, never the keys.
 // Exits with 1 on errors.
-import { registerHooks } from 'node:module'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '../src/lib/db/database.types.ts'
 import { embedMany } from 'ai'
-
-// The app's modules import each other without extensions, as the bundler allows; Node needs `.ts`.
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    try {
-      return nextResolve(specifier, context)
-    } catch (error) {
-      if (specifier.startsWith('.') && !/\.[cm]?[jt]s$/.test(specifier)) return nextResolve(`${specifier}.ts`, context)
-      throw error
-    }
-  },
-})
+import { required, serviceClient, type Table } from './lib/node.ts'
 
 const { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, contentHash, embeddingModel, toVector } =
   await import('../src/lib/ai/embedding.ts')
@@ -46,18 +32,8 @@ type RoomViewRow = import('../src/lib/features.ts').RoomViewRowRead
 
 const BATCH = 32
 const PAGE = 1000
-/** A table of the schema, for the helpers that take its name. */
-type Table = keyof Database['public']['Tables']
 
-function required(name: string): string {
-  const value = process.env[name]
-  if (!value) throw new Error(`${name} is not set: run npm run secrets:reveal`)
-  return value
-}
-
-const supabase = createClient<Database>(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
-  auth: { persistSession: false, autoRefreshToken: false },
-})
+const supabase = serviceClient()
 const model = embeddingModel(required(NVIDIA_KEY), 'passage')
 const turn = pacer()
 
