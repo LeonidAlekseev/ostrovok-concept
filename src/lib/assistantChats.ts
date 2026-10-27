@@ -10,6 +10,7 @@ import {
 import { clearDialog, isBrief, isPlan, isQuestion, loadDialog } from './assistantDialog'
 import { parseChatMap, type ChatMap } from './geo/chatMap'
 import { parseParams, type SessionParam } from './sessionMemory'
+import { parseToolRun, type ToolRun } from './toolResult'
 
 /**
  * The chats with Эвал. A message has a role, a status and structured data, so the feed holds the steps of Эвал's
@@ -29,6 +30,11 @@ export interface AgentStep {
   /** What it was called with, briefly in Russian. */
   params?: string
   result?: string
+  /**
+   * A tool of the contract (src/lib/toolResult.ts): its run with the sources and data, kept in the message so the
+   * block opens after a reload and in a shared snapshot. An older step has none and shows as before.
+   */
+  run?: ToolRun
 }
 
 /**
@@ -166,6 +172,18 @@ const isStep = (value: unknown): value is AgentStep =>
   (value.params === undefined || isString(value.params)) &&
   (value.result === undefined || isString(value.result))
 
+/** The known parts of a step; a run off the contract is dropped and the step shows as an older one. */
+function stepOf(value: AgentStep): AgentStep {
+  const run = parseToolRun(value.run)
+  return {
+    agent: value.agent,
+    title: value.title,
+    ...(value.params !== undefined && { params: value.params }),
+    ...(value.result !== undefined && { result: value.result }),
+    ...(run && { run }),
+  }
+}
+
 const isSize = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= 10_000
 /** The only pictures a message shows: its own data URL and the links of Supabase Storage. */
@@ -196,7 +214,7 @@ export function parseData(value: unknown): MessageData | null {
   return {
     ...(attachments.length > 0 && { attachments }),
     ...(value.plan !== undefined && { plan: value.plan as Plan }),
-    ...(value.step !== undefined && { step: value.step as AgentStep }),
+    ...(value.step !== undefined && { step: stepOf(value.step as AgentStep) }),
     ...(value.more === true && { more: true as const }),
     ...(isString(value.unverified) && value.unverified && { unverified: value.unverified }),
     ...(parseChatMap(value.map) && { map: parseChatMap(value.map) }),

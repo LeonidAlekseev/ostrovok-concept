@@ -269,3 +269,48 @@ export async function searchHotelChunks(hotelId: string, query: string, limit = 
     return chunksOf(data ?? [])
   })
 }
+
+/** At most this many sources are read at once. */
+export const EVIDENCE_LIMIT = 100
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** The rows of `evidence` read; a row it cannot read is left out. */
+export const evidenceOf = (rows: readonly unknown[]): ClaimEvidence[] =>
+  rows.flatMap((value) => {
+    const parsed = evidenceRow.safeParse(value)
+    if (!parsed.success) return []
+    const e = parsed.data
+    return [
+      {
+        id: e.id,
+        role: null,
+        type: e.type,
+        title: e.title,
+        provider: e.provider,
+        externalId: e.external_id,
+        url: e.url,
+        retrievedAt: e.retrieved_at,
+        excerpt: e.excerpt,
+        datasetId: e.dataset_id,
+      },
+    ]
+  })
+
+/**
+ * The sources of the ids for the real hotel whose chunks cite them (`HotelChunk.evidenceId`), in no order; `[]` for no
+ * id, `null` when they cannot be read.
+ */
+export async function loadEvidence(hotelId: string, ids: readonly string[]): Promise<ClaimEvidence[] | null> {
+  const wanted = [...new Set(ids)].filter((id) => UUID.test(id)).slice(0, EVIDENCE_LIMIT)
+  if (!isRealHotelId(hotelId)) return null
+  if (wanted.length === 0) return []
+  return readOrNull(hotelId, 'evidence', async () => {
+    const { data, error } = await anonClient()
+      .from('evidence')
+      .select('id, type, title, provider, external_id, url, retrieved_at, excerpt, dataset_id')
+      .in('id', wanted)
+    if (error) throw error
+    return evidenceOf(data ?? [])
+  })
+}

@@ -37,7 +37,10 @@ import { loadDestinations, loadHotel, loadHotelSummaries } from '@/lib/db/catalo
 import { loadHotelFeatures } from '@/lib/db/features'
 import { loadHotelDetails } from '@/lib/db/hotelDetails'
 import { loadHotelNoise } from '@/lib/db/noise'
-import { isHotelGeoQuestion, isHotelViewQuestion } from '@/lib/noise'
+import { recordRun, runOwner } from '@/lib/db/toolRuns'
+import { NOISE_TOOL, NOISE_TOOL_PARAMS, NOISE_TOOL_TITLE, runNoiseTool } from '@/lib/ai/noiseTool'
+import { isHotelGeoQuestion, isHotelViewQuestion, isNoiseQuestion } from '@/lib/noise'
+import type { ToolRun } from '@/lib/toolResult'
 import { todayIso, type IsoDate } from '@/lib/dates'
 import type { Hotel } from '@/lib/catalog'
 import { assistantRequestSchema } from './schema'
@@ -101,6 +104,9 @@ async function planTurn(context: Omit<TurnContext, 'summaries' | 'features'>): P
  * tools, the answer tells what they found — the Ostrovok places of the hotel first, OpenStreetMap besides — with the
  * steps' lines and the map; a hotel with neither data is answered as before. A question about the view from the
  * windows («видно ли море») is the view steps' (src/lib/ai/viewTurn.ts): the lines of sight over EUBUCCO's buildings.
+ * A question about the noise runs the tool «Анализ шума» (src/lib/ai/noiseTool.ts) first: the answer goes by its
+ * result, and its step carries the run with the sources for the block of the feed; a signed-in user's run is written
+ * to `tool_runs` (src/lib/db/toolRuns.ts).
  */
 async function hotelTurn(
   hotel: Hotel,
@@ -109,15 +115,31 @@ async function hotelTurn(
     messages,
     signal,
     deadline,
-  }: { brief: Brief; messages: AssistantRequest['messages']; signal: AbortSignal; deadline: number },
+    chatId,
+    messageId,
+  }: {
+    brief: Brief
+    messages: AssistantRequest['messages']
+    signal: AbortSignal
+    deadline: number
+    chatId?: string
+    messageId?: string
+  },
 ): Promise<Response> {
   const next: Brief = { ...brief, hotelId: hotel.id, destinationId: hotel.destinationId }
-  const [models, details, noise] = await Promise.all([
+  const text = messages[messages.length - 1].text
+  const [models, details, noise, noiseRun] = await Promise.all([
     getTextModels(),
     loadHotelDetails(hotel.id),
     loadHotelNoise(hotel),
+    isNoiseQuestion(text)
+      ? runOwner(chatId, messageId).then((owner) =>
+          recordRun(owner, NOISE_TOOL, `${hotel.name} (${hotel.id})`, () => runNoiseTool(hotel.id)),
+        )
+      : null,
   ])
-  const text = messages[messages.length - 1].text
+  const steps = noiseRun ? { steps: [noiseStep(noiseRun)] } : {}
+  const noiseTool = noiseRun?.result
   const geo = isHotelViewQuestion(text)
     ? await viewTurn(hotel, messages, {
         deadline,
@@ -151,7 +173,14 @@ async function hotelTurn(
     const result = await firstAnswer(
       models,
       (model, timeout) =>
-        answerWithModel(model, { messages }, hotel, { dates: brief.dates, features, details, noise, signal: timeout }),
+        answerWithModel(model, { messages }, hotel, {
+          dates: brief.dates,
+          features,
+          details,
+          noise,
+          noiseTool,
+          signal: timeout,
+        }),
       {
         deadline: textDeadline(deadline),
         signal,
@@ -165,19 +194,31 @@ async function hotelTurn(
         reply: answer,
         ...(unverified && { unverified }),
         source: 'model',
+        ...steps,
       } satisfies AssistantResponse)
     }
     down = result.failed.length > 0
     console.warn('assistant: no model answered a hotel question, using the rules')
   }
-  const { answer } = ruleAnswer(messages[messages.length - 1].text, hotel, brief.dates, details, noise)
+  const { answer } = ruleAnswer(text, hotel, brief.dates, details, noise, noiseTool)
   return Response.json({
     brief: next,
     reply: answer,
     source: 'rules',
     ...(down && { modelsDown: true }),
+    ...steps,
   } satisfies AssistantResponse)
 }
+
+/** The step of «Анализ шума» with its run: the block of the feed. */
+const noiseStep = (run: ToolRun): TurnStep => ({
+  agent: 'features',
+  title: NOISE_TOOL_TITLE,
+  params: NOISE_TOOL_PARAMS,
+  status: run.result.status === 'error' ? 'failed' : 'done',
+  result: run.result.summary.slice(0, 300),
+  run,
+})
 
 interface WishContext {
   messages: AssistantRequest['messages']
@@ -397,7 +438,10 @@ export async function POST(request: Request) {
   // A chat about a hotel answers about it; an id the catalogue does not know is a chat like any other.
   const hotel = brief.hotelId ? await loadHotel(brief.hotelId).catch(() => undefined) : undefined
   if (brief.hotelId && !hotel) delete brief.hotelId
-  if (hotel) return hotelTurn(hotel, { brief, messages, signal: request.signal, deadline })
+  if (hotel) {
+    const { chatId, messageId } = parsedBody.data
+    return hotelTurn(hotel, { brief, messages, signal: request.signal, deadline, chatId, messageId })
+  }
   const context: WishContext = { messages, brief, today, destinations, deadline, signal: request.signal }
   if (rerun) return Response.json(await rerunTurn(context))
   return Response.json(photos.length > 0 ? await photoTurn(photos, ip, context) : await wishTurn(context))

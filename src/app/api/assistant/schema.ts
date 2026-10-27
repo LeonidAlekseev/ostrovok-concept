@@ -12,9 +12,11 @@ import { VIEW_LABEL, type HotelFeatures, type ViewKind } from '@/lib/features'
 import type { ChatMap } from '@/lib/geo/chatMap'
 import { MAX_PHOTO_URL_LENGTH, PHOTO_DATA_URL } from '@/lib/ai/vision'
 import { RATE_LIMIT } from '@/lib/ai/rateLimit'
+import { toolRunSchema } from '@/lib/toolResult'
 import { component, errorSchema, sameType, type ApiOperation } from '@/lib/openapi/operation'
 import { hotelSummarySchema } from '../hotels/schema'
 import geoExample from '@/lib/openapi/examples/assistant-geo.json'
+import noiseExample from '@/lib/openapi/examples/assistant-noise.json'
 import wishExample from '@/lib/openapi/examples/assistant-wish.json'
 
 /** `POST /api/assistant`: the traveller's newest message to Эвал and its answer. */
@@ -41,6 +43,11 @@ export const assistantRequestSchema = z
       .max(MAX_PHOTOS)
       .optional()
       .meta({ description: 'Фото последнего сообщения: data URL WebP или JPEG' }),
+    chatId: z.uuid().optional().meta({
+      description:
+        'Чат вошедшего пользователя: сервер проверяет, что чат его, и записывает запуски инструментов в `tool_runs`',
+    }),
+    messageId: z.uuid().optional().meta({ description: 'Ожидающий ответ хода: запуски записываются с ним' }),
   })
   .refine(({ messages, rerun }) => rerun || messages.at(-1)?.role === 'user', 'The last message is the traveller’s')
 
@@ -124,6 +131,18 @@ const chatMapSchema = component(
     .meta({ description: 'Карта ответа об отеле: отель, найденные места и маршруты к ним' }),
 )
 
+/**
+ * The run of a tool of the contract (src/lib/toolResult.ts, docs/tools.md): its id (the row of `tool_runs` for a
+ * signed-in user) and its result with the sources, the characteristics, the calculations and the limitations.
+ */
+const toolRunComponent = component(
+  'ToolRun',
+  toolRunSchema.meta({
+    description:
+      'Запуск инструмента: `id` и `result` — статус, итог, источники (`evidence`, только из базы), характеристики с происхождением (`claims`), расчёты, ограничения, ошибка',
+  }),
+)
+
 export const assistantResponseSchema = component(
   'AssistantResponse',
   z
@@ -145,6 +164,7 @@ export const assistantResponseSchema = component(
             params: z.string().optional(),
             status: z.enum(['done', 'failed']),
             result: z.string().optional(),
+            run: toolRunComponent.optional(),
           }),
         )
         .optional()
@@ -176,7 +196,7 @@ export const assistantOperations: ApiOperation[] = [
     summary: 'Сообщение Эвалу',
     description: [
       'Новое сообщение путешественника:',
-      '- с `brief.hotelId` — вопрос об отеле: ответ из данных отеля, о местах рядом и маршрутах — с картой `map`, о виде из окон — по линиям взгляда;',
+      '- с `brief.hotelId` — вопрос об отеле: ответ из данных отеля, о местах рядом и маршрутах — с картой `map`, о виде из окон — по линиям взгляда, о шуме — по инструменту «Анализ шума» (шаг с `run`);',
       '- с `photos` — найти похожие отели или учесть фото в запросе;',
       '- иначе — пожелание: бриф дополняется, а когда он полный — отели `matches` поиска по смыслу.',
       '',
@@ -187,6 +207,7 @@ export const assistantOperations: ApiOperation[] = [
       schema: assistantRequestSchema,
       examples: {
         geo: { summary: 'Об отеле: места рядом и маршрут', value: geoExample.request },
+        noise: { summary: 'Об отеле: шум', value: noiseExample.request },
         wish: { summary: 'Пожелание с полным брифом', value: wishExample.request },
       },
     },
@@ -199,6 +220,11 @@ export const assistantOperations: ApiOperation[] = [
             summary: 'Аптека рядом с ota-9096882',
             description: 'Точки отеля и места, пеший маршрут',
             value: geoExample.response,
+          },
+          noise: {
+            summary: 'Шум у ota-9096882',
+            description: 'Шаг «Анализ шума» с запуском `run`: источники EEA и OpenStreetMap, характеристики, расчёты',
+            value: noiseExample.response,
           },
           wish: {
             summary: 'Тихий отель у моря в Валенсии',

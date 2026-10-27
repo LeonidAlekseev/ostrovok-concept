@@ -448,7 +448,7 @@ export const CHUNK_CHARS = 2000
 /** The mention's excerpt is cut to this many characters around its word. */
 export const MENTION_CHARS = 300
 
-const sentencesOf = (part: string) =>
+export const sentencesOf = (part: string) =>
   part
     .split(/(?<=[.!?…])\s+|\r?\n+/u)
     .map((s) => s.trim())
