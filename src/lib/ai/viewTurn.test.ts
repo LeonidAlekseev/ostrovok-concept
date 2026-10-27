@@ -217,6 +217,13 @@ describe('the view steps of a hotel question', () => {
     expect(outcome.summary).toMatch(/• «Ciutat de les Arts i les Ciències» \(место, .*\): возможны препятствия/)
   })
 
+  it('says so when the named place is not found', async () => {
+    const outcome = await viewTurn(hotel, ask('Видно ли Несуществующую башню?'), options())
+    expect(outcome.steps.at(-1)).toMatchObject({ title: 'Ищу на карте «Несуществующую башню»', status: 'failed' })
+    expect(outcome.summary).toMatch(/• «Несуществующую башню»: /)
+    expect(checkPoints).not.toHaveBeenCalled()
+  })
+
   it('says «недостаточно данных» without a reliable height of the building', async () => {
     const outcome = await viewTurn(hotel, ask('Видно ли море?'), options({ details: details({ building: null }) }))
     expect(loadView).not.toHaveBeenCalled()

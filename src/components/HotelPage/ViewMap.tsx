@@ -131,7 +131,7 @@ export default function ViewMap({
             id: 'view-sector',
             type: 'fill',
             source: 'view-sector',
-            paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0.18 },
+            paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0.3 },
           },
           labels,
         )

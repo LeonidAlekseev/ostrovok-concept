@@ -94,6 +94,8 @@ export function linesOf(answer: unknown, count: number): (SightLine | null)[] {
 interface Point {
   lat: number
   lon: number
+  /** The end of a ray of the horizon, not a target: the building there is an obstacle. */
+  horizon?: true
 }
 
 /** The lines from the hotel's window `eyeM` above the ground to the points, a call per `LINES_PER_CALL`. */
@@ -106,7 +108,7 @@ async function measure(db: Db, hotel: Point, eyeM: number, points: readonly Poin
         lat: hotel.lat,
         lon: hotel.lon,
         eye_m: eyeM,
-        targets: batch.map(({ lat, lon }) => ({ lat, lon })),
+        targets: batch.map(({ lat, lon, horizon }) => ({ lat, lon, ...(horizon && { horizon }) })),
       })
       if (error) throw error
       return linesOf(data, batch.length)
@@ -154,7 +156,10 @@ const readView = unstable_cache(
   async (_hotelId: string, lat: number, lon: number, eyeM: number, ostrovok: Landmark[]): Promise<Measured> => {
     const db = database()
     const hotel = { lat, lon }
-    const rayPoints = RAY_BEARINGS.map((bearing) => pointAt(hotel, bearing, RAY_LENGTH_M))
+    const rayPoints = RAY_BEARINGS.map((bearing) => ({
+      ...pointAt(hotel, bearing, RAY_LENGTH_M),
+      horizon: true as const,
+    }))
     const [rays, sea, attractions] = await Promise.all([
       measure(db, hotel, eyeM, rayPoints),
       db.rpc('osm_places_near', { lat, lon, radius_m: SEA_RADIUS_M, wanted: ['sea'], per_category: 20 }),
@@ -195,7 +200,7 @@ const readView = unstable_cache(
       landmarks: measured.filter((t) => t.kind !== 'sea').sort((a, b) => a.distanceM - b.distanceM),
     }
   },
-  [CATALOG_TAG, 'hotel-view'],
+  [CATALOG_TAG, 'hotel-view-v2'],
   { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME },
 )
 

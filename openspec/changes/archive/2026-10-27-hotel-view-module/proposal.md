@@ -24,5 +24,5 @@
 
 ## Impact
 
-- База: миграция `20261026150000_hotel_view.sql` (одна функция, без таблиц — размер базы не растёт).
+- База: миграции `20261026150000_hotel_view.sql` (функция) и `20261026150500_hotel_view_horizon.sql` (лучи горизонта: здание в конце луча — помеха), без таблиц — размер базы не растёт.
 - Код: `src/lib/view.ts`, `src/lib/db/view.ts`, `src/lib/ai/viewTurn.ts`, `src/app/api/hotels/[hotelId]/{view,view-map}/route.ts`, `src/components/HotelPage/{HotelView,ViewMap}.tsx`, `HotelPage`, `HotelTabs`, `src/lib/noise.ts` (маршрутизация вопросов), `src/app/api/assistant/route.ts`, `useChats`, `geoTurn` (экспорт `modelPlan`), `database.types.ts`, README.

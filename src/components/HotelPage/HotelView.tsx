@@ -381,9 +381,9 @@ export function HotelView({ hotel, building }: { hotel: Hotel; building: HotelBu
                   lines={[`азимут ${Math.round(sunset.azimuth)}°`]}
                 />
               )}
-              {inView.map(({ target, verdict }) => (
+              {inView.map(({ target, verdict }, i) => (
                 <Row
-                  key={`${target.kind}-${target.name}`}
+                  key={`${target.kind}-${target.name}-${i}`}
                   icon={Landmark}
                   title={target.name}
                   verdict={verdict}
@@ -404,9 +404,9 @@ export function HotelView({ hotel, building }: { hotel: Hotel; building: HotelBu
             Ориентиры до 3 км
           </h3>
           <ul className="grid gap-3 md:grid-cols-2">
-            {landmarks.map(({ target, verdict }) => (
+            {landmarks.map(({ target, verdict }, i) => (
               <Row
-                key={`${target.kind}-${target.name}`}
+                key={`${target.kind}-${target.name}-${i}`}
                 icon={Landmark}
                 title={target.name}
                 verdict={verdict}

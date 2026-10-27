@@ -1,6 +1,7 @@
 import 'server-only'
 import type { AssistantRequest, TurnStep } from '../assistant'
 import { todayIso } from '../dates'
+import { countRu } from '../format'
 import { checkViewPoints, loadHotelView } from '../db/view'
 import { CATEGORY } from '../geo/categories'
 import { MAP_ATTRIBUTION_TEXT, MAX_MAP_POINTS, distanceText, type ChatMap, type MapPoint } from '../geo/chatMap'
@@ -273,6 +274,7 @@ export async function viewTurn(
         const result = (await tools().geocode.execute!({ query: name }, options)) as GeoResult<Geocoded>
         const place = result.ok ? result.value.places[0] : undefined
         if (place) found.push({ label: place.name ?? place.displayName, category: 'место', point: place })
+        else lines.push(`• «${name}»: ${result.ok ? 'не нашёл на карте' : result.message}`)
         steps.push({
           agent: 'geo',
           title,
@@ -282,6 +284,7 @@ export async function viewTurn(
       } catch (error) {
         if (signal.aborted) throw error
         steps.push({ agent: 'geo', title, status: 'failed', result: 'не удалось проверить' })
+        lines.push(`• «${name}»: не удалось найти на карте.`)
       }
     }
     if (found.length) {
@@ -294,7 +297,9 @@ export async function viewTurn(
         agent: 'geo',
         title: `Проверяю, видно ли из окна: ${found.map((f) => `«${f.label}»`).join(', ')}`,
         status: sightLines ? 'done' : 'failed',
-        result: sightLines ? `${sightLines.filter(Boolean).length} линий взгляда` : 'не удалось проверить',
+        result: sightLines
+          ? countRu(sightLines.filter(Boolean).length, ['линия взгляда', 'линии взгляда', 'линий взгляда'])
+          : 'не удалось проверить',
       })
       found.forEach((f, i) => {
         const line: SightLine | null = sightLines?.[i] ?? null
