@@ -3,6 +3,7 @@ import { apiDocument } from '@/lib/openapi/document'
 import assistantGeo from '@/lib/openapi/examples/assistant-geo.json'
 import assistantWish from '@/lib/openapi/examples/assistant-wish.json'
 import hotelsBbox from '@/lib/openapi/examples/hotels-bbox.json'
+import relationsExample from '@/lib/openapi/examples/relations.json'
 import noiseMap from '@/lib/openapi/examples/noise-map.json'
 import view from '@/lib/openapi/examples/view.json'
 import viewMap from '@/lib/openapi/examples/view-map.json'
@@ -52,6 +53,14 @@ describe('geoOfResponse', () => {
     expect(answer.features[1].properties.color).toBe(HOTEL_COLOR)
   })
 
+  it('draws the places of the relations of the hotel, with their distances', () => {
+    const answer = geoOfResponse('/api/hotels/ota-9096882/relations', relationsExample.response, hotel)!
+    expect(kinds(answer)).toEqual([...relationsExample.response.relations.map(() => 'place'), 'hotel'])
+    expect(answer.features[0].properties.label).toMatch(/ · \d+(\.\d+)? м$/)
+    expect(hotelRoute('/api/hotels/ota-9096882/relations')).toEqual({ hotelId: 'ota-9096882', part: 'relations' })
+    expect(geoOfResponse('/api/hotels/ota-9096882/relations', { hotelId: 'x', relations: [] })).toBeNull()
+  })
+
   it('has nothing to draw of an answer without geo', () => {
     expect(geoOfResponse('/api/assistant', assistantWish.response)).toBeNull()
     expect(geoOfResponse('/api/hotels/ota-9096882/view', { view: null })).toBeNull()
@@ -90,6 +99,7 @@ describe('geoExamples', () => {
       '/api/hotels/ota-9096882/view',
       '/api/hotels/ota-9096882/view-map',
       '/api/hotels/ota-9096882/noise-map',
+      '/api/hotels/ota-9096882/relations',
       '/api/assistant',
     ])
     expect(examples.find((e) => e.path.endsWith('/noise-map'))?.title).toBe('Шум вокруг отеля · ota-9096882')

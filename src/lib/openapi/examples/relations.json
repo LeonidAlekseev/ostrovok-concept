@@ -1,0 +1,118 @@
+{
+  "query": {
+    "predicate": "near",
+    "category": "pharmacy",
+    "limit": 3
+  },
+  "response": {
+    "hotelId": "ota-9096882",
+    "relations": [
+      {
+        "id": "e47a88f0-beeb-4a9b-a0c4-0f6be2271889",
+        "predicate": "near",
+        "confidence": 1,
+        "object": {
+          "kind": "osm_place",
+          "ref": "node/2477521752",
+          "name": null,
+          "lat": 39.383047,
+          "lon": -0.3332363,
+          "categories": ["pharmacy"]
+        },
+        "claim": {
+          "id": "0a00dc88-8f9b-4c08-9bb2-1dde74bcc009",
+          "property": "nearby.distance",
+          "sourceKey": "node/2477521752",
+          "value": {
+            "kind": "number",
+            "value": 66.2
+          },
+          "unit": "m",
+          "status": "derived",
+          "confidence": 1,
+          "method": {
+            "categories": ["pharmacy"],
+            "confidence": {
+              "rule": "osm_distance",
+              "policy": "confidence-1"
+            }
+          },
+          "observedAt": null,
+          "validFrom": null,
+          "validTo": null,
+          "limitations": [],
+          "calculation": {
+            "id": "c46c2ab6-4473-4524-a2f5-36337d18738a",
+            "method": "osm_places_near: расстояние по прямой от точки отеля до формы объекта OSM; место Островка — его расстояние со страницы",
+            "version": "nearby-1",
+            "inputs": {
+              "lat": 39.3833,
+              "lon": -0.33254,
+              "covered": [
+                "beach",
+                "bus_stop",
+                "hospital",
+                "metro",
+                "park",
+                "pharmacy",
+                "supermarket",
+                "train_station",
+                "tram"
+              ],
+              "hotel_id": "ota-9096882"
+            },
+            "parameters": {
+              "radius_m": 1000,
+              "categories": [
+                "pharmacy",
+                "supermarket",
+                "hospital",
+                "bus_stop",
+                "tram",
+                "metro",
+                "train_station",
+                "beach",
+                "park"
+              ],
+              "per_category": 5
+            },
+            "limitations": [
+              "Кэш OSM ограничен тем, что загружено: места нет в кэше — не значит, что его нет на месте",
+              "Расстояние по прямой до формы объекта, не путь пешком",
+              "Не более 5 ближайших мест каждой категории",
+              "Место OSM, которое есть и на странице Островка, записано как место Островка"
+            ],
+            "computedAt": "2026-10-27T17:08:44.835+00:00"
+          },
+          "evidence": [
+            {
+              "id": "da6660b7-37f0-4274-af26-46a5c67b125d",
+              "role": "input",
+              "type": "osm",
+              "title": "node/2477521752",
+              "provider": "OpenStreetMap",
+              "externalId": "node/2477521752",
+              "url": "https://www.openstreetmap.org/node/2477521752",
+              "retrievedAt": "2026-10-26T19:30:00.378+00:00",
+              "excerpt": null,
+              "datasetId": null
+            }
+          ]
+        },
+        "evidence": {
+          "id": "da6660b7-37f0-4274-af26-46a5c67b125d",
+          "role": null,
+          "type": "osm",
+          "title": "node/2477521752",
+          "provider": "OpenStreetMap",
+          "externalId": "node/2477521752",
+          "url": "https://www.openstreetmap.org/node/2477521752",
+          "retrievedAt": "2026-10-26T19:30:00.378+00:00",
+          "excerpt": null,
+          "datasetId": null
+        }
+      }
+    ],
+    "truncated": false
+  }
+}

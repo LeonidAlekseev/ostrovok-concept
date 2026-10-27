@@ -16,19 +16,27 @@ describe.runIf(process.env.LIVE_DB === '1' && isSupabaseConfigured)('runNoiseToo
     expect(result.status).toBe('success')
     expect(result.summary).toMatch(/^Ночью 55–59 дБ \(дороги города\), днём оценка 55–63 дБ/)
     const night = result.claims.find((c) => c.label === 'Ночью (Lnight): дороги города')
-    expect(night).toMatchObject({ value: '55–59 дБ', status: 'reported', confidence: null })
+    // The confidence of the policy (confidence-1, #350): EEA's band 0,9.
+    expect(night).toMatchObject({ value: '55–59 дБ', status: 'reported', confidence: 0.9 })
     const eea = result.evidence.find((e) => e.id === night!.evidence_ids[0])
     expect(eea).toMatchObject({ source_type: 'dataset', source_name: 'EEA', source_id: 'eea-noise-end2022-v01_r00' })
     expect(eea!.source_url).toMatch(/^https:\/\/sdi\.eea\.europa\.eu\//)
     const day = result.claims.find((c) => c.label.startsWith('Днём') && c.label.endsWith('дороги города'))
-    expect(day).toMatchObject({ status: 'derived', value: '55–63 дБ' })
+    expect(day).toMatchObject({ status: 'derived', value: '55–63 дБ', confidence: 0.8 })
     const calculation = result.calculations.find((c) => c.id === day!.calculation_id)
     expect(calculation).toMatchObject({ version: '1' })
     expect(calculation!.inputs).toContainEqual({ label: 'Lden (сутки)', value: '60–64 дБ' })
     expect(calculation!.assumptions).toContain('Допущение: вечер так же громок, как день')
-    expect(result.claims).toContainEqual(expect.objectContaining({ label: 'Рестораны в 200 м', value: '4' }))
+    expect(result.claims).toContainEqual(
+      expect.objectContaining({ label: 'Рестораны в 200 м', value: '4', confidence: 0.9 }),
+    )
     const nearest = result.claims.find((c) => c.label.startsWith('Ближайшее место: ресторан'))
-    expect(nearest).toMatchObject({ label: 'Ближайшее место: ресторан «Pinares 14»', value: '40 м', status: 'derived' })
+    expect(nearest).toMatchObject({
+      label: 'Ближайшее место: ресторан «Pinares 14»',
+      value: '40 м',
+      status: 'derived',
+      confidence: 1,
+    })
     expect(result.evidence.find((e) => e.id === nearest!.evidence_ids[0])).toMatchObject({
       source_type: 'osm',
       source_id: 'node/1632037131',

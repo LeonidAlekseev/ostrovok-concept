@@ -1358,7 +1358,7 @@
         "tags": ["Функции"],
         "summary": "osm_places_near",
         "description": "Функция `osm_places_near` базы через PostgREST.",
-        "x-used-in": ["src/lib/db/noise.ts", "src/lib/db/view.ts", "src/lib/geo/store.ts"],
+        "x-used-in": ["src/lib/db/knowledge.ts", "src/lib/db/noise.ts", "src/lib/db/view.ts", "src/lib/geo/store.ts"],
         "requestBody": {
           "required": true,
           "content": {
