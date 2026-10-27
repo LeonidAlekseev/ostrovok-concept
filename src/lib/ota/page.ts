@@ -635,6 +635,7 @@ const buildingOf = (row: BuildingRow | null | undefined, roomFloors: number | nu
         floors: row.floors,
         heightM: row.height_m,
         estimated: row.floors_source === 'estimated' || (!row.floors_source && row.height_source === 'estimated'),
+        ...(row.height_source === 'estimated' && { heightEstimated: true }),
       }
     : null
 

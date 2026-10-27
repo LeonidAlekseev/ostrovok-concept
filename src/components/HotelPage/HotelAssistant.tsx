@@ -12,6 +12,7 @@ import { MAX_MESSAGE_LENGTH } from '@/lib/assistant'
 import { hotelChatOf, isPending, newId, type ChatMessage } from '@/lib/assistantChats'
 import type { Hotel } from '@/lib/catalog'
 import { useDestinations } from '../Catalog/useDestinations'
+import { MapMessage } from '../AssistantPage/MapMessage'
 import { useChats, type Chats } from '../AssistantPage/useChats'
 import { useHotelStay } from './stayContext'
 
@@ -58,6 +59,7 @@ function Bubble({ message, onRetry }: { message: ChatMessage; onRetry: () => voi
           <p className="whitespace-pre-wrap">{data.unverified}</p>
         </div>
       )}
+      {data.map && <MapMessage map={data.map} compact className="[&_figcaption]:text-[13px]" />}
       {status === 'failed' && (
         <Button variant="outline" size="sm" shape="pill" onClick={onRetry}>
           <RotateCcw className="size-4" aria-hidden />

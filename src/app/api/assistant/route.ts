@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import { firstAnswer } from '@/lib/ai/chain'
+import { geoTurn } from '@/lib/ai/geoTurn'
+import { viewTurn } from '@/lib/ai/viewTurn'
 import { answerWithModel, ruleAnswer } from '@/lib/ai/hotelAnswer'
 import { getTextModels, getVisionModels } from '@/lib/ai/model'
 import { APICallError } from 'ai'
@@ -38,6 +40,8 @@ import type { Destination } from '@/data/destinations'
 import { loadDestinations, loadHotel, loadHotelSummaries } from '@/lib/db/catalog'
 import { loadHotelFeatures } from '@/lib/db/features'
 import { loadHotelDetails } from '@/lib/db/hotelDetails'
+import { loadHotelNoise } from '@/lib/db/noise'
+import { isHotelGeoQuestion, isHotelViewQuestion } from '@/lib/noise'
 import { todayIso, type IsoDate } from '@/lib/dates'
 import type { Hotel } from '@/lib/catalog'
 
@@ -107,6 +111,10 @@ async function planTurn(context: Omit<TurnContext, 'summaries' | 'features'>): P
 /**
  * A question about the hotel the chat is on: the model answers from the hotel's data, with its general knowledge
  * apart; on a missing key, an error or a timeout the rules answer the ready-made questions (src/lib/ai/hotelAnswer.ts).
+ * A question about the places near is the geo steps' (src/lib/ai/geoTurn.ts): the model chooses the calls of the geo
+ * tools, the answer tells what they found — the Ostrovok places of the hotel first, OpenStreetMap besides — with the
+ * steps' lines and the map; a hotel with neither data is answered as before. A question about the view from the
+ * windows («видно ли море») is the view steps' (src/lib/ai/viewTurn.ts): the lines of sight over EUBUCCO's buildings.
  */
 async function hotelTurn(
   hotel: Hotel,
@@ -118,14 +126,46 @@ async function hotelTurn(
   }: { brief: Brief; messages: AssistantRequest['messages']; signal: AbortSignal; deadline: number },
 ): Promise<Response> {
   const next: Brief = { ...brief, hotelId: hotel.id, destinationId: hotel.destinationId }
-  const [models, details] = await Promise.all([getTextModels(), loadHotelDetails(hotel.id)])
+  const [models, details, noise] = await Promise.all([
+    getTextModels(),
+    loadHotelDetails(hotel.id),
+    loadHotelNoise(hotel),
+  ])
+  const text = messages[messages.length - 1].text
+  const geo = isHotelViewQuestion(text)
+    ? await viewTurn(hotel, messages, {
+        deadline,
+        signal,
+        details,
+        date: brief.dates?.checkIn,
+        models,
+        onError: (id, error) => warn(`${id} did not name the place of a view question`, error),
+      })
+    : isHotelGeoQuestion(text)
+      ? await geoTurn(hotel, messages, {
+          deadline,
+          signal,
+          models,
+          ostrovok: details?.nearby,
+          onError: (id, error) => warn(`${id} did not choose the geo calls`, error),
+        })
+      : null
+  if (geo)
+    return Response.json({
+      brief: next,
+      reply: geo.summary,
+      source: geo.planner,
+      steps: geo.steps,
+      ...(geo.map && { map: geo.map }),
+      ...(geo.modelsDown && { modelsDown: true }),
+    } satisfies AssistantResponse)
   let down = false
   if (models) {
     const features = (await loadHotelFeatures().catch(() => null))?.get(hotel.id)
     const result = await firstAnswer(
       models,
       (model, timeout) =>
-        answerWithModel(model, { messages }, hotel, { dates: brief.dates, features, details, signal: timeout }),
+        answerWithModel(model, { messages }, hotel, { dates: brief.dates, features, details, noise, signal: timeout }),
       {
         deadline: textDeadline(deadline),
         signal,
@@ -144,7 +184,7 @@ async function hotelTurn(
     down = result.failed.length > 0
     console.warn('assistant: no model answered a hotel question, using the rules')
   }
-  const { answer } = ruleAnswer(messages[messages.length - 1].text, hotel, brief.dates, details)
+  const { answer } = ruleAnswer(messages[messages.length - 1].text, hotel, brief.dates, details, noise)
   return Response.json({
     brief: next,
     reply: answer,

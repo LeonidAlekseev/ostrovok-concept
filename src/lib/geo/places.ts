@@ -14,6 +14,12 @@ import { outside, type GeoFailure, type GeoResult } from './result'
 export const ATTRIBUTION = '© OpenStreetMap contributors, ODbL 1.0'
 /** Overpass is asked online only this far around: farther the query is heavy and the places are not «рядом». */
 export const ONLINE_MAX_RADIUS_M = 5000
+/**
+ * The places asked about from far: a circle of 20 km never fits in the loaded area, but the area around the point has
+ * the airport, the centre and the coast of its city. They count as checked when the point itself is in an area loaded
+ * for them.
+ */
+export const FAR_CATEGORIES: readonly PlaceCategory[] = ['airport', 'centre', 'sea', 'beach']
 
 export interface Place extends LatLon {
   osmType: OsmType
@@ -129,6 +135,11 @@ export async function nearbyPlaces(
   const cached = await store.near(point, radiusM, categories, perCategory, budget)
   const covered = new Set(cached.ok ? cached.value.covered : [])
   let places = cached.ok ? cached.value.places : []
+  const far = categories.filter((c) => !covered.has(c) && FAR_CATEGORIES.includes(c))
+  if (cached.ok && far.length && radiusM > ONLINE_MAX_RADIUS_M) {
+    const here = await store.near(point, 1, far, 1, budget)
+    if (here.ok) here.value.covered.forEach((c) => covered.add(c))
+  }
   const missing = categories.filter((c) => !covered.has(c))
   const checked = new Set(covered)
   let failure: GeoFailure | undefined = cached.ok ? undefined : cached
@@ -160,7 +171,8 @@ export async function nearbyPlaces(
       label: CATEGORY[category].label,
       status: mine.length ? 'found' : done ? 'none' : 'unchecked',
       places: mine,
-      ...(!done && failure && { failure }),
+      // A far place the cache has is the answer, not a failure: nothing nearer is asked online anyway.
+      ...(!done && failure && !(mine.length && FAR_CATEGORIES.includes(category)) && { failure }),
     }
   })
   return { point, radiusM, groups, attribution: ATTRIBUTION }

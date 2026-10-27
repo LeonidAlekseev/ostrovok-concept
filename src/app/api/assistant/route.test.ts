@@ -2,6 +2,7 @@ import { APICallError, type LanguageModel } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ModelLink } from '@/lib/ai/chain'
+import { geoTurn } from '@/lib/ai/geoTurn'
 import { getTextModels, getVisionModels } from '@/lib/ai/model'
 import { allowVisionRequest } from '@/lib/ai/rateLimit'
 import { semanticSearch } from '@/lib/ai/semantic'
@@ -15,6 +16,7 @@ vi.mock('@/lib/ai/model', () => ({ getTextModels: vi.fn(), getVisionModels: vi.f
 vi.mock('@/lib/ai/semantic', () => ({ SEMANTIC_TIMEOUT_MS: 8000, semanticSearch: vi.fn() }))
 vi.mock('@/lib/db/catalog', () => import('@/test/catalog'))
 vi.mock('@/lib/db/features', () => ({ loadHotelFeatures: vi.fn() }))
+vi.mock('@/lib/ai/geoTurn', () => ({ geoTurn: vi.fn() }))
 
 const usage = {
   inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
@@ -78,6 +80,8 @@ beforeEach(() => {
   vi.spyOn(console, 'warn').mockImplementation(() => {})
   vi.mocked(semanticSearch).mockResolvedValue({ status: 'empty' })
   vi.mocked(loadHotelFeatures).mockResolvedValue(new Map())
+  // The tests' hotels have no places loaded: the geo steps give way to the hotel's data.
+  vi.mocked(geoTurn).mockResolvedValue(null)
 })
 afterEach(() => {
   vi.restoreAllMocks()
@@ -578,7 +582,7 @@ describe('POST /api/assistant: a question about a hotel', () => {
     expect(semanticSearch).not.toHaveBeenCalled()
   })
 
-  it('admits it has no places nearby without a key (Scenario: Без модели)', async () => {
+  it('admits it has no places nearby without a key (Scenario: Нет данных о местах)', async () => {
     setModel(undefined)
     const { reply, unverified } = await (await aboutHotel('Что рядом с отелем?')).json()
     expect(reply).toContain('данных о местах рядом пока нет')
@@ -625,6 +629,58 @@ describe('POST /api/assistant: a question about a hotel', () => {
     expect(body.reply).toMatch(/парковк/i)
     expect(body.modelsDown).toBe(true)
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('429 Rate limit exceeded'))
+  })
+
+  // assistant-geo, Requirement: Гео-шаги в ходе Эвала
+  it('answers a question about the places near with the geo steps and the map (Scenario: Сколько идти до аптеки)', async () => {
+    setModel(undefined)
+    const map = {
+      points: [
+        { kind: 'hotel' as const, label: hotel.name, lat: 50.08, lon: 14.42 },
+        { kind: 'place' as const, label: 'Lékárna', lat: 50.081, lon: 14.421 },
+      ],
+      routes: [],
+      attribution: '© OpenStreetMap',
+    }
+    const steps = [{ agent: 'geo' as const, title: 'Ищу рядом с отелем: аптека', status: 'done' as const }]
+    vi.mocked(geoTurn).mockResolvedValue({ steps, summary: 'По данным OpenStreetMap: …', map, planner: 'rules' })
+    const body = await (await aboutHotel('Сколько идти до аптеки?')).json()
+    expect(body).toEqual({
+      brief: { hotelId, destinationId: 'prague' },
+      reply: 'По данным OpenStreetMap: …',
+      source: 'rules',
+      steps,
+      map,
+    })
+    expect(vi.mocked(geoTurn).mock.calls[0][0]).toMatchObject({ id: hotelId })
+  })
+
+  it('asks the geo steps only of a question about the places near', async () => {
+    setModel(undefined)
+    await aboutHotel('Есть ли парковка?')
+    expect(geoTurn).not.toHaveBeenCalled()
+  })
+
+  // hotel-page, Requirement: Шум и окружение настоящего отеля
+  it('answers «шумно ли рядом» from the noise data, never by the geo steps', async () => {
+    setModel(undefined)
+    const body = await (await aboutHotel('Шумно ли рядом с отелем ночью?')).json()
+    expect(geoTurn).not.toHaveBeenCalled()
+    expect(body).toMatchObject({ reply: 'Сейчас не могу ответить: данных о шуме у этого отеля нет.', source: 'rules' })
+    await aboutHotel('Есть ли рядом бар?')
+    expect(geoTurn).toHaveBeenCalledTimes(1)
+  })
+
+  it('says the models are down when none chose the geo calls', async () => {
+    setModel(failing('boom'))
+    vi.mocked(geoTurn).mockResolvedValue({
+      steps: [],
+      summary: 'По данным OpenStreetMap: …',
+      planner: 'rules',
+      modelsDown: true,
+    })
+    const body = await (await aboutHotel('Есть ли рядом бар?')).json()
+    expect(body).toMatchObject({ source: 'rules', modelsDown: true })
   })
 
   it('treats an id the catalogue does not know as a chat like any other', async () => {

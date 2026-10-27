@@ -10,6 +10,7 @@ import {
 } from './features'
 import { addDays, formatShortRange, fromIso, nightsBetween, toIso, type IsoDate } from './dates'
 import { countRu, formatPrice } from './format'
+import { parseChatMap, type ChatMap } from './geo/chatMap'
 import { stayTotal } from './offer'
 import { MAX_NIGHTS, type Guests, type SearchQuery } from './search'
 
@@ -692,9 +693,9 @@ export interface PhotoAnswer {
 export interface TurnStep {
   /**
    * `search` picks the hotels by meaning, `features` checks their building, noise and views, `vision` looks at the
-   * photos (another model when the first failed).
+   * photos (another model when the first failed), `geo` is a call of a geo tool: the places near, a route.
    */
-  agent: 'search' | 'features' | 'vision'
+  agent: 'search' | 'features' | 'vision' | 'geo'
   title: string
   status: 'done' | 'failed'
   result?: string
@@ -722,6 +723,8 @@ export interface AssistantResponse {
   photo?: PhotoAnswer
   /** No text model answered, so the rules did: Эвал says so in a message of its own (`MODELS_DOWN`). */
   modelsDown?: true
+  /** A chat about a hotel: the map of the places near it the geo steps found. */
+  map?: ChatMap
 }
 
 /** What Эвал says about a hotel when it cannot answer at all (no network, the route is down). */
@@ -743,7 +746,7 @@ const isCriterion = (value: unknown): value is Criterion => value === 'quiet' ||
 const isStep = (value: unknown): value is TurnStep =>
   typeof value === 'object' &&
   value !== null &&
-  ['search', 'features', 'vision'].includes((value as TurnStep).agent) &&
+  ['search', 'features', 'vision', 'geo'].includes((value as TurnStep).agent) &&
   typeof (value as TurnStep).title === 'string' &&
   ['done', 'failed'].includes((value as TurnStep).status)
 const PHOTO_ACTIONS: readonly PhotoAnswer['action'][] = [
@@ -815,6 +818,7 @@ export async function askAssistant(
         ...(Array.isArray(data.steps) && { steps: data.steps.filter(isStep) }),
         ...(parsePhoto(data.photo) && { photo: parsePhoto(data.photo) }),
         ...(data.modelsDown === true && { modelsDown: true as const }),
+        ...(parseChatMap(data.map) && { map: parseChatMap(data.map) }),
       }
     }
     limited = response.status === 429
