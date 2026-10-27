@@ -1,5 +1,30 @@
-import { describe, expect, it } from 'vitest'
-import { noiseMapOf, placesOf, sourcesOf } from './noise'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { loadNoiseMap, noiseMapOf, placesOf, sourcesOf } from './noise'
+
+/** The answers of the database's functions by name, and the names asked. */
+const db = vi.hoisted(() => ({
+  answers: {} as Record<string, { data: unknown; error: { message: string } | null }>,
+  asked: [] as string[],
+}))
+vi.mock('@/lib/supabase/config', () => ({
+  isSupabaseConfigured: true,
+  supabaseUrl: 'https://project.supabase.test',
+  supabaseAnonKey: 'anon',
+}))
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: () => ({
+    rpc: async (name: string) => {
+      db.asked.push(name)
+      return db.answers[name] ?? { data: null, error: { message: `no ${name}` } }
+    },
+  }),
+}))
+vi.mock('next/cache', () => ({ unstable_cache: (read: unknown) => read }))
+
+beforeEach(() => {
+  db.answers = {}
+  db.asked = []
+})
 
 // hotel-page, Requirement: Шум и окружение настоящего отеля
 describe('sourcesOf', () => {
@@ -145,5 +170,42 @@ describe('placesOf', () => {
 
   it('has nothing for an answer it cannot read', () => {
     expect(placesOf(null)).toEqual({ places: [], placesCovered: [] })
+  })
+})
+
+// geo-data, Requirement: Готовые карты шума отелей
+describe('loadNoiseMap', () => {
+  const hotel = { id: 'ota-1', lat: 39.47, lon: -0.37 }
+  const night = {
+    type: 'Feature',
+    geometry: { type: 'Polygon', coordinates: [] },
+    properties: { layer: 'noise', source: 'roadsInAgglomeration', indicator: 'Lnight', db_min: 55, db_max: 59 },
+  }
+  const quiet = {
+    type: 'Feature',
+    geometry: { type: 'Polygon', coordinates: [] },
+    properties: { layer: 'noise', source: 'quiet', indicator: 'Lnight', db_min: null, db_max: 39 },
+  }
+
+  it('reads the map computed ahead in one call', async () => {
+    db.answers.hotel_noise_map = { data: { contours: [night], quiet: [quiet], day: [] }, error: null }
+    const map = await loadNoiseMap(hotel)
+    expect(db.asked).toEqual(['hotel_noise_map'])
+    expect(map).toEqual(noiseMapOf([night], [quiet], []))
+  })
+
+  it('computes the map when the point has none yet (Scenario: Новый отель до пересчёта)', async () => {
+    db.answers.hotel_noise_map = { data: null, error: null }
+    db.answers.hotel_geo_features = { data: { features: [night] }, error: null }
+    db.answers.hotel_noise_quiet = { data: { features: [quiet] }, error: null }
+    db.answers.hotel_noise_day = { data: { features: [] }, error: null }
+    const map = await loadNoiseMap(hotel)
+    expect(db.asked).toEqual(['hotel_noise_map', 'hotel_geo_features', 'hotel_noise_quiet', 'hotel_noise_day'])
+    expect(map).toEqual(noiseMapOf([night], [quiet], []))
+  })
+
+  it('reads no map for a synthetic hotel without asking', async () => {
+    expect(await loadNoiseMap({ ...hotel, id: 'prague-old-town-lantern' })).toBeNull()
+    expect(db.asked).toEqual([])
   })
 })

@@ -15,14 +15,15 @@ import {
   type NoisyCategory,
   type SourceNoise,
 } from '@/lib/noise'
-import { anonClient, catalogCached, readOrNull, warnShort, type HotelPoint } from './anon'
+import { anonClient, catalogCached, readOrNull, warnShort, type AnonClient, type HotelPoint } from './anon'
 
 /**
  * «Шум и окружение» of a real hotel for its page and for Эвал (`HotelNoise`): the EEA bands at its point by layer
  * (`hotel_geo`) and the loud places of the OSM cache around it (`osm_places_near`), and the noise around it for the
  * map: the day estimate of the pieces of `hotel_noise_day`, the Lnight contours of `hotel_geo_features` and the quiet of
- * `hotel_noise_quiet`. Read with the anon key and cached with the catalogue; a synthetic hotel, a
- * database without the functions or a failure read as `null`, and the page and Эвал say they do not know.
+ * `hotel_noise_quiet`, computed ahead into `hotel_noise_maps` (`hotel_noise_map`) and computed now only for a point
+ * without one. Read with the anon key and cached with the catalogue; a synthetic hotel, a database without the
+ * functions or a failure read as `null`, and the page and Эвал say they do not know.
  */
 
 /** A row of `hotel_geo().noise`. */
@@ -234,27 +235,44 @@ export function noiseMapOf(
   }
 }
 
+const features = z.object({ features: z.array(z.unknown()) })
+/** A map of `hotel_noise_map`: the three parts as their functions give them. */
+const storedMap = z.object({ contours: z.array(z.unknown()), quiet: z.array(z.unknown()), day: z.array(z.unknown()) })
+
+/** The map computed from the contours on this request: three intersections of the EEA polygons, a second or more. */
+async function computeNoiseMap(db: AnonClient, lat: number, lon: number): Promise<NoiseMap> {
+  const args = { lat, lon, radius_m: NOISE_MAP_RADIUS_M }
+  const [contours, quiet, day] = await Promise.all([
+    db.rpc('hotel_geo_features', args),
+    db.rpc('hotel_noise_quiet', args),
+    db.rpc('hotel_noise_day', args),
+  ])
+  // The day is the map's default: a map without it is not cached, the next request asks again.
+  if (contours.error) throw contours.error
+  if (day.error) throw day.error
+  // Without the quiet the louder shapes still stand: the map leaves the quiet uncoloured.
+  if (quiet.error) warnShort('noise map: no quiet', quiet.error)
+  return noiseMapOf(
+    features.parse(contours.data).features,
+    quiet.error ? [] : (features.safeParse(quiet.data).data?.features ?? []),
+    features.parse(day.data).features,
+  )
+}
+
+/**
+ * The map of `hotel_noise_maps`, computed ahead by `npm run db:features` (a few ms instead of seconds under load), or
+ * the one computed now when the point has none yet (a new hotel, one that moved) or the database has no such function.
+ * Both give the same shapes: the stored contours are the Lnight bands `nightOf` keeps anyway.
+ */
 const readNoiseMap = catalogCached(
   ['hotel-noise-map', 'day'],
   async (_hotelId: string, lat: number, lon: number): Promise<NoiseMap> => {
     const db = anonClient()
-    const args = { lat, lon, radius_m: NOISE_MAP_RADIUS_M }
-    const [contours, quiet, day] = await Promise.all([
-      db.rpc('hotel_geo_features', args),
-      db.rpc('hotel_noise_quiet', args),
-      db.rpc('hotel_noise_day', args),
-    ])
-    // The day is the map's default: a map without it is not cached, the next request asks again.
-    if (contours.error) throw contours.error
-    if (day.error) throw day.error
-    const features = z.object({ features: z.array(z.unknown()) })
-    // Without the quiet the louder shapes still stand: the map leaves the quiet uncoloured.
-    if (quiet.error) warnShort('noise map: no quiet', quiet.error)
-    return noiseMapOf(
-      features.parse(contours.data).features,
-      quiet.error ? [] : (features.safeParse(quiet.data).data?.features ?? []),
-      features.parse(day.data).features,
-    )
+    const { data, error } = await db.rpc('hotel_noise_map', { lat, lon, radius_m: NOISE_MAP_RADIUS_M })
+    const stored = error ? null : storedMap.safeParse(data).data
+    if (stored) return noiseMapOf(stored.contours, stored.quiet, stored.day)
+    if (error) warnShort('noise map: none stored, computing', error)
+    return computeNoiseMap(db, lat, lon)
   },
 )
 
