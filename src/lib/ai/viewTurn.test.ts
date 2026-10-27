@@ -11,23 +11,27 @@ import { floorOf, placeQuery, viewTurn } from './viewTurn'
 
 const hotel = { id: 'ota-1', name: 'Hotel Turia', lat: 39.4735, lon: -0.3799 }
 
+/** A building of 45 m, 40–50 m by EUBUCCO's interval: surely in the way of the eyes up to 5 m below its `eyeM`. */
 const blocker = (over: Partial<LineBlocker> = {}): LineBlocker => ({
   id: 'b1',
   distanceM: 300,
   heightM: 45,
+  heightLowerM: 40,
+  heightUpperM: 50,
   estimated: true,
+  eyeLowerM: (over.eyeM ?? 40) - 5,
   eyeM: 40,
   eyeUpperM: 45,
   ...over,
 })
 
-/** A line seen from every floor, or one in the way of the eyes up to `eyeUpperM` with its building. */
+/** A line seen from every floor, or one in the way of the eyes up to `eyeUpperM` (surely to `eyeM` − 5) with its building. */
 const line = (over: Partial<SightLine> = {}, eyeM = -3, eyeUpperM = 0, blockers: LineBlocker[] = []): SightLine => ({
   distanceM: 1500,
   checked: true,
   crossed: 4,
   coveredM: 1500,
-  eyes: [{ eyeM, eyeUpperM, blockers }],
+  eyes: [{ eyeM, eyeLowerM: eyeM - 5, eyeUpperM, blockers }],
   targetBuilding: null,
   ...over,
 })
@@ -69,7 +73,7 @@ const view: HotelView = {
     bearing,
     line:
       bearing > 200 && bearing < 320
-        ? ray(line({}, 40, 45, [blocker()]), line({}, 30, 36, [blocker({ eyeM: 30, eyeUpperM: 36 })]))
+        ? ray(line({}, 45, 50, [blocker({ eyeM: 45, eyeUpperM: 50 })]), line({}, 40, 45, [blocker()]))
         : ray(line(), line()),
   })),
   sea: [
@@ -83,7 +87,7 @@ const view: HotelView = {
       bearing: 110,
       // Seen above 23 m: from the 9th floor (25,5 m).
       line: line({ distanceM: 4430, coveredM: 4430 }, 20, 23, [
-        blocker({ id: 's1', distanceM: 800, heightM: 40, eyeM: 20, eyeUpperM: 23 }),
+        blocker({ id: 's1', distanceM: 800, heightM: 40, heightUpperM: 43, eyeM: 20, eyeUpperM: 23 }),
       ]),
     },
   ],
@@ -180,7 +184,7 @@ describe('the view steps of a hotel question', () => {
       'Из отеля (здание 12 этажей, ≈ 36 м (по оценке EUBUCCO); проверены этажи с 1-го по 12-й):',
     )
     expect(outcome.summary).toContain(
-      '• Море (берег в 4,4 км, азимут 110° (восток)): видно с 9-го этажа (ниже мешает здание ≈ 40 м (по оценке EUBUCCO) в 800 м от отеля).',
+      '• Море (берег в 4,4 км, азимут 110° (восток)): видно с 9-го этажа (ниже — возможно, закрыто: здание ≈ 40 м (по оценке EUBUCCO) в 800 м от отеля может быть выше — до 43 м).',
     )
     expect(outcome.summary).toContain('Гость о виде (Анна): «Из окна видно море»')
     expect(outcome.map?.points.map((p) => [p.label, p.category])).toEqual([
@@ -193,7 +197,7 @@ describe('the view steps of a hotel question', () => {
     const outcome = await viewTurn(hotel, ask('А с 3 этажа закат видно?'), options())
     expect(loadView).toHaveBeenCalledWith(hotel, expect.anything(), null, expect.anything())
     expect(outcome.summary).toContain(
-      '• Закат 21 июня в 21:32, азимут 302° (северо-запад): не видно ни с одного этажа; с 3-го этажа — возможны препятствия: мешает здание ≈ 45 м (по оценке EUBUCCO) в 300 м от отеля',
+      '• Закат 21 июня в 21:32, азимут 302° (северо-запад): не видно ни с одного этажа; с 3-го этажа — закрыто зданием ≈ 45 м (по оценке EUBUCCO) в 300 м от отеля',
     )
     expect(outcome.summary).toContain('проверены этажи с 1-го по 12-й, отдельно — 3-й')
   })
@@ -204,11 +208,37 @@ describe('the view steps of a hotel question', () => {
     expect(outcome.summary).not.toContain('• Закат')
   })
 
+  it('sees the sunrise over a ray without buildings within the data and knows nothing only past its border', async () => {
+    const empty = { eyeM: null, eyeLowerM: null, eyeUpperM: null, blockers: [] }
+    const east = (coveredM: number): HotelView => ({
+      ...view,
+      rays: view.rays.map((r) =>
+        r.bearing < 30 || r.bearing > 120
+          ? r
+          : { ...r, line: { ...r.line, crossed: 0, coveredM, eyes: [empty, empty] } },
+      ),
+    })
+    const open = await viewTurn(
+      hotel,
+      ask('Увижу ли рассвет?'),
+      options({ loadView: (async () => east(1500)) as never }),
+    )
+    expect(open.summary).toMatch(/• Восход 21 июня в 06:35, азимут 58° \(северо-восток\): видно со всех этажей \(/)
+    const cut = await viewTurn(
+      hotel,
+      ask('Увижу ли рассвет?'),
+      options({ loadView: (async () => east(1100)) as never }),
+    )
+    expect(cut.summary).toContain(
+      'нет данных — через 1,1 км линия уходит за границу муниципалитета Валенсия — данных о зданиях там нет',
+    )
+  })
+
   it('finds a kind of place among the Ostrovok places first, then in OSM, and checks the lines to them', async () => {
     const outcome = await viewTurn(hotel, ask('Видна ли больница из номера?'), options())
     expect(checkPoints.mock.calls[0].slice(1)).toMatchObject([[{ lat: 39.48, lon: -0.37 }]])
     expect(outcome.summary).toMatch(
-      /• «Hospital Clínico» \(больница, .*\): не видно ни с одного этажа — мешает здание ≈ 45 м/,
+      /• «Hospital Clínico» \(больница, .*\): не видно ни с одного этажа — закрыто зданием ≈ 45 м/,
     )
     expect(outcome.steps.at(-1)).toMatchObject({ title: 'Проверяю, видно ли из окна: «Hospital Clínico»' })
     const osm = await viewTurn(hotel, ask('Видна ли больница?'), options({ details: details({ nearby: [] }) }))

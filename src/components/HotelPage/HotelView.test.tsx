@@ -36,25 +36,29 @@ vi.mock('./ViewMap', () => ({
 const hotel = { ...getHotel('prague-old-town-lantern')!, id: 'ota-1', lat: 39.4735, lon: -0.3799 }
 const building = { floors: 12, heightM: 36, estimated: false, heightEstimated: true }
 
+/** A building of 45 m, 40–50 m by EUBUCCO's interval: surely in the way of the eyes up to 5 m below its `eyeM`. */
 const blocker = (over: Partial<LineBlocker> = {}): LineBlocker => ({
   id: 'b1',
   distanceM: 40,
   heightM: 45,
+  heightLowerM: 40,
+  heightUpperM: 50,
   estimated: true,
+  eyeLowerM: (over.eyeM ?? 40) - 5,
   eyeM: 40,
   eyeUpperM: 45,
   ...over,
 })
 
-/** A line in the way of every floor of the 12 (the top eye is 34,5 m), or of the eyes up to `eyeUpperM`. */
+/** A line surely in the way of every floor of the 12 (the top eye is 34,5 m), or of the eyes up to `eyeUpperM`. */
 const line = (over: Partial<SightLine> = {}, eyeM = 40, eyeUpperM = 45, blockers = [blocker()]): SightLine => ({
   distanceM: 1500,
   checked: true,
   crossed: 4,
   coveredM: 1500,
   eyes: [
-    { eyeM, eyeUpperM, blockers },
-    { eyeM, eyeUpperM, blockers },
+    { eyeM, eyeLowerM: eyeM - 5, eyeUpperM, blockers },
+    { eyeM, eyeLowerM: eyeM - 5, eyeUpperM, blockers },
   ],
   targetBuilding: null,
   ...over,
@@ -128,19 +132,22 @@ describe('HotelView', () => {
   it('tells the window and from which floor the sea and the landmarks are seen', async () => {
     render(<HotelView hotel={hotel} building={building} roomFloors={null} />)
     expect(screen.getByRole('heading', { level: 2, name: 'Вид из отеля' })).toBeTruthy()
-    const window = screen.getByRole('region', { name: 'Окно' })
+    const window = screen.getByRole('region', { name: 'Положение окна' })
     expect(within(window).getByText('здание 12 этажей, ≈ 36 м (по оценке EUBUCCO)')).toBeTruthy()
     expect(within(window).getByText('окно 12-го этажа, ≈ 34,5 м над землёй')).toBeTruthy()
     expect(floorSlider().getAttribute('aria-valuenow')).toBe('12')
     const sea = screen.getByRole('region', { name: 'Море' })
     await waitFor(() => expect(within(sea).getByText('видно с 9-го этажа')).toBeTruthy())
     expect(within(sea).getByText('Берег в 4,4 км')).toBeTruthy()
-    expect(within(sea).getByText('С 12-го этажа — вероятно видно')).toBeTruthy()
+    expect(within(sea).getByText('С 12-го этажа — видно')).toBeTruthy()
+    expect(within(sea).getByText('С 12-го этажа море видно в 1 из 1 направления на берег.')).toBeTruthy()
     const landmarks = screen.getByRole('region', { name: 'Ориентиры до 3 км' })
     expect(within(landmarks).getByText('Torres de Serranos')).toBeTruthy()
     expect(within(landmarks).getByText('не видно ни с одного этажа')).toBeTruthy()
     expect(within(landmarks).getByText('видно со всех этажей')).toBeTruthy()
-    expect(within(landmarks).getByText(/мешает здание ≈ 45 м \(по оценке EUBUCCO\) в 40 м от отеля/)).toBeTruthy()
+    expect(
+      within(landmarks).getByText('С 12-го этажа — закрыто зданием ≈ 45 м (по оценке EUBUCCO) в 40 м от отеля'),
+    ).toBeTruthy()
     // The sun's ray of the west is closed: its building is in the way.
     await waitFor(() => expect(screen.getByTestId('view-map').textContent).toBe('90 3 [b1] own'))
     expect(fetchMock).toHaveBeenCalledWith('/api/hotels/ota-1/view', expect.anything())
@@ -150,35 +157,39 @@ describe('HotelView', () => {
   it('shows on the map and the lists what is seen from the floor of the slider, asking nothing more', async () => {
     render(<HotelView hotel={hotel} building={building} roomFloors={null} />)
     const sea = screen.getByRole('region', { name: 'Море' })
-    await waitFor(() => expect(within(sea).getByText('С 12-го этажа — вероятно видно')).toBeTruthy())
+    await waitFor(() => expect(within(sea).getByText('С 12-го этажа — видно')).toBeTruthy())
     fireEvent.change(floorSlider(), { target: { value: '3' } })
     expect(screen.getByText('окно 3-го этажа, ≈ 7,5 м над землёй')).toBeTruthy()
     expect(
-      within(sea).getByText(
-        'С 3-го этажа — возможны препятствия: мешает здание ≈ 40 м (по оценке EUBUCCO) в 800 м от отеля',
-      ),
+      within(sea).getByText('С 3-го этажа — закрыто зданием ≈ 40 м (по оценке EUBUCCO) в 800 м от отеля'),
     ).toBeTruthy()
+    expect(within(sea).getByText('С 3-го этажа море видно в 0 из 1 направления на берег.')).toBeTruthy()
     // The reach of a target is the same from any floor.
     expect(within(sea).getByText('видно с 9-го этажа')).toBeTruthy()
+    expect(screen.getByText('Окно на 3-м этаже на восток')).toBeTruthy()
     // The sea's point is east, the side the page opens on: its building is in the way from the 3rd floor.
     expect(screen.getByTestId('view-map').textContent).toMatch(/\[.*s1.*\]/)
     expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/view'))).toHaveLength(1)
   })
 
-  it('opens on the side with the most open rays and turns to the side picked on the compass', async () => {
+  // hotel-page, Requirement: Положение окна
+  it('picks the side in «Положение окна», opening on the openest, and repeats no verdict of the other blocks', async () => {
     render(<HotelView hotel={hotel} building={building} roomFloors={null} />)
-    const side = screen.getByRole('region', { name: 'Сторона окон' })
+    const window = screen.getByRole('region', { name: 'Положение окна' })
     await waitFor(() =>
-      expect(within(side).getByRole('button', { name: 'В' }).getAttribute('aria-pressed')).toBe('true'),
+      expect(within(window).getByRole('button', { name: 'В' }).getAttribute('aria-pressed')).toBe('true'),
     )
-    expect(within(side).getByText(/Поверх крыш до 1,5 км с 12-го этажа: 15 из 15/)).toBeTruthy()
-    expect(within(side).getByRole('list', { name: 'Что видно с этой стороны' }).textContent).toMatch('Ла-Лонха')
-    await userEvent.click(within(side).getByRole('button', { name: 'С' }))
+    expect(screen.getByText('Окно на 12-м этаже на восток')).toBeTruthy()
+    expect(
+      within(window).getByText(/Поверх крыш до 1,5 км с 12-го этажа: 15 из 15 направлений этой стороны/),
+    ).toBeTruthy()
+    expect(screen.queryByRole('region', { name: 'Сторона окон' })).toBeNull()
+    expect(screen.queryByText(/с этой стороны нет/)).toBeNull()
+    await userEvent.click(within(window).getByRole('button', { name: 'С' }))
     expect(screen.getByTestId('view-map').textContent).toMatch(/^0 /)
-    expect(within(side).getByText(/с 12-го этажа: 0 из 15/)).toBeTruthy()
-    expect(within(side).getByRole('list', { name: 'Что видно с этой стороны' }).textContent).toMatch(
-      'Torres de Serranos',
-    )
+    expect(screen.getByText('Окно на 12-м этаже на север')).toBeTruthy()
+    expect(within(window).getByText(/с 12-го этажа: 0 из 15/)).toBeTruthy()
+    // Torres de Serranos is north: its building in the way is coloured on the map.
     expect(screen.getByTestId('view-map').textContent).toMatch(/\[.*b1.*\]/)
   })
 
@@ -195,7 +206,7 @@ describe('HotelView', () => {
 
   it('counts the floors the rooms take without exact data of the building', async () => {
     render(<HotelView hotel={hotel} building={null} roomFloors={6} />)
-    const window = screen.getByRole('region', { name: 'Окно' })
+    const window = screen.getByRole('region', { name: 'Положение окна' })
     expect(within(window).getByText('нет точных данных о здании, номера на 6 этажах (Островок)')).toBeTruthy()
     expect(within(window).getByText('окно 6-го этажа, ≈ 16,5 м над землёй')).toBeTruthy()
     expect(floorSlider().getAttribute('max')).toBe('6')
