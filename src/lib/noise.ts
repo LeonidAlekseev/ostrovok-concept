@@ -13,6 +13,13 @@ import { isViewQuestion } from './view'
 
 export type NoiseIndicator = 'Lden' | 'Lnight'
 
+/**
+ * The modes of the noise map: the day level estimated from Lden and Lnight (`dayEstimate`) and EEA's Lnight. Lden, a
+ * weighted mean of the 24 hours, is no level of the day and is not drawn.
+ */
+export type NoiseMapIndicator = 'Lday' | 'Lnight'
+export const NOISE_MAP_LABEL: Record<NoiseMapIndicator, string> = { Lday: 'Днём', Lnight: 'Ночью' }
+
 /** A question about the noise: «шумно», «тихо», «громко», «децибелы» — not «стихи». */
 export const isNoiseQuestion = (text: string) => /(?<!\p{L})(?:бес|не)?(?:шум|тих|громк|децибел)/iu.test(text)
 
@@ -112,6 +119,8 @@ export interface HotelNoise {
 const lowerOf = (band: NoiseBand) => band.min ?? -Infinity
 const upperOf = (band: NoiseBand) => (band.max === undefined ? Infinity : band.max + 1)
 
+const closed = (band: NoiseBand | undefined) => band?.min !== undefined && band.max !== undefined
+
 /** A louder band first: by the lower bound, an open top above all. */
 const minus = (x: number, y: number) => (x === y ? 0 : x - y)
 const louder = (a: NoiseBand, b: NoiseBand) => minus(lowerOf(b), lowerOf(a)) || minus(upperOf(b), upperOf(a))
@@ -141,30 +150,44 @@ export function dayLevel(lden: number, lnight: number): number | null {
   return rest > 0 ? 10 * Math.log10(rest / (12 + 4 * Math.sqrt(10))) : null
 }
 
-/** The day level's range, dB, from the bands of one layer. */
+/**
+ * The day level's range, dB, from the bands of one layer: `max` infinite for an Lden open at the top, `min` for an Lden
+ * open below («ниже 40 дБ») with a night open below.
+ */
 export interface DayEstimate {
   min: number
   max: number
 }
 
+/** Lden − Lday when the evening and the night are as loud as the day: 10·lg((12 + 4·10^0.5 + 8·10)/24). */
+const EVEN_DAY = 10 * Math.log10((12 + 4 * Math.sqrt(10) + 80) / 24)
+
 /**
- * The day level of `dayLevel` over the whole bands: the loudest day of the loudest Lden with the quietest night, the
- * quietest day of the quietest Lden with the loudest night. A pair the formula cannot fit at the quiet end keeps the
- * night's lower bound, assuming the day no quieter than the night. `null` without an Lden closed on both ends, a
- * closed night band or a fit at all.
+ * The day level of `dayLevel` over the whole bands, assuming as well the day no quieter than the night: the loudest
+ * day is the one of the loudest Lden with the quietest night, the quietest day the one of the quietest Lden with the
+ * loudest night that is not louder than the day. A band open below (EEA's «below 40 dB») leaves its level unbounded
+ * below, an Lden open at the top the day unbounded above. `null` without both bands or when the pair fits no day (the
+ * bands of the two maps do not quite meet at their borders).
  */
 export function dayEstimate(lden: NoiseBand | undefined, lnight: NoiseBand | undefined): DayEstimate | null {
-  if (lden?.min === undefined || lden.max === undefined || lnight?.min === undefined || lnight.max === undefined)
-    return null
-  const max = dayLevel(upperOf(lden), lnight.min)
+  if (!lden || !lnight) return null
+  const max = lden.max === undefined ? Infinity : dayLevel(upperOf(lden), lowerOf(lnight))
   if (max === null) return null
-  const min = Math.max(dayLevel(lden.min, upperOf(lnight)) ?? lnight.min, lnight.min)
+  const low = lowerOf(lden)
+  const min = Math.max(dayLevel(low, upperOf(lnight)) ?? -Infinity, low - EVEN_DAY, lowerOf(lnight))
   return min > max ? null : { min, max }
 }
 
-/** «58–63 дБ». */
-export const dayLabel = ({ min, max }: DayEstimate) =>
-  Math.round(min) === Math.round(max) ? `≈${Math.round(min)} дБ` : `${Math.round(min)}–${Math.round(max)} дБ`
+/** «58–63 дБ»; «от 69 дБ» and «ниже 40 дБ» for an open estimate. */
+export function dayLabel({ min, max }: DayEstimate): string {
+  if (max === Infinity) return `от ${Math.round(min)} дБ`
+  if (min === -Infinity) return `ниже ${Math.round(max)} дБ`
+  return Math.round(min) === Math.round(max) ? `≈${Math.round(min)} дБ` : `${Math.round(min)}–${Math.round(max)} дБ`
+}
+
+/** The level a day estimate is coloured by on the map: its middle, or its closed bound when it is open. */
+export const dayColorLevel = ({ min, max }: DayEstimate) =>
+  max === Infinity ? min : min === -Infinity ? max : (min + max) / 2
 
 /** Day 07–19, evening 19–23, night 23–07 (the directive's default periods, Spain's as well). */
 export const DAY_START = 7
@@ -198,7 +221,7 @@ export interface DayCurve {
  */
 export function dayCurve(noise: Pick<HotelNoise, 'sources'>): DayCurve | null {
   const source = loudestSource(noise, 'Lden')
-  const estimate = source && dayEstimate(source.lden, source.lnight)
+  const estimate = source && closed(source.lden) && closed(source.lnight) && dayEstimate(source.lden, source.lnight)
   if (!estimate) return null
   const night = (lowerOf(source.lnight!) + upperOf(source.lnight!)) / 2
   const middle = dayLevel((lowerOf(source.lden!) + upperOf(source.lden!)) / 2, night)
@@ -229,6 +252,9 @@ export const NOISE_COLORS = [
   '#d73027',
   '#a50026',
 ] as const
+
+/** The colour of a piece of the day map whose bands fit no day level. */
+export const NOISE_UNKNOWN_COLOR = '#9ca3af'
 
 /** The colour of a level or of a band's lower bound. */
 export const noiseColor = (db: number) => NOISE_COLORS[LEGEND_STEPS.filter((step) => db >= step).length]
@@ -274,8 +300,8 @@ export function placeLines(noise: Pick<HotelNoise, 'places'>): string[] {
 }
 
 /**
- * The facts of the noise for the page's summary and for Эвал, one line each: the loudest bands, the day estimate,
- * each layer and the loud places nearby. Only the data: no level is stated without its band.
+ * The facts of the noise for the page's summary and for Эвал, one line each, in the order of the map's switch: the
+ * day estimate, the loudest night and 24-hour bands, each layer and the loud places nearby. Only the data: no level is stated without its band.
  */
 export function noiseLines(noise: HotelNoise | null | undefined): string[] {
   if (!noise) return []
@@ -283,21 +309,23 @@ export function noiseLines(noise: HotelNoise | null | undefined): string[] {
   const lden = loudestSource(noise, 'Lden')
   const lnight = loudestSource(noise, 'Lnight')
   if (!hasEeaNoise(noise)) lines.push(`${NO_EEA}.`)
-  if (lden) {
-    const who = whoLine(lden, 'Lden')
+  const day = lden && dayEstimate(lden.lden, lden.lnight)
+  if (day)
     lines.push(
-      `За сутки (Lden) по карте шума EEA 2022: ${bandLabel(lden.lden!)}, громче всего — ${noiseSourceLabel(lden.source).toLocaleLowerCase('ru')}${who ? `; ${who}` : ''}.`,
+      `Днём (07:00–19:00): ${dayLabel(day)}, громче всего — ${noiseSourceLabel(lden.source).toLocaleLowerCase('ru')}; это оценка из Lden и Lnight карты шума EEA 2022 по директиве ЕС 2002/49/EC (вечер принят равным дню, день — не тише ночи).`,
     )
-  }
   if (lnight) {
     const who = whoLine(lnight, 'Lnight')
     lines.push(
       `Ночью (Lnight, 23:00–07:00): ${bandLabel(lnight.lnight!)}, громче всего — ${noiseSourceLabel(lnight.source).toLocaleLowerCase('ru')}${who ? `; ${who}` : ''}.`,
     )
   }
-  const day = lden && dayEstimate(lden.lden, lden.lnight)
-  if (day)
-    lines.push(`Днём, по оценке из Lden и Lnight (директива ЕС 2002/49/EC, вечер принят равным дню): ${dayLabel(day)}.`)
+  if (lden) {
+    const who = whoLine(lden, 'Lden')
+    lines.push(
+      `За сутки (Lden) по карте шума EEA 2022: ${bandLabel(lden.lden!)}, громче всего — ${noiseSourceLabel(lden.source).toLocaleLowerCase('ru')}${who ? `; ${who}` : ''}.`,
+    )
+  }
   if (noise.sources.length > 1)
     lines.push(
       `Источники EEA у отеля: ${noise.sources
