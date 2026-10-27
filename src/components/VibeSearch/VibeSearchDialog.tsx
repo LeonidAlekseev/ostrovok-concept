@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ComponentProps, type CSSProperties, t
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 import { poleImage, VIBE_AXES, VIBE_STEPS, type Answer } from '../../lib/vibe'
 import { SmartImage } from '../ui/SmartImage'
 import { useVibeReading } from './useVibeReading'

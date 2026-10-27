@@ -30,7 +30,7 @@ import type { IsoDate } from '../../lib/dates'
 import { VIEW_LABEL, type ViewKind } from '../../lib/features'
 import { formatMeters } from '../../lib/format'
 import type { Guests } from '../../lib/search'
-import { briefGuestsOf, paramLine, sessionParams, type ParamKey, type SessionParam } from '../../lib/sessionParams'
+import { briefGuestsOf, paramLine, sessionParams, type ParamKey, type SessionParam } from '../../lib/sessionMemory'
 
 // The cards of Эвал's feed beside its words: what it saved to the session, the tools it called, the row of the work
 // in progress and the parameters of «ничего не нашёл», each one changed in place.

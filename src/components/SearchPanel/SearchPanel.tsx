@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 import { searchGlassPanel } from './glass'
 
 /** The two ways to search; the figures are drawn to face the middle of the panel. */
