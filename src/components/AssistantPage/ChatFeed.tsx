@@ -25,7 +25,7 @@ import type { ChatMessage } from '../../lib/assistantChats'
 import { formatDateRange, type IsoDate } from '../../lib/dates'
 import { formatPrice, guestsLabel } from '../../lib/format'
 import { HotelTile } from '../HotelTile/HotelTile'
-import { MemoryCard, SessionParamsCard, ToolCard, WorkingRow } from './ChatCards'
+import { MemoryCard, SessionParamsCard, ToolCard, ToolRunCard, WorkingRow } from './ChatCards'
 import { MessagePhotos, type PhotoUrl } from './ChatPhotos'
 import { MapMessage } from './MapMessage'
 
@@ -203,7 +203,11 @@ function MessageItem({ message, photoUrl, onChoose, onRetry, actions, params }: 
             <WorkingRow text={workingText(data.step)} />
           ) : (
             <>
-              <ToolCard step={data.step} failed={status === 'failed'} />
+              {data.step.run ? (
+                <ToolRunCard step={data.step} run={data.step.run} />
+              ) : (
+                <ToolCard step={data.step} failed={status === 'failed'} />
+              )}
               <MessageTime iso={createdAt} />
             </>
           )}

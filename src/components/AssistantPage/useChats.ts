@@ -54,7 +54,7 @@ import type { PhotoUrl } from './ChatPhotos'
 import { savedParams } from '@/lib/sessionMemory'
 import type { HotelSummary } from '@/lib/catalog'
 import { todayIso } from '@/lib/dates'
-import { isHotelGeoQuestion, isHotelViewQuestion } from '@/lib/noise'
+import { isHotelGeoQuestion, isHotelViewQuestion, isNoiseQuestion } from '@/lib/noise'
 import type { OptimizedPhoto } from '@/lib/imageOptimize'
 import { getBrowserClient } from '@/lib/supabase/client'
 
@@ -76,6 +76,24 @@ const SEARCH_STEP = { agent: 'search', title: 'Подбираю отели по 
 /** The step shown while a question about the places near the hotel is answered: the geo steps come with the answer. */
 const GEO_STEP = { agent: 'geo', title: 'Проверяю места рядом с отелем' } as const
 const VIEW_STEP = { agent: 'geo', title: 'Проверяю, что видно из окна' } as const
+/** The step of the tool «Анализ шума» while it runs: its block with the sources comes with the answer. */
+const NOISE_STEP = { agent: 'features', title: 'Анализ шума' } as const
+/** How long a turn of a signed-in user waits for its chat to be saved: the server records the tools' runs in it. */
+const SAVE_WAIT_MS = 3000
+
+/**
+ * The steps of the answer in the feed: a step of a tool's run (`run.id`) already there is updated in place, so a run is
+ * one block whatever comes of it; the others are added.
+ */
+export function mergeSteps(messages: readonly ChatMessage[], steps: readonly ChatMessage[]): ChatMessage[] {
+  const byRun = new Map(steps.flatMap((m) => (m.data.step?.run ? [[m.data.step.run.id, m] as const] : [])))
+  const kept = messages.map((m) => {
+    const run = m.data.step?.run && byRun.get(m.data.step.run.id)
+    return run ? { ...run, id: m.id, createdAt: m.createdAt } : m
+  })
+  const there = new Set(messages.flatMap((m) => m.data.step?.run?.id ?? []))
+  return [...kept, ...steps.filter((m) => !(m.data.step?.run && there.has(m.data.step.run.id)))]
+}
 
 /** Eval's answer: the next question with what it has understood, or the plan once nothing is left to ask. */
 export function compose(
@@ -395,7 +413,9 @@ export function useChats(
           ? VIEW_STEP
           : chat.brief.hotelId && isHotelGeoQuestion(input)
             ? GEO_STEP
-            : null
+            : chat.brief.hotelId && isNoiseQuestion(input)
+              ? NOISE_STEP
+              : null
       const stepId = newId()
       update(chatId, (c) => ({
         ...c,
@@ -420,6 +440,9 @@ export function useChats(
       try {
         // Only the photos in Storage are waited for: the turn is already marked in flight, so no other one starts.
         const sent = found instanceof Promise ? await found : found
+        // A signed-in user's chat is saved first (a little while at most): the server writes the tools' runs in it.
+        const remote = modeRef.current.kind === 'remote'
+        if (remote) await Promise.race([queue.current, delay(SAVE_WAIT_MS)])
         if (controller.signal.aborted) return
         const ask = () =>
           askAssistant(
@@ -428,6 +451,7 @@ export function useChats(
               brief: chat.brief,
               ...(sent && { photos: sent }),
               ...(rerun && { rerun }),
+              ...(remote && { chatId, messageId: pendingId }),
             },
             rerun ? null : question,
             destinations,
@@ -497,6 +521,7 @@ export function useChats(
             title: step.title,
             ...(step.params && { params: step.params }),
             ...(step.result && { result: step.result }),
+            ...(step.run && { run: step.run }),
           },
         },
         createdAt: later(pending.createdAt, i - steps.length),
@@ -515,9 +540,11 @@ export function useChats(
           ]
         : []
       const messages = [
-        ...chat.messages.filter((m) => !(m.role === 'agent' && m.status === 'pending')),
+        ...mergeSteps(
+          chat.messages.filter((m) => !(m.role === 'agent' && m.status === 'pending')),
+          stepMessages,
+        ),
         ...memoryMessages,
-        ...stepMessages,
         ...down,
       ]
         .map((m) => (m.id === pendingId ? { ...m, status: 'done' as const, text, data } : m))

@@ -16,6 +16,7 @@ import {
   type ChatMessage,
 } from './assistantChats'
 import { DIALOG_KEY } from './assistantDialog'
+import { RUN_ID, sampleResult } from '@/test/toolResult'
 
 afterEach(() => {
   window.localStorage.clear()
@@ -232,5 +233,27 @@ describe('the photos of a message', () => {
     expect(saved[0].messages[0].data.attachments).toEqual([{ preview, width: 320, height: 240 }])
     expect(saved[1].messages[0].data.attachments).toEqual([{ width: 320, height: 240 }])
     expect(saved[1].messages[0].text).toBe('вот')
+  })
+})
+
+// assistant-search, Requirement: Восстановление блоков инструментов
+describe('the runs of the steps in the saved chats', () => {
+  const step = { agent: 'features', title: 'Анализ шума', params: 'карты шума EEA', result: 'Ночью 55–59 дБ' }
+  const chatWith = (data: unknown): unknown => ({
+    ...newChat('2026-10-27T10:00:00.000Z'),
+    messages: [{ ...message('agent', ''), data }],
+  })
+
+  it('keeps the run with its sources after a reload (Scenario: Перезагрузка)', () => {
+    const run = { id: RUN_ID, result: sampleResult }
+    const chat = chatWith({ step: { ...step, run } }) as Chat
+    saveGuestChats([chat])
+    expect(loadGuestChats()[0].messages[0].data.step).toEqual({ ...step, run })
+  })
+
+  it('shows an older step without a run as before, and drops a run off the contract only', () => {
+    expect(parseChat(chatWith({ step }))!.messages[0].data.step).toEqual(step)
+    const broken = { id: RUN_ID, result: { ...sampleResult, claims: 'много' } }
+    expect(parseChat(chatWith({ step: { ...step, run: broken } }))!.messages[0].data.step).toEqual(step)
   })
 })

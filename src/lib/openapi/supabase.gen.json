@@ -79,7 +79,7 @@
         "tags": ["Таблицы"],
         "summary": "assistant_chats",
         "description": "Строки `assistant_chats` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
-        "x-used-in": ["src/lib/assistantChatsRemote.ts"],
+        "x-used-in": ["src/lib/assistantChatsRemote.ts", "src/lib/db/toolRuns.ts"],
         "parameters": [
           {
             "name": "select",
@@ -241,6 +241,50 @@
                   "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/destinations"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evidence": {
+      "get": {
+        "operationId": "select_evidence",
+        "tags": ["Таблицы"],
+        "summary": "evidence",
+        "description": "Строки `evidence` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/db/claims.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/evidence"
                   }
                 }
               }
@@ -549,6 +593,94 @@
                   "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/profiles"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tool_run_evidence": {
+      "get": {
+        "operationId": "select_tool_run_evidence",
+        "tags": ["Таблицы"],
+        "summary": "tool_run_evidence",
+        "description": "Строки `tool_run_evidence` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/db/toolRuns.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/tool_run_evidence"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tool_runs": {
+      "get": {
+        "operationId": "select_tool_runs",
+        "tags": ["Таблицы"],
+        "summary": "tool_runs",
+        "description": "Строки `tool_runs` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/db/toolRuns.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/tool_runs"
                   }
                 }
               }
@@ -1489,6 +1621,62 @@
         },
         "required": ["data", "id", "position", "updated_at"]
       },
+      "evidence": {
+        "type": "object",
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "dataset_id": {
+            "type": ["string", "null"]
+          },
+          "excerpt": {
+            "type": ["string", "null"]
+          },
+          "external_id": {
+            "type": ["string", "null"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": ["object", "array", "string", "number", "boolean"],
+            "description": "JSON"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "retrieved_at": {
+            "type": ["string", "null"]
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "url": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": [
+          "created_at",
+          "dataset_id",
+          "excerpt",
+          "external_id",
+          "id",
+          "metadata",
+          "provider",
+          "retrieved_at",
+          "title",
+          "type",
+          "updated_at",
+          "url"
+        ]
+      },
       "hotel_features": {
         "type": "object",
         "properties": {
@@ -1811,6 +1999,105 @@
           }
         },
         "required": ["created_at", "id", "name"]
+      },
+      "tool_run_evidence": {
+        "type": "object",
+        "properties": {
+          "evidence_id": {
+            "type": "string"
+          },
+          "tool_run_id": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          }
+        },
+        "required": ["evidence_id", "tool_run_id", "user_id"]
+      },
+      "tool_runs": {
+        "type": "object",
+        "properties": {
+          "chat_id": {
+            "type": "string"
+          },
+          "completed_at": {
+            "type": ["string", "null"]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "description": "JSON"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "input_summary": {
+            "type": "string"
+          },
+          "message_id": {
+            "type": ["string", "null"]
+          },
+          "result_data": {
+            "anyOf": [
+              {
+                "description": "JSON"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "result_summary": {
+            "type": "string"
+          },
+          "resume": {
+            "anyOf": [
+              {
+                "description": "JSON"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "started_at": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tool_name": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "chat_id",
+          "completed_at",
+          "error",
+          "id",
+          "input_summary",
+          "message_id",
+          "result_data",
+          "result_summary",
+          "resume",
+          "started_at",
+          "status",
+          "tool_name",
+          "updated_at",
+          "user_id"
+        ]
       }
     },
     "securitySchemes": {

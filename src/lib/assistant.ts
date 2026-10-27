@@ -13,6 +13,7 @@ import { countRu, formatMeters, formatPrice } from './format'
 import { parseChatMap, type ChatMap } from './geo/chatMap'
 import { stayTotal } from './offer'
 import { MAX_NIGHTS, type Guests, type SearchQuery } from './search'
+import { parseToolRun, type ToolRun } from './toolResult'
 
 /**
  * Travel assistant: a free-text wish is read by the language model behind `POST /api/assistant`
@@ -721,6 +722,13 @@ export interface AssistantRequest {
    * and does not read the newest message again.
    */
   rerun?: true
+  /**
+   * The chat of a signed-in user: the server records the runs of the turn's tools in its `tool_runs` (src/lib/db/toolRuns.ts)
+   * once it has checked the chat is the user's. A guest's chat sends none.
+   */
+  chatId?: string
+  /** The pending answer of the turn: the runs are recorded with it. */
+  messageId?: string
 }
 
 /** Photos a message takes. */
@@ -778,6 +786,8 @@ export interface TurnStep {
   params?: string
   status: 'done' | 'failed'
   result?: string
+  /** A tool of the contract (src/lib/toolResult.ts): its run with the sources and data shown in the block. */
+  run?: ToolRun
 }
 
 export interface AssistantResponse {
@@ -832,14 +842,18 @@ const isStep = (value: unknown): value is TurnStep =>
   ['search', 'features', 'vision', 'geo'].includes((value as TurnStep).agent) &&
   typeof (value as TurnStep).title === 'string' &&
   ['done', 'failed'].includes((value as TurnStep).status)
-/** The known fields of a step only. */
-const stepOf = ({ agent, title, params, status, result }: TurnStep): TurnStep => ({
-  agent,
-  title,
-  ...(typeof params === 'string' && params && { params }),
-  status,
-  ...(typeof result === 'string' && result && { result }),
-})
+/** The known fields of a step only; a run off the contract is dropped, the step stays as an older one. */
+const stepOf = ({ agent, title, params, status, result, run }: TurnStep): TurnStep => {
+  const parsed = parseToolRun(run)
+  return {
+    agent,
+    title,
+    ...(typeof params === 'string' && params && { params }),
+    status,
+    ...(typeof result === 'string' && result && { result }),
+    ...(parsed && { run: parsed }),
+  }
+}
 const PHOTO_ACTIONS: readonly PhotoAnswer['action'][] = [
   'ask',
   'similar',
