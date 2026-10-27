@@ -9,7 +9,7 @@ import {
   type ViewKind,
 } from './features'
 import { addDays, formatShortRange, fromIso, nightsBetween, toIso, type IsoDate } from './dates'
-import { countRu, formatPrice } from './format'
+import { countRu, formatMeters, formatPrice } from './format'
 import { parseChatMap, type ChatMap } from './geo/chatMap'
 import { stayTotal } from './offer'
 import { MAX_NIGHTS, type Guests, type SearchQuery } from './search'
@@ -51,6 +51,10 @@ export interface Brief {
   height?: 'high' | 'low'
   /** A window view of a room; `any` is «с видом» without saying of what. */
   view?: ViewKind | 'any'
+  /** The sea within so many metres of the hotel: «близко к морю» is 1 km, «до моря 500 м» is 500. */
+  seaMaxM?: number
+  /** The guests and rooms set by hand: they take over the party's (`PARTY_GUESTS`). */
+  guests?: Guests
   /** The hotel the chat is about (a chat opened on a hotel's page): Эвал answers about it instead of picking hotels. */
   hotelId?: string
 }
@@ -169,6 +173,33 @@ const VIEW_RULES: [ViewKind | 'any', RegExp][] = [
   ['any', /(?<![а-яё])(?:с\s+видом|вид\s+из\s+окна|красив[а-яё]*\s+вид|панорамн|видовой)/],
 ]
 
+/** «близко к морю», «ближе к пляжу», «рядом с морем», «у моря», «на берегу», «первая линия». */
+const NEAR_SEA = word(
+  '(?:близко|ближе|поближе|рядом|недалеко|неподал[её]ку|возле|около)\\s+(?:к\\s+|с\\s+|от\\s+)?(?:мор|пляж|берег)|у\\s+(?:самого\\s+)?(?:мор|пляж)|на\\s+(?:самом\\s+)?берегу|(?:мор[еяю]|пляж[ауи]?)\\s+(?:рядом|близко|недалеко|в\\s+шаговой)|шагов[а-яё]*\\s+доступност[а-яё]*\\s+(?:от|до)\\s+(?:мор|пляж)|перв[а-яё]*\\s+лини',
+)
+const SEA_WORD = '(?:мор[а-яё]*|пляж[а-яё]*|берег[а-яё]*)'
+const DISTANCE = '(\\d+(?:[.,]\\d+)?)\\s*(км|километр[а-яё]*|м|метр[а-яё]*)(?![а-яё])'
+/** «до моря не больше 500 м», «в 2 км от моря», «300 метров до пляжа». */
+const SEA_DISTANCE = [
+  new RegExp(`(?<![а-яё])${SEA_WORD}[^.!?,;\\d]{0,25}?${DISTANCE}`),
+  new RegExp(`${DISTANCE}[^.!?,;\\d]{0,15}?(?<![а-яё])${SEA_WORD}`),
+]
+/** «Близко к морю» without a distance. */
+export const NEAR_SEA_M = 1000
+const MIN_SEA_M = 50
+const MAX_SEA_M = 20_000
+
+/** The distance to the sea the text names, m, and the words that named it (they are not a budget). */
+function seaDistance(text: string): { meters: number; said: string } | undefined {
+  for (const re of SEA_DISTANCE) {
+    const m = text.match(re)
+    if (!m) continue
+    const value = Number(m[1].replace(',', '.')) * (m[2].startsWith('к') ? 1000 : 1)
+    if (value > 0) return { meters: Math.min(Math.max(Math.round(value), MIN_SEA_M), MAX_SEA_M), said: m[0] }
+  }
+  return undefined
+}
+
 const ANY = word(
   'не важно|неважно|вс[её] равно|любо[ей]|не знаю|куда угодно|удиви|на тво[йё]|реши сам|выбери сам|без разницы',
 )
@@ -208,9 +239,12 @@ export function parseWish(input: string, destinations: readonly Destination[]): 
   if (LOW.test(text)) brief.height = 'low'
   else if (HIGH.test(text)) brief.height = 'high'
   brief.view = VIEW_RULES.find(([, re]) => re.test(text))?.[0]
+  const sea = seaDistance(text)
+  if (sea) brief.seaMaxM = sea.meters
+  else if (NEAR_SEA.test(text)) brief.seaMaxM = NEAR_SEA_M
 
-  // "до 70 000 ₽", "70к", "70 тыс.", "бюджет 120000" — but not "на 5 ночей".
-  for (const m of text.matchAll(/(\d[\d ]*\d|\d)\s*(тыс[а-я.]*|к(?![а-яё])|₽|руб[а-я.]*|р\.)?/g)) {
+  // "до 70 000 ₽", "70к", "70 тыс.", "бюджет 120000" — but not "на 5 ночей" or "в 3000 м от моря".
+  for (const m of (sea ? text.replace(sea.said, ' ') : text).matchAll(/(\d[\d ]*\d|\d)\s*(тыс[а-я.]*|к(?![а-яё])|₽|руб[а-я.]*|р\.)?/g)) {
     const value = Number(m[1].replace(/ /g, ''))
     const suffix = m[2] ?? ''
     const amount = /^(тыс|к)/.test(suffix) ? value * 1000 : value
@@ -312,12 +346,21 @@ const VIBE_DESTINATIONS: Partial<Record<VibeId, string[]>> = {
 const WARM_IN_WINTER = new Set(['dubai', 'cancun', 'honolulu', 'miami'])
 const isWinter = (month: number) => month >= 10 || month <= 2
 
-function candidatesFor(vibe: VibeId, month: number, destinations: readonly Destination[]): Destination[] {
+/**
+ * The cities of a theme in the month. The sea in winter is the warm beaches only, unless the traveller named a distance
+ * to the sea (`anySea`): then it is the sea, not the swimming, and every city by the sea counts.
+ */
+function candidatesFor(
+  vibe: VibeId,
+  month: number,
+  destinations: readonly Destination[],
+  anySea = false,
+): Destination[] {
   const ids = VIBE_DESTINATIONS[vibe]
   const list = ids
     ? ids.flatMap((id) => destinations.find((d) => d.id === id) ?? [])
     : destinations.filter((d) => d.scenarios.includes(vibe as 'sea' | 'weekend' | 'europe'))
-  if (vibe === 'sea' && isWinter(month)) return list.filter((d) => WARM_IN_WINTER.has(d.id))
+  if (vibe === 'sea' && isWinter(month) && !anySea) return list.filter((d) => WARM_IN_WINTER.has(d.id))
   return list
 }
 
@@ -427,7 +470,10 @@ function planScope(brief: Brief, today: IsoDate, destinations: readonly Destinat
   const own = brief.vibe && brief.vibe !== 'any' ? brief.vibe : null
   if (own || named) {
     const vibe = own ?? named?.scenarios[0] ?? 'europe'
-    return { vibe, reason: '', named, pool: named ? [named] : candidatesFor(vibe, month, destinations) }
+    // The traveller's own sea is never left without a city: in winter without a warm beach shown, the cold ones.
+    const cities = named ? [named] : candidatesFor(vibe, month, destinations, brief.seaMaxM !== undefined)
+    const pool = cities.length > 0 ? cities : candidatesFor(vibe, month, destinations, true)
+    return { vibe, reason: '', named, pool }
   }
   const picked = chooseVibe(brief, month, destinations)
   if (picked) return { ...picked, named, pool: candidatesFor(picked.vibe, month, destinations) }
@@ -449,7 +495,9 @@ const roomViews = (features: HotelFeatures | undefined): ViewKind[] =>
 /**
  * The plan over the `destinations`, with a hotel from `hotels` (the "recently added" ones) where a city has
  * one. `matches` are the hotels the semantic search found for the traveller's words, best first: they lead
- * the plan — up to three in a named city, otherwise one a city, the rest by the rules.
+ * the plan — up to three in a named city, otherwise one a city, the rest by the rules. A `strict` plan (the sea within
+ * a distance, with data on the coast) takes only the matches within it, any city, and adds none by the rules: no
+ * hotel within it is an empty plan, and Эвал offers to change the parameters.
  */
 export function makePlan(
   brief: Brief,
@@ -460,6 +508,7 @@ export function makePlan(
   features: Readonly<Record<string, HotelFeatures>> = {},
   /** The hotels already shown in the chat: «Другие варианты» skips them. */
   exclude: ReadonlySet<string> = new Set(),
+  strict = brief.seaMaxM !== undefined,
 ): Plan {
   const { vibe, reason, named, pool } = planScope(brief, today, destinations)
   const [emoji, atmosphere, text] = ATMOSPHERES[vibe][brief.mood ?? 'default']
@@ -467,7 +516,7 @@ export function makePlan(
   const nights = brief.dates
     ? nightsBetween(brief.dates.checkIn, brief.dates.checkOut)
     : Math.min(brief.nights ?? (vibe === 'weekend' ? 2 : brief.party === 'family' ? 7 : 5), MAX_NIGHTS)
-  const guests = PARTY_GUESTS[brief.party && brief.party !== 'any' ? brief.party : 'couple']
+  const guests = brief.guests ?? PARTY_GUESTS[brief.party && brief.party !== 'any' ? brief.party : 'couple']
   const checkIn = travelDates(brief, nights, today)
 
   // Quiet and romantic trips get the best-rated hotel; active ones and tight budgets the cheaper good one.
@@ -493,15 +542,17 @@ export function makePlan(
   // The semantic matches in the plan's cities keep their order, within the budget first.
   const cityOf = new Map(pool.map((d) => [d.id, d]))
   const found: AssistantOption[] = []
+  const near = (hotel: HotelSummary) => (features[hotel.id]?.seaM ?? Infinity) <= (brief.seaMaxM ?? Infinity)
   for (const hotel of matches) {
     if (exclude.has(hotel.id)) continue
     const destination = cityOf.get(hotel.destinationId)
-    if (!destination || (!named && found.some((o) => o.destination.id === destination.id))) continue
+    if (!destination) continue
+    if (strict ? !near(hotel) : !named && found.some((o) => o.destination.id === destination.id)) continue
     found.push(option(destination, hotel))
   }
   found.sort((a, b) => Number(b.fitsBudget) - Number(a.fitsBudget))
 
-  const ruled = pool
+  const ruled = (strict ? [] : pool)
     .filter((destination) => !found.some((o) => o.destination.id === destination.id))
     .map((destination) => {
       const cityHotels = hotels
@@ -570,6 +621,7 @@ export function describeBrief(brief: Brief, destinations: readonly Destination[]
     brief.quiet ? 'тихо ночью' : null,
     brief.height === 'high' ? 'здание повыше' : brief.height === 'low' ? 'здание пониже' : null,
     brief.view === 'any' ? 'с видом из окна' : brief.view ? `вид ${VIEW_LABEL[brief.view]}` : null,
+    brief.seaMaxM ? `до моря до ${formatMeters(brief.seaMaxM)}` : null,
   ]
     .filter(Boolean)
     .join(' · ')
@@ -580,6 +632,18 @@ const intIn = (value: unknown, min: number, max: number) =>
   typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max ? value : undefined
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
+
+/** Guests set by hand: 1–9 adults, 0–6 children, 1–5 rooms and no more rooms than adults. */
+export const GUEST_LIMITS = { adults: [1, 9], children: [0, 6], rooms: [1, 5] } as const
+
+export function briefGuests(value: unknown): Guests | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const { adults, children, rooms } = value as Record<string, unknown>
+  const a = intIn(adults, ...GUEST_LIMITS.adults)
+  const c = intIn(children, ...GUEST_LIMITS.children)
+  const r = intIn(rooms, ...GUEST_LIMITS.rooms)
+  return a !== undefined && c !== undefined && r !== undefined && r <= a ? { adults: a, children: c, rooms: r } : undefined
+}
 
 /**
  * Two named days of a stay: real calendar days (not 31 февраля), check-out after check-in, at most `MAX_NIGHTS`
@@ -614,7 +678,7 @@ export function normalizeBrief(
 ): Brief {
   const brief: Brief = {}
   const { vibe, destinationId, when, nights, party, mood, budget, quiet, height, view, dates, datesRejected } = raw
-  const { hotelId } = raw
+  const { hotelId, seaMaxM, guests } = raw
   if (vibe === 'any' || (typeof vibe === 'string' && Object.hasOwn(VIBE_LABEL, vibe))) brief.vibe = vibe as VibeId
   if (destinations.some((d) => d.id === destinationId)) brief.destinationId = destinationId as string
   if (when === 'soon' || when === 'any') brief.when = when
@@ -630,6 +694,10 @@ export function normalizeBrief(
   if (quiet === true) brief.quiet = true
   if (height === 'high' || height === 'low') brief.height = height
   if (view === 'any' || (typeof view === 'string' && Object.hasOwn(VIEW_LABEL, view))) brief.view = view as ViewKind
+  if (typeof seaMaxM === 'number' && seaMaxM > 0)
+    brief.seaMaxM = Math.min(Math.max(Math.round(seaMaxM), MIN_SEA_M), MAX_SEA_M)
+  const counted = briefGuests(guests)
+  if (counted) brief.guests = counted
   // Only the shape: the route checks the id against the catalogue.
   if (typeof hotelId === 'string' && hotelId && hotelId.length <= MAX_HOTEL_ID_LENGTH) brief.hotelId = hotelId
   return brief
@@ -644,6 +712,11 @@ export interface AssistantRequest {
    * JPEG data URLs, at most `MAX_PHOTOS` (src/lib/imageOptimize.ts).
    */
   photos?: string[]
+  /**
+   * The parameters were changed by hand after «ничего не нашёл»: the route picks the hotels by the `brief` as it is
+   * and does not read the newest message again.
+   */
+  rerun?: true
 }
 
 /** Photos a message takes. */
@@ -697,6 +770,8 @@ export interface TurnStep {
    */
   agent: 'search' | 'features' | 'vision' | 'geo'
   title: string
+  /** What the step was called with, briefly in Russian: «Валенсия», «до моря до 1 км · тихо ночью». */
+  params?: string
   status: 'done' | 'failed'
   result?: string
 }
@@ -742,13 +817,22 @@ const PHOTO_TIMEOUT_MS = 30_000
 
 const isRecord = (value: unknown): value is Record<string, HotelFeatures> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
-const isCriterion = (value: unknown): value is Criterion => value === 'quiet' || value === 'height' || value === 'view'
+const isCriterion = (value: unknown): value is Criterion =>
+  value === 'sea' || value === 'quiet' || value === 'height' || value === 'view'
 const isStep = (value: unknown): value is TurnStep =>
   typeof value === 'object' &&
   value !== null &&
   ['search', 'features', 'vision', 'geo'].includes((value as TurnStep).agent) &&
   typeof (value as TurnStep).title === 'string' &&
   ['done', 'failed'].includes((value as TurnStep).status)
+/** The known fields of a step only. */
+const stepOf = ({ agent, title, params, status, result }: TurnStep): TurnStep => ({
+  agent,
+  title,
+  ...(typeof params === 'string' && params && { params }),
+  status,
+  ...(typeof result === 'string' && result && { result }),
+})
 const PHOTO_ACTIONS: readonly PhotoAnswer['action'][] = [
   'ask',
   'similar',
@@ -815,7 +899,7 @@ export async function askAssistant(
         matches: Array.isArray(data.matches) ? data.matches : undefined,
         ...(isRecord(data.features) && { features: data.features }),
         ...(Array.isArray(data.missing) && { missing: data.missing.filter(isCriterion) }),
-        ...(Array.isArray(data.steps) && { steps: data.steps.filter(isStep) }),
+        ...(Array.isArray(data.steps) && { steps: data.steps.filter(isStep).map(stepOf) }),
         ...(parsePhoto(data.photo) && { photo: parsePhoto(data.photo) }),
         ...(data.modelsDown === true && { modelsDown: true as const }),
         ...(parseChatMap(data.map) && { map: parseChatMap(data.map) }),
@@ -827,6 +911,8 @@ export async function askAssistant(
   }
   // A chat about a hotel has no rules of its own here: the hotel's data are on the server.
   if (request.brief.hotelId) return { brief: request.brief, reply: HOTEL_UNAVAILABLE, source: 'rules' }
+  // Parameters changed by hand are kept as they are: the plan goes by the rules over them.
+  if (request.rerun) return { brief: request.brief, source: 'rules' }
   const input = request.messages.at(-1)?.text ?? ''
   const brief = mergeBrief(request.brief, input, asked, destinations)
   // The rules cannot see photos: Эвал says why instead of pretending.

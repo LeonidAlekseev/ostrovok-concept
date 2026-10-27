@@ -9,6 +9,7 @@ import {
 } from './assistant'
 import { clearDialog, isBrief, isPlan, isQuestion, loadDialog } from './assistantDialog'
 import { parseChatMap, type ChatMap } from './geo/chatMap'
+import { parseParams, type SessionParam } from './sessionParams'
 
 /**
  * The chats with Эвал. A message has a role, a status and structured data, so the feed holds the steps of Эвал's
@@ -25,6 +26,8 @@ export type MessageStatus = 'pending' | 'done' | 'failed'
 export interface AgentStep {
   agent: TurnStep['agent'] | (string & {})
   title: string
+  /** What it was called with, briefly in Russian. */
+  params?: string
   result?: string
 }
 
@@ -56,6 +59,15 @@ export interface MessageData {
   unverified?: string
   /** A chat about a hotel: the places near it and the routes to them the geo steps found. */
   map?: ChatMap
+  /** «Сохранил в память сессии»: what a change of the chat's brief saved (an agent's message). */
+  memory?: SessionParam[]
+  /**
+   * «Пока не нашёл точных совпадений»: the brief the search went by, its parameters shown to be changed (the newest
+   * such answer only).
+   */
+  notFound?: Brief
+  /** An answer to the parameters changed by hand: the route picks by the brief, the dialog is not read again. */
+  rerun?: true
 }
 
 export interface ChatMessage {
@@ -151,6 +163,7 @@ const isStep = (value: unknown): value is AgentStep =>
   isObject(value) &&
   isString(value.agent) &&
   isString(value.title) &&
+  (value.params === undefined || isString(value.params)) &&
   (value.result === undefined || isString(value.result))
 
 const isSize = (value: unknown): value is number =>
@@ -187,6 +200,9 @@ export function parseData(value: unknown): MessageData | null {
     ...(value.more === true && { more: true as const }),
     ...(isString(value.unverified) && value.unverified && { unverified: value.unverified }),
     ...(parseChatMap(value.map) && { map: parseChatMap(value.map) }),
+    ...(parseParams(value.memory) && { memory: parseParams(value.memory) }),
+    ...(isBrief(value.notFound) && { notFound: value.notFound }),
+    ...(value.rerun === true && { rerun: true as const }),
   }
 }
 

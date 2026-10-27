@@ -13,6 +13,12 @@ export function formatDecimal(value: number): string {
   return value.toFixed(1).replace('.', ',')
 }
 
+/** «220 м», «1 км», «1,5 км»: a distance rounded to 10 m, from a kilometre in kilometres. */
+export function formatMeters(meters: number): string {
+  if (meters < 1000) return `${Math.round(meters / 10) * 10} м`
+  return `${formatDecimal(meters / 1000).replace(/,0$/, '')} км`
+}
+
 /** Russian plural form: pluralRu(2, ['гость', 'гостя', 'гостей']) → 'гостя'. */
 export function pluralRu(n: number, forms: [one: string, few: string, many: string]): string {
   const mod10 = n % 10
