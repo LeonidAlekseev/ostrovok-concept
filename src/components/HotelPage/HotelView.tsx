@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import dynamic from 'next/dynamic'
 import { Building2, ChevronDown, Landmark, Sunrise, Sunset, Waves } from 'lucide-react'
 import { cn } from 'cn'
+import { MapUnavailable } from '@/components/MapUnavailable/MapUnavailable'
 import { Slider } from '@/components/ui/slider'
 import type { Hotel } from '@/lib/catalog'
 import type { ViewMap as ViewMapData } from '@/lib/db/view'
@@ -49,7 +50,7 @@ import {
   type Tone,
   type ViewTarget,
 } from '@/lib/view'
-import { HotelMapUnavailable } from './HotelMapUnavailable'
+import { useHotelJson } from './useHotelJson'
 import {
   BLOCKER_COLOR,
   HOTEL_BUILDING_COLOR,
@@ -60,7 +61,7 @@ import {
 } from './viewColors'
 
 // MapLibre is loaded only in the browser.
-const ViewMap = dynamic(() => import('./ViewMap').catch(() => ({ default: () => <HotelMapUnavailable /> })), {
+const ViewMap = dynamic(() => import('./ViewMap').catch(() => ({ default: () => <MapUnavailable /> })), {
   ssr: false,
   loading: () => <div className="size-full animate-pulse bg-muted" aria-hidden />,
 })
@@ -84,37 +85,6 @@ const COMPASS: (SideId | null)[] = ['nw', 'n', 'ne', 'w', null, 'e', 'sw', 's', 
 
 /** «254° (запад)» kept on one line. */
 const unbroken = (text: string) => text.replace(/ /g, ' ')
-
-/** The view from every floor (`GET /api/hotels/<id>/view`): `null` while it comes and when there is none. */
-function useView(hotelId: string, enabled: boolean) {
-  const [state, setState] = useState<{ key: string; view: HotelViewData | null } | null>(null)
-  useEffect(() => {
-    if (!enabled) return
-    const controller = new AbortController()
-    fetch(`/api/hotels/${encodeURIComponent(hotelId)}/view`, { signal: controller.signal })
-      .then((response) => (response.ok ? (response.json() as Promise<{ view: HotelViewData | null }>) : null))
-      .then((body) => setState({ key: hotelId, view: body?.view ?? null }))
-      .catch(() => {
-        if (!controller.signal.aborted) setState({ key: hotelId, view: null })
-      })
-    return () => controller.abort()
-  }, [hotelId, enabled])
-  return { view: state?.view ?? null, loading: enabled && state?.key !== hotelId }
-}
-
-/** The buildings around the hotel (`GET /api/hotels/<id>/view-map`): `null` until they come and on a failure. */
-function useViewMap(hotelId: string) {
-  const [map, setMap] = useState<ViewMapData | null>(null)
-  useEffect(() => {
-    const controller = new AbortController()
-    fetch(`/api/hotels/${encodeURIComponent(hotelId)}/view-map`, { signal: controller.signal })
-      .then((response) => (response.ok ? (response.json() as Promise<{ map: ViewMapData | null }>) : null))
-      .then((body) => setMap(body?.map ?? null))
-      .catch(() => {})
-    return () => controller.abort()
-  }, [hotelId])
-  return map
-}
 
 function ReachBadge({ reach }: { reach: Reach }) {
   return (
@@ -239,8 +209,10 @@ export function HotelView({
   const viewWindow = windowOf(building, roomFloors)
   const [picked, setPickedFloor] = useState<number | null>(null)
   const floor = viewWindow ? Math.min(picked ?? viewWindow.floors, viewWindow.floors) : null
-  const { view, loading } = useView(hotel.id, Boolean(viewWindow))
-  const buildings = useViewMap(hotel.id)
+  // The view from every floor, asked only when the floors of the window are known.
+  const { value: view, loading } = useHotelJson<HotelViewData>(hotel.id, 'view', 'view', Boolean(viewWindow))
+  // The buildings around the hotel for the map.
+  const { value: buildings } = useHotelJson<ViewMapData>(hotel.id, 'view-map', 'map')
   const [failed, setFailed] = useState(false)
   // The date is the visitor's today in the browser (the prerendered page has none) until one is picked.
   const today = useSyncExternalStore(noChanges, todayIso, () => '')
@@ -298,7 +270,7 @@ export function HotelView({
         {!failed && <Legend side={shownSide} floor={ready ? floor : null} />}
         <div className="relative h-[clamp(18rem,55vw,28rem)] overflow-hidden rounded-2xl bg-muted md:order-first">
           {failed ? (
-            <HotelMapUnavailable />
+            <MapUnavailable />
           ) : (
             <ViewMap
               center={{ lat: hotel.lat, lon: hotel.lon }}

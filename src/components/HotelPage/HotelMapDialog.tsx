@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
+import { MapUnavailable } from '@/components/MapUnavailable/MapUnavailable'
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import type { Hotel } from '@/lib/catalog'
 import { useHotels } from '@/hooks/useHotels'
@@ -11,12 +12,11 @@ import { lowestPrice } from '@/lib/offer'
 import { setGuestParams, setStayParams } from '@/lib/search'
 import { todayIso } from '@/lib/dates'
 import type { MapCamera } from '../SearchResultsPage/searchView'
-import { HotelMapUnavailable } from './HotelMapUnavailable'
 import { useHotelStay } from './stayContext'
 
 // MapLibre is loaded only when the map opens, and only in the browser.
 const SearchMap = dynamic(
-  () => import('../SearchResultsPage/SearchMap').catch(() => ({ default: () => <HotelMapUnavailable /> })),
+  () => import('../SearchResultsPage/SearchMap').catch(() => ({ default: () => <MapUnavailable /> })),
   { ssr: false, loading: () => <div className="size-full animate-pulse bg-muted" aria-hidden /> },
 )
 
@@ -71,7 +71,7 @@ function HotelMap({ hotel }: { hotel: Hotel }) {
       initialCamera={camera}
       frame={false}
       onViewChange={onViewChange}
-      fallback={<HotelMapUnavailable />}
+      fallback={<MapUnavailable />}
     />
   )
 }

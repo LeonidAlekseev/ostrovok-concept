@@ -46,7 +46,7 @@ import { FiltersPanel } from './FiltersPanel'
 import { FiltersSheet } from './FiltersSheet'
 import { Pagination } from './Pagination'
 import { ResultTile } from './ResultTile'
-import { MapUnavailable } from './MapUnavailable'
+import { MapUnavailable, SEARCH_MAP_HINT } from '@/components/MapUnavailable/MapUnavailable'
 import {
   entryState,
   readSearchView,
@@ -59,10 +59,13 @@ import {
 } from './searchView'
 
 // MapLibre is loaded only here and only in the browser; a failed chunk load reads as an unavailable map.
-const SearchMap = dynamic(() => import('./SearchMap').catch(() => ({ default: MapUnavailable })), {
-  ssr: false,
-  loading: () => <div className="size-full animate-pulse bg-muted" aria-hidden />,
-})
+const SearchMap = dynamic(
+  () => import('./SearchMap').catch(() => ({ default: () => <MapUnavailable hint={SEARCH_MAP_HINT} /> })),
+  {
+    ssr: false,
+    loading: () => <div className="size-full animate-pulse bg-muted" aria-hidden />,
+  },
+)
 
 /** The title of the blank search; its hotels are those of every destination, see `top`. */
 const TOP_TITLE = 'Лучшие по оценкам гостей'

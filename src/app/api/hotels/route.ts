@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { apiError, CDN_CACHE_HEADERS } from '@/lib/api'
 import { loadBoxHotels, loadCityHotels, loadHotels } from '@/lib/db/catalog'
 import { MAX_BOX_SPAN_DEG, parseBox } from '@/lib/mapBox'
 
@@ -30,19 +31,14 @@ export async function GET(request: Request) {
   const bbox = params.get('bbox')
   if (bbox !== null) {
     const box = params.size === 1 ? parseBox(bbox) : null
-    if (!box)
-      return Response.json(
-        { error: `Pass bbox alone: west,south,east,north, at most ${MAX_BOX_SPAN_DEG}° a side` },
-        { status: 400 },
-      )
+    if (!box) return apiError(400, `Pass bbox alone: west,south,east,north, at most ${MAX_BOX_SPAN_DEG}° a side`)
     return answer(() => loadBoxHotels(box))
   }
   const query = querySchema.safeParse({
     ids: params.get('ids') ?? undefined,
     destinations: params.get('destinations') ?? undefined,
   })
-  if (!query.success)
-    return Response.json({ error: `Pass ids or destinations: 1…${MAX_IDS} comma-separated ids` }, { status: 400 })
+  if (!query.success) return apiError(400, `Pass ids or destinations: 1…${MAX_IDS} comma-separated ids`)
 
   const { ids, destinations } = query.data
   return answer(() => (ids ? loadHotels(ids) : loadCityHotels(destinations!)))
@@ -51,14 +47,9 @@ export async function GET(request: Request) {
 /** The hotels with a short CDN life, or 503 when the catalogue fails. */
 async function answer(load: () => Promise<unknown[]>) {
   try {
-    const hotels = await load()
-    return Response.json(
-      { hotels },
-      // A short CDN life: the server cache, unlike the CDN, is dropped by POST /api/revalidate.
-      { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600' } },
-    )
+    return Response.json({ hotels: await load() }, { headers: CDN_CACHE_HEADERS })
   } catch (error) {
     console.error('GET /api/hotels:', error instanceof Error ? error.message : error)
-    return Response.json({ error: 'Каталог временно недоступен' }, { status: 503 })
+    return apiError(503, 'Catalog unavailable')
   }
 }

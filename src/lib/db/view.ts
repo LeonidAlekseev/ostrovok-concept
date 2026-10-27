@@ -1,12 +1,8 @@
 import 'server-only'
-import { createClient } from '@supabase/supabase-js'
-import { unstable_cache } from 'next/cache'
 import { z } from 'zod'
-import type { Database } from '@/lib/db/database.types'
 import { haversineMeters } from '@/lib/geo/distance'
 import { mergePlaces } from '@/lib/geo/samePlace'
 import type { HotelBuilding, NearbyPlace } from '@/lib/hotelDetails'
-import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/config'
 import {
   LANDMARK_RADIUS_M,
   pointAt,
@@ -23,7 +19,7 @@ import {
   type SightLine,
   type ViewTarget,
 } from '@/lib/view'
-import { CATALOG_LIFETIME, CATALOG_TAG } from './catalog'
+import { anonClient, catalogCached, readOrNull, type AnonClient, type HotelPoint } from './anon'
 
 /**
  * «Вид из отеля» of a real hotel for its page and for Эвал (`HotelView`, src/lib/view.ts): the lines of sight of
@@ -33,13 +29,6 @@ import { CATALOG_LIFETIME, CATALOG_TAG } from './catalog'
  * a hotel without the floors of its window, a database without the function or a failure read as `null`, and the page
  * and Эвал say «нет данных».
  */
-
-const database = () =>
-  createClient<Database>(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } })
-
-type Db = ReturnType<typeof database>
-
-const isRealHotel = (id: string) => isSupabaseConfigured && /^ota-\d{1,15}$/.test(id)
 
 /** At most this many lines a call of `hotel_view_eyes`. */
 const LINES_PER_CALL = 160
@@ -127,7 +116,7 @@ interface Point {
 }
 
 /** The lines from the hotel's point to the points, a call per `LINES_PER_CALL`, and the hotel's own building. */
-async function measure(db: Db, hotel: Point, points: readonly Point[]) {
+async function measure(db: AnonClient, hotel: Point, points: readonly Point[]) {
   const batches: Point[][] = []
   for (let i = 0; i < points.length; i += LINES_PER_CALL) batches.push(points.slice(i, i + LINES_PER_CALL))
   const answers = await Promise.all(
@@ -252,9 +241,11 @@ export function viewLandmarks(
 
 type Measured = Omit<HotelView, 'window' | 'windowSides'>
 
-const readView = unstable_cache(
+// The version in the key goes up with every change of `Measured`.
+const readView = catalogCached(
+  ['hotel-view-v5'],
   async (_hotelId: string, lat: number, lon: number, ostrovok: Landmark[]): Promise<Measured> => {
-    const db = database()
+    const db = anonClient()
     const hotel = { lat, lon }
     const rayPoints = RAY_BEARINGS.map((bearing) => ({
       ...pointAt(hotel, bearing, RAY_LENGTH_M),
@@ -295,13 +286,7 @@ const readView = unstable_cache(
       landmarks: measured.filter((t) => t.kind !== 'sea').sort((a, b) => a.distanceM - b.distanceM),
     }
   },
-  [CATALOG_TAG, 'hotel-view-v5'],
-  { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME },
 )
-
-const warn = (what: string, error: unknown) =>
-  // The kind and the provider's short message only.
-  console.warn(`${what} (${String((error as { message?: unknown })?.message ?? error).slice(0, 200)})`)
 
 /**
  * The view from every floor of the real hotel (`windowOf`: EUBUCCO's building, else the floors the rooms take), or
@@ -309,34 +294,27 @@ const warn = (what: string, error: unknown) =>
  * the lines cannot be read.
  */
 export async function loadHotelView(
-  hotel: { id: string; lat: number; lon: number },
+  hotel: HotelPoint,
   building: HotelBuilding | null | undefined,
   roomFloors: number | null | undefined,
   nearby: readonly NearbyPlace[],
 ): Promise<HotelView | null> {
   const window = windowOf(building, roomFloors)
-  if (!isRealHotel(hotel.id) || !window) return null
-  try {
-    const measured = await readView(hotel.id, hotel.lat, hotel.lon, ostrovokLandmarks(nearby))
-    return { window, ...measured, windowSides: [] }
-  } catch (error) {
-    warn(`hotel view: none for ${hotel.id}`, error)
-    return null
-  }
+  if (!window) return null
+  return readOrNull(hotel.id, 'hotel view', async () => ({
+    window,
+    ...(await readView(hotel.id, hotel.lat, hotel.lon, ostrovokLandmarks(nearby))),
+    windowSides: [],
+  }))
 }
 
 /** The lines from the hotel to places found by Эвал's geo tools; `null` when they cannot be read. */
 export async function checkViewPoints(
-  hotel: { id: string; lat: number; lon: number },
+  hotel: HotelPoint,
   points: readonly { lat: number; lon: number }[],
 ): Promise<(SightLine | null)[] | null> {
-  if (!isRealHotel(hotel.id) || points.length === 0) return null
-  try {
-    return (await measure(database(), hotel, points)).lines
-  } catch (error) {
-    warn(`hotel view: no lines for ${hotel.id}`, error)
-    return null
-  }
+  if (points.length === 0) return null
+  return readOrNull(hotel.id, 'hotel view lines', async () => (await measure(anonClient(), hotel, points)).lines)
 }
 
 export { VIEW_MAP_RADIUS_M }
@@ -390,23 +368,15 @@ export function viewMapOf(features: readonly unknown[]): ViewMap {
   }
 }
 
-const readViewMap = unstable_cache(
+const readViewMap = catalogCached(
+  ['hotel-view-map'],
   async (_hotelId: string, lat: number, lon: number): Promise<ViewMap> => {
-    const { data, error } = await database().rpc('hotel_geo_features', { lat, lon, radius_m: VIEW_MAP_RADIUS_M })
+    const { data, error } = await anonClient().rpc('hotel_geo_features', { lat, lon, radius_m: VIEW_MAP_RADIUS_M })
     if (error) throw error
     return viewMapOf(z.object({ features: z.array(z.unknown()) }).parse(data).features)
   },
-  [CATALOG_TAG, 'hotel-view-map'],
-  { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME },
 )
 
 /** The buildings around the real hotel for the map of the view, or `null` when they cannot be read. */
-export async function loadViewMap(hotel: { id: string; lat: number; lon: number }): Promise<ViewMap | null> {
-  if (!isRealHotel(hotel.id)) return null
-  try {
-    return await readViewMap(hotel.id, hotel.lat, hotel.lon)
-  } catch (error) {
-    warn(`view map: none for ${hotel.id}`, error)
-    return null
-  }
-}
+export const loadViewMap = (hotel: HotelPoint): Promise<ViewMap | null> =>
+  readOrNull(hotel.id, 'view map', () => readViewMap(hotel.id, hotel.lat, hotel.lon))

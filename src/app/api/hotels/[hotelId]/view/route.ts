@@ -1,6 +1,5 @@
 import type { NextRequest } from 'next/server'
-import { isVisibleHotel } from '@/lib/catalog'
-import { loadHotel } from '@/lib/db/catalog'
+import { CDN_CACHE_HEADERS, loadVisibleHotel } from '@/lib/api'
 import { loadHotelDetails } from '@/lib/db/hotelDetails'
 import { loadHotelView } from '@/lib/db/view'
 
@@ -11,13 +10,9 @@ import { loadHotelView } from '@/lib/db/view'
  */
 export async function GET(_request: NextRequest, context: { params: Promise<{ hotelId: string }> }) {
   const { hotelId } = await context.params
-  const hotel = isVisibleHotel({ id: hotelId }) ? await loadHotel(hotelId) : null
+  const hotel = await loadVisibleHotel(hotelId)
   const details = hotel ? await loadHotelDetails(hotel.id) : null
   const view =
     hotel && details ? await loadHotelView(hotel, details.building, details.facts.roomFloors, details.nearby) : null
-  return Response.json(
-    { view },
-    // A short CDN life: the server cache, unlike the CDN, is dropped by POST /api/revalidate.
-    { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600' } },
-  )
+  return Response.json({ view }, { headers: CDN_CACHE_HEADERS })
 }

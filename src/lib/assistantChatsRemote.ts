@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, Json } from './db/database.types'
 import { byRecent, parseChat, withoutPreview, type Attachment, type Chat, type ChatMessage } from './assistantChats'
+import { blobToDataUrl } from './imageOptimize'
 
 /**
  * The chats of a signed-in user in Supabase, under RLS «only the owner's» (supabase/migrations/…_assistant_chats.sql).
@@ -157,18 +158,10 @@ export async function downloadPhotos(client: Client, paths: readonly string[]): 
     paths.map(async (path) => {
       const { data, error } = await client.storage.from(PHOTO_BUCKET).download(path)
       fail(PHOTO_BUCKET, error)
-      return blobDataUrl(data!)
+      return blobToDataUrl(data!)
     }),
   )
 }
-
-const blobDataUrl = (blob: Blob) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(blob)
-  })
 
 /** The paths of the chat's photos in Storage. */
 export const photoPaths = (chat: Chat): string[] =>
