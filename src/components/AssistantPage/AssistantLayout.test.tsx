@@ -397,22 +397,35 @@ describe('the feed', () => {
   })
 
   it.each([
-    ['pending', 'Шаг выполняется:', 'Подбираю отели…'],
-    ['done', 'Шаг готово:', 'Подбираю отели — нашёл 3 отеля'],
-    ['failed', 'Шаг не удалось:', 'Подбираю отели — нет ответа'],
-  ] as const)('shows a %s step as a card of the tool with its status', (status, label, title) => {
-    const step = {
-      agent: 'search' as const,
-      title: 'Подбираю отели',
-      result: status === 'done' ? 'нашёл 3 отеля' : 'нет ответа',
-    }
+    ['done', 'Инструмент, готово:', 'нашёл 3 отеля'],
+    ['failed', 'Инструмент, не удалось:', 'нет ответа'],
+  ] as const)('shows a %s step as a card of the call with its parameters and status', (status, label, result) => {
+    const step = { agent: 'search' as const, title: 'Подбираю отели', params: 'Лиссабон', result }
     const chat = chatOf('Лиссабон', 5, ['Лиссабон вдвоём'])
     chat.messages.push(message('agent', '', minutesAgo(4), { status, data: { step } }))
     renderWith([chat])
-    const card = within(log()).getByText(title).closest<HTMLElement>('[data-slot=trace]')!
-    expect(within(card).getByText('Инструмент').className).toMatch(/\buppercase\b/)
+    const card = within(log()).getByText('Подбираю отели').closest<HTMLElement>('[data-slot=trace]')!
     expect(within(card).getByText(label)).toBeTruthy()
+    expect(within(card).getByText(`Лиссабон · ${result}`)).toBeTruthy()
     expect(card.querySelector('[data-slot=trace-icon]')!.className).toMatch(/\brounded-full\b/)
+    expect(card.className).toMatch(/\bbg-muted\b/)
+  })
+
+  it('shows a step at work as a row with the three dots: «Ищу подходящие варианты…» for the search', () => {
+    const chat = chatOf('Лиссабон', 5, ['Лиссабон вдвоём'])
+    chat.messages.push(
+      message('agent', '', minutesAgo(4), {
+        status: 'pending',
+        data: { step: { agent: 'search', title: 'Подбираю отели по вашему описанию' } },
+      }),
+      message('agent', '', minutesAgo(4), {
+        status: 'pending',
+        data: { step: { agent: 'geo', title: 'Проверяю места рядом с отелем' } },
+      }),
+    )
+    renderWith([chat])
+    expect(within(log()).getByRole('status', { name: 'Ищу подходящие варианты…' })).toBeTruthy()
+    expect(within(log()).getByRole('status', { name: 'Проверяю места рядом с отелем…' })).toBeTruthy()
   })
 })
 

@@ -123,7 +123,7 @@ describe('the trip of a chat', () => {
     expect(trip).toMatchObject({ checkIn: '2026-11-10', checkOut: '2026-11-15', nights: 5 })
     expect(trip.guests).toEqual({ adults: 2, children: 0, rooms: 1 })
     expect(trip.city?.id).toBe('lisbon')
-    expect(tripLine(trip)).toBe('2 гостя · 10–15 нояб · Лиссабон')
+    expect(tripLine(trip)).toBe('2 гостя · 10–15 нояб. · Лиссабон')
   })
 
   it('takes the dates and the guests of the newest plan, and knows nothing without them', () => {

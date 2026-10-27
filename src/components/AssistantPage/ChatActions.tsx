@@ -220,22 +220,13 @@ function ShareBody({ share, signedIn }: { share: ReturnType<typeof useShare>; si
   )
 }
 
-export function SharePopover({ chat, signedIn }: { chat: Chat; signedIn: boolean }) {
+/** «Поделиться» of the header: a round button with the popover of the link. */
+export function SharePopover({ chat, signedIn, className }: { chat: Chat; signedIn: boolean; className?: string }) {
   const share = useShare(chat, signedIn)
   return (
     <Popover onOpenChange={share.toggle}>
-      <PopoverTrigger
-        render={
-          <Button
-            variant="outline"
-            size="sm"
-            shape="pill"
-            className="h-9 bg-(--decor-light) text-foreground max-xl:w-9 max-xl:p-0"
-          />
-        }
-      >
-        <Share2 className="size-4" aria-hidden />
-        <span className="max-xl:sr-only">Поделиться</span>
+      <PopoverTrigger render={<Button variant="ghost" size="icon" className={className} />} aria-label="Поделиться">
+        <Share2 aria-hidden />
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[min(340px,calc(100vw-24px))] gap-3 p-4 shadow-(--shadow-popover)">
         <ShareBody share={share} signedIn={signedIn} />

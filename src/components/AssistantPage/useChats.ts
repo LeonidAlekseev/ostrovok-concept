@@ -11,6 +11,7 @@ import {
   MODELS_DOWN,
   missingNote,
   nextQuestion,
+  NOT_FOUND,
   planCities,
   PHOTO_QUESTION,
   PHOTO_TEXT,
@@ -51,6 +52,7 @@ import {
   uploadPhotos,
 } from '@/lib/assistantChatsRemote'
 import type { PhotoUrl } from './ChatPhotos'
+import { savedParams } from '@/lib/sessionParams'
 import type { HotelSummary } from '@/lib/catalog'
 import { todayIso } from '@/lib/dates'
 import { isHotelGeoQuestion, isHotelViewQuestion } from '@/lib/noise'
@@ -62,6 +64,9 @@ export const THINK_MS = 650
 
 /** Where the chats live: not known yet, the browser (a guest) or Supabase (a signed-in user). */
 type Mode = { kind: 'loading' } | { kind: 'guest' } | { kind: 'remote'; email: string; userId: string }
+
+/** The answer's time after the traveller's message: the memory and the steps of the turn go between them. */
+const ANSWER_GAP_MS = 50
 
 const later = (iso: string, ms: number) => new Date(Date.parse(iso) + ms).toISOString()
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -80,6 +85,11 @@ export function compose(
   newHotels: readonly HotelSummary[],
   /** The hotels the chat has shown, for «Другие варианты». */
   exclude?: ReadonlySet<string>,
+  /**
+   * The chat's brief before the answer: what the answer saved is shown in a card of its own («Сохранил в память
+   * сессии»), so the text does not repeat «Записал: …».
+   */
+  before?: Brief,
 ): { brief: Brief; question: Question | null; text: string; data: ChatMessage['data'] } {
   const { brief, reply: remark, matches, features, missing = [], photo } = response
   const today = todayIso()
@@ -97,7 +107,7 @@ export function compose(
   if (photo?.action === 'ask') return { brief, question: PHOTO_QUESTION, text: PHOTO_QUESTION.text, data: {} }
   // No model that sees photos answered: the answer to the message's words, and Эвал says the photos went unseen.
   if (photo?.action === 'skipped') {
-    const answer = compose({ ...response, photo: undefined }, destinations, newHotels, exclude)
+    const answer = compose({ ...response, photo: undefined }, destinations, newHotels, exclude, before)
     return { ...answer, text: `${PHOTO_SKIPPED} ${answer.text}`.trim() }
   }
   // The provider does not answer (every model of the chain failed) or the limit is over: Эвал says so honestly.
@@ -116,20 +126,26 @@ export function compose(
       }
     // The hotels like the photo lead the plan, in the city of the best of them unless the chat has its own.
     const scope = { ...brief, destinationId: brief.destinationId ?? matches[0].destinationId }
-    const plan = makePlan(scope, today, destinations, newHotels, matches, features, exclude)
+    const plan = makePlan(scope, today, destinations, newHotels, matches, features, exclude, false)
     const like = photo.like ? `Похоже: ${photo.like}` : 'Похоже на ваше фото'
     plan.options = plan.options.map((o) => (o.hotel ? { ...o, reasons: [like, ...(o.reasons ?? [])] } : o))
     return { brief, question: null, text: `${seen} Нашёл похожие отели.`.trim(), data: { plan } }
   }
   const question = nextQuestion(brief, today, destinations)
-  const understood = describeBrief(brief, destinations)
+  const saved = before !== undefined && savedParams(before, brief, destinations).length > 0
+  const understood = saved ? '' : describeBrief(brief, destinations)
   if (question) {
     // The model's remark fills in only when nothing is understood yet, so answers keep "Записал: …".
-    const lead = understood ? `Записал: ${understood}.` : remark
+    const lead = saved ? '' : understood ? `Записал: ${understood}.` : remark
     const text = lead ? `${lead} ${question.text}` : question.text
     return { brief, question, text: seen ? `${seen} ${text}` : text, data: {} }
   }
-  const plan = makePlan(brief, today, destinations, newHotels, matches, features, exclude)
+  // The sea within a distance is kept unless no hotel of the plan's cities has data on the coast.
+  const strict = brief.seaMaxM !== undefined && !missing.includes('sea')
+  const plan = makePlan(brief, today, destinations, newHotels, matches, features, exclude, strict)
+  // Nothing within the conditions: Эвал offers to change the parameters the search went by.
+  if (strict && plan.options.length === 0)
+    return { brief, question, text: [seen, NOT_FOUND].filter(Boolean).join(' '), data: { notFound: brief } }
   const note = missingNote(missing, planCities(brief, today, destinations))
   const text = [seen, understood && `Записал: ${understood}.`, note].filter(Boolean).join(' ')
   return { brief, question, text, data: { plan } }
@@ -162,6 +178,11 @@ export interface Chats {
   remove: (chatId: string) => void
   /** The trip's parameters edited by hand: the next answer goes by them. */
   setBrief: (chatId: string, brief: Brief) => void
+  /**
+   * The parameters changed in the card of «ничего не нашёл»: saved to the session (its card in the feed) and the
+   * hotels are looked for again by them, without a message of the traveller.
+   */
+  research: (chatId: string, brief: Brief) => void
   /** Resolves once the changes so far are saved (in the account: written to Supabase), e.g. before opening a chat elsewhere. */
   flush: () => Promise<void>
   /** What shows a photo of a message: the shared link, the signed link of Storage or the preview; none reads «Фото». */
@@ -355,10 +376,13 @@ export function useChats(
       const question = chat.question?.id === 'photo' ? null : (chat.question?.id ?? null)
       const today = todayIso()
       // The photos of the turn; the ones kept in Storage come later, after the turn's state is set.
-      const found = requestPhotos(chat, pending.createdAt)
+      const rerun = pending.data.rerun === true
+      const found = rerun ? undefined : requestPhotos(chat, pending.createdAt)
       // The plan is surely due when the rules alone complete the brief: its first step shows while Эвал works.
       const planDue =
-        !found && !chat.brief.hotelId && !nextQuestion(mergeBrief(chat.brief, input, question, destinations), today)
+        !found &&
+        !chat.brief.hotelId &&
+        !nextQuestion(rerun ? chat.brief : mergeBrief(chat.brief, input, question, destinations), today)
       const waitStep = planDue
         ? SEARCH_STEP
         : chat.brief.hotelId && isHotelViewQuestion(input)
@@ -393,8 +417,8 @@ export function useChats(
         if (controller.signal.aborted) return
         const ask = () =>
           askAssistant(
-            { messages: history, brief: chat.brief, ...(sent && { photos: sent }) },
-            question,
+            { messages: history, brief: chat.brief, ...(sent && { photos: sent }), ...(rerun && { rerun }) },
+            rerun ? null : question,
             destinations,
             controller.signal,
           )
@@ -428,19 +452,42 @@ export function useChats(
     const asked = chat?.messages.findLast((m) => m.role === 'user' && m.createdAt < pendingAt)
     const exclude = chat && asked?.data.more ? shownHotels(chat) : undefined
     // Composed before the update: a failure here fails the answer, not the render.
-    const { brief: next, question, text, data } = compose(response, destinations, newHotels, exclude)
+    const { brief: next, question, text, data } = compose(response, destinations, newHotels, exclude, chat?.brief)
     const steps = response.steps ?? []
     const now = new Date().toISOString()
     update(chatId, (chat) => {
       const pending = chat.messages.find((m) => m.id === pendingId)
       if (!pending || pending.status !== 'pending') return chat
+      // What the answer saved of the trip goes right after the traveller's message, before the steps.
+      const memory = savedParams(chat.brief, next, destinations)
+      const userMessage = chat.messages.findLast((m) => m.role === 'user' && m.createdAt < pending.createdAt)
+      const memoryMessages: ChatMessage[] =
+        memory.length > 0
+          ? [
+              {
+                id: newId(),
+                role: 'agent',
+                status: 'done',
+                text: '',
+                data: { memory },
+                createdAt: userMessage ? later(userMessage.createdAt, 1) : later(pending.createdAt, -steps.length - 1),
+              },
+            ]
+          : []
       // The turn's steps go right before the answer, in their order.
       const stepMessages: ChatMessage[] = steps.map((step, i) => ({
         id: newId(),
         role: 'agent',
         status: step.status,
         text: '',
-        data: { step: { agent: step.agent, title: step.title, ...(step.result && { result: step.result }) } },
+        data: {
+          step: {
+            agent: step.agent,
+            title: step.title,
+            ...(step.params && { params: step.params }),
+            ...(step.result && { result: step.result }),
+          },
+        },
         createdAt: later(pending.createdAt, i - steps.length),
       }))
       // No text model answered and the rules did: Эвал says so in a message of its own, right after the answer.
@@ -458,6 +505,7 @@ export function useChats(
         : []
       const messages = [
         ...chat.messages.filter((m) => !(m.role === 'agent' && m.status === 'pending')),
+        ...memoryMessages,
         ...stepMessages,
         ...down,
       ]
@@ -512,13 +560,14 @@ export function useChats(
         user.id,
         sent.map((p) => p.photo),
       )
+    // The memory and the steps of the turn go between the message and the answer: room for them in the order.
     const pending: ChatMessage = {
       id: newId(),
       role: 'assistant',
       status: 'pending',
       text: '',
       data: {},
-      createdAt: later(now, 2),
+      createdAt: later(now, ANSWER_GAP_MS),
     }
     // A chat about a hotel is named after it, and the page's dates go to the next answer.
     const about = hotel && (!current.brief.hotelId || current.brief.hotelId === hotel.id)
@@ -596,15 +645,52 @@ export function useChats(
       })
   }
 
+  /** «Сохранил в память сессии»: the card of what a change of the brief by hand saved, at `now`. */
+  const memoryMessage = (chat: Chat, brief: Brief, now: string): ChatMessage[] => {
+    const memory = savedParams(chat.brief, brief, destinations)
+    return chat.messages.length > 0 && memory.length > 0
+      ? [{ id: newId(), role: 'agent', status: 'done', text: '', data: { memory }, createdAt: now }]
+      : []
+  }
+
   const setBrief = (chatId: string, brief: Brief) => {
+    const now = new Date().toISOString()
     // The question asked follows the new brief: the answer of a date question is given by the dates set.
     const edit = (chat: Chat): Chat => ({
       ...chat,
       brief,
       question: chat.question && nextQuestion(brief, todayIso(), destinations),
+      messages: [...chat.messages, ...memoryMessage(chat, brief, now)],
     })
     if (listed?.id === chatId || chats.some((c) => c.id === chatId)) update(chatId, edit)
     else if (active.id === chatId) setDraft(edit({ ...active }))
+  }
+
+  const research = (chatId: string, brief: Brief) => {
+    const chat = chatsRef.current.find((c) => c.id === chatId)
+    if (!chat || chat.messages.some((m) => m.status === 'pending')) return
+    const now = new Date().toISOString()
+    const memory = memoryMessage(chat, brief, now)
+    // Nothing changed: nothing to look for again.
+    if (memory.length === 0) return
+    const pending: ChatMessage = {
+      id: newId(),
+      role: 'assistant',
+      status: 'pending',
+      text: '',
+      data: { rerun: true },
+      createdAt: later(now, ANSWER_GAP_MS),
+    }
+    const next: Chat = {
+      ...chat,
+      brief,
+      question: null,
+      messages: [...chat.messages, ...memory, pending],
+      updatedAt: now,
+    }
+    chatsRef.current = [next, ...chatsRef.current.filter((c) => c.id !== chatId)]
+    setChats((list) => [next, ...list.filter((c) => c.id !== chatId)])
+    // The turn starts from the effect that finishes the pending answers.
   }
 
   return {
@@ -617,6 +703,7 @@ export function useChats(
     rename,
     remove,
     setBrief,
+    research,
     flush: () => queue.current,
     photoUrl: (attachment, size) => {
       const stored = attachment.url ?? (attachment.path ? signed.get(attachment.path) : undefined)

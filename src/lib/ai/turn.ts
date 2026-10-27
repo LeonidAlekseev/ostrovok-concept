@@ -68,7 +68,10 @@ const stayCount = (n: number) => countRu(n, ['отель', 'отеля', 'оте
 const CITIES_SHOWN = 3
 export function citiesParam(cities: readonly Destination[]): string | undefined {
   if (cities.length === 0) return undefined
-  const named = cities.slice(0, CITIES_SHOWN).map((d) => d.name).join(', ')
+  const named = cities
+    .slice(0, CITIES_SHOWN)
+    .map((d) => d.name)
+    .join(', ')
   return cities.length > CITIES_SHOWN ? `${named} и ещё ${cities.length - CITIES_SHOWN}` : named
 }
 
@@ -153,6 +156,7 @@ export const featuresStep: Step = {
     for (let keep = criteria.length; keep > 0 && ranked.length === 0; keep--) {
       const kept = new Set(criteria.slice(0, keep))
       ranked = rankByFeatures(ids, features, {
+        ...(kept.has('sea') && { seaMaxM: wish.seaMaxM }),
         ...(kept.has('quiet') && { quiet: wish.quiet }),
         ...(kept.has('height') && { height: wish.height }),
         ...(kept.has('view') && { view: wish.view }),

@@ -175,7 +175,7 @@ const VIEW_RULES: [ViewKind | 'any', RegExp][] = [
 
 /** «близко к морю», «ближе к пляжу», «рядом с морем», «у моря», «на берегу», «первая линия». */
 const NEAR_SEA = word(
-  '(?:близко|ближе|поближе|рядом|недалеко|неподал[её]ку|возле|около)\\s+(?:к\\s+|с\\s+|от\\s+)?(?:мор|пляж|берег)|у\\s+(?:самого\\s+)?(?:мор|пляж)|на\\s+(?:самом\\s+)?берегу|(?:мор[еяю]|пляж[ауи]?)\\s+(?:рядом|близко|недалеко|в\\s+шаговой)|шагов[а-яё]*\\s+доступност[а-яё]*\\s+(?:от|до)\\s+(?:мор|пляж)|перв[а-яё]*\\s+лини',
+  '(?:близко|ближе|поближе|рядом|недалеко|неподал[её]ку|возле|около)\\s+(?:к\\s+|с\\s+|от\\s+)?(?:мор|пляж|берег)|у\\s+(?:самого\\s+)?(?:мор|пляж)|на\\s+(?:самом\\s+)?берегу|(?:мор[еяю]|пляж[ауи]?)\\s+(?:был[аио]?\\s+)?(?:рядом|близко|недалеко|в\\s+шаговой)|шагов[а-яё]*\\s+доступност[а-яё]*\\s+(?:от|до)\\s+(?:мор|пляж)|перв[а-яё]*\\s+лини',
 )
 const SEA_WORD = '(?:мор[а-яё]*|пляж[а-яё]*|берег[а-яё]*)'
 const DISTANCE = '(\\d+(?:[.,]\\d+)?)\\s*(км|километр[а-яё]*|м|метр[а-яё]*)(?![а-яё])'
@@ -244,7 +244,9 @@ export function parseWish(input: string, destinations: readonly Destination[]): 
   else if (NEAR_SEA.test(text)) brief.seaMaxM = NEAR_SEA_M
 
   // "до 70 000 ₽", "70к", "70 тыс.", "бюджет 120000" — but not "на 5 ночей" or "в 3000 м от моря".
-  for (const m of (sea ? text.replace(sea.said, ' ') : text).matchAll(/(\d[\d ]*\d|\d)\s*(тыс[а-я.]*|к(?![а-яё])|₽|руб[а-я.]*|р\.)?/g)) {
+  for (const m of (sea ? text.replace(sea.said, ' ') : text).matchAll(
+    /(\d[\d ]*\d|\d)\s*(тыс[а-я.]*|к(?![а-яё])|₽|руб[а-я.]*|р\.)?/g,
+  )) {
     const value = Number(m[1].replace(/ /g, ''))
     const suffix = m[2] ?? ''
     const amount = /^(тыс|к)/.test(suffix) ? value * 1000 : value
@@ -642,7 +644,9 @@ export function briefGuests(value: unknown): Guests | undefined {
   const a = intIn(adults, ...GUEST_LIMITS.adults)
   const c = intIn(children, ...GUEST_LIMITS.children)
   const r = intIn(rooms, ...GUEST_LIMITS.rooms)
-  return a !== undefined && c !== undefined && r !== undefined && r <= a ? { adults: a, children: c, rooms: r } : undefined
+  return a !== undefined && c !== undefined && r !== undefined && r <= a
+    ? { adults: a, children: c, rooms: r }
+    : undefined
 }
 
 /**
@@ -801,6 +805,9 @@ export interface AssistantResponse {
   /** A chat about a hotel: the map of the places near it the geo steps found. */
   map?: ChatMap
 }
+
+/** What Эвал says when no hotel meets the conditions it keeps (the sea within a distance): the parameters follow. */
+export const NOT_FOUND = 'Пока не нашёл точных совпадений. Давайте расширим поиск — можно изменить параметры.'
 
 /** What Эвал says about a hotel when it cannot answer at all (no network, the route is down). */
 export const HOTEL_UNAVAILABLE = 'Сейчас не могу ответить. Попробуйте позже.'
