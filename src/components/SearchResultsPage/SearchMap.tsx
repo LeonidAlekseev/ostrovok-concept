@@ -21,16 +21,10 @@ import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import { hasStars, isRated, type Hotel } from '../../lib/catalog'
 import { countRu, formatDecimal, formatPrice } from '../../lib/format'
 import { clusterPoints, expansionZoom, type MapCluster } from '../../lib/mapClusters'
-import {
-  ATTRIBUTION_CLASS,
-  ATTRIBUTION_SHOWN_MS,
-  foldAttribution,
-  MAP_ATTRIBUTION,
-  MAP_STYLE,
-  silenceSourceAttribution,
-} from './mapSetup'
+import { ATTRIBUTION_CLASS, MAP_ATTRIBUTION, MAP_STYLE, manageAttribution } from './mapSetup'
 import { MapUnavailable } from './MapUnavailable'
 import type { MapCamera } from './searchView'
+import type { MapBox } from '../../lib/mapBox'
 
 export interface MapHotel {
   hotel: Hotel
@@ -66,6 +60,10 @@ interface Props {
   initialCamera?: MapCamera | null
   /** Called after every move of the map. */
   onCameraChange?: (camera: MapCamera) => void
+  /** The camera frames every new list of hotels; `false`: it stays where it starts and where the user moves it. */
+  frame?: boolean
+  /** Called with the box in view once the map loads and after every move. */
+  onViewChange?: (view: MapBox) => void
 }
 
 /**
@@ -83,6 +81,8 @@ export default function SearchMap({
   onOpen,
   initialCamera,
   onCameraChange,
+  frame = true,
+  onViewChange,
 }: Props) {
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const [failed, setFailed] = useState(false)
@@ -116,8 +116,10 @@ export default function SearchMap({
   // The camera to start with is used once; later lists of hotels are framed.
   const startCamera = useRef(initialCamera)
   const cameraChange = useRef(onCameraChange)
+  const viewChange = useRef(onViewChange)
   useEffect(() => {
     cameraChange.current = onCameraChange
+    viewChange.current = onViewChange
   })
   // The preview card above a hovered or focused marker: one popup, its content rendered by React.
   const [previewElement] = useState(() => document.createElement('div'))
@@ -145,18 +147,17 @@ export default function SearchMap({
       return
     }
     let loaded = false
-    instance.on('styledata', () => silenceSourceAttribution(instance))
-    let foldTimer: ReturnType<typeof setTimeout> | undefined
-    const fold = () => {
-      clearTimeout(foldTimer)
-      foldAttribution(instance)
+    const stopAttribution = manageAttribution(instance)
+    const reportView = () => {
+      if (!viewChange.current) return
+      const bounds = instance.getBounds()
+      viewChange.current([bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()])
     }
     instance.on('load', () => {
       loaded = true
       setMap(instance)
       setZoom(instance.getZoom())
-      foldTimer = setTimeout(fold, ATTRIBUTION_SHOWN_MS)
-      for (const type of ['mousedown', 'touchstart', 'wheel'] as const) instance.once(type, fold)
+      reportView()
     })
     // Before the style is in, any error leaves an empty map; later tile errors only leave gaps.
     instance.on('error', () => {
@@ -166,16 +167,17 @@ export default function SearchMap({
     instance.on('moveend', () => {
       const { lng, lat } = instance.getCenter()
       cameraChange.current?.({ center: [lng, lat], zoom: instance.getZoom() })
+      reportView()
     })
     return () => {
-      clearTimeout(foldTimer)
+      stopAttribution()
       instance.remove()
     }
   }, [])
 
   // The camera frames the hotels of every new list, except the first one when a camera is kept.
   useEffect(() => {
-    if (!map || hotels.length === 0) return
+    if (!map || !frame || hotels.length === 0) return
     if (startCamera.current) {
       startCamera.current = null
       return
@@ -184,7 +186,7 @@ export default function SearchMap({
     for (const { hotel } of hotels) bounds.extend([hotel.lon, hotel.lat])
     map.fitBounds(bounds, { padding: 56, maxZoom: 14, duration: 0 })
     setZoom(map.getZoom())
-  }, [map, hotels])
+  }, [map, frame, hotels])
 
   // Markers follow the groups. A marker of the same hotel or group keeps its element, so it does not blink.
   useEffect(() => {

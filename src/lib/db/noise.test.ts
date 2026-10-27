@@ -60,6 +60,22 @@ describe('noiseMapOf', () => {
       },
     ])
   })
+  it('drops the bands below 40 dB of the layers and adds the quiet of hotel_noise_quiet', () => {
+    const geometry = { type: 'Polygon', coordinates: [] }
+    const band = (source: string, db_min: number | null, db_max: number | null) => ({
+      type: 'Feature',
+      geometry,
+      properties: { layer: 'noise', source, indicator: 'Lnight', db_min, db_max },
+    })
+    const map = noiseMapOf(
+      [band('industryInAgglomeration', null, 39), band('roadsInAgglomeration', 55, 59)],
+      [band('quiet', null, 39), band('roadsInAgglomeration', null, 39)],
+    )
+    expect(map.features.map((f) => [f.properties.source, f.properties.db_min])).toEqual([
+      ['roadsInAgglomeration', 55],
+      ['quiet', null],
+    ])
+  })
 })
 
 describe('placesOf', () => {

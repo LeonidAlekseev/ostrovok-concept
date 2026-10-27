@@ -67,6 +67,19 @@ describe('HotelNoise', () => {
     expect(screen.getByRole('link', { name: 'Карты шума EEA' })).toBeTruthy()
   })
 
+  it('shows in the legend the quiet below 40 dB and the dots of the loud places shown, and nothing of shielding', () => {
+    render(<HotelNoise hotel={hotel} noise={loud} building={{ floors: 5, heightM: 17.6, estimated: false }} />)
+    expect(screen.getByText('<40')).toBeTruthy()
+    expect(screen.queryByText(/не закрашено/i)).toBeNull()
+    const dots = screen.getByRole('list', { name: 'Шумные места на карте' })
+    expect(
+      within(dots)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(['Бары и клубы'])
+    expect(screen.queryByText(/экранир/)).toBeNull()
+  })
+
   it('switches the map to the night', async () => {
     render(<HotelNoise hotel={hotel} noise={loud} />)
     await userEvent.click(screen.getByRole('button', { name: 'Ночью' }))
