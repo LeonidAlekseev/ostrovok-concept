@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { firstAnswer } from '@/lib/ai/chain'
 import { geoTurn } from '@/lib/ai/geoTurn'
+import { viewTurn } from '@/lib/ai/viewTurn'
 import { answerWithModel, ruleAnswer } from '@/lib/ai/hotelAnswer'
 import { getTextModels, getVisionModels } from '@/lib/ai/model'
 import { APICallError } from 'ai'
@@ -40,7 +41,7 @@ import { loadDestinations, loadHotel, loadHotelSummaries } from '@/lib/db/catalo
 import { loadHotelFeatures } from '@/lib/db/features'
 import { loadHotelDetails } from '@/lib/db/hotelDetails'
 import { loadHotelNoise } from '@/lib/db/noise'
-import { isHotelGeoQuestion } from '@/lib/noise'
+import { isHotelGeoQuestion, isHotelViewQuestion } from '@/lib/noise'
 import { todayIso, type IsoDate } from '@/lib/dates'
 import type { Hotel } from '@/lib/catalog'
 
@@ -112,7 +113,8 @@ async function planTurn(context: Omit<TurnContext, 'summaries' | 'features'>): P
  * apart; on a missing key, an error or a timeout the rules answer the ready-made questions (src/lib/ai/hotelAnswer.ts).
  * A question about the places near is the geo steps' (src/lib/ai/geoTurn.ts): the model chooses the calls of the geo
  * tools, the answer tells what they found — the Ostrovok places of the hotel first, OpenStreetMap besides — with the
- * steps' lines and the map; a hotel with neither data is answered as before.
+ * steps' lines and the map; a hotel with neither data is answered as before. A question about the view from the
+ * windows («видно ли море») is the view steps' (src/lib/ai/viewTurn.ts): the lines of sight over EUBUCCO's buildings.
  */
 async function hotelTurn(
   hotel: Hotel,
@@ -129,15 +131,25 @@ async function hotelTurn(
     loadHotelDetails(hotel.id),
     loadHotelNoise(hotel),
   ])
-  const geo = isHotelGeoQuestion(messages[messages.length - 1].text)
-    ? await geoTurn(hotel, messages, {
+  const text = messages[messages.length - 1].text
+  const geo = isHotelViewQuestion(text)
+    ? await viewTurn(hotel, messages, {
         deadline,
         signal,
+        details,
+        date: brief.dates?.checkIn,
         models,
-        ostrovok: details?.nearby,
-        onError: (id, error) => warn(`${id} did not choose the geo calls`, error),
+        onError: (id, error) => warn(`${id} did not name the place of a view question`, error),
       })
-    : null
+    : isHotelGeoQuestion(text)
+      ? await geoTurn(hotel, messages, {
+          deadline,
+          signal,
+          models,
+          ostrovok: details?.nearby,
+          onError: (id, error) => warn(`${id} did not choose the geo calls`, error),
+        })
+      : null
   if (geo)
     return Response.json({
       brief: next,

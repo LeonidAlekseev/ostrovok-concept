@@ -2,6 +2,7 @@ import { bandLabel, type NoiseBand } from './features'
 import { isGeoQuestion } from './geo/questions'
 import { countRu } from './format'
 import { distanceLabel } from './hotelDetails'
+import { isViewQuestion } from './view'
 
 /**
  * «Шум и окружение» of a real hotel, the same for its page and for Эвал: the bands of the EEA strategic noise maps
@@ -17,9 +18,16 @@ export const isNoiseQuestion = (text: string) => /(?<!\p{L})(?:бес|не)?(?:�
 
 /**
  * A question of the hotel's chat for the geo calls (src/lib/ai/geoTurn.ts): about the places near the hotel or the way
- * to one, and not about the noise — «Шумно ли рядом?» is answered from the noise data, «Есть ли бар рядом?» by the calls.
+ * to one, and not about the noise or the view — «Шумно ли рядом?» is answered from the noise data, «Есть ли бар рядом?» by the calls.
  */
-export const isHotelGeoQuestion = (text: string) => !isNoiseQuestion(text) && isGeoQuestion(text)
+export const isHotelGeoQuestion = (text: string) =>
+  !isNoiseQuestion(text) && !isViewQuestion(text) && isGeoQuestion(text)
+
+/**
+ * A question of the hotel's chat about the view from its windows (src/lib/ai/viewTurn.ts): «Видно ли море из окна?»,
+ * «Будет ли виден закат?» — and not about the noise: «Шумно ли из окна?» is the noise data's.
+ */
+export const isHotelViewQuestion = (text: string) => !isNoiseQuestion(text) && isViewQuestion(text)
 
 /** EEA's noise contours of the round 2022 (`geo_datasets.url` of `eea-noise-end2022-v01_r00`). */
 export const EEA_NOISE_URL =

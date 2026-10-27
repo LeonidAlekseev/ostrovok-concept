@@ -947,6 +947,7 @@ export type Database = {
       }
       hotel_geo: { Args: { lat: number; lon: number }; Returns: Json }
       hotel_geo_features: { Args: { lat: number; lon: number; radius_m?: number }; Returns: Json }
+      hotel_view_lines: { Args: { eye_m: number; lat: number; lon: number; targets: Json }; Returns: Json }
       match_embeddings: {
         Args: { destination_ids?: string[]; match_count?: number; match_kind: string; query_embedding: unknown }
         Returns: {

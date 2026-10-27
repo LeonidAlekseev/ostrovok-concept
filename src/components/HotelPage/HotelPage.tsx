@@ -13,6 +13,7 @@ import { HotelRating } from './HotelRating'
 import { HotelRules } from './HotelRules'
 import { HotelRooms, HotelStay, type LocalStay } from './HotelStay'
 import { HotelTabs } from './HotelTabs'
+import { HotelView } from './HotelView'
 import { MobileBooking } from './MobileBooking'
 import { MobileTopBar } from './MobileTopBar'
 import { WhyGuests } from './WhyGuests'
@@ -34,8 +35,8 @@ const card = 'rounded-2xl bg-card p-5 shadow-(--shadow-card)'
 
 /**
  * The hotel, then its photos, the sticky tabs and the sections straight on the page's background: the overview,
- * the rooms with the dates, the amenities, the guests' rating (if any), the location, the noise (a real hotel's) and
- * the rules. From `lg` the booking, Эвал, the location and "Почему гости выбирают нас" stand in a sticky column on the right; below `lg`
+ * the rooms with the dates, the amenities, the guests' rating (if any), the location, the noise and the view (a real
+ * hotel's) and the rules. From `lg` the booking, Эвал, the location and "Почему гости выбирают нас" stand in a sticky column on the right; below `lg`
  * the compact header shows once the name scrolls away and a button stuck to the bottom opens the booking. The
  * hotel dialog of the search is one column with the booking card and Эвал at its end and nothing stuck to the bottom.
  */
@@ -68,6 +69,7 @@ export function HotelPage({ hotel, details, noise, titleId, stay }: Props) {
                 hotel={hotel}
                 details={details}
                 noise={Boolean(noise)}
+                view={Boolean(details) && !inDialog}
                 inDialog={inDialog}
                 className={cn(!inDialog && 'max-lg:top-14')}
               />
@@ -80,6 +82,7 @@ export function HotelPage({ hotel, details, noise, titleId, stay }: Props) {
                 {hasGuestReviews(hotel, details) && <HotelRating hotel={hotel} details={details} />}
                 <HotelLocation hotel={hotel} details={details} />
                 {noise && <HotelNoise hotel={hotel} noise={noise} building={details?.building} />}
+                {details && !inDialog && <HotelView hotel={hotel} building={details.building} />}
                 <HotelRules hotel={hotel} details={details} />
                 {inDialog && (
                   <>

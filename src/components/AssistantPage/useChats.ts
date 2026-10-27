@@ -53,7 +53,7 @@ import {
 import type { PhotoUrl } from './ChatPhotos'
 import type { HotelSummary } from '@/lib/catalog'
 import { todayIso } from '@/lib/dates'
-import { isHotelGeoQuestion } from '@/lib/noise'
+import { isHotelGeoQuestion, isHotelViewQuestion } from '@/lib/noise'
 import type { OptimizedPhoto } from '@/lib/imageOptimize'
 import { getBrowserClient } from '@/lib/supabase/client'
 
@@ -71,6 +71,7 @@ const reason = (error: unknown) => (error instanceof Error ? error.message.slice
 const SEARCH_STEP = { agent: 'search', title: 'Подбираю отели по вашему описанию' } as const
 /** The step shown while a question about the places near the hotel is answered: the geo steps come with the answer. */
 const GEO_STEP = { agent: 'geo', title: 'Проверяю места рядом с отелем' } as const
+const VIEW_STEP = { agent: 'geo', title: 'Проверяю, что видно из окна' } as const
 
 /** Eval's answer: the next question with what it has understood, or the plan once nothing is left to ask. */
 export function compose(
@@ -358,7 +359,13 @@ export function useChats(
       // The plan is surely due when the rules alone complete the brief: its first step shows while Эвал works.
       const planDue =
         !found && !chat.brief.hotelId && !nextQuestion(mergeBrief(chat.brief, input, question, destinations), today)
-      const waitStep = planDue ? SEARCH_STEP : chat.brief.hotelId && isHotelGeoQuestion(input) ? GEO_STEP : null
+      const waitStep = planDue
+        ? SEARCH_STEP
+        : chat.brief.hotelId && isHotelViewQuestion(input)
+          ? VIEW_STEP
+          : chat.brief.hotelId && isHotelGeoQuestion(input)
+            ? GEO_STEP
+            : null
       const stepId = newId()
       update(chatId, (c) => ({
         ...c,
