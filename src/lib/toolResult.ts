@@ -96,6 +96,21 @@ export const toolErrorSchema = z.object({ code: text(100).min(1), message: text(
 export const MAX_EVIDENCE = 40
 export const MAX_CLAIMS = 60
 export const MAX_CALCULATIONS = 10
+export const MAX_GROUPS = 20
+
+/**
+ * The characteristics of one thing the tool looked at — a hotel — with its verdict: the block shows each group apart.
+ * A claim of no group is shown in the common list.
+ */
+export const toolGroupSchema = z.object({
+  id,
+  /** «Hotel Valencia Center». */
+  title: text(300).min(1),
+  /** The verdict in Russian: «подходит», «нет данных о шуме ночью». */
+  note: text(500).nullable(),
+  claim_ids: z.array(id).max(MAX_CLAIMS),
+})
+export type ToolGroup = z.infer<typeof toolGroupSchema>
 
 export const toolResultSchema = z
   .object({
@@ -111,6 +126,8 @@ export const toolResultSchema = z
     method: toolMethodSchema.nullable(),
     limitations: z.array(text(500)).max(20),
     error: toolErrorSchema.nullable(),
+    /** The characteristics by the hotel they are of; absent for a tool of one hotel. */
+    groups: z.array(toolGroupSchema).max(MAX_GROUPS).optional(),
   })
   .superRefine((result, context) => {
     if ((result.status === 'error') !== (result.error !== null))
@@ -122,6 +139,11 @@ export const toolResultSchema = z
         context.addIssue({ code: 'custom', message: 'A claim cites a source not in the result', path: ['claims', i] })
       if (claim.calculation_id !== null && !calculations.has(claim.calculation_id))
         context.addIssue({ code: 'custom', message: 'A claim cites an unknown calculation', path: ['claims', i] })
+    })
+    const claims = new Set(result.claims.map((c) => c.id))
+    result.groups?.forEach((group, i) => {
+      if (group.claim_ids.some((c) => !claims.has(c)))
+        context.addIssue({ code: 'custom', message: 'A group names a claim not in the result', path: ['groups', i] })
     })
   })
 export type ToolResult = z.infer<typeof toolResultSchema>
@@ -142,9 +164,16 @@ export const jsonBytes = (value: unknown) => new TextEncoder().encode(JSON.strin
 /** A result's share of a message's 100 KB of data. */
 export const MAX_RESULT_BYTES = 60_000
 
+/** The groups with only the claims the result still has. */
+const keptGroups = (result: ToolResult): Pick<ToolResult, 'groups'> => {
+  if (!result.groups) return {}
+  const claims = new Set(result.claims.map((c) => c.id))
+  return { groups: result.groups.map((g) => ({ ...g, claim_ids: g.claim_ids.filter((c) => claims.has(c)) })) }
+}
+
 /**
- * The result within `MAX_RESULT_BYTES`: the excerpts are cut first, then the last claims go, then the last sources
- * (none is cited by then). The cut is said in the limitations.
+ * The result within `MAX_RESULT_BYTES`: the excerpts are cut first, then the last claims go (and out of their groups),
+ * then the last sources (none is cited by then). The cut is said in the limitations.
  */
 export function fitResult(result: ToolResult, maxBytes = MAX_RESULT_BYTES): ToolResult {
   if (jsonBytes(result) <= maxBytes) return result
@@ -159,7 +188,7 @@ export function fitResult(result: ToolResult, maxBytes = MAX_RESULT_BYTES): Tool
       next.claims.length > 0
         ? { ...next, claims: next.claims.slice(0, -1) }
         : { ...next, evidence: next.evidence.slice(0, -1) }
-  return next
+  return { ...next, ...keptGroups(next) }
 }
 
 export const RESULT_CUT = 'Часть данных не показана: результат слишком большой'

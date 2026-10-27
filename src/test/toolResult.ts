@@ -76,3 +76,21 @@ export const sampleResult: ToolResult = {
 
 /** The id of the sample's run. */
 export const RUN_ID = '0b9c8d7e-6f5a-4b3c-8d2e-1f0a9b8c7d6e'
+
+/** A result of a tool of the choice: the same claims by hotel, five hotels and the line of the hotels without data. */
+export const groupedResult: ToolResult = {
+  ...sampleResult,
+  summary: 'Ночью тише 50 дБ: подходят 2 из 5 отелей; нет данных у 1',
+  groups: [
+    { id: 'ota-1', title: 'Hotel Quiet', note: 'Ночь: подходит', claim_ids: ['c-night'] },
+    { id: 'ota-2', title: 'Hotel Calm', note: 'Ночь: подходит', claim_ids: [sampleResult.claims[1].id] },
+    { id: 'ota-3', title: 'Hotel Third', note: null, claim_ids: [] },
+    { id: 'ota-4', title: 'Hotel Fourth', note: null, claim_ids: [] },
+    {
+      id: 'nodata',
+      title: 'Нет данных: 1 отель',
+      note: 'Данных по этим характеристикам в хранилище нет: Hotel Unknown',
+      claim_ids: [],
+    },
+  ],
+}

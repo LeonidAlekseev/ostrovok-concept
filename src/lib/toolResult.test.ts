@@ -10,7 +10,7 @@ import {
   toolResultSchema,
   type ToolResult,
 } from './toolResult'
-import { RUN_ID, sampleResult } from '@/test/toolResult'
+import { RUN_ID, groupedResult, sampleResult } from '@/test/toolResult'
 
 // assistant-search, Requirement: Контракт результата инструмента
 describe('the contract of a tool result', () => {
@@ -23,6 +23,12 @@ describe('the contract of a tool result', () => {
     expect(toolResultSchema.safeParse(errorResult('store_unavailable', 'Хранилище недоступно')).success).toBe(true)
     expect(toolResultSchema.safeParse({ ...sampleResult, status: 'error' }).success).toBe(false)
     expect(toolResultSchema.safeParse({ ...sampleResult, error: { code: 'x', message: 'сбой' } }).success).toBe(false)
+  })
+
+  it('takes the characteristics by hotel, only of the claims the result has', () => {
+    expect(toolResultSchema.safeParse(groupedResult).success).toBe(true)
+    const invented = { id: 'ota-9', title: 'Hotel', note: null, claim_ids: ['invented'] }
+    expect(toolResultSchema.safeParse({ ...groupedResult, groups: [invented] }).success).toBe(false)
   })
 
   it('takes no claim citing a source the result does not have: the sources are the tool’s only', () => {

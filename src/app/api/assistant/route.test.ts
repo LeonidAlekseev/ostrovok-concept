@@ -12,14 +12,20 @@ import { nextQuestion } from '@/lib/assistant'
 import { getHotel } from '@/lib/catalogGenerator'
 import { runNoiseTool } from '@/lib/ai/noiseTool'
 import { runOwner } from '@/lib/db/toolRuns'
+import { loadLevelIndex, loadNearIndex } from '@/lib/db/knowledge'
 import { errorResult, toolResultSchema } from '@/lib/toolResult'
 import { sampleResult } from '@/test/toolResult'
 import { POST } from './route'
 
-vi.mock('@/lib/ai/model', () => ({ getTextModels: vi.fn(), getVisionModels: vi.fn() }))
+vi.mock('@/lib/ai/model', () => ({ getTextModels: vi.fn(), getVisionModels: vi.fn(), REMARK_MODEL_ID: 'remark' }))
 vi.mock('@/lib/ai/semantic', () => ({ SEMANTIC_TIMEOUT_MS: 8000, semanticSearch: vi.fn() }))
 vi.mock('@/lib/db/catalog', () => import('@/test/catalog'))
 vi.mock('@/lib/db/features', () => ({ loadHotelFeatures: vi.fn() }))
+vi.mock('@/lib/db/knowledge', () => ({
+  loadLevelIndex: vi.fn(async () => null),
+  loadNearIndex: vi.fn(async () => null),
+  loadClaimsByIds: vi.fn(async () => []),
+}))
 vi.mock('@/lib/ai/geoTurn', () => ({ geoTurn: vi.fn() }))
 vi.mock('@/lib/ai/noiseTool', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/ai/noiseTool')>()
@@ -420,7 +426,8 @@ describe('POST /api/assistant: the semantic search', () => {
     const body = await (
       await post({
         messages: [
-          { role: 'user', text: 'тихий хостел с быстрым Wi‑Fi' },
+          // No «тихо»: the tools of the store would keep their own time out of the search's.
+          { role: 'user', text: 'хостел с быстрым Wi‑Fi' },
           { role: 'assistant', text: 'Куда?' },
           { role: 'user', text: 'в Прагу' },
         ],
@@ -1147,5 +1154,120 @@ describe('POST /api/assistant: «близко к морю»', () => {
       brief: november,
     })
     expect(response.status).toBe(400)
+  })
+})
+
+// assistant-search, Requirements: Подбор отелей инструментами хранилища, Выбор инструментов хранилища
+describe('POST /api/assistant: the choice by the tools of the store', () => {
+  const complete = { destinationId: 'lisbon', when: 9, party: 'solo' }
+  const lisbon = async () => (await import('@/test/catalog')).loadCityHotels(['lisbon'])
+  const wish = 'Найди отель, чтобы рядом была аптека и было тихо ночью'
+  beforeEach(() => {
+    vi.mocked(loadLevelIndex).mockResolvedValue(null)
+    vi.mocked(loadNearIndex).mockResolvedValue(null)
+  })
+  /** The store of the tests: a quiet hotel with a pharmacy near, a loud one, the rest without data. */
+  async function store() {
+    const [a, b, c] = await lisbon()
+    vi.mocked(loadLevelIndex).mockResolvedValue([
+      { hotelId: a.id, property: 'noise.lnight.roadsInAgglomeration', min: 45, max: 49, value: null },
+      { hotelId: b.id, property: 'noise.lnight.roadsInAgglomeration', min: 60, max: 64, value: null },
+      { hotelId: c.id, property: 'noise.lnight.roadsInAgglomeration', min: null, max: 39, value: null },
+    ])
+    vi.mocked(loadNearIndex).mockResolvedValue([
+      { hotelId: a.id, claimId: 'c-a', distanceM: 180, name: 'Farmacia', kind: 'osm_place' },
+      { hotelId: c.id, claimId: 'c-c', distanceM: 900, name: null, kind: 'osm_place' },
+    ])
+    return [a, b, c]
+  }
+
+  // Scenario: Без модели правила выбирают те же инструменты
+  it('chooses the hotels by the rules without a model, each call a step with its run', async () => {
+    setModel(undefined)
+    const [a] = await store()
+    const body = await (await ask(wish, complete)).json()
+    expect(body.steps.map((s: { title: string; params?: string }) => [s.title, s.params])).toEqual([
+      ['Подбираю отели по вашему описанию', 'Лиссабон'],
+      ['Отели по характеристикам', 'ночью тише 50 дБ'],
+      ['Места рядом', 'аптека в 500 м'],
+      ['Отзывы', 'тема: шум и тишина'],
+    ])
+    for (const step of body.steps.slice(1)) expect(toolResultSchema.safeParse(step.run.result).success).toBe(true)
+    expect(body.matches.map((h: { id: string }) => h.id)).toEqual([a.id])
+    expect(body.findings).toMatch(/^Подобрал по данным \(ночью тише 50 дБ, аптека в 500 м\):\n1\. /)
+    expect(body.source).toBe('rules')
+  })
+
+  // Scenario: Модель выбирает вызовы инструментов
+  it('runs the calls the model chose, with its parameters', async () => {
+    const model = new MockLanguageModelV4({
+      doGenerate: async ({ tools }) =>
+        tools?.length
+          ? {
+              content: [
+                {
+                  type: 'tool-call' as const,
+                  toolCallId: 'c1',
+                  toolName: 'nearbyPlaces',
+                  input: JSON.stringify({ category: 'pharmacy', radiusM: 1000 }),
+                },
+              ],
+              finishReason: { unified: 'tool-calls' as const, raw: undefined },
+              usage,
+              warnings: [],
+            }
+          : answer({}),
+    })
+    setModel(model)
+    const [a, , c] = await store()
+    const body = await (await ask('Отель, чтобы рядом была аптека', complete)).json()
+    expect(body.steps.slice(1).map((s: { params?: string }) => s.params)).toEqual(['аптека в 1 км'])
+    expect(body.matches.map((h: { id: string }) => h.id)).toEqual([a.id, c.id])
+  })
+
+  it('writes each run for a signed-in user’s chat', async () => {
+    setModel(undefined)
+    await store()
+    // The user's client: the rows of `tool_runs` it writes.
+    const rows: { tool_name?: string; status?: string }[] = []
+    const client = {
+      from: () => ({
+        insert: async (row: { tool_name?: string; status?: string }) => (rows.push(row), { error: null }),
+        update: (row: { status?: string }) => ({ eq: async () => (rows.push(row), { error: null }) }),
+      }),
+    }
+    vi.mocked(runOwner).mockResolvedValueOnce({
+      client: client as never,
+      userId: 'u1',
+      chatId: 'chat-1',
+      messageId: null,
+    })
+    await post({
+      messages: [{ role: 'user', text: wish }],
+      brief: complete,
+      chatId: '0b0c7a1e-6f2b-4c3d-8e9f-0a1b2c3d4e5f',
+    })
+    expect(rows.filter((r) => r.status === 'running').map((r) => r.tool_name)).toEqual([
+      'hotels_by_features',
+      'nearby_places',
+      'hotel_reviews',
+    ])
+    expect(rows.filter((r) => r.status === 'success' || r.status === 'error')).toHaveLength(3)
+  })
+
+  // Scenario: Хранилище не прочиталось
+  it('ranks the quiet by the hotels’ features as before when the store cannot be read', async () => {
+    setModel(undefined)
+    const [a, b] = await lisbon()
+    vi.mocked(loadHotelFeatures).mockResolvedValue(
+      new Map([
+        [a.id, { views: [], lnight: { min: 60, max: 64 } }],
+        [b.id, { views: [], lnight: { max: 39 } }],
+      ]),
+    )
+    const body = await (await ask('тихий отель', complete)).json()
+    expect(body.findings).toBe('Данные хранилища не прочитались (ночью тише 50 дБ) — по ним не подбирал.')
+    expect(body.steps.at(-1)).toMatchObject({ title: 'Проверяю данные о шуме', status: 'done' })
+    expect(body.matches.map((h: { id: string }) => h.id).slice(0, 2)).toEqual([b.id, a.id])
   })
 })

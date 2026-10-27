@@ -181,7 +181,7 @@ const PREFIX = /^[A-Za-z0-9_.]*$/
 /** `like` with the prefix's `_` taken as itself. */
 export const likePrefix = (prefix: string) => `${prefix.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
 
-const CLAIM_SELECT =
+export const CLAIM_SELECT =
   'id, property, source_key, value_numeric, value_min, value_max, value_text, value_boolean, value_json, unit, ' +
   'epistemic_status, confidence, method, observed_at, valid_from, valid_to, limitations, ' +
   'calculation:calculations(id, method, version, inputs, parameters, limitations, computed_at), ' +
