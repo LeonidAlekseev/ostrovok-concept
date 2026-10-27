@@ -13,14 +13,81 @@ import type { ChatMap } from '@/lib/geo/chatMap'
 import { MAX_PHOTO_URL_LENGTH, PHOTO_DATA_URL } from '@/lib/ai/vision'
 import { RATE_LIMIT } from '@/lib/ai/rateLimit'
 import { toolRunSchema } from '@/lib/toolResult'
+import { MAX_BOOKINGS, type DateChange, type TripBooking } from '@/lib/trips'
 import { component, errorSchema, sameType, type ApiOperation } from '@/lib/openapi/operation'
 import { hotelSummarySchema } from '../hotels/schema'
 import geoExample from '@/lib/openapi/examples/assistant-geo.json'
 import noiseExample from '@/lib/openapi/examples/assistant-noise.json'
 import wishExample from '@/lib/openapi/examples/assistant-wish.json'
 import knowledgeExample from '@/lib/openapi/examples/assistant-knowledge.json'
+import tripsExample from '@/lib/openapi/examples/assistant-trips.json'
 
 /** `POST /api/assistant`: the traveller's newest message to Эвал and its answer. */
+
+const isoDate = z.iso.date()
+const cancellationSchema = z
+  .discriminatedUnion('kind', [
+    z.object({ kind: z.literal('free'), daysBefore: z.number().int().min(0).max(365) }),
+    z.object({ kind: z.literal('non-refundable') }),
+  ])
+  .meta({ description: 'Условия отмены: бесплатно за `daysBefore` дней до заезда или невозвратный тариф' })
+const amount = z.number().min(0).max(100_000_000)
+const bookingId = z
+  .string()
+  .regex(/^OS-[A-Z0-9]{6}$/)
+  .meta({ examples: ['OS-7K2Q9Z'] })
+
+/**
+ * A booking of this browser as Эвал gets it: without the guests' names, the contacts, the requests and the card (the
+ * fields unknown here are dropped). Untrusted: only the shape is checked, the hotel and its rate are read from the
+ * catalogue again.
+ */
+const tripBookingSchema = component(
+  'TripBooking',
+  z
+    .object({
+      id: bookingId,
+      createdAt: z.string().max(40),
+      status: z.enum(['confirmed', 'cancelled']),
+      hotelId: z.string().min(1).max(120),
+      roomId: z.string().min(1).max(200),
+      rateId: z.string().min(1).max(200),
+      checkIn: isoDate,
+      checkOut: isoDate,
+      guests: z.object({
+        adults: z.number().int().min(1).max(30),
+        children: z.number().int().min(0).max(30),
+        rooms: z.number().int().min(1).max(30),
+      }),
+      payment: z.enum(['now', 'at-hotel']),
+      total: amount.meta({ description: 'За всё проживание и все номера, ₽' }),
+      cancellation: cancellationSchema,
+      cancelledAt: z.string().max(40).optional(),
+      cancellationFee: amount.optional().meta({ description: 'Удержано при отмене, ₽' }),
+    })
+    .meta({ description: 'Бронирование браузера без имён гостей, контактов, пожеланий и карты' }),
+)
+sameType<z.output<typeof tripBookingSchema>, TripBooking>()
+
+/** The change of the dates Эвал proposes: applied only in the browser, after «Подтвердить». */
+const dateChangeSchema = component(
+  'DateChange',
+  z
+    .object({
+      bookingId,
+      from: z
+        .object({ checkIn: isoDate, checkOut: isoDate, total: amount })
+        .meta({ description: 'Бронирование, каким его посчитали: изменение применяется только к нему' }),
+      checkIn: isoDate,
+      checkOut: isoDate,
+      total: amount.meta({ description: 'Цена тарифа брони на новые даты, как при бронировании, ₽' }),
+      cancellation: cancellationSchema,
+    })
+    .meta({
+      description: 'Предложение сменить даты брони: новая цена и условия отмены; без «Подтвердить» не меняется ничего',
+    }),
+)
+sameType<z.output<typeof dateChangeSchema>, DateChange>()
 
 export const assistantRequestSchema = z
   .object({
@@ -49,6 +116,10 @@ export const assistantRequestSchema = z
         'Чат вошедшего пользователя: сервер проверяет, что чат его, и записывает запуски инструментов в `tool_runs`',
     }),
     messageId: z.uuid().optional().meta({ description: 'Ожидающий ответ хода: запуски записываются с ним' }),
+    bookings: z.array(tripBookingSchema).max(MAX_BOOKINGS).optional().meta({
+      description:
+        'Чат о поездках (`brief.trips`): бронирования браузера без личных данных. Сервер читает их для ответа и не хранит',
+    }),
   })
   .refine(({ messages, rerun }) => rerun || messages.at(-1)?.role === 'user', 'The last message is the traveller’s')
 
@@ -77,6 +148,8 @@ const briefSchema = component(
       seaMaxM: z.number().optional().meta({ description: 'Море не дальше, м' }),
       guests: z.object({ adults: z.number().int(), children: z.number().int(), rooms: z.number().int() }).optional(),
       hotelId: z.string().optional().meta({ description: 'Отель чата: Эвал отвечает о нём' }),
+      trips: z.literal(true).optional().meta({ description: 'Чат о бронированиях: Эвал отвечает по `bookings`' }),
+      bookingId: bookingId.optional().meta({ description: 'Бронь, из которой открыт чат' }),
     })
     .meta({ description: 'Что известно о поездке' }),
 )
@@ -160,7 +233,7 @@ export const assistantResponseSchema = component(
       steps: z
         .array(
           z.object({
-            agent: z.enum(['search', 'features', 'vision', 'geo']),
+            agent: z.enum(['search', 'features', 'vision', 'geo', 'trips']),
             title: z.string(),
             params: z.string().optional(),
             status: z.enum(['done', 'failed']),
@@ -186,6 +259,7 @@ export const assistantResponseSchema = component(
         description:
           'Ответ инструментов хранилища при подборе: отели с характеристиками, местами рядом и отзывами, по которым они подобраны (только данные запусков `steps[].run`)',
       }),
+      change: dateChangeSchema.optional(),
     })
     .meta({ description: 'Ответ Эвала' }),
 )
@@ -202,6 +276,7 @@ export const assistantOperations: ApiOperation[] = [
     description: [
       'Новое сообщение путешественника:',
       '- с `brief.hotelId` — вопрос об отеле: ответ из данных отеля, о местах рядом и маршрутах — с картой `map`, о виде из окон — по линиям взгляда, о шуме — по инструменту «Анализ шума» (шаг с `run`);',
+      '- с `brief.trips` — вопрос о бронированиях `bookings`: детали брони (шаг «Бронирования» с `run`) или смена дат — пересчёт цены тарифа и условий отмены (шаг «Пересчёт при смене дат», предложение `change`); применяет изменение браузер после «Подтвердить», сервер брони не хранит;',
       '- с `photos` — найти похожие отели или учесть фото в запросе;',
       '- иначе — пожелание: бриф дополняется, а когда он полный — отели `matches` поиска по смыслу; пожелание о шуме, местах рядом или отзывах подбирается инструментами хранилища (шаги с `run`, ответ `findings`).',
       '',
@@ -215,6 +290,7 @@ export const assistantOperations: ApiOperation[] = [
         noise: { summary: 'Об отеле: шум', value: noiseExample.request },
         wish: { summary: 'Пожелание с полным брифом', value: wishExample.request },
         knowledge: { summary: 'Подбор: аптека рядом и тихо ночью', value: knowledgeExample.request },
+        trips: { summary: 'Поездки: перенести бронь на другие даты', value: tripsExample.request },
       },
     },
     responses: {
@@ -237,6 +313,12 @@ export const assistantOperations: ApiOperation[] = [
             description:
               'Шаги «Отели по характеристикам», «Места рядом» с запусками `run` (характеристики по отелям в `groups`) и ответ `findings`; первые 3 отеля `matches`',
             value: knowledgeExample.response,
+          },
+          trips: {
+            summary: 'Перенос брони на другие даты',
+            description:
+              'Шаг «Пересчёт при смене дат» с запуском `run` (цена тарифа из каталога, расчёт, условия отмены) и предложение `change`',
+            value: tripsExample.response,
           },
           wish: {
             summary: 'Тихий отель у моря в Валенсии',

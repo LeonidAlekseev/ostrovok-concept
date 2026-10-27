@@ -26,7 +26,8 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Trace, TraceIcon, TraceLine, TraceTitle } from '@/components/ui/trace'
 import type { Destination } from '@/data/destinations'
 import { GUEST_LIMITS, VIBE_LABEL, briefWithStay, stayDates, type Brief, type VibeId } from '../../lib/assistant'
-import type { AgentStep } from '../../lib/assistantChats'
+import type { AgentStep, MessageData } from '../../lib/assistantChats'
+import { cancellationLabel } from '../../lib/booking'
 import {
   EPISTEMIC_LABEL,
   isSafeUrl,
@@ -35,9 +36,9 @@ import {
   type ToolResult,
   type ToolRun,
 } from '../../lib/toolResult'
-import type { IsoDate } from '../../lib/dates'
+import { formatDateRange, nightsBetween, type IsoDate } from '../../lib/dates'
 import { VIEW_LABEL, type ViewKind } from '../../lib/features'
-import { formatMeters } from '../../lib/format'
+import { countRu, formatMeters, formatPrice } from '../../lib/format'
 import type { Guests } from '../../lib/search'
 import { briefGuestsOf, paramLine, sessionParams, type ParamKey, type SessionParam } from '../../lib/sessionMemory'
 
@@ -94,6 +95,68 @@ export function MemoryCard({ params }: { params: readonly SessionParam[] }) {
       lines={params.map(paramLine)}
       label="Память сессии:"
     />
+  )
+}
+
+const stay = (checkIn: IsoDate, checkOut: IsoDate) =>
+  `${formatDateRange(checkIn, checkOut)}, ${countRu(nightsBetween(checkIn, checkOut), ['ночь', 'ночи', 'ночей'])}`
+
+/**
+ * The change of a booking's dates Эвал proposed: the dates and the price now and after, the cancellation terms, and
+ * «Подтвердить» — nothing changes without it. Applied, it says so; a booking changed since then makes it outdated. A
+ * shared chat shows it without the button (`onConfirm` absent).
+ */
+export function DateChangeCard({
+  change: { proposal, state },
+  onConfirm,
+}: {
+  change: NonNullable<MessageData['change']>
+  onConfirm?: () => void
+}) {
+  const difference = proposal.total - proposal.from.total
+  const rows: [string, string][] = [
+    ['Сейчас', `${stay(proposal.from.checkIn, proposal.from.checkOut)} · ${formatPrice(proposal.from.total)}`],
+    ['Новые даты', stay(proposal.checkIn, proposal.checkOut)],
+    [
+      'Новая цена',
+      `${formatPrice(proposal.total)}${difference === 0 ? '' : difference > 0 ? ` (доплата ${formatPrice(difference)})` : ` (меньше на ${formatPrice(-difference)})`}`,
+    ],
+    ['Отмена', cancellationLabel(proposal.cancellation, proposal.checkIn, { short: true })],
+  ]
+  return (
+    <section
+      aria-label={`Перенос бронирования ${proposal.bookingId}`}
+      className="flex w-full max-w-md flex-col gap-3 rounded-[18px] border bg-card p-3.5"
+    >
+      <h3 className="flex items-center gap-2 font-semibold">
+        <CalendarDays className="size-5 text-primary" aria-hidden />
+        Перенос бронирования {proposal.bookingId}
+      </h3>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
+        {rows.map(([term, value]) => (
+          <div key={term} className="contents">
+            <dt className={greyMutedText}>{term}</dt>
+            <dd className="font-medium">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      {state === 'applied' ? (
+        <p role="status" className="flex items-center gap-1.5 font-semibold text-success-foreground">
+          <Check className="size-4" strokeWidth={2.5} aria-hidden />
+          Даты изменены
+        </p>
+      ) : state === 'outdated' ? (
+        <p role="status" className={greyMutedText}>
+          Бронирование изменилось после расчёта — попросите Эвала посчитать заново.
+        </p>
+      ) : (
+        onConfirm && (
+          <Button className="w-fit" onClick={onConfirm}>
+            Подтвердить
+          </Button>
+        )
+      )}
+    </section>
   )
 }
 

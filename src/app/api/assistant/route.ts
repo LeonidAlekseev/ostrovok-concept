@@ -43,7 +43,8 @@ import {
 } from '@/lib/assistant'
 import type { HotelSummary } from '@/lib/catalog'
 import type { Destination } from '@/data/destinations'
-import { loadDestinations, loadHotel, loadHotelSummaries } from '@/lib/db/catalog'
+import { loadDestinations, loadHotel, loadHotels, loadHotelSummaries } from '@/lib/db/catalog'
+import { bookingTurn } from '@/lib/ai/bookingTurn'
 import { loadHotelFeatures } from '@/lib/db/features'
 import { loadHotelDetails } from '@/lib/db/hotelDetails'
 import { loadHotelNoise } from '@/lib/db/noise'
@@ -521,8 +522,8 @@ async function photoTurn(photos: readonly string[], ip: string, context: WishCon
 }
 
 /**
- * The traveller's newest message: about the chat's hotel (`hotelTurn`), with photos (`photoTurn`) or a wish
- * (`wishTurn`).
+ * The traveller's newest message: about the bookings (`bookingTurn`), about the chat's hotel (`hotelTurn`), with
+ * photos (`photoTurn`) or a wish (`wishTurn`).
  */
 export async function POST(request: Request) {
   const ip = clientIp(request)
@@ -536,10 +537,26 @@ export async function POST(request: Request) {
   if (!destinations) return apiError(503, 'Catalog unavailable')
   const brief = normalizeBrief(parsedBody.data.brief, destinations)
   const today = todayIso()
+  const { chatId, messageId } = parsedBody.data
+  // A chat about the bookings answers from the bookings of the request; the server keeps none of them.
+  if (brief.trips) {
+    const models = await getTextModels()
+    return Response.json(
+      await bookingTurn(
+        { messages, brief, bookings: parsedBody.data.bookings ?? [], today, deadline, signal: request.signal },
+        {
+          hotels: loadHotels,
+          models,
+          record: recordRun,
+          owner: () => runOwner(chatId, messageId),
+          onError: (id, error) => warn(`${id} failed on a question about the bookings`, error),
+        },
+      ),
+    )
+  }
   // A chat about a hotel answers about it; an id the catalogue does not know is a chat like any other.
   const hotel = brief.hotelId ? await loadHotel(brief.hotelId).catch(() => undefined) : undefined
   if (brief.hotelId && !hotel) delete brief.hotelId
-  const { chatId, messageId } = parsedBody.data
   if (hotel) {
     return hotelTurn(hotel, { brief, messages, signal: request.signal, deadline, chatId, messageId })
   }

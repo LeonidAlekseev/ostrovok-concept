@@ -14,6 +14,7 @@ import { feeLabel, STATUS_LABEL, tripTab } from '@/lib/trips'
 import { CancelDialog } from './CancelDialog'
 import { EditForm } from './EditForm'
 import { pageClass, TripsGate } from './TripsGate'
+import { TripsAssistant } from './TripsAssistant'
 
 function Details({ booking }: { booking: Booking }) {
   const leadingRows: [string, string][] = [
@@ -32,6 +33,7 @@ function Details({ booking }: { booking: Booking }) {
 function BookingView({ booking }: { booking: Booking }) {
   const [editing, setEditing] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [asking, setAsking] = useState(false)
   const upcoming = tripTab(booking, todayIso()) === 'upcoming'
 
   return (
@@ -73,17 +75,18 @@ function BookingView({ booking }: { booking: Booking }) {
             <CancelDialog booking={booking} />
           </div>
           <p className="text-sm text-muted-foreground">
-            Изменить даты нельзя.{' '}
-            <Link className="underline" href="/help">
-              Напишите в поддержку
-            </Link>
-            .
+            Перенести даты поможет Эвал: он посчитает новую цену и условия отмены, а изменит даты только после вашего
+            подтверждения.{' '}
+            <Button variant="link" className="h-auto p-0 align-baseline" onClick={() => setAsking(true)}>
+              Изменить даты с Эвалом
+            </Button>
           </p>
         </div>
       )}
       <Link className={buttonVariants({ variant: 'outline' }) + ' w-fit'} href="/trips">
         Все поездки
       </Link>
+      <TripsAssistant bookingId={booking.id} open={asking} onOpenChange={setAsking} />
     </>
   )
 }

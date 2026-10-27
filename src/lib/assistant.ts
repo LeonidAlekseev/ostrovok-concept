@@ -14,6 +14,7 @@ import { parseChatMap, type ChatMap } from './geo/chatMap'
 import { stayTotal } from './offer'
 import { MAX_NIGHTS, type Guests, type SearchQuery } from './search'
 import { parseToolRun, type ToolRun } from './toolResult'
+import { parseDateChange, type DateChange, type TripBooking } from './trips'
 
 /**
  * Travel assistant: a free-text wish is read by the language model behind `POST /api/assistant`
@@ -58,6 +59,10 @@ export interface Brief {
   guests?: Guests
   /** The hotel the chat is about (a chat opened on a hotel's page): Эвал answers about it instead of picking hotels. */
   hotelId?: string
+  /** A chat about the traveller's bookings («Мои поездки»): Эвал answers from the bookings the request brings. */
+  trips?: true
+  /** The booking the chat was opened on (`OS-XXXXXX`): the questions are about it unless another is named. */
+  bookingId?: string
 }
 
 export type QuestionId = 'vibe' | 'when' | 'party' | 'dates'
@@ -671,6 +676,8 @@ export function briefWithStay(dates: StayDates): Pick<Brief, 'dates' | 'when' | 
 }
 
 const MAX_HOTEL_ID_LENGTH = 120
+/** The number of a booking: `OS-` and 6 characters `[A-Z0-9]`. */
+export const BOOKING_ID = /^OS-[A-Z0-9]{6}$/
 
 /**
  * Keeps only what the assistant understands: a catalog city, known themes and answers, a month 0–11,
@@ -683,7 +690,7 @@ export function normalizeBrief(
 ): Brief {
   const brief: Brief = {}
   const { vibe, destinationId, when, nights, party, mood, budget, quiet, height, view, dates, datesRejected } = raw
-  const { hotelId, seaMaxM, guests } = raw
+  const { hotelId, seaMaxM, guests, trips, bookingId } = raw
   if (vibe === 'any' || (typeof vibe === 'string' && Object.hasOwn(VIBE_LABEL, vibe))) brief.vibe = vibe as VibeId
   if (destinations.some((d) => d.id === destinationId)) brief.destinationId = destinationId as string
   if (when === 'soon' || when === 'any') brief.when = when
@@ -705,6 +712,8 @@ export function normalizeBrief(
   if (counted) brief.guests = counted
   // Only the shape: the route checks the id against the catalogue.
   if (typeof hotelId === 'string' && hotelId && hotelId.length <= MAX_HOTEL_ID_LENGTH) brief.hotelId = hotelId
+  if (trips === true) brief.trips = true
+  if (typeof bookingId === 'string' && BOOKING_ID.test(bookingId)) brief.bookingId = bookingId
   return brief
 }
 
@@ -729,6 +738,11 @@ export interface AssistantRequest {
   chatId?: string
   /** The pending answer of the turn: the runs are recorded with it. */
   messageId?: string
+  /**
+   * A chat about the bookings (`brief.trips`): the bookings of this browser without the guests' names, the contacts,
+   * the requests and the card. The server reads them for the answer and keeps none of them.
+   */
+  bookings?: TripBooking[]
 }
 
 /** Photos a message takes. */
@@ -778,9 +792,10 @@ export interface PhotoAnswer {
 export interface TurnStep {
   /**
    * `search` picks the hotels by meaning, `features` checks their building, noise and views, `vision` looks at the
-   * photos (another model when the first failed), `geo` is a call of a geo tool: the places near, a route.
+   * photos (another model when the first failed), `geo` is a call of a geo tool: the places near, a route; `trips`
+   * reads the traveller's bookings and counts a change of their dates.
    */
-  agent: 'search' | 'features' | 'vision' | 'geo'
+  agent: 'search' | 'features' | 'vision' | 'geo' | 'trips'
   title: string
   /** What the step was called with, briefly in Russian: «Валенсия», «до моря до 1 км · тихо ночью». */
   params?: string
@@ -819,6 +834,11 @@ export interface AssistantResponse {
    * the places near and the reviews they were chosen by, from the runs' data only. Shown before the plan.
    */
   findings?: string
+  /**
+   * A chat about the bookings: the change of a booking's dates Эвал proposes, with the new price and cancellation
+   * terms. Nothing changes until the traveller presses «Подтвердить» in the browser.
+   */
+  change?: DateChange
 }
 
 /** What Эвал says when no hotel meets the conditions it keeps (the sea within a distance): the parameters follow. */
@@ -846,7 +866,7 @@ const isCriterion = (value: unknown): value is Criterion =>
 const isStep = (value: unknown): value is TurnStep =>
   typeof value === 'object' &&
   value !== null &&
-  ['search', 'features', 'vision', 'geo'].includes((value as TurnStep).agent) &&
+  ['search', 'features', 'vision', 'geo', 'trips'].includes((value as TurnStep).agent) &&
   typeof (value as TurnStep).title === 'string' &&
   ['done', 'failed'].includes((value as TurnStep).status)
 /** The known fields of a step only; a run off the contract is dropped, the step stays as an older one. */
@@ -932,14 +952,16 @@ export async function askAssistant(
         ...(data.modelsDown === true && { modelsDown: true as const }),
         ...(parseChatMap(data.map) && { map: parseChatMap(data.map) }),
         ...(typeof data.findings === 'string' && data.findings && { findings: data.findings.slice(0, MAX_FINDINGS) }),
+        ...(parseDateChange(data.change) && { change: parseDateChange(data.change) }),
       }
     }
     limited = response.status === 429
   } catch {
     // Falls through to the rules below.
   }
-  // A chat about a hotel has no rules of its own here: the hotel's data are on the server.
-  if (request.brief.hotelId) return { brief: request.brief, reply: HOTEL_UNAVAILABLE, source: 'rules' }
+  // A chat about a hotel or the bookings has no rules of its own here: the hotel's data are on the server.
+  if (request.brief.hotelId || request.brief.trips)
+    return { brief: request.brief, reply: HOTEL_UNAVAILABLE, source: 'rules' }
   // Parameters changed by hand are kept as they are: the plan goes by the rules over them.
   if (request.rerun) return { brief: request.brief, source: 'rules' }
   const input = request.messages.at(-1)?.text ?? ''
