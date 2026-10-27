@@ -3,11 +3,13 @@
 # dependencies = ["duckdb>=1.4", "psycopg[binary]>=3.2"]
 # ///
 """Fills public.geo_buildings and public.geo_noise for the city of Valencia, with the datasets' provenance
-(migrations 20261023120000_valencia_geo, 20261026120500_geo_data_provenance).
+(migrations 20261023120000_valencia_geo, 20261026120500_geo_data_provenance), and public.geo_coverage, where the
+buildings are known (20261027170000_hotel_view_coverage).
 
 Usage, from the repository root, after `npm run db:push`; the buildings first, the noise is cut to their extent:
     uv run scripts/load-valencia-geo.py buildings [<ES52.parquet>]
     uv run scripts/load-valencia-geo.py noise <ES.gpkg>
+    uv run scripts/load-valencia-geo.py coverage
 
 Sources (kept outside git):
     buildings  EUBUCCO v0.2, region ES52 (Comunidad Valenciana), https://eubucco.com/data/download/v0.2: building
@@ -18,6 +20,10 @@ Sources (kept outside git):
     noise      EEA noise contours of the Environmental Noise Directive, round 2022, Spain (ES.gpkg from
                https://sdi.eea.europa.eu/datastore/public?path=/eea_v_3035_1_k_noise-contours-end2022_p_2026_v01_r00),
                one layer per source and indicator, EPSG:3035; cut to the extent of the city's buildings plus 300 m.
+    coverage   OpenStreetMap's boundaries (© OpenStreetMap contributors, ODbL 1.0) of the municipality of València
+               (relation 344953, ine:municipio 46250, from IGN) and of the province of Valencia (relation 349000), as
+               Nominatim's /lookup assembles them: the buildings are known within the municipality; the province's land
+               around it within ~0.3° has none; neither is the sea, where no building stands.
 
 The footprints are only reprojected; `st_makevalid` fixes a geometry only where it is invalid, and the row says so
 (`made_valid`). The noise contours are simplified by 2 m (the bands are 5 dB wide) and subdivided into pieces of at
@@ -25,8 +31,10 @@ most 256 vertices. Each command writes its dataset to public.geo_datasets and re
 afterwards `npm run db:features`. SUPABASE_DB_URL comes from the environment or .env.local and is never printed.
 """
 
+import json
 import os
 import sys
+import urllib.request
 
 import duckdb
 import psycopg
@@ -55,6 +63,13 @@ NOISE = {
     'processing': f'st_makevalid, cut, simplified by {SIMPLIFY_M} m (EPSG:3035), EPSG:4326, subdivided into pieces '
     'of at most 256 vertices; made_valid marks a contour invalid in the source or after the processing',
 }
+
+# The boundaries of the coverage: OSM relations, the project's User-Agent (src/lib/geo/http.ts).
+MUNICIPALITY_RELATION = 344953
+PROVINCE_RELATION = 349000
+USER_AGENT = 'ostrovok-concept/1.0 (+https://github.com/LeonidAlekseev/ostrovok-concept)'
+# The province's land kept around the municipality: the lines of sight are at most 6 km long.
+AROUND_DEG = 0.3
 
 # The provenance columns of EUBUCCO v0.2, loaded under their own names.
 BUILDING_COLUMNS = [
@@ -226,11 +241,62 @@ def load_noise(path):
     analyze('public.geo_noise')
 
 
+def osm_boundary(relation):
+    """The GeoJSON geometry of an OSM boundary relation, as Nominatim assembles it."""
+    url = f'https://nominatim.openstreetmap.org/lookup?osm_ids=R{relation}&format=geojson&polygon_geojson=1'
+    request = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
+    with urllib.request.urlopen(request, timeout=120) as response:
+        features = json.load(response)['features']
+    if not features or features[0]['geometry']['type'] not in ('Polygon', 'MultiPolygon'):
+        sys.exit(f'no boundary of the relation {relation}')
+    return json.dumps(features[0]['geometry'])
+
+
+def load_coverage():
+    municipality = osm_boundary(MUNICIPALITY_RELATION)
+    province = osm_boundary(PROVINCE_RELATION)
+    with psycopg.connect(db_url()) as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            with m as (select extensions.st_setsrid(extensions.st_geomfromgeojson(%(m)s), 4326) g),
+            p as (select extensions.st_setsrid(extensions.st_geomfromgeojson(%(p)s), 4326) g)
+            insert into public.geo_coverage (dataset, name, covered, uncovered, source, loaded_at)
+            select %(dataset)s, 'València', extensions.st_multi(m.g),
+              extensions.st_multi(extensions.st_collectionextract(extensions.st_difference(
+                extensions.st_intersection(p.g, extensions.st_expand(extensions.st_envelope(m.g), %(around)s)), m.g), 3)),
+              %(source)s, now()
+            from m, p
+            on conflict (dataset) do update set name = excluded.name, covered = excluded.covered,
+              uncovered = excluded.uncovered, source = excluded.source, loaded_at = excluded.loaded_at
+            """,
+            {
+                'm': municipality,
+                'p': province,
+                'dataset': BUILDINGS['id'],
+                'around': AROUND_DEG,
+                'source': f'OpenStreetMap (© OpenStreetMap contributors, ODbL 1.0) via Nominatim: municipality of '
+                f'València, relation {MUNICIPALITY_RELATION} (IGN); province of Valencia, relation {PROVINCE_RELATION}, '
+                f'within {AROUND_DEG}° of the municipality, but it',
+            },
+        )
+        cur.execute("""
+            select count(*) filter (where extensions.st_intersects(extensions.st_centroid(b.geom), c.covered)),
+                   count(*), round((extensions.st_area(c.covered::extensions.geography) / 1e6)::numeric, 1),
+                   round((extensions.st_area(c.uncovered::extensions.geography) / 1e6)::numeric, 1)
+            from public.geo_coverage c join public.geo_buildings b on b.dataset = c.dataset
+            where c.dataset = %s
+            group by c.covered, c.uncovered
+        """, (BUILDINGS['id'],))
+        print('buildings within the municipality, all, its km², the uncovered land km²:', cur.fetchone())
+
+
 if __name__ == '__main__':
     command, args = (sys.argv[1], sys.argv[2:]) if len(sys.argv) > 1 else (None, [])
     if command == 'buildings' and len(args) <= 1:
         load_buildings(args[0] if args else EUBUCCO_S3)
     elif command == 'noise' and len(args) == 1:
         load_noise(args[0])
+    elif command == 'coverage' and not args:
+        load_coverage()
     else:
         sys.exit(__doc__)

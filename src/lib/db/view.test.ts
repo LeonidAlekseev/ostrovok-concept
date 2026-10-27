@@ -17,14 +17,18 @@ describe('linesOf', () => {
           eyes: [
             {
               eye_m: 49.81,
+              eye_lower_m: 40.5,
               eye_upper_m: 59.13,
               blockers: [
                 {
                   id: 'b6',
                   distance_m: 276.9,
                   height: 45,
+                  height_lower: 36.4,
+                  height_upper: 59.2,
                   height_source: 'estimated',
                   eye_m: 44.9,
+                  eye_lower_m: 36.3,
                   eye_upper_m: 59.13,
                 },
               ],
@@ -54,8 +58,21 @@ describe('linesOf', () => {
       eyes: [
         {
           eyeM: 49.81,
+          eyeLowerM: 40.5,
           eyeUpperM: 59.13,
-          blockers: [{ id: 'b6', distanceM: 276.9, heightM: 45, estimated: true, eyeM: 44.9, eyeUpperM: 59.13 }],
+          blockers: [
+            {
+              id: 'b6',
+              distanceM: 276.9,
+              heightM: 45,
+              heightLowerM: 36.4,
+              heightUpperM: 59.2,
+              estimated: true,
+              eyeLowerM: 36.3,
+              eyeM: 44.9,
+              eyeUpperM: 59.13,
+            },
+          ],
         },
       ],
       targetBuilding: null,
@@ -65,6 +82,34 @@ describe('linesOf', () => {
     expect(linesOf(null, 2)).toEqual([null, null])
     expect(ownBuildingOf(answer)).toBe('own')
     expect(ownBuildingOf(null)).toBeNull()
+  })
+
+  it('reads an answer of before the bounds as the height alone', () => {
+    const [line] = linesOf(
+      {
+        own_building: null,
+        lines: [
+          {
+            i: 0,
+            distance_m: 100,
+            checked: true,
+            crossed: 1,
+            covered_m: 100,
+            eyes: [
+              {
+                eye_m: 10,
+                eye_upper_m: 12,
+                blockers: [{ id: 'b', distance_m: 50, height: 20, height_source: 'osm', eye_m: 10, eye_upper_m: 12 }],
+              },
+            ],
+            target_building: null,
+          },
+        ],
+      },
+      1,
+    )
+    expect(line?.eyes[0]).toMatchObject({ eyeM: 10, eyeLowerM: 10, eyeUpperM: 12 })
+    expect(line?.eyes[0].blockers[0]).toMatchObject({ heightLowerM: 20, heightUpperM: 20, eyeLowerM: 10 })
   })
 })
 

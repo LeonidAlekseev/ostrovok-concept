@@ -19,6 +19,7 @@ import {
   seaPoints,
   windowOf,
   type HotelView,
+  type LineBlocker,
   type SightLine,
   type ViewTarget,
 } from '@/lib/view'
@@ -43,16 +44,21 @@ const isRealHotel = (id: string) => isSupabaseConfigured && /^ota-\d{1,15}$/.tes
 /** At most this many lines a call of `hotel_view_eyes`. */
 const LINES_PER_CALL = 160
 
+// The bounds of the height and the lower eye came with 20261027170000: before it, the height and `eye_m` stand for them.
 const blockerRow = z.object({
   id: z.string(),
   distance_m: z.number(),
   height: z.number(),
+  height_lower: z.number().optional(),
+  height_upper: z.number().optional(),
   height_source: z.string().nullable(),
   eye_m: z.number(),
+  eye_lower_m: z.number().optional(),
   eye_upper_m: z.number(),
 })
 const eyeRow = z.object({
   eye_m: z.number().nullable(),
+  eye_lower_m: z.number().nullable().optional(),
   eye_upper_m: z.number().nullable(),
   blockers: z.array(blockerRow),
 })
@@ -85,12 +91,16 @@ export function linesOf(answer: unknown, count: number): (SightLine | null)[] {
       coveredM: r.covered_m,
       eyes: r.eyes.map((eye) => ({
         eyeM: eye.eye_m,
+        eyeLowerM: eye.eye_lower_m === undefined ? eye.eye_m : eye.eye_lower_m,
         eyeUpperM: eye.eye_upper_m,
         blockers: eye.blockers.map((b) => ({
           id: b.id,
           distanceM: b.distance_m,
           heightM: b.height,
+          heightLowerM: b.height_lower ?? b.height,
+          heightUpperM: b.height_upper ?? b.height,
           estimated: b.height_source === 'estimated',
+          eyeLowerM: b.eye_lower_m ?? b.eye_m,
           eyeM: b.eye_m,
           eyeUpperM: b.eye_upper_m,
         })),
@@ -139,12 +149,25 @@ async function measure(db: Db, hotel: Point, points: readonly Point[]) {
   return { lines: answers.flatMap((a) => a.lines), own: answers.find((a) => a.own)?.own ?? null }
 }
 
-/** A ray keeps the 2 buildings of the highest eyes of each angle: the answer of 120 rays stays ~70 KB. */
+/**
+ * A ray keeps, of each angle, the 2 buildings of the highest upper eyes and the ones of the highest eye and lower eye
+ * (the surest in the way, `blockersAt`): the answer of 120 rays stays ~80 KB.
+ */
 const RAY_BLOCKERS = 2
+
+const highest = (blockers: readonly LineBlocker[], eye: (b: LineBlocker) => number) =>
+  blockers.reduce<LineBlocker | undefined>((best, b) => (!best || eye(b) > eye(best) ? b : best), undefined)
 
 const trimmed = (line: SightLine): SightLine => ({
   ...line,
-  eyes: line.eyes.map((eye) => ({ ...eye, blockers: eye.blockers.slice(0, RAY_BLOCKERS) })),
+  eyes: line.eyes.map((eye) => {
+    const kept = [
+      ...eye.blockers.slice(0, RAY_BLOCKERS),
+      highest(eye.blockers, (b) => b.eyeM),
+      highest(eye.blockers, (b) => b.eyeLowerM),
+    ]
+    return { ...eye, blockers: eye.blockers.filter((b) => kept.includes(b)) }
+  }),
 })
 
 const nearPlace = z.object({
@@ -272,7 +295,7 @@ const readView = unstable_cache(
       landmarks: measured.filter((t) => t.kind !== 'sea').sort((a, b) => a.distanceM - b.distanceM),
     }
   },
-  [CATALOG_TAG, 'hotel-view-v4'],
+  [CATALOG_TAG, 'hotel-view-v5'],
   { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME },
 )
 

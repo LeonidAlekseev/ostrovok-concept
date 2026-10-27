@@ -282,6 +282,42 @@ export type Database = {
           },
         ]
       }
+      geo_coverage: {
+        Row: {
+          covered: unknown
+          dataset: string
+          loaded_at: string
+          name: string
+          source: string
+          uncovered: unknown
+        }
+        ComputedFields: never
+        Insert: {
+          covered: unknown
+          dataset: string
+          loaded_at?: string
+          name: string
+          source: string
+          uncovered: unknown
+        }
+        Update: {
+          covered?: unknown
+          dataset?: string
+          loaded_at?: string
+          name?: string
+          source?: string
+          uncovered?: unknown
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'geo_coverage_dataset_fkey'
+            columns: ['dataset']
+            isOneToOne: true
+            referencedRelation: 'geo_datasets'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       geo_datasets: {
         Row: {
           extract: string

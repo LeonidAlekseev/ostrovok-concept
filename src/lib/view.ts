@@ -7,19 +7,42 @@ import { distanceLabel } from './hotelDetails'
  * sunset, the sunrise, the attractions of OpenStreetMap and the places of Ostrovok can be seen, by the lines of sight
  * over the buildings of EUBUCCO (`hotel_view_eyes`, supabase/migrations/20261027150000_hotel_view_eyes.sql: the lowest
  * eye each line passes over all the buildings from). Which window a room has is not known, so every floor is checked:
- * a target is «видно со всех этажей», «видно с N-го этажа», «не видно ни с одного этажа» or «нет данных», and from a
- * floor «вероятно видно», «возможны препятствия» or «нет данных» — never a promise. The window is at the hotel's
- * point and looks every way: which side the windows of a room face is not known yet (`RoomWindowSide`), so the
- * traveller picks a side on the compass. No `server-only`: the page computes the sun and the floors.
+ * a target is «видно со всех этажей», «видно с N-го этажа», «возможно, видно с N-го этажа», «не видно ни с одного
+ * этажа» or «нет данных», and from a floor one of `Verdict`, as sure as the data: a building is «закрыто» when even the
+ * lower bound of its height stands above the line of sight. The data cover the municipality of Valencia
+ * (`geo_coverage`): no building on a line within it is «видно», over the sea too; «нет данных» only where a line
+ * leaves it. The window is at the hotel's point and looks every way: which side the windows of a room face is not
+ * known yet (`RoomWindowSide`), so the traveller picks a side on the compass. The page's blocks and Эвал say all of it
+ * with the same functions. No `server-only`: the page computes the sun and the floors.
  */
 
-/** The verdicts from one floor, as the page and Эвал say them. */
-export type Verdict = 'visible' | 'obstructed' | 'unknown'
+/**
+ * The verdicts from one floor: nothing in the way to the line's end («видно»); the sun at `SUN_CHECK_ALTITUDE_DEG`
+ * seen, the roofs hiding it lower («частично закрыто»); a building in the way even with the lower bound of its height
+ * («закрыто»), with EUBUCCO's height but not the lower bound («вероятно, закрыто»), with the upper bound only
+ * («возможно, закрыто»); the line leaving the data with nothing in the way before («нет данных»).
+ */
+export type Verdict = 'visible' | 'partial' | 'blocked' | 'likely' | 'possible' | 'unknown'
 
 export const VERDICT_LABEL: Record<Verdict, string> = {
-  visible: 'вероятно видно',
-  obstructed: 'возможны препятствия',
+  visible: 'видно',
+  partial: 'частично закрыто',
+  blocked: 'закрыто',
+  likely: 'вероятно, закрыто',
+  possible: 'возможно, закрыто',
   unknown: 'нет данных',
+}
+
+/** How a verdict is coloured on the page and the map: seen, seen in part or perhaps, closed, not known. */
+export type Tone = 'seen' | 'partly' | 'closed' | 'unknown'
+
+export const VERDICT_TONE: Record<Verdict, Tone> = {
+  visible: 'seen',
+  partial: 'partly',
+  blocked: 'closed',
+  likely: 'closed',
+  possible: 'partly',
+  unknown: 'unknown',
 }
 
 /**
@@ -61,13 +84,20 @@ export const MAX_SEA_POINTS = 8
 /** Two points of the coast closer in bearing than this are one. */
 const SEA_BEARING_GAP_DEG = 5
 
-/** A building in the way of a line: in the way of an eye up to `eyeM` (EUBUCCO's height) or `eyeUpperM` (its upper bound). */
+/**
+ * A building in the way of a line: in the way of an eye up to `eyeLowerM` with the lower bound of its height, `eyeM`
+ * with EUBUCCO's height, `eyeUpperM` with the upper bound (the three equal for a measured height).
+ */
 export interface LineBlocker {
   id: string
   /** From the hotel, m. */
   distanceM: number
   heightM: number
+  /** The bounds of EUBUCCO's height interval, m: the height for a measured one. */
+  heightLowerM: number
+  heightUpperM: number
   estimated: boolean
+  eyeLowerM: number
   eyeM: number
   eyeUpperM: number
 }
@@ -76,6 +106,8 @@ export interface LineBlocker {
 export interface LineEye {
   /** The lowest eye above the ground it passes from is above this, m, with EUBUCCO's heights; `null` without buildings. */
   eyeM: number | null
+  /** The same with the lower bounds of EUBUCCO's height intervals. */
+  eyeLowerM: number | null
   /** The same with the upper bounds of EUBUCCO's height intervals. */
   eyeUpperM: number | null
   /** The buildings in the way of the highest eyes, the highest first. */
@@ -90,7 +122,10 @@ export interface SightLine {
   checked: boolean
   /** The buildings the line crosses, but the hotel's and the target's. */
   crossed: number
-  /** How far from the hotel the dataset covers the line, m. */
+  /**
+   * How far from the hotel the line stays within the dataset's municipality or over the sea, m: the line's length
+   * unless it enters the land of another municipality; `null` without the coverage loaded.
+   */
   coveredM: number | null
   /** By the angle of `RAY_ANGLES` for a ray of the horizon; one for a target. */
   eyes: LineEye[]
@@ -147,49 +182,94 @@ export const curvatureDrop = (d: number) => (d * d) / (2 * EFFECTIVE_EARTH_RADIU
 const deg = (rad: number) => (rad * 180) / Math.PI
 const rad = (degrees: number) => (degrees * Math.PI) / 180
 
+type Obstruction = Extract<Verdict, 'blocked' | 'likely' | 'possible'>
+
+/** How surely the buildings of thresholds `eye` stand in the way of an eye `eyeM` above the ground, `null` when not. */
+function obstruction(eye: Pick<LineEye, 'eyeM' | 'eyeLowerM' | 'eyeUpperM'>, eyeM: number): Obstruction | null {
+  if (eye.eyeLowerM !== null && eyeM <= eye.eyeLowerM) return 'blocked'
+  if (eye.eyeM !== null && eyeM <= eye.eyeM) return 'likely'
+  if (eye.eyeUpperM !== null && eyeM <= eye.eyeUpperM) return 'possible'
+  return null
+}
+
+const isClosed = (o: Obstruction | null) => o === 'blocked' || o === 'likely'
+
 /**
  * The verdict of a line from an eye `eyeM` above the ground, for the angle `angle` of `RAY_ANGLES` (a target has one):
- * a building of the line in the way with EUBUCCO's height — «возможны препятствия»; else a line the dataset does not
- * cover to its end — «нет данных»; else a building in the way with the upper bound of its height — «возможны
- * препятствия»; else «вероятно видно».
+ * a building in the way with the lower bound of its height or with EUBUCCO's height — «закрыто», «вероятно, закрыто»;
+ * else a line leaving the data — «нет данных»; else a building in the way with the upper bound only — «возможно,
+ * закрыто»; else «видно» — for the sun «частично закрыто» when the roofs (0°) of the same ray hide it lower.
  */
 export function lineVerdict(line: SightLine | null | undefined, eyeM: number, angle = 0): Verdict {
   const eye = line?.eyes[angle]
   if (!line || !line.checked || line.coveredM === null || !eye) return 'unknown'
-  if (eye.eyeM !== null && eyeM <= eye.eyeM) return 'obstructed'
+  const blocked = obstruction(eye, eyeM)
+  if (isClosed(blocked)) return blocked!
   if (line.coveredM < line.distanceM - 1) return 'unknown'
-  if (eye.eyeUpperM !== null && eyeM <= eye.eyeUpperM) return 'obstructed'
-  return 'visible'
+  if (blocked) return blocked
+  const roofs = angle === SUN ? line.eyes[ROOFS] : undefined
+  return roofs && isClosed(obstruction(roofs, eyeM)) ? 'partial' : 'visible'
 }
 
-/** The buildings in the way of the eye: by EUBUCCO's height first, then by the upper bound, the highest first. */
-export function blockersAt(line: SightLine | null | undefined, eyeM: number, angle = 0): LineBlocker[] {
-  const blockers = line?.eyes[angle]?.blockers ?? []
-  return [
-    ...blockers.filter((b) => eyeM <= b.eyeM).sort((a, b) => b.eyeM - a.eyeM),
-    ...blockers.filter((b) => eyeM > b.eyeM && eyeM <= b.eyeUpperM),
-  ]
+/** The eye of a building by how surely it is in the way: the lower bound's, the height's, the upper bound's. */
+const SURE_EYE: Record<Obstruction, (b: LineBlocker) => number> = {
+  blocked: (b) => b.eyeLowerM,
+  likely: (b) => b.eyeM,
+  possible: (b) => b.eyeUpperM,
 }
-
-/** From which floor a target is seen. */
-export type Reach = { kind: 'all' } | { kind: 'from'; floor: number } | { kind: 'none' } | { kind: 'unknown' }
+const SURE_RANK: Record<Obstruction, number> = { blocked: 0, likely: 1, possible: 2 }
 
 /**
- * From which floor of the window the line is seen: the lowest floor of «вероятно видно» («со всех этажей» for the
- * first); none of them — «не видно ни с одного этажа» when every floor has a building in the way, else «нет данных».
+ * The buildings in the way of the eye, the surest first (`obstruction`); of the same, the one rising the most above
+ * the line of sight by that bound.
+ */
+export function blockersAt(line: SightLine | null | undefined, eyeM: number, angle = 0): LineBlocker[] {
+  return (line?.eyes[angle]?.blockers ?? [])
+    .flatMap((b) => {
+      const o = obstruction(b, eyeM)
+      return o ? [{ b, o }] : []
+    })
+    .sort((x, y) => SURE_RANK[x.o] - SURE_RANK[y.o] || SURE_EYE[y.o](y.b) - SURE_EYE[x.o](x.b))
+    .map(({ b }) => b)
+}
+
+/** From which floor a target is seen; `maybe` — seen from the floor unless a building is higher than EUBUCCO's estimate. */
+export type Reach =
+  | { kind: 'all' }
+  | { kind: 'from'; floor: number }
+  | { kind: 'maybe'; floor: number }
+  | { kind: 'none' }
+  | { kind: 'unknown' }
+
+const isSeen = (verdict: Verdict) => verdict === 'visible' || verdict === 'partial'
+
+/**
+ * From which floor of the window the line is seen: the lowest floor of «видно» or «частично закрыто» («со всех
+ * этажей» for the first); none of them — by the top floor, the openest: «возможно, видно» from the lowest floor of
+ * «возможно, закрыто», «не видно ни с одного этажа» when a building is in the way of it, else «нет данных».
  */
 export function reachOf(line: SightLine | null | undefined, window: ViewWindow, angle = 0): Reach {
   const verdicts = Array.from({ length: window.floors }, (_, i) => lineVerdict(line, eyeOf(window, i + 1), angle))
-  const seen = verdicts.indexOf('visible')
+  const seen = verdicts.findIndex(isSeen)
   if (seen === 0) return { kind: 'all' }
   if (seen > 0) return { kind: 'from', floor: seen + 1 }
-  return verdicts.every((v) => v === 'obstructed') ? { kind: 'none' } : { kind: 'unknown' }
+  const top = verdicts[verdicts.length - 1]
+  if (top === 'possible') return { kind: 'maybe', floor: verdicts.indexOf('possible') + 1 }
+  return top === 'blocked' || top === 'likely' ? { kind: 'none' } : { kind: 'unknown' }
 }
 
 const reachRank = (reach: Reach) =>
-  reach.kind === 'all' ? 1 : reach.kind === 'from' ? reach.floor : reach.kind === 'none' ? 1000 : 1001
+  reach.kind === 'all'
+    ? 1
+    : reach.kind === 'from'
+      ? reach.floor
+      : reach.kind === 'maybe'
+        ? 500 + reach.floor
+        : reach.kind === 'none'
+          ? 1000
+          : 1001
 
-/** The best of several: the lowest floor; a building in the way of every floor beats no data. */
+/** The best of several: the lowest floor, a sure one before a perhaps; a building in the way beats no data. */
 export const bestReach = (reaches: readonly Reach[]): Reach =>
   reaches.reduce<Reach>((best, r) => (reachRank(r) < reachRank(best) ? r : best), { kind: 'unknown' })
 
@@ -201,13 +281,21 @@ export const reachLabel = (reach: Reach) =>
     ? 'видно со всех этажей'
     : reach.kind === 'from'
       ? `видно ${fromFloor(reach.floor)} этажа`
-      : reach.kind === 'none'
-        ? 'не видно ни с одного этажа'
-        : 'нет данных'
+      : reach.kind === 'maybe'
+        ? `возможно, видно ${reach.floor === 1 ? 'со всех этажей' : `${fromFloor(reach.floor)} этажа`}`
+        : reach.kind === 'none'
+          ? 'не видно ни с одного этажа'
+          : 'нет данных'
 
-/** The colour of a reach on the page: seen, in the way, not known. */
-export const reachVerdict = (reach: Reach): Verdict =>
-  reach.kind === 'all' || reach.kind === 'from' ? 'visible' : reach.kind === 'none' ? 'obstructed' : 'unknown'
+/** The colour of a reach on the page: seen, perhaps, closed, not known. */
+export const reachTone = (reach: Reach): Tone =>
+  reach.kind === 'all' || reach.kind === 'from'
+    ? 'seen'
+    : reach.kind === 'maybe'
+      ? 'partly'
+      : reach.kind === 'none'
+        ? 'closed'
+        : 'unknown'
 
 /** The bearing from `a` to `b`, degrees clockwise from north. */
 export function bearingDeg(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
@@ -326,6 +414,12 @@ export function seaReach(view: Pick<HotelView, 'sea' | 'seaChecked' | 'window'>,
   const reach: Reach = view.seaChecked && points.length ? bestReach(reaches) : { kind: 'unknown' }
   const index = reaches.findIndex((r) => reachRank(r) === reachRank(reach))
   return { reach, point: (points[index] ?? points[0]) as ViewTarget | undefined }
+}
+
+/** How many points of the coast (of the side, if one is given) are seen from the eye — «видно» — of how many. */
+export function seaSeen(view: Pick<HotelView, 'sea'>, eyeM: number, side?: SideId) {
+  const points = view.sea.filter((p) => !side || inSide(p.bearing, side))
+  return { seen: points.filter((p) => lineVerdict(p.line, eyeM) === 'visible').length, of: points.length }
 }
 
 /** The ray towards the sun at `azimuth`, and from which floor the sun at `SUN_CHECK_ALTITUDE_DEG` is seen on it. */
@@ -469,24 +563,66 @@ export const windowLabel = (window: ViewWindow) =>
 export const floorLabel = (window: ViewWindow, floor: number) =>
   `окно ${clampFloor(window, floor)}-го этажа, ${window.estimated ? '≈ ' : ''}${metres(eyeOf(window, floor))} м над землёй`
 
-/** Why a verdict from the eye: the building in the way, or the gap in the data. */
-export function verdictReason(line: SightLine | null, verdict: Verdict, eyeM: number, angle = 0): string | null {
-  if (!line) return 'линия не проверена'
-  if (!line.checked) return 'дальше 6 км — не проверяем'
-  const blocker = verdict === 'obstructed' ? blockersAt(line, eyeM, angle)[0] : undefined
-  if (blocker)
-    return `мешает здание ${heightLabel(blocker.heightM, blocker.estimated)} в ${distanceLabel(blocker.distanceM)} от отеля`
-  if (verdict === 'unknown' && line.coveredM !== null && line.coveredM < line.distanceM - 1)
-    return `данные о зданиях есть только на первые ${distanceLabel(line.coveredM)} пути`
-  return null
+/** «≈ 17,2 м (по оценке EUBUCCO: от 13 до 21 м)» with the bounds of the interval, «17,2 м» for a measured height. */
+const boundedHeight = (b: LineBlocker) =>
+  b.estimated && b.heightLowerM < b.heightUpperM
+    ? `≈ ${metres(b.heightM)} м (по оценке EUBUCCO: от ${metres(b.heightLowerM)} до ${metres(b.heightUpperM)} м)`
+    : heightLabel(b.heightM, b.estimated)
+
+/** «в 80 м от отеля». */
+const away = (b: LineBlocker) => `в ${distanceLabel(b.distanceM)} от отеля`
+
+/**
+ * Why the verdict from the eye, after its label: «зданием ≈ 17,2 м (по оценке EUBUCCO) в 80 м от отеля» for
+ * «закрыто», the bounds of the height for «вероятно, закрыто» and «возможно, закрыто», the roofs at the horizon for
+ * «частично закрыто», where the data end for «нет данных»; `null` for «видно».
+ */
+export function verdictReason(line: SightLine | null | undefined, eyeM: number, angle = 0): string | null {
+  const verdict = lineVerdict(line, eyeM, angle)
+  if (verdict === 'visible') return null
+  if (verdict === 'unknown') {
+    if (!line) return 'линия не проверена'
+    if (!line.checked) return 'дальше 6 км — не проверяем'
+    if (line.coveredM === null) return 'границы данных о зданиях не загружены'
+    return line.coveredM < 1
+      ? 'отель за границей муниципалитета Валенсия — данных о зданиях вокруг нет'
+      : `через ${distanceLabel(line.coveredM)} линия уходит за границу муниципалитета Валенсия — данных о зданиях там нет`
+  }
+  if (verdict === 'partial') {
+    const roofs = blockersAt(line, eyeM, ROOFS)[0]
+    return `солнце на высоте ${SUN_CHECK_ALTITUDE_DEG}° видно, ниже его закрывает ${roofs ? `здание ${heightLabel(roofs.heightM, roofs.estimated)} ${away(roofs)}` : 'застройка'}`
+  }
+  const blocker = blockersAt(line, eyeM, angle)[0]
+  if (!blocker) return null
+  if (verdict === 'blocked') return `зданием ${heightLabel(blocker.heightM, blocker.estimated)} ${away(blocker)}`
+  if (verdict === 'likely') return `зданием ${boundedHeight(blocker)} ${away(blocker)}`
+  return `здание ${heightLabel(blocker.heightM, blocker.estimated)} ${away(blocker)} может быть выше — до ${metres(blocker.heightUpperM)} м`
 }
+
+/**
+ * The verdict from the eye with its reason, the same on the page and in Эвал's answers: «закрыто зданием ≈ 17,2 м (по
+ * оценке EUBUCCO) в 80 м от отеля», «нет данных: через 300 м линия уходит за границу Валенсии …», «видно».
+ */
+export function verdictText(line: SightLine | null | undefined, eyeM: number, angle = 0): string {
+  const verdict = lineVerdict(line, eyeM, angle)
+  const reason = verdictReason(line, eyeM, angle)
+  if (!reason) return VERDICT_LABEL[verdict]
+  return `${VERDICT_LABEL[verdict]}${verdict === 'blocked' || verdict === 'likely' ? ' ' : ': '}${reason}`
+}
+
+/** «на север», «на юго-восток»: where the window looks, the accusative of `compassPoint`. */
+const towards = (side: SideId) => `на ${sideOf(side).label.toLocaleLowerCase('ru')}`
+
+/** «Окно на 2-м этаже на юго-восток»; «Окно на юго-восток» before the floors come. */
+export const windowSideLabel = (side: SideId, floor: number | null) =>
+  `Окно${floor ? ` на ${floor}-м этаже` : ''} ${towards(side)}`
 
 /** The assumptions of the check, for the page's «Как мы считаем» and for Эвал. */
 export const VIEW_ASSUMPTIONS = [
   'Окно — в точке отеля по координатам Островка; из какого окна смотрит номер, неизвестно, поэтому проверяем каждый этаж от 1-го до верхнего. Высота этажа = высота здания EUBUCCO / число его этажей, а без точных данных о здании — 3 м (медиана зданий Валенсии в EUBUCCO с измеренной высотой), этажей — сколько занимают номера по Островку; глаза на 1,5 м над полом. Стены самого здания и сторону окон номера не учитываем.',
-  'Препятствия — здания EUBUCCO v0.2 (кадастр Испании, OSM, оценка модели); высоты почти везде — оценка модели EUBUCCO, «видно с этажа» — только если линия проходит выше и верхней границы её интервала. Деревья, рельеф, рекламные щиты и новые постройки не учтены; земля считается ровной.',
-  'Кривизна Земли с рефракцией (k = 0,13) учтена: на 5 км точка ниже на ~1,7 м. Дальше 6 км линии не проверяем; если на пути есть участок без данных о зданиях (другой муниципалитет), ответ — «нет данных».',
-  'Море видно, если ни одно здание до берега не закрывает горизонт моря; место — если не закрыта верхушка его здания (или земля в его точке). Закат и восход — солнце на высоте 2° над горизонтом по лучу 1,5 км.',
+  'Препятствия — здания EUBUCCO v0.2 (кадастр Испании, OSM, оценка модели); высоты почти везде — оценка модели EUBUCCO с интервалом. «Видно» — линия проходит выше и верхней границы интервала каждого здания; «закрыто» — здание выше линии взгляда даже по нижней границе; «вероятно, закрыто» — по оценке, но не по нижней границе; «возможно, закрыто» — только по верхней. Деревья, рельеф, рекламные щиты и новые постройки не учтены; земля считается ровной.',
+  'Кривизна Земли с рефракцией (k = 0,13) учтена: на 5 км точка ниже на ~1,7 м. Дальше 6 км линии не проверяем. Данные о зданиях есть по всему муниципалитету Валенсия (граница — OpenStreetMap по данным IGN): если на линии зданий нет — над морем, парком, руслом Турии, — это «видно»; «нет данных» — только если линия без помех уходит в соседний муниципалитет.',
+  'Море видно, если ни одно здание до берега не закрывает горизонт моря; место — если не закрыта верхушка его здания (или земля в его точке). Закат и восход — солнце на высоте 2° над горизонтом по лучу 1,5 км; «частично закрыто» — солнце на 2° видно, а ниже его закрывают крыши.',
 ] as const
 
 /** A question about the view from the window: «видно ли море», «вид из окна», «закат» — not the noise. */
