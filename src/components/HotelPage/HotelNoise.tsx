@@ -20,14 +20,17 @@ import {
   loudestSource,
   NO_EEA,
   NOISE_COLORS,
+  NOISE_MAP_RADIUS_M,
   noiseColor,
   noiseSourceLabel,
   NOISY_CATEGORIES,
+  NOISY_GROUPS,
   NOISY_LABEL,
   NOISY_RADIUS_M,
   whoLine,
   type HotelNoise as HotelNoiseData,
   type NoiseIndicator,
+  type NoisyPlace,
 } from '@/lib/noise'
 import { HotelMapUnavailable } from './HotelMapUnavailable'
 
@@ -67,25 +70,45 @@ function useNoiseMap(hotelId: string) {
   return map
 }
 
-/** The legend of the map: the colours of the bands from 40 dB, each under its lower bound. */
-function Legend({ indicator }: { indicator: NoiseIndicator }) {
+/**
+ * The legend of the map: the colours of the bands, the quiet below 40 dB first, each under its lower bound, and the
+ * dots of the loud places shown.
+ */
+function Legend({ indicator, places }: { indicator: NoiseIndicator; places: readonly NoisyPlace[] }) {
+  const groups = NOISY_GROUPS.filter((g) => places.some((p) => g.categories.includes(p.category)))
   return (
-    <div className="flex flex-col gap-1.5 rounded-xl bg-white/90 p-2.5 text-xs text-foreground shadow-sm dark:bg-card/90">
+    <div className="flex flex-col gap-1.5 rounded-xl bg-card p-2.5 text-xs text-foreground shadow-sm sm:bg-white/90 sm:dark:bg-card/90">
       <span className="font-semibold">
         {indicator}, дБ ({INDICATOR_LABEL[indicator].toLocaleLowerCase('ru')})
       </span>
       <ul className="flex">
-        {LEGEND_STEPS.map((step, i) => (
-          <li key={step} className="flex w-7 flex-col gap-1">
-            <span className="h-2 w-full" style={{ backgroundColor: NOISE_COLORS[i + 1] }} aria-hidden />
+        {NOISE_COLORS.map((color, i) => (
+          <li key={color} className="flex w-7 flex-col gap-1">
+            <span className="h-2 w-full" style={{ backgroundColor: color }} aria-hidden />
             <span className="text-[0.625rem] text-muted-foreground">
-              {step}
-              {i === LEGEND_STEPS.length - 1 && '+'}
+              {i === 0 ? `<${LEGEND_STEPS[0]}` : LEGEND_STEPS[i - 1]}
+              {i === LEGEND_STEPS.length && '+'}
             </span>
           </li>
         ))}
       </ul>
-      <span className="text-[0.625rem] text-muted-foreground">Ниже 40 дБ не закрашено</span>
+      {groups.length > 0 && (
+        <ul aria-label="Шумные места на карте" className="flex flex-wrap gap-x-3 gap-y-1">
+          {groups.map((g) => (
+            <li key={g.label} className="flex items-center gap-1.5">
+              <span
+                className="size-3 shrink-0 rounded-full border-2 border-white shadow-sm"
+                style={{ backgroundColor: g.color }}
+                aria-hidden
+              />
+              {g.label}
+            </li>
+          ))}
+        </ul>
+      )}
+      <span className="text-[0.625rem] text-muted-foreground">
+        Без цвета — нет контура EEA или дальше {NOISE_MAP_RADIUS_M} м от отеля
+      </span>
     </div>
   )
 }
@@ -95,25 +118,15 @@ function NoiseMapCard({ hotel, noise }: { hotel: Hotel; noise: HotelNoiseData })
   const [indicator, setIndicator] = useState<NoiseIndicator>('Lden')
   const [failed, setFailed] = useState(false)
   return (
-    <div className="relative h-[clamp(18rem,55vw,28rem)] overflow-hidden rounded-2xl bg-muted">
-      {failed ? (
-        <HotelMapUnavailable />
-      ) : (
-        <NoiseMap
-          center={{ lat: hotel.lat, lon: hotel.lon }}
-          contours={contours}
-          indicator={indicator}
-          places={noise.places}
-          onFail={() => setFailed(true)}
-        />
-      )}
+    // On a phone the legend and the switch stand above the map, from `sm` on it.
+    <div className="flex flex-col gap-2 sm:relative">
       {!failed && (
-        <div className="pointer-events-none absolute inset-x-2 top-2 flex flex-wrap items-start justify-between gap-2">
-          <Legend indicator={indicator} />
+        <div className="flex flex-wrap items-start justify-between gap-2 sm:pointer-events-none sm:absolute sm:inset-x-2 sm:top-2 sm:z-1">
+          <Legend indicator={indicator} places={noise.places} />
           <div
             role="group"
             aria-label="Показатель шума"
-            className="pointer-events-auto flex rounded-full bg-white p-1 text-sm shadow-sm dark:bg-card"
+            className="pointer-events-auto flex rounded-full bg-card p-1 text-sm shadow-sm sm:bg-white sm:dark:bg-card"
           >
             {(['Lden', 'Lnight'] as const).map((value) => (
               <button
@@ -132,6 +145,19 @@ function NoiseMapCard({ hotel, noise }: { hotel: Hotel; noise: HotelNoiseData })
           </div>
         </div>
       )}
+      <div className="h-[clamp(18rem,55vw,28rem)] overflow-hidden rounded-2xl bg-muted">
+        {failed ? (
+          <HotelMapUnavailable />
+        ) : (
+          <NoiseMap
+            center={{ lat: hotel.lat, lon: hotel.lon }}
+            contours={contours}
+            indicator={indicator}
+            places={noise.places}
+            onFail={() => setFailed(true)}
+          />
+        )}
+      </div>
     </div>
   )
 }
@@ -341,8 +367,7 @@ function BuildingCard({ building }: { building: HotelBuilding }) {
               .join(', ')}
           </b>
           <span className="text-sm text-muted-foreground">
-            EUBUCCO{estimated ? `, ${building.estimated ? '' : 'высота '}по оценке модели` : ''}. Как здание экранирует
-            шум, по этим данным не сказать.
+            EUBUCCO{estimated ? `, ${building.estimated ? '' : 'высота '}по оценке модели` : ''}.
           </span>
         </span>
       </p>

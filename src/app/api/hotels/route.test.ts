@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { loadHotels } from '@/lib/db/catalog'
+import { allHotels } from '@/test/catalog'
 import { setProduction } from '@/test/env'
 import { GET } from './route'
 
@@ -36,8 +37,26 @@ describe('GET /api/hotels', () => {
     )
   })
 
+  it('returns the hotels in a box of the map, and nothing outside it', async () => {
+    const hotel = allHotels()[0]
+    const box = `${hotel.lon - 0.01},${hotel.lat - 0.01},${hotel.lon + 0.01},${hotel.lat + 0.01}`
+    const ids = await idsOf(
+      await get(
+        `bbox=${box
+          .split(',')
+          .map((v) => Number(v).toFixed(5))
+          .join(',')}`,
+      ),
+    )
+    expect(ids).toContain(hotel.id)
+    const inside = allHotels().filter((h) => Math.abs(h.lon - hotel.lon) < 0.01 && Math.abs(h.lat - hotel.lat) < 0.01)
+    expect(ids.sort()).toEqual(inside.map((h) => h.id).sort())
+  })
+
   it.each([
     ['nothing', ''],
+    ['a box wider than the widest', 'bbox=14,50,14.5,50.05'],
+    ['a box with the ids', 'bbox=14.4,50,14.45,50.05&ids=a'],
     ['both lists', 'ids=a&destinations=prague'],
     ['an id with other characters', 'ids=../etc'],
     ['too many ids', `ids=${Array.from({ length: 61 }, (_, i) => `h${i}`).join(',')}`],

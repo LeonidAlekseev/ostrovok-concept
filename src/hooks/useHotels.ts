@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import type { Hotel } from '@/lib/catalog'
+import { boxParam, type MapBox } from '@/lib/mapBox'
 
-export type HotelsQuery = { ids: readonly string[] } | { destinations: readonly string[] }
+export type HotelsQuery = { ids: readonly string[] } | { destinations: readonly string[] } | { bbox: MapBox }
 
 export type HotelsState =
   { status: 'loading' } | { status: 'done'; hotels: Hotel[] } | { status: 'error'; message: string }
@@ -11,14 +12,21 @@ export type HotelsState =
 export const HOTELS_ERROR = 'Не удалось загрузить отели'
 
 const urlOf = (query: HotelsQuery) =>
-  'ids' in query ? `/api/hotels?ids=${query.ids.join(',')}` : `/api/hotels?destinations=${query.destinations.join(',')}`
+  'bbox' in query
+    ? `/api/hotels?bbox=${boxParam(query.bbox)}`
+    : 'ids' in query
+      ? `/api/hotels?ids=${query.ids.join(',')}`
+      : `/api/hotels?destinations=${query.destinations.join(',')}`
 
 /** One request a set of hotels per page load; a failed one is dropped, so the next call tries again. */
 const requests = new Map<string, Promise<Hotel[]>>()
 
-/** Full hotels from `GET /api/hotels`, for the places that know only the ids: favourites, trips, the search. */
+/**
+ * Full hotels from `GET /api/hotels`, for the places that know only the ids (favourites, trips, the search) and for the
+ * map around a hotel (a box of it).
+ */
 export function fetchHotels(query: HotelsQuery): Promise<Hotel[]> {
-  if (('ids' in query ? query.ids : query.destinations).length === 0) return Promise.resolve([])
+  if (!('bbox' in query) && ('ids' in query ? query.ids : query.destinations).length === 0) return Promise.resolve([])
   const url = urlOf(query)
   let request = requests.get(url)
   if (!request) {

@@ -12,14 +12,7 @@ import {
 import { cn } from 'cn'
 import type { ViewMap as ViewMapData } from '@/lib/db/view'
 import { pointAt, SIDE_HALF_WIDTH_DEG, VIEW_MAP_RADIUS_M, type Verdict } from '@/lib/view'
-import {
-  ATTRIBUTION_CLASS,
-  ATTRIBUTION_SHOWN_MS,
-  foldAttribution,
-  MAP_ATTRIBUTION,
-  MAP_STYLE,
-  silenceSourceAttribution,
-} from '../SearchResultsPage/mapSetup'
+import { ATTRIBUTION_CLASS, MAP_ATTRIBUTION, MAP_STYLE, manageAttribution } from '../SearchResultsPage/mapSetup'
 import {
   BLOCKER_COLOR,
   BUILDING_COLOR,
@@ -135,8 +128,7 @@ export default function ViewMap({
         return
       }
       let loaded = false
-      instance.on('styledata', () => silenceSourceAttribution(instance))
-      let foldTimer: ReturnType<typeof setTimeout> | undefined
+      const stopAttribution = manageAttribution(instance)
       instance.on('load', () => {
         loaded = true
         const layers = instance.getStyle().layers
@@ -186,13 +178,12 @@ export default function ViewMap({
         })
         new Marker({ color: '#0f172a' }).setLngLat([center.lon, center.lat]).addTo(instance)
         setMap(instance)
-        foldTimer = setTimeout(() => foldAttribution(instance), ATTRIBUTION_SHOWN_MS)
       })
       instance.on('error', () => {
         if (!loaded) fail.current()
       })
       return () => {
-        clearTimeout(foldTimer)
+        stopAttribution()
         instance.remove()
       }
     },
