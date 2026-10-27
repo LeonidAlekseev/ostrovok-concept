@@ -549,11 +549,11 @@ export const bearingLabel = (bearing: number) => `${Math.round(bearing) % 360}°
 /** «36», «34,5»: metres to a decimetre. */
 const metres = (value: number) => String(Math.round(value * 10) / 10).replace('.', ',')
 
-/** «≈ 36 м (по оценке EUBUCCO)», «36 м». */
+/** «≈ 36 м» for a height estimated by a model, «36 м»; where the heights come from is said in «Как мы считаем». */
 export const heightLabel = (heightM: number, estimated: boolean) =>
-  estimated ? `≈ ${metres(heightM)} м (по оценке EUBUCCO)` : `${metres(heightM)} м`
+  estimated ? `≈ ${metres(heightM)} м` : `${metres(heightM)} м`
 
-/** «здание 12 этажей, ≈ 36 м (по оценке EUBUCCO)»; «нет точных данных о здании, номера на 6 этажах (Островок)». */
+/** «здание 12 этажей, ≈ 36 м»; «нет точных данных о здании, номера на 6 этажах (Островок)». */
 export const windowLabel = (window: ViewWindow) =>
   window.source === 'building'
     ? `здание ${countRu(window.floors, ['этаж', 'этажа', 'этажей'])}, ${heightLabel(window.heightM!, window.estimated)}`
@@ -563,18 +563,12 @@ export const windowLabel = (window: ViewWindow) =>
 export const floorLabel = (window: ViewWindow, floor: number) =>
   `окно ${clampFloor(window, floor)}-го этажа, ${window.estimated ? '≈ ' : ''}${metres(eyeOf(window, floor))} м над землёй`
 
-/** «≈ 17,2 м (по оценке EUBUCCO: от 13 до 21 м)» with the bounds of the interval, «17,2 м» for a measured height. */
-const boundedHeight = (b: LineBlocker) =>
-  b.estimated && b.heightLowerM < b.heightUpperM
-    ? `≈ ${metres(b.heightM)} м (по оценке EUBUCCO: от ${metres(b.heightLowerM)} до ${metres(b.heightUpperM)} м)`
-    : heightLabel(b.heightM, b.estimated)
-
 /** «в 80 м от отеля». */
 const away = (b: LineBlocker) => `в ${distanceLabel(b.distanceM)} от отеля`
 
 /**
- * Why the verdict from the eye, after its label: «зданием ≈ 17,2 м (по оценке EUBUCCO) в 80 м от отеля» for
- * «закрыто», the bounds of the height for «вероятно, закрыто» and «возможно, закрыто», the roofs at the horizon for
+ * Why the verdict from the eye, after its label: «зданием ≈ 17,2 м в 80 м от отеля» for «закрыто» and «вероятно,
+ * закрыто», the upper bound of the height for «возможно, закрыто», the roofs at the horizon for
  * «частично закрыто», where the data end for «нет данных»; `null` for «видно».
  */
 export function verdictReason(line: SightLine | null | undefined, eyeM: number, angle = 0): string | null {
@@ -595,13 +589,13 @@ export function verdictReason(line: SightLine | null | undefined, eyeM: number, 
   const blocker = blockersAt(line, eyeM, angle)[0]
   if (!blocker) return null
   if (verdict === 'blocked') return `зданием ${heightLabel(blocker.heightM, blocker.estimated)} ${away(blocker)}`
-  if (verdict === 'likely') return `зданием ${boundedHeight(blocker)} ${away(blocker)}`
+  if (verdict === 'likely') return `зданием ${heightLabel(blocker.heightM, blocker.estimated)} ${away(blocker)}`
   return `здание ${heightLabel(blocker.heightM, blocker.estimated)} ${away(blocker)} может быть выше — до ${metres(blocker.heightUpperM)} м`
 }
 
 /**
- * The verdict from the eye with its reason, the same on the page and in Эвал's answers: «закрыто зданием ≈ 17,2 м (по
- * оценке EUBUCCO) в 80 м от отеля», «нет данных: через 300 м линия уходит за границу Валенсии …», «видно».
+ * The verdict from the eye with its reason, the same on the page and in Эвал's answers: «закрыто зданием ≈ 17,2 м в
+ * 80 м от отеля», «нет данных: через 300 м линия уходит за границу Валенсии …», «видно».
  */
 export function verdictText(line: SightLine | null | undefined, eyeM: number, angle = 0): string {
   const verdict = lineVerdict(line, eyeM, angle)

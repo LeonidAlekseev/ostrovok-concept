@@ -795,7 +795,17 @@ export type Database = {
           lnight_min: number | null
           lnight_source: string | null
           noise_dataset: string | null
+          noise_method: string | null
+          noise_zone: string | null
+          street_lday_max: number | null
+          street_lday_min: number | null
+          street_lnight_max: number | null
+          street_lnight_min: number | null
           updated_at: string
+          yard_lday_max: number | null
+          yard_lday_min: number | null
+          yard_lnight_max: number | null
+          yard_lnight_min: number | null
         }
         ComputedFields: never
         Insert: {
@@ -818,7 +828,17 @@ export type Database = {
           lnight_min?: number | null
           lnight_source?: string | null
           noise_dataset?: string | null
+          noise_method?: string | null
+          noise_zone?: string | null
+          street_lday_max?: number | null
+          street_lday_min?: number | null
+          street_lnight_max?: number | null
+          street_lnight_min?: number | null
           updated_at?: string
+          yard_lday_max?: number | null
+          yard_lday_min?: number | null
+          yard_lnight_max?: number | null
+          yard_lnight_min?: number | null
         }
         Update: {
           building_dataset?: string | null
@@ -840,7 +860,17 @@ export type Database = {
           lnight_min?: number | null
           lnight_source?: string | null
           noise_dataset?: string | null
+          noise_method?: string | null
+          noise_zone?: string | null
+          street_lday_max?: number | null
+          street_lday_min?: number | null
+          street_lnight_max?: number | null
+          street_lnight_min?: number | null
           updated_at?: string
+          yard_lday_max?: number | null
+          yard_lday_min?: number | null
+          yard_lnight_max?: number | null
+          yard_lnight_min?: number | null
         }
         Relationships: [
           {
@@ -1550,6 +1580,7 @@ export type Database = {
       hotel_geo: { Args: { lat: number; lon: number }; Returns: Json }
       hotel_geo_features: { Args: { lat: number; lon: number; radius_m?: number }; Returns: Json }
       hotel_noise_day: { Args: { lat: number; lon: number; radius_m?: number }; Returns: Json }
+      hotel_noise_facade: { Args: { lat: number; lon: number }; Returns: Json }
       hotel_noise_map: { Args: { lat: number; lon: number; radius_m?: number }; Returns: Json }
       hotel_noise_map_refresh: { Args: { lat: number; lon: number; radius_m?: number }; Returns: number }
       hotel_noise_maps_prune: { Args: { radius_m?: number }; Returns: number }

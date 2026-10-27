@@ -3,6 +3,8 @@ import type { ClaimEvidence, ClaimValue, HotelClaim } from '@/lib/db/claims'
 import { cacheHeader, component, errorSchema, sameType, type ApiOperation } from '@/lib/openapi/operation'
 import { hotelIdParameter } from '../../schema'
 import claimsExample from '@/lib/openapi/examples/claims.json'
+import estimateExample from '@/lib/openapi/examples/claims-estimate.json'
+import { NOISE_ESTIMATE_DOC } from '../noiseEstimateDoc'
 
 /** `GET /api/hotels/{hotelId}/claims`: what the store of claims knows of a real hotel, with its sources. */
 
@@ -128,14 +130,13 @@ export const claimsOperations: ApiOperation[] = [
     operationId: 'getHotelClaims',
     tags: ['Знания об отеле'],
     summary: 'Характеристики отеля',
-    description:
-      'Утверждения хранилища знаний о настоящем отеле Валенсии: значение (число, диапазон, текст, логическое), единица, эпистемический статус, уверенность, источники (`evidence`) и расчёт для производных значений. Фильтр `property` — префикс свойства: `noise.`, `building.`, `noise.nearby.`. Отель, которого нет, скрытый или демонстрационный, даёт 404.',
+    description: `Утверждения хранилища знаний о настоящем отеле Валенсии: значение (число, диапазон, текст, логическое), единица, эпистемический статус, уверенность, источники (\`evidence\`) и расчёт для производных значений. Фильтр \`property\` — префикс свойства: \`noise.\`, \`noise.estimate.\`, \`building.\`, \`noise.nearby.\`. Отель, которого нет, скрытый или демонстрационный, даёт 404.\n\n${NOISE_ESTIMATE_DOC}`,
     parameters: [
       hotelIdParameter,
       {
         name: 'property',
         in: 'query',
-        description: 'Префикс свойства: `noise.`, `building.`, `noise.nearby.`; пусто — все',
+        description: 'Префикс свойства: `noise.`, `noise.estimate.`, `building.`, `noise.nearby.`; пусто — все',
         schema: claimsQuerySchema.shape.property,
         example: 'noise.lnight.',
       },
@@ -157,6 +158,11 @@ export const claimsOperations: ApiOperation[] = [
             summary: 'ota-9096882, `noise.lnight.`',
             description: `${claimsExample.response.claims.length} утверждений из ответа`,
             value: claimsExample.response,
+          },
+          estimate: {
+            summary: `${estimateExample.hotel}, \`${estimateExample.query.property}\``,
+            description: `Оценка шума у фасада: ${estimateExample.response.claims.length} утверждений из ответа`,
+            value: estimateExample.response,
           },
         },
       },

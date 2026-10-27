@@ -6,6 +6,7 @@ import {
   NOISE_MENTION,
   canonical,
   chunksOf,
+  estimateStore,
   claimKey,
   mentionExcerpt,
   mergeStores,
@@ -438,6 +439,118 @@ describe('buildingStore', () => {
   })
 })
 
+/** The answer of `hotel_noise_facade` for ota-9741622: the roads at the door, the yard below 40 dB. */
+const facadeBand = (side: string, source: string, indicator: string, db_min: number | null, db_max: number | null) => ({
+  side,
+  source,
+  indicator,
+  db_min,
+  db_max,
+  dataset: eea.id,
+})
+const facade = {
+  zone: { kind: 'building', building_id: '21adf97303954791-16', buffer_m: 5 },
+  bands: [
+    facadeBand('street', 'roadsInAgglomeration', 'Lden', 70, 74),
+    facadeBand('street', 'roadsInAgglomeration', 'Lnight', 65, 69),
+    facadeBand('yard', 'roadsInAgglomeration', 'Lden', null, 39),
+    facadeBand('yard', 'roadsInAgglomeration', 'Lnight', null, 39),
+  ],
+}
+
+// hotel-knowledge, Requirement: Оценка шума у фасада
+describe('estimateStore', () => {
+  const near = {
+    places: [
+      place(1, 'bar', 85.5),
+      place(1, 'restaurant', 85.5),
+      place(2, 'cafe', 47.6),
+      place(3, 'tram', 30),
+      place(4, 'pharmacy', 10),
+    ],
+  }
+  const store = estimateStore(hotel, facade, near, [eea, eubucco], eubucco.id)
+  const value = (property: string) => store.claims.find((c) => c.property === property)
+
+  it('derives the street, the yard, the facade and the places by period from one calculation', () => {
+    expect(store.calculations).toHaveLength(1)
+    const [calculation] = store.calculations
+    expect(calculation).toMatchObject({
+      key: 'noise.estimate:ota-1',
+      version: 'noise-estimate-v1',
+      inputs: {
+        hotel_id: 'ota-1',
+        zone: { kind: 'building', building_id: '21adf97303954791-16', buffer_m: 5 },
+        street_bands: { roadsInAgglomeration: { lden: { min: 70, max: 74 }, lnight: { min: 65, max: 69 } } },
+        // The bar that serves food is a bar; the tram stop is no source of the estimate.
+        places: [
+          { category: 'cafe', name: 'P2', distance_m: 47.6, levels_db: { day: 46.4, evening: 48.4 } },
+          { category: 'bar', name: 'P1', distance_m: 85.5, levels_db: { day: 39.4, evening: 46.4, night: 43.4 } },
+        ],
+      },
+      parameters: { facade_buffer_m: 5, circle_radius_m: 25, places_radius_m: 200, min_distance_m: 3 },
+    })
+    expect(calculation.limitations).toContain(
+      'Экранирование зданиями не учитывается: шум заведения доходит до фасада и двора без препятствий',
+    )
+    expect(value('noise.estimate.street.lnight')).toMatchObject({
+      value_min: 65,
+      value_max: 70,
+      unit: 'dB',
+      epistemic_status: 'derived',
+      calculation: 'noise.estimate:ota-1',
+      confidence: 0.5,
+    })
+    expect(value('noise.estimate.facade.lden')).toMatchObject({ value_min: 70, value_max: 75, confidence: 0.9 })
+    expect(value('noise.estimate.facade.lday')!.confidence).toBe(0.8)
+    expect(value('noise.estimate.street.lday')!.confidence).toBe(0.4)
+    expect(value('noise.estimate.venues.lnight')).toMatchObject({ value_numeric: 43.4, confidence: 0.6 })
+    // The yard: the roads below 40 dB and the bar at night, 10·lg(10^4 + 10^4.34) = 45 dB at most.
+    expect(value('noise.estimate.yard.lnight')).toMatchObject({ value_min: 43.4, value_max: 45 })
+  })
+
+  it('cites the datasets, and the places open in its period for a level of the places', () => {
+    expect(store.evidence.map((e) => `${e.provider}:${e.external_id}`)).toEqual([
+      'EEA:eea-noise-end2022-v01_r00',
+      'EUBUCCO:eubucco-v0.2',
+      'OpenStreetMap:node/2',
+      'OpenStreetMap:node/1',
+    ])
+    expect(value('noise.estimate.street.lnight')!.evidence).toEqual([
+      { evidence: 'EEA:eea-noise-end2022-v01_r00', role: 'input' },
+      { evidence: 'EUBUCCO:eubucco-v0.2', role: 'input' },
+    ])
+    expect(value('noise.estimate.venues.lnight')!.evidence).toEqual([
+      { evidence: 'OpenStreetMap:node/1', role: 'input' },
+    ])
+    expect(value('noise.estimate.venues.lday')!.evidence).toHaveLength(2)
+  })
+
+  it('keeps an open band open and writes nothing without an EEA band at the facade', () => {
+    const open = estimateStore(
+      hotel,
+      { ...facade, bands: [facadeBand('street', 'roadsInAgglomeration', 'Lnight', 70, null)] },
+      { places: [] },
+      [eea],
+      null,
+    )
+    expect(open.claims.find((c) => c.property === 'noise.estimate.street.lnight')).toMatchObject({
+      value_min: 70,
+      value_max: null,
+      confidence: 0.8,
+    })
+    expect(open.evidence.map((e) => e.provider)).toEqual(['EEA'])
+    expect(estimateStore(hotel, { zone: facade.zone, bands: [] }, near, [eea], null)).toEqual({
+      entities: [],
+      evidence: [],
+      calculations: [],
+      claims: [],
+      relations: [],
+      documents: [],
+    })
+  })
+})
+
 // hotel-knowledge, Requirement: Политика уверенности
 describe('the confidence of the claims', () => {
   it('follows the policy: the least input less each assumption', () => {
@@ -454,6 +567,13 @@ describe('the confidence of the claims', () => {
       osm_count: 0.9,
       building_distance: 0.9,
       day_estimate: 0.8,
+      facade_band: 0.9,
+      facade_day: 0.8,
+      venue_level: 0.6,
+      noise_estimate: 0.5,
+      noise_estimate_day: 0.4,
+      noise_estimate_no_places: 0.8,
+      noise_estimate_no_places_day: 0.7,
       inferred: 0.5,
     })
   })
@@ -471,6 +591,8 @@ describe('the confidence of the claims', () => {
         perCategory: 5,
       }),
       buildingStore(hotel, { id: 'b', height: 9, floors: 3, distance_m: 4, dataset: eubucco.id }, [eubucco]),
+      estimateStore(hotel, facade, { places: [place(1, 'bar', 20)] }, [eea, eubucco], eubucco.id),
+      estimateStore({ ...hotel, id: 'ota-2' }, facade, { places: [] }, [eea, eubucco], eubucco.id),
       reviewStore(hotel, {
         master_id: 1,
         updated_at: '2026-10-26 10:00:00+00',
@@ -487,6 +609,13 @@ describe('the confidence of the claims', () => {
         'building_distance',
         'eubucco_building',
         'review_mention',
+        'facade_band',
+        'facade_day',
+        'venue_level',
+        'noise_estimate',
+        'noise_estimate_day',
+        'noise_estimate_no_places',
+        'noise_estimate_no_places_day',
       ]),
     )
     for (const claim of claims) {

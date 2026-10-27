@@ -313,7 +313,7 @@ describe('otaHotelDetails', () => {
     expect(factLines(details.facts, details.building)).toEqual([
       '140 номеров',
       'Номера занимают 6 этажей (по данным отеля)',
-      'В здании 19 этажей (EUBUCCO, оценка)',
+      'В здании ≈19 этажей',
       'Розетки C, F · 230 В · 50 Гц',
     ])
     expect(otaHotelDetails(storedRow(), []).building).toBeNull()

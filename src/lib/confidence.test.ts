@@ -18,6 +18,17 @@ describe('confidenceOf', () => {
     expect(() => confidenceOf({ inputs: [], assumptions: [] })).toThrow()
   })
 
+  // hotel-knowledge, Requirement: Оценка шума у фасада
+  it('rates the noise estimate: the facade 0.9, the places 0.6, the sum by its assumptions', () => {
+    expect(confidenceFor('facade_band').confidence).toBe(0.9)
+    expect(confidenceFor('facade_day').confidence).toBe(0.8)
+    expect(confidenceFor('venue_level').confidence).toBe(0.6)
+    expect(confidenceFor('noise_estimate').confidence).toBe(0.5)
+    expect(confidenceFor('noise_estimate_day').confidence).toBe(0.4)
+    expect(confidenceFor('noise_estimate_no_places').confidence).toBe(0.8)
+    expect(confidenceFor('noise_estimate_no_places_day').confidence).toBe(0.7)
+  })
+
   it('names the policy and the rule', () => {
     expect(confidenceFor('osm_count')).toEqual({
       confidence: 0.9,

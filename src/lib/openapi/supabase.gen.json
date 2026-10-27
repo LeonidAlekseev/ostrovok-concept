@@ -861,46 +861,6 @@
         }
       }
     },
-    "/rpc/hotel_geo": {
-      "post": {
-        "operationId": "rpc_hotel_geo",
-        "tags": ["Функции"],
-        "summary": "hotel_geo",
-        "description": "Функция `hotel_geo` базы через PostgREST.",
-        "x-used-in": ["src/lib/db/noise.ts"],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "lat": {
-                    "type": "number"
-                  },
-                  "lon": {
-                    "type": "number"
-                  }
-                },
-                "required": ["lat", "lon"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Результат функции",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "description": "JSON"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/rpc/hotel_geo_features": {
       "post": {
         "operationId": "rpc_hotel_geo_features",
@@ -965,6 +925,46 @@
                     "type": "number"
                   },
                   "radius_m": {
+                    "type": "number"
+                  }
+                },
+                "required": ["lat", "lon"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "JSON"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/hotel_noise_facade": {
+      "post": {
+        "operationId": "rpc_hotel_noise_facade",
+        "tags": ["Функции"],
+        "summary": "hotel_noise_facade",
+        "description": "Функция `hotel_noise_facade` базы через PostgREST.",
+        "x-used-in": ["src/lib/db/noise.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "lat": {
+                    "type": "number"
+                  },
+                  "lon": {
                     "type": "number"
                   }
                 },
@@ -1781,8 +1781,38 @@
           "noise_dataset": {
             "type": ["string", "null"]
           },
+          "noise_method": {
+            "type": ["string", "null"]
+          },
+          "noise_zone": {
+            "type": ["string", "null"]
+          },
+          "street_lday_max": {
+            "type": ["number", "null"]
+          },
+          "street_lday_min": {
+            "type": ["number", "null"]
+          },
+          "street_lnight_max": {
+            "type": ["number", "null"]
+          },
+          "street_lnight_min": {
+            "type": ["number", "null"]
+          },
           "updated_at": {
             "type": "string"
+          },
+          "yard_lday_max": {
+            "type": ["number", "null"]
+          },
+          "yard_lday_min": {
+            "type": ["number", "null"]
+          },
+          "yard_lnight_max": {
+            "type": ["number", "null"]
+          },
+          "yard_lnight_min": {
+            "type": ["number", "null"]
           }
         },
         "required": [
@@ -1805,7 +1835,17 @@
           "lnight_min",
           "lnight_source",
           "noise_dataset",
-          "updated_at"
+          "noise_method",
+          "noise_zone",
+          "street_lday_max",
+          "street_lday_min",
+          "street_lnight_max",
+          "street_lnight_min",
+          "updated_at",
+          "yard_lday_max",
+          "yard_lday_min",
+          "yard_lnight_max",
+          "yard_lnight_min"
         ]
       },
       "hotel_room_views_named": {

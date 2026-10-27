@@ -1,4 +1,5 @@
 import { viewsOfRoomName } from './features'
+import { NOISE_ESTIMATE_METHOD, loudestSource, type HotelNoise, type LevelRange, type NoiseEstimate } from './noise'
 
 /**
  * The rows `npm run db:features` writes (scripts/hotel-features.ts): pure, so the tests check what goes to the
@@ -27,6 +28,24 @@ export interface FeatureRow {
   floors_lower: number | null
   floors_upper: number | null
   noise_dataset: string | null
+  /** noise-estimate-v1 at the facade (`noiseEstimate`): the street side and the yard side, the places summed in, dB. */
+  noise_method: string | null
+  noise_zone: 'building' | 'circle' | null
+  street_lday_min: number | null
+  street_lday_max: number | null
+  street_lnight_min: number | null
+  street_lnight_max: number | null
+  yard_lday_min: number | null
+  yard_lday_max: number | null
+  yard_lnight_min: number | null
+  yard_lnight_max: number | null
+}
+
+/** The facade of a hotel for its row: its EEA layers to the street, their dataset and the estimate. */
+export interface FacadeNoise {
+  sources: HotelNoise['sources']
+  dataset: string | null
+  estimate: NoiseEstimate | null
 }
 
 export interface ViewRow {
@@ -51,9 +70,6 @@ export interface HotelGeo {
     floors_confidence_lower?: unknown
     floors_confidence_upper?: unknown
   } | null
-  loudest?: Partial<
-    Record<'Lden' | 'Lnight', { source?: unknown; db_min?: unknown; db_max?: unknown; dataset?: unknown }>
-  > | null
 }
 
 const positive = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null)
@@ -62,21 +78,34 @@ const text = (value: unknown) => (typeof value === 'string' && value ? value : n
 /** A bound of an estimate: a floor's lower bound may be 0. */
 const bound = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null)
 
-/** The hotel's row, or `null` when `hotel_geo` found neither a building nor noise there (outside Valencia). */
-export function featureRow(hotelId: string, geo: HotelGeo): FeatureRow | null {
+/** A bound of the estimate, to 0.1 dB; an infinite one is an open end. */
+const level = (value: number | undefined) =>
+  value !== undefined && Number.isFinite(value) ? Math.round(value * 10) / 10 : null
+const bounds = (range: LevelRange | null | undefined) => [level(range?.min), level(range?.max)] as const
+
+/**
+ * The hotel's row, or `null` when `hotel_geo` found no building and the facade no noise (outside Valencia): the
+ * building at the point, the loudest EEA band of each indicator at the facade to the street over the layers, and the
+ * estimate of noise-estimate-v1 at the facade.
+ */
+export function featureRow(hotelId: string, geo: HotelGeo, facade: FacadeNoise): FeatureRow | null {
   const building = geo.building && text(geo.building.id) ? geo.building : null
   const floors = positive(building?.floors)
   const noise = (indicator: 'Lden' | 'Lnight') => {
-    const band = geo.loudest?.[indicator]
-    const min = db(band?.db_min)
-    const max = db(band?.db_max)
-    return min === null && max === null ? [null, null, null] : [min, max, text(band?.source)]
+    const source = loudestSource(facade, indicator)
+    const band = indicator === 'Lden' ? source?.lden : source?.lnight
+    const min = db(band?.min)
+    const max = db(band?.max)
+    return min === null && max === null ? [null, null, null] : [min, max, source!.source]
   }
   const [lden_min, lden_max, lden_source] = noise('Lden')
   const [lnight_min, lnight_max, lnight_source] = noise('Lnight')
-  // The loudest bands of both indicators come from one dataset.
-  const noiseDataset =
-    lden_source || lnight_source ? text(geo.loudest?.Lden?.dataset ?? geo.loudest?.Lnight?.dataset) : null
+  const noiseDataset = lden_source || lnight_source ? facade.dataset : null
+  const estimate = facade.estimate
+  const [street_lday_min, street_lday_max] = bounds(estimate?.street.lday)
+  const [street_lnight_min, street_lnight_max] = bounds(estimate?.street.lnight)
+  const [yard_lday_min, yard_lday_max] = bounds(estimate?.yard.lday)
+  const [yard_lnight_min, yard_lnight_max] = bounds(estimate?.yard.lnight)
   const row: FeatureRow = {
     hotel_id: hotelId,
     building_id: building ? text(building.id) : null,
@@ -98,6 +127,16 @@ export function featureRow(hotelId: string, geo: HotelGeo): FeatureRow | null {
     floors_lower: building ? bound(building.floors_confidence_lower) : null,
     floors_upper: building ? bound(building.floors_confidence_upper) : null,
     noise_dataset: noiseDataset,
+    noise_method: estimate ? NOISE_ESTIMATE_METHOD : null,
+    noise_zone: estimate?.zone?.kind ?? null,
+    street_lday_min,
+    street_lday_max,
+    street_lnight_min,
+    street_lnight_max,
+    yard_lday_min,
+    yard_lday_max,
+    yard_lnight_min,
+    yard_lnight_max,
   }
   return row.building_id ||
     row.lden_max !== null ||

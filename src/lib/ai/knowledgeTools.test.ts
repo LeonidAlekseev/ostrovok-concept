@@ -23,12 +23,10 @@ const candidates: Candidate[] = [
   { id: 'ota-3', name: 'Hotel Unknown' },
 ]
 const levels: LevelRow[] = [
-  { hotelId: 'ota-1', property: 'noise.lnight.roadsInAgglomeration', min: 45, max: 49, value: null },
-  { hotelId: 'ota-1', property: 'noise.lnight.industryInAgglomeration', min: null, max: 39, value: null },
-  { hotelId: 'ota-1', property: 'noise.lday.estimate.roadsInAgglomeration', min: 48.6, max: 59.4, value: null },
+  { hotelId: 'ota-1', property: 'noise.estimate.street.lnight', min: 45, max: 49, value: null },
+  { hotelId: 'ota-1', property: 'noise.estimate.street.lday', min: 48.6, max: 59.4, value: null },
   { hotelId: 'ota-1', property: 'building.height', min: null, max: null, value: 19.6 },
-  { hotelId: 'ota-2', property: 'noise.lnight.roadsInAgglomeration', min: 55, max: 59, value: null },
-  { hotelId: 'ota-2', property: 'noise.lnight.majorRoadsIncludingAgglomeration', min: 65, max: null, value: null },
+  { hotelId: 'ota-2', property: 'noise.estimate.street.lnight', min: 65, max: null, value: null },
 ]
 const near: NearRow[] = [
   { hotelId: 'ota-1', claimId: 'c-far', distanceM: 640, name: 'Farmacia Lejos', kind: 'osm_place' },
@@ -83,28 +81,32 @@ const claim = (fields: Partial<HotelClaim> & Pick<HotelClaim, 'id' | 'property' 
   evidence: [eea],
   ...fields,
 })
+/** The calculation of noise-estimate-v1 the estimates at the facade share. */
+const estimate = {
+  id: '44444444-4444-4444-8444-444444444444',
+  method: 'Оценка шума у фасада: самые громкие (улица) и самые тихие (двор) полосы карт шума EEA у контура здания',
+  version: 'noise-estimate-v1',
+  inputs: { zone: { kind: 'building', building_id: 'b-1', buffer_m: 5 } },
+  parameters: { facade_buffer_m: 5 },
+  limitations: ['Экранирование зданиями не учитывается: шум заведения доходит до фасада и двора без препятствий'],
+  computedAt: '2026-10-27T20:40:00Z',
+}
 const quietClaims: HotelClaim[] = [
-  claim({ id: 'n-road', property: 'noise.lnight.roadsInAgglomeration', value: { kind: 'range', min: 45, max: 49 } }),
   claim({
-    id: 'n-industry',
-    property: 'noise.lnight.industryInAgglomeration',
-    value: { kind: 'range', min: null, max: 39 },
+    id: 'n-road',
+    property: 'noise.estimate.street.lnight',
+    value: { kind: 'range', min: 45, max: 49 },
+    status: 'derived',
+    confidence: 0.5,
+    calculation: estimate,
   }),
   claim({
     id: 'd-road',
-    property: 'noise.lday.estimate.roadsInAgglomeration',
+    property: 'noise.estimate.street.lday',
     value: { kind: 'range', min: 48.6, max: 59.4 },
     status: 'derived',
-    confidence: 0.8,
-    calculation: {
-      id: '44444444-4444-4444-8444-444444444444',
-      method: 'Директива ЕС 2002/49/EC, приложение I: Lday из Lden и Lnight',
-      version: 'dayEstimate-1',
-      inputs: { layer: 'roadsInAgglomeration' },
-      parameters: { evening_equals_day: true },
-      limitations: ['Допущение: вечер так же громок, как день'],
-      computedAt: '2026-10-26T18:10:00Z',
-    },
+    confidence: 0.4,
+    calculation: estimate,
   }),
 ]
 const pharmacyClaim = claim({
@@ -175,12 +177,12 @@ describe('the runs of the tools', () => {
     expect(hotel).toMatchObject({ id: 'ota-1', title: 'Hotel Quiet', note: 'Ночь: подходит' })
     const shown = hotel.claim_ids.map((id) => result.claims.find((c) => c.id === id)!)
     expect(shown[0]).toMatchObject({
-      label: 'Ночью (Lnight), громче всего: дороги города',
+      label: 'Фасад на улицу, ночью (23:00–07:00)',
       value: '45–49 дБ',
-      status: 'reported',
-      confidence: 0.9,
+      status: 'derived',
+      confidence: 0.5,
     })
-    expect(shown[1]).toMatchObject({ status: 'derived', confidence: 0.8 })
+    expect(shown[1]).toMatchObject({ label: 'Фасад на улицу, днём (07:00–19:00)', status: 'derived', confidence: 0.4 })
     expect(result.calculations[0].id).toBe(shown[1].calculation_id)
     expect(result.evidence.find((e) => e.id === shown[0].evidence_ids[0])).toMatchObject({ source_name: 'EEA' })
     expect(nodata).toMatchObject({ title: 'Нет данных: 1 отель', claim_ids: [] })

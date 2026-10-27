@@ -94,7 +94,7 @@ describe('the window', () => {
 
   it('is told with «≈» for an estimate, never comparing the rooms with the building', () => {
     expect(floorLabel(window12, 12)).toBe('окно 12-го этажа, ≈ 34,5 м над землёй')
-    expect(windowLabel(window12)).toBe('здание 12 этажей, ≈ 36 м (по оценке EUBUCCO)')
+    expect(windowLabel(window12)).toBe('здание 12 этажей, ≈ 36 м')
     expect(windowLabel({ ...window12, estimated: false })).toBe('здание 12 этажей, 36 м')
     const rooms = windowOf(null, 6)!
     expect(windowLabel(rooms)).toBe('нет точных данных о здании, номера на 6 этажах (Островок)')
@@ -165,7 +165,7 @@ describe('the verdicts', () => {
     // Not at the roofs' angle itself.
     expect(lineVerdict(ray, 20, 0)).toBe('blocked')
     expect(verdictText(ray, 20, 1)).toBe(
-      'частично закрыто: солнце на высоте 2° видно, ниже его закрывает здание ≈ 30 м (по оценке EUBUCCO) в 900 м от отеля',
+      'частично закрыто: солнце на высоте 2° видно, ниже его закрывает здание ≈ 30 м в 900 м от отеля',
     )
   })
 
@@ -226,13 +226,9 @@ describe('the verdicts', () => {
         eyeUpperM: 18.5,
       }),
     ]
-    expect(verdictText(near, 4.5)).toBe('закрыто зданием ≈ 17,2 м (по оценке EUBUCCO) в 80 м от отеля')
-    expect(verdictText(line(), 17)).toBe(
-      'вероятно, закрыто зданием ≈ 30 м (по оценке EUBUCCO: от 24 до 36 м) в 200 м от отеля',
-    )
-    expect(verdictText(line(), 24)).toBe(
-      'возможно, закрыто: здание ≈ 30 м (по оценке EUBUCCO) в 200 м от отеля может быть выше — до 36 м',
-    )
+    expect(verdictText(near, 4.5)).toBe('закрыто зданием ≈ 17,2 м в 80 м от отеля')
+    expect(verdictText(line(), 17)).toBe('вероятно, закрыто зданием ≈ 30 м в 200 м от отеля')
+    expect(verdictText(line(), 24)).toBe('возможно, закрыто: здание ≈ 30 м в 200 м от отеля может быть выше — до 36 м')
     expect(verdictText(line({ crossed: 0 }, empty), 1.5)).toBe('видно')
     expect(verdictText(line({ coveredM: 600 }), 30)).toBe(
       'нет данных: через 600 м линия уходит за границу муниципалитета Валенсия — данных о зданиях там нет',

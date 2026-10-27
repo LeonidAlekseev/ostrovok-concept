@@ -5,10 +5,10 @@ import { noiseToolResult, reviewExcerpt, runNoiseTool } from './noiseTool'
 
 vi.mock('next/cache', () => ({ unstable_cache: (read: unknown) => read }))
 
-/** The store's rows of ota-9096882 as `loadHotelClaims` reads them (supabase, 2026-10-27), cut to one layer. */
+/** The store's rows of ota-9741622 as `loadHotelClaims` reads them (supabase, 2026-10-27), cut to a few. */
 const eea: ClaimEvidence = {
   id: '11111111-1111-4111-8111-111111111111',
-  role: 'source',
+  role: 'input',
   type: 'dataset',
   title: 'EEA noise contours, Environmental Noise Directive, round 2022 v01_r00',
   provider: 'EEA',
@@ -18,73 +18,94 @@ const eea: ClaimEvidence = {
   excerpt: null,
   datasetId: 'eea-noise-end2022-v01_r00',
 }
+const eubucco: ClaimEvidence = {
+  ...eea,
+  id: '77777777-7777-4777-8777-777777777777',
+  title: 'EUBUCCO v0.2',
+  provider: 'EUBUCCO',
+  externalId: 'eubucco-v0.2',
+  url: 'https://eubucco.com/data/download/v0.2',
+  datasetId: 'eubucco-v0.2',
+}
 const osm: ClaimEvidence = {
   ...eea,
   id: '22222222-2222-4222-8222-222222222222',
   role: 'input',
   type: 'osm',
-  title: 'Pinares 14',
+  title: 'Pasión turca',
   provider: 'OpenStreetMap',
   externalId: 'node/1632037131',
   url: 'https://www.openstreetmap.org/node/1632037131',
   datasetId: null,
 }
+const bar: ClaimEvidence = {
+  ...osm,
+  id: '88888888-8888-4888-8888-888888888888',
+  title: 'cerveceria tames',
+  externalId: 'node/4590181790',
+  url: 'https://www.openstreetmap.org/node/4590181790',
+}
 const claim = (fields: Partial<HotelClaim> & Pick<HotelClaim, 'id' | 'property' | 'value'>): HotelClaim => ({
   sourceKey: '',
   unit: 'dB',
-  status: 'reported',
+  status: 'derived',
   confidence: null,
   method: {},
   observedAt: null,
   validFrom: null,
   validTo: null,
-  limitations: ['Полоса 5 дБ, а не уровень'],
-  calculation: null,
-  evidence: [eea],
+  limitations: [],
+  calculation: estimateCalculation,
+  evidence: [eea, eubucco],
   ...fields,
 })
-const dayCalculation = {
+const estimateCalculation = {
   id: '33333333-3333-4333-8333-333333333333',
-  method: 'Директива ЕС 2002/49/EC, приложение I: Lday из Lden и Lnight',
-  version: 'dayEstimate-1',
-  inputs: { lden: { max: 64, min: 60 }, layer: 'roadsInAgglomeration', lnight: { max: 59, min: 55 } },
-  parameters: { evening_equals_day: true },
-  limitations: ['Допущение: вечер так же громок, как день'],
-  computedAt: '2026-10-26T18:10:00Z',
+  method:
+    'Оценка шума у фасада: самые громкие (улица) и самые тихие (двор) полосы карт шума EEA у контура здания, энергетическая сумма слоёв и шумных мест OpenStreetMap как точечных источников',
+  version: 'noise-estimate-v1',
+  inputs: {
+    zone: { kind: 'building', building_id: '21adf97303954791-16', buffer_m: 5 },
+    street_bands: { roadsInAgglomeration: { lden: { min: 70, max: 74 }, lnight: { min: 65, max: 69 } } },
+    places: [{ category: 'bar', name: 'cerveceria tames', distance_m: 85.5, levels_db: { night: 43.4 } }],
+  },
+  parameters: { facade_buffer_m: 5, attenuation: 'L = Lref − 20·lg(d/10)' },
+  limitations: ['Экранирование зданиями не учитывается: шум заведения доходит до фасада и двора без препятствий'],
+  computedAt: '2026-10-27T20:40:00Z',
 }
 const osmCalculation = {
   id: '44444444-4444-4444-8444-444444444444',
   method: 'osm_places_near: расстояние по прямой от точки отеля до формы объекта OSM',
   version: 'osm_places_near-1',
-  inputs: { lat: 39.3833, lon: -0.33254 },
+  inputs: { lat: 39.466843, lon: -0.355094 },
   parameters: { radius_m: 200, categories: ['bar', 'restaurant'] },
   limitations: ['Расстояние по прямой до формы объекта, не путь пешком'],
   computedAt: '2026-10-26T19:30:00Z',
 }
 const claims: HotelClaim[] = [
+  // EEA's band at the point is in the store but not the tool's: the facade is read instead.
   claim({
-    id: 'lden-rail',
-    property: 'noise.lden.railwaysInAgglomeration',
+    id: 'point-industry',
+    property: 'noise.lden.industryInAgglomeration',
     value: { kind: 'range', min: null, max: 39 },
+    status: 'reported',
+    calculation: null,
+    evidence: [eea],
   }),
-  claim({ id: 'lden-road', property: 'noise.lden.roadsInAgglomeration', value: { kind: 'range', min: 60, max: 64 } }),
+  claim({ id: 'facade-night', property: 'noise.estimate.facade.lnight', value: { kind: 'range', min: 65, max: 70 } }),
+  claim({ id: 'yard-night', property: 'noise.estimate.yard.lnight', value: { kind: 'range', min: 43.4, max: 47.1 } }),
+  claim({ id: 'street-night', property: 'noise.estimate.street.lnight', value: { kind: 'range', min: 65, max: 70 } }),
+  claim({ id: 'street-day', property: 'noise.estimate.street.lday', value: { kind: 'range', min: 65.2, max: 73.2 } }),
   claim({
-    id: 'lnight-road',
-    property: 'noise.lnight.roadsInAgglomeration',
-    value: { kind: 'range', min: 55, max: 59 },
-  }),
-  claim({
-    id: 'lday-road',
-    property: 'noise.lday.estimate.roadsInAgglomeration',
-    value: { kind: 'range', min: 55, max: 63.1 },
-    status: 'derived',
-    calculation: dayCalculation,
+    id: 'venues-night',
+    property: 'noise.estimate.venues.lnight',
+    value: { kind: 'number', value: 43.4 },
+    evidence: [bar],
   }),
   claim({
     id: 'count-restaurant',
     property: 'noise.nearby.restaurant.count',
     value: { kind: 'range', min: 20, max: null },
-    status: 'derived',
     unit: 'count',
     limitations: ['Ответ ограничен: мест может быть больше'],
     calculation: osmCalculation,
@@ -94,20 +115,20 @@ const claims: HotelClaim[] = [
     id: 'far',
     property: 'noise.nearby.distance',
     sourceKey: 'node/9270705402',
-    value: { kind: 'number', value: 107.9 },
-    status: 'derived',
+    value: { kind: 'number', value: 110.2 },
+    unit: 'm',
     method: { categories: ['restaurant'] },
     calculation: osmCalculation,
     evidence: [
-      { ...osm, id: '55555555-5555-4555-8555-555555555555', title: 'Casa Pote', externalId: 'node/9270705402' },
+      { ...osm, id: '55555555-5555-4555-8555-555555555555', title: 'Tian an men', externalId: 'node/9270705402' },
     ],
   }),
   claim({
     id: 'near',
     property: 'noise.nearby.distance',
     sourceKey: 'node/1632037131',
-    value: { kind: 'number', value: 41.5 },
-    status: 'derived',
+    value: { kind: 'number', value: 52.7 },
+    unit: 'm',
     method: { categories: ['restaurant'] },
     calculation: osmCalculation,
     evidence: [osm],
@@ -151,32 +172,35 @@ describe('the noise tool', () => {
     expect(toolResultSchema.safeParse(result).success).toBe(true)
     expect(result.status).toBe('success')
     expect(result.summary).toBe(
-      'Ночью 55–59 дБ (дороги города), днём оценка 55–63 дБ; шумных мест OpenStreetMap в 200 м: 20 и больше; отзывов о шуме и тишине: 1',
+      'У фасада на улицу: днём 65–73 дБ, ночью 65–70 дБ; окна во двор: ночью 43–47 дБ; шумных мест OpenStreetMap в 200 м: 20 и больше; отзывов о шуме и тишине: 1',
     )
   })
 
-  it('shows the loudest layer first, the day estimate with its calculation, the nearest place of a kind', () => {
+  it('shows the estimate at the facade, the street first, with its calculation, then the nearest place of a kind', () => {
     expect(result.claims.map((c) => [c.label, c.value, c.status])).toEqual([
-      ['Днём (07:00–19:00), оценка: дороги города', '55–63 дБ', 'derived'],
-      ['Ночью (Lnight): дороги города', '55–59 дБ', 'reported'],
-      ['За сутки (Lden): дороги города', '60–64 дБ', 'reported'],
-      ['За сутки (Lden): железная дорога в городе', 'ниже 40 дБ', 'reported'],
+      ['Фасад на улицу, днём (07:00–19:00)', '65–73 дБ', 'derived'],
+      ['Фасад на улицу, ночью (23:00–07:00)', '65–70 дБ', 'derived'],
+      ['Окна во двор, ночью', '43–47 дБ', 'derived'],
+      ['Вклад заведений рядом, ночью', '≈43 дБ', 'derived'],
+      ['Карты шума EEA у фасада на улицу, ночью (Lnight)', '65–70 дБ', 'derived'],
       ['Рестораны в 200 м', '20 и больше', 'derived'],
-      ['Ближайшее место: ресторан «Pinares 14»', '40 м', 'derived'],
+      ['Ближайшее место: ресторан «Pasión turca»', '50 м', 'derived'],
     ])
-    const day = result.calculations.find((c) => c.id === dayCalculation.id)!
-    expect(day).toEqual({
-      id: dayCalculation.id,
-      name: 'Директива ЕС 2002/49/EC, приложение I: Lday из Lden и Lnight',
+    const estimate = result.calculations.find((c) => c.id === estimateCalculation.id)!
+    expect(estimate).toEqual({
+      id: estimateCalculation.id,
+      name: estimateCalculation.method,
       version: '1',
       inputs: [
-        { label: 'Lden (сутки)', value: '60–64 дБ' },
-        { label: 'Источник шума', value: 'Дороги города' },
-        { label: 'Lnight (ночь)', value: '55–59 дБ' },
-        { label: 'Вечер так же громок, как день', value: 'да' },
+        { label: 'Зона фасада', value: 'контур здания EUBUCCO 21adf97303954791-16 и 5 м вокруг' },
+        { label: 'Полосы EEA у фасада на улицу', value: 'Дороги города: 70–74 дБ за сутки, 65–69 дБ ночью' },
+        { label: 'Заведения в расчёте', value: 'бар «cerveceria tames» — 90 м' },
+        { label: 'Буфер вокруг контура здания, м', value: '5' },
+        { label: 'Затухание', value: 'L = Lref − 20·lg(d/10)' },
       ],
-      assumptions: ['Допущение: вечер так же громок, как день'],
+      assumptions: estimateCalculation.limitations,
     })
+    expect(result.claims.find((c) => c.id === 'street-day')!.calculation_id).toBe(estimateCalculation.id)
     // No name of a function in what is shown.
     expect(result.calculations.find((c) => c.id === osmCalculation.id)!.name).toBe(
       'Расстояние по прямой от точки отеля до формы объекта OSM',
@@ -186,16 +210,21 @@ describe('the noise tool', () => {
   it('cites only the store’s sources, each once, with the review’s words as the excerpt', () => {
     expect(result.evidence.map((e) => [e.source_type, e.source_name, e.source_id])).toEqual([
       ['dataset', 'EEA', 'eea-noise-end2022-v01_r00'],
+      ['dataset', 'EUBUCCO', 'eubucco-v0.2'],
+      ['osm', 'OpenStreetMap', 'node/4590181790'],
       ['osm', 'OpenStreetMap', 'node/1632037131'],
       ['review', 'Островок', '253866'],
     ])
-    expect(result.evidence[2]).toMatchObject({
+    expect(result.evidence.at(-1)).toMatchObject({
       excerpt: 'Тонкие стены из-за чего очень шумно.',
       source_url: null,
       retrieved_at: '2026-10-26T19:43:48.681+00:00',
     })
-    // The confidence of the store is null: none is made up.
+    // The confidence of the store is null here: none is made up.
     expect(result.claims.every((c) => c.confidence === null)).toBe(true)
+    expect(result.limitations).toContain(
+      'Экранирование зданиями не учитывается: шум заведения доходит до фасада и двора без препятствий',
+    )
   })
 
   it('says «нет данных EEA», not «тихо», for a hotel outside the contours', () => {
@@ -203,7 +232,7 @@ describe('the noise tool', () => {
     expect(outside.status).toBe('success')
     expect(outside.summary).toBe('Нет данных EEA; отзывов о шуме и тишине: 0')
     expect(outside.evidence).toEqual([])
-    expect(outside.limitations[0]).toMatch(/^Нет данных EEA: точка отеля вне загруженных карт шума/)
+    expect(outside.limitations[0]).toMatch(/^Нет данных EEA: здание отеля вне загруженных карт шума/)
     expect(outside.summary).not.toMatch(/тихо/)
   })
 
@@ -225,7 +254,7 @@ describe('the noise tool', () => {
   it('drops a link that is not http(s)', () => {
     const odd = claim({
       id: 'odd',
-      property: 'noise.lnight.roadsInAgglomeration',
+      property: 'noise.estimate.street.lnight',
       value: { kind: 'range', min: 50, max: 54 },
       evidence: [{ ...eea, url: 'javascript:alert(1)' }],
     })

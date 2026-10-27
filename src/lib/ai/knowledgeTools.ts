@@ -12,11 +12,10 @@ import {
 } from '../db/claims'
 import type { LevelRow, NearRow } from '../db/knowledge'
 import { loadClaimsByIds } from '../db/knowledge'
-import { bandLabel } from '../features'
 import { countRu, formatDecimal, formatMeters } from '../format'
 import { CATEGORY } from '../geo/categories'
 import { distanceLabel } from '../hotelDetails'
-import { dayLabel, noiseSourceLabel } from '../noise'
+import { NOISE_ESTIMATE_METHOD, dayLabel } from '../noise'
 import {
   MAX_CALCULATIONS,
   MAX_CLAIMS,
@@ -35,8 +34,8 @@ import { calculationOf, evidenceOf } from './noiseTool'
 
 /**
  * Эвал's tools of the choice of hotels (docs/tools.md), each a run of the contract with its sources:
- * - «Отели по характеристикам» — the hotels of the plan's cities by their claims: the night bands of EEA, the day
- *   estimated from them, the building's height; a hotel without the claim is «нет данных», never «подходит» or not;
+ * - «Отели по характеристикам» — the hotels of the plan's cities by their claims: the night and the day at the
+ *   facade to the street (noise-estimate-v1: EEA's bands and the loud places nearby), the building's height; a hotel without the claim is «нет данных», never «подходит» or not;
  * - «Места рядом» (the graph of the store) — the nearest place of a category by the edges `near` of each hotel, its
  *   distance a claim with its evidence of OSM or Островок; no edge is «в данных нет», never «рядом нет»;
  * - «Отзывы» (the search of the reviews) — the guests' words on a topic for the chosen hotels, quoted.
@@ -70,9 +69,9 @@ export interface HotelVerdict {
 
 /** The thresholds of «Отели по характеристикам»; at least one. */
 export interface FeatureCriteria {
-  /** The night's loudest EEA band must end below this, dB: «тихо ночью» is 50. */
+  /** The night at the facade to the street must end below this, dB: «тихо ночью» is 50. */
   nightBelowDb?: number
-  /** The day's estimate must end below this, dB. */
+  /** The day at the facade to the street must end below this, dB. */
   dayBelowDb?: number
   heightMinM?: number
   heightMaxM?: number
@@ -85,7 +84,7 @@ export const NEAR_CATEGORIES: readonly NearCategory[] = NEARBY_CATEGORIES
 export const NEAR_MAX_RADIUS_M = 1000
 /** «Рядом» of the rules: five minutes or so on foot. */
 export const NEAR_DEFAULT_RADIUS_M = 500
-/** «Тихо ночью» of the rules: the loudest night band ends below 50 dB. */
+/** «Тихо ночью» of the rules: the night at the facade to the street ends below 50 dB. */
 export const QUIET_NIGHT_DB = 50
 
 export const REVIEW_TOPICS = ['noise', 'cleanliness', 'staff', 'breakfast', 'comfort', 'location'] as const
@@ -136,14 +135,15 @@ const ofHotels = (n: number) => countRu(n, ['отеля', 'отелей', 'от�
 
 // ——— The choice ———
 
-const NIGHT = /^noise\.lnight\.([A-Za-z]+)$/
-const DAY = /^noise\.lday\.estimate\.([A-Za-z]+)$/
+/** The estimate of noise-estimate-v1 at the facade to the street: the EEA layers and the loud places summed. */
+const NIGHT = /^noise\.estimate\.street\.lnight$/
+const DAY = /^noise\.estimate\.street\.lday$/
 const HEIGHT = 'building.height'
 
 /** The upper bound of a band: an open one is the loudest. */
 const upper = (row: { max: number | null }) => row.max ?? Infinity
 
-/** What the levels say of a hotel: the loudest night band, the loudest day estimate, the height. */
+/** What the levels say of a hotel: the night and the day at the facade to the street, the height. */
 export interface HotelLevels {
   night?: number
   day?: number
@@ -382,16 +382,12 @@ function loudest(claims: readonly HotelClaim[], pattern: RegExp): HotelClaim | u
     })[0]
 }
 
-/** The loudest band is below the map's threshold: every source is, and none is the loudest. */
-const belowMapping = (claim: HotelClaim) =>
-  claim.value.kind === 'range' && claim.value.min === null && claim.value.max !== null && claim.value.max < 40
-
 const VERDICT_NOTE: Record<Verdict, string> = { match: 'подходит', miss: 'не подходит', nodata: 'нет данных' }
 
 /**
  * «Отели по характеристикам» from the index of levels and the chosen hotels' claims (`null`: not read): the counts
- * of the choice among the candidates, and for each chosen hotel the claims it was chosen by — the loudest night band,
- * the loudest day estimate, the building's height — with the verdict of each criterion.
+ * of the choice among the candidates, and for each chosen hotel the claims it was chosen by — the night and the day
+ * at the facade to the street, the building's height — with the verdict of each criterion.
  */
 export function featuresResult(
   { criteria, candidates, chosen, where }: FeaturesInput,
@@ -414,27 +410,13 @@ export function featuresResult(
     const night = by.night && loudest(own, NIGHT)
     const day = (by.day || by.night) && loudest(own, DAY)
     const height = by.height && own.find((c) => c.property === HEIGHT && c.value.kind === 'number')
+    const range = (claim: HotelClaim) =>
+      claim.value.kind === 'range'
+        ? dayLabel({ min: claim.value.min ?? -Infinity, max: claim.value.max ?? Infinity })
+        : ''
     const shown = [
-      night &&
-        gathered.claim(
-          night,
-          id,
-          belowMapping(night)
-            ? 'Ночью (Lnight), все источники шума EEA'
-            : `Ночью (Lnight), громче всего: ${noiseSourceLabel(NIGHT.exec(night.property)![1]).toLocaleLowerCase('ru')}`,
-          night.value.kind === 'range' ? bandLabel(rangeBand(night.value)) : '',
-        ),
-      day &&
-        gathered.claim(
-          day,
-          id,
-          belowMapping(day)
-            ? 'Днём (07:00–19:00), оценка: все источники шума EEA'
-            : `Днём (07:00–19:00), оценка: ${noiseSourceLabel(DAY.exec(day.property)![1]).toLocaleLowerCase('ru')}`,
-          day.value.kind === 'range'
-            ? dayLabel({ min: day.value.min ?? -Infinity, max: day.value.max ?? Infinity })
-            : '',
-        ),
+      night && gathered.claim(night, id, 'Фасад на улицу, ночью (23:00–07:00)', range(night)),
+      day && gathered.claim(day, id, 'Фасад на улицу, днём (07:00–19:00)', range(day)),
       height &&
         height.value.kind === 'number' &&
         gathered.claim(
@@ -464,15 +446,15 @@ export function featuresResult(
     summary,
     data: { ...counts, chosen: [...chosen] },
     method: {
-      name: 'Отбор отелей по характеристикам хранилища: полосы шума EEA ночью, оценка дня, высота здания EUBUCCO',
-      version: '1',
+      name: `Отбор отелей по характеристикам хранилища: оценка шума у фасада (${NOISE_ESTIMATE_METHOD}) ночью и днём, высота здания EUBUCCO`,
+      version: '2',
       inputs: [
         { label: 'Условия', value: label },
         { label: 'Отелей проверено', value: String(ids.length) },
       ],
       assumptions: [
-        'Ночью отель тише порога, если самая громкая полоса EEA по всем источникам шума заканчивается ниже порога',
-        'Днём — по самой громкой оценке дня из Lden и Lnight',
+        'Ночью отель тише порога, если оценка у фасада на улицу (карты шума EEA и заведения рядом) заканчивается ниже порога',
+        'Днём — по оценке у фасада на улицу днём (07:00–19:00)',
         'Отели без характеристики — «нет данных», они не отбираются и не отбрасываются',
       ],
     },
@@ -484,11 +466,6 @@ export function featuresResult(
     ],
   })
 }
-
-const rangeBand = (value: { min: number | null; max: number | null }) => ({
-  ...(value.min !== null && { min: value.min }),
-  ...(value.max !== null && { max: value.max }),
-})
 
 export const placeLabel = (category: NearCategory) => CATEGORY[category].label
 
@@ -689,7 +666,10 @@ export async function runFeaturesTool(input: FeaturesInput, index: readonly Leve
     const real = input.chosen.filter(isRealHotelId)
     const read = await Promise.all(
       real.map(async (id) => {
-        const [noise, building] = await Promise.all([loadHotelClaims(id, 'noise.l'), loadHotelClaims(id, 'building.')])
+        const [noise, building] = await Promise.all([
+          loadHotelClaims(id, 'noise.estimate.street.'),
+          loadHotelClaims(id, 'building.'),
+        ])
         return [id, noise && building ? [...noise, ...building] : (noise ?? building)] as const
       }),
     )

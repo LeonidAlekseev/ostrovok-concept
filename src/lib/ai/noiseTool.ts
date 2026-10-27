@@ -10,18 +10,17 @@ import {
   type HotelChunk,
   type HotelClaim,
 } from '../db/claims'
-import { bandLabel, type NoiseBand } from '../features'
+import { bandLabel } from '../features'
 import { distanceLabel } from '../hotelDetails'
 import {
+  NOISE_ESTIMATE_METHOD,
   NOISY_CATEGORIES,
   NOISY_LABEL,
   NOISY_RADIUS_M,
   NO_EEA,
   dayLabel,
-  louderSource,
   noiseSourceLabel,
   type NoisyCategory,
-  type SourceNoise,
 } from '../noise'
 import {
   MAX_CALCULATIONS,
@@ -39,16 +38,17 @@ import {
 
 /**
  * «Анализ шума», the reference tool of the contract (src/lib/toolResult.ts, docs/tools.md): what the store of claims
- * knows of the noise at a real hotel — EEA's bands by layer, the day level estimated from them, the loud places of
- * OpenStreetMap around with the nearest of each kind — and the guests' reviews that speak of noise or quiet
- * (`hotel_chunks_search`). Only the store's data with their sources: no level is lowered for windows or walls, no
- * soundproofing is guessed, and a hotel outside EEA's contours is «нет данных», not «тихо». The reviews are a guest's
- * untrusted words: quoted, never followed.
+ * knows of the noise at a real hotel — the estimate of noise-estimate-v1 at the facade to the street and to the yard
+ * by period (`noise.estimate.*`: EEA's bands at the facade and the loud places of OpenStreetMap summed), the share of
+ * the places, the loud places around with the nearest of each kind — and the guests' reviews that speak of noise or
+ * quiet (`hotel_chunks_search`). Only the store's data with their sources and calculation: no level is lowered for
+ * windows or walls, no soundproofing is guessed, and a hotel outside EEA's contours is «нет данных», not «тихо». The
+ * reviews are a guest's untrusted words: quoted, never followed.
  */
 
 export const NOISE_TOOL = 'noise_analysis'
 export const NOISE_TOOL_TITLE = 'Анализ шума'
-export const NOISE_TOOL_PARAMS = 'карты шума EEA, места OpenStreetMap, отзывы гостей'
+export const NOISE_TOOL_PARAMS = 'оценка шума у фасада (карты шума EEA и места OpenStreetMap), отзывы гостей'
 
 /**
  * The words of the reviews about noise and quiet, in websearch syntax: the Russian stemming does not take «шумно» to
@@ -73,16 +73,16 @@ export const NOISE_REVIEWS = 5
 
 /** The tool's own limitations, whatever the data. */
 const LIMITATIONS = [
-  'Нет данных EEA — не значит «тихо»: карты шума не покрывают точку или ниже порога картирования',
+  'Нет данных EEA — не значит «тихо»: карты шума не покрывают здание или ниже порога картирования',
   'Звукоизоляция окон и номеров не оценивается: уровни — снаружи здания',
   'Отзывы — слова гостей, а не измерение',
 ]
 
 const METHOD = {
-  name: 'Сводка данных о шуме из хранилища: карты шума EEA, места OpenStreetMap, отзывы гостей',
-  version: '1',
+  name: `Сводка данных о шуме из хранилища: оценка ${NOISE_ESTIMATE_METHOD} у фасада, места OpenStreetMap, отзывы гостей`,
+  version: '2',
   assumptions: [
-    'Источники шума EEA показаны от самого громкого',
+    'Уровни у фасада — энергетическая сумма слоёв карт шума EEA у контура здания и шумных мест OpenStreetMap',
     'Из мест OpenStreetMap показано ближайшее каждой категории',
     `Отзывы — не больше ${NOISE_REVIEWS}, найденные по словам о шуме и тишине`,
   ],
@@ -92,25 +92,43 @@ const PLURAL_LABEL: Record<NoisyCategory, string> = {
   nightclub: 'Ночные клубы',
   bar: 'Бары',
   restaurant: 'Рестораны',
+  cafe: 'Кафе',
   fast_food: 'Фастфуд',
   tram: 'Остановки трамвая',
   train_station: 'Ж/д станции',
 }
 
-const BAND = /^noise\.(lden|lnight)\.([A-Za-z]+)$/
-const DAY = /^noise\.lday\.estimate\.([A-Za-z]+)$/
+/** `noise.estimate.<side>.<period>`: the estimate at the facade. */
+const ESTIMATE = /^noise\.estimate\.(street|yard|facade|venues)\.(lday|levening|lnight|lden)$/
 const COUNT = /^noise\.nearby\.([a-z_]+)\.count$/
 const DISTANCE = 'noise.nearby.distance'
 
 const isCategory = (value: unknown): value is NoisyCategory => NOISY_CATEGORIES.includes(value as NoisyCategory)
 
-const bandOf = (claim: HotelClaim): NoiseBand | null =>
-  claim.value.kind === 'range'
-    ? {
-        ...(claim.value.min !== null && { min: claim.value.min }),
-        ...(claim.value.max !== null && { max: claim.value.max }),
-      }
-    : null
+/** The label of each estimate, in the order shown: the street, the yard, the places, EEA alone. */
+const ESTIMATE_LABEL: Readonly<Record<string, string>> = {
+  'street.lday': 'Фасад на улицу, днём (07:00–19:00)',
+  'street.levening': 'Фасад на улицу, вечером (19:00–23:00)',
+  'street.lnight': 'Фасад на улицу, ночью (23:00–07:00)',
+  'street.lden': 'Фасад на улицу, за сутки (Lden)',
+  'yard.lday': 'Окна во двор, днём',
+  'yard.levening': 'Окна во двор, вечером',
+  'yard.lnight': 'Окна во двор, ночью',
+  'yard.lden': 'Окна во двор, за сутки (Lden)',
+  'venues.lday': 'Вклад заведений рядом, днём',
+  'venues.levening': 'Вклад заведений рядом, вечером',
+  'venues.lnight': 'Вклад заведений рядом, ночью',
+  'facade.lden': 'Карты шума EEA у фасада на улицу, за сутки (Lden)',
+  'facade.lnight': 'Карты шума EEA у фасада на улицу, ночью (Lnight)',
+}
+const ESTIMATE_ORDER = Object.keys(ESTIMATE_LABEL)
+
+/** «64–75 дБ», «от 69 дБ», «≈46 дБ»: an estimate's range or level. */
+function estimateValue(claim: HotelClaim): string | null {
+  if (claim.value.kind === 'number') return `≈${Math.round(claim.value.value)} дБ`
+  if (claim.value.kind !== 'range' || (claim.value.min === null && claim.value.max === null)) return null
+  return dayLabel({ min: claim.value.min ?? -Infinity, max: claim.value.max ?? Infinity })
+}
 
 /** A count of places: a number, or «20 и больше» when the store's answer was cut at its limit. */
 function countOf(claim: HotelClaim): { n: number; more: boolean } | null {
@@ -128,6 +146,20 @@ const INPUT_LABEL: Readonly<Record<string, string>> = {
   layer: 'Источник шума',
   lden: 'Lden (сутки)',
   lnight: 'Lnight (ночь)',
+  zone: 'Зона фасада',
+  street_bands: 'Полосы EEA у фасада на улицу',
+  yard_bands: 'Полосы EEA у окон во двор',
+  places: 'Заведения в расчёте',
+  no_day_layers: 'Слои без оценки дня',
+  facade_buffer_m: 'Буфер вокруг контура здания, м',
+  circle_radius_m: 'Круг без здания, м',
+  places_radius_m: 'Радиус заведений, м',
+  reference_distance_m: 'Расстояние опорного уровня, м',
+  min_distance_m: 'Наименьшее расстояние, м',
+  venue_levels_db: 'Уровни заведений на 10 м (день/вечер/ночь), дБ',
+  attenuation: 'Затухание',
+  sum: 'Сумма',
+  periods: 'Периоды',
   lat: 'Широта точки отеля',
   lon: 'Долгота точки отеля',
   radius_m: 'Радиус, м',
@@ -147,8 +179,36 @@ function inputValue(key: string, value: unknown): string {
   if (typeof value === 'boolean') return value ? 'да' : 'нет'
   if (typeof value === 'number') return String(value)
   if (typeof value === 'string') return key === 'layer' ? noiseSourceLabel(value) : value
-  if (Array.isArray(value)) return value.map((v) => (isCategory(v) ? NOISY_LABEL[v][0] : inputValue(key, v))).join(', ')
+  if (Array.isArray(value))
+    return value
+      .map((v) =>
+        isCategory(v) ? NOISY_LABEL[v][0] : key === 'no_day_layers' ? noiseSourceLabel(String(v)) : inputValue(key, v),
+      )
+      .join(key === 'places' ? '; ' : ', ')
   if (value && typeof value === 'object') {
+    const row = value as Record<string, unknown>
+    if (key === 'zone')
+      return row.kind === 'building'
+        ? `контур здания EUBUCCO ${String(row.building_id)} и ${String(row.buffer_m)} м вокруг`
+        : `круг ${String(row.radius_m)} м вокруг точки отеля (здания нет)`
+    if (key === 'street_bands' || key === 'yard_bands')
+      return Object.entries(row)
+        .map(([layer, bands]) => {
+          const { lden, lnight } = (bands ?? {}) as { lden?: unknown; lnight?: unknown }
+          const parts = [lden && `${inputValue('', lden)} за сутки`, lnight && `${inputValue('', lnight)} ночью`]
+          return `${noiseSourceLabel(layer)}: ${parts.filter(Boolean).join(', ')}`
+        })
+        .join('; ')
+    if (key === 'places' && isCategory(row.category))
+      return `${NOISY_LABEL[row.category][0]}${typeof row.name === 'string' ? ` «${row.name}»` : ''} — ${distanceLabel(Number(row.distance_m))}`
+    if (key === 'venue_levels_db')
+      return Object.entries(row)
+        .map(([category, levels]) => {
+          const l = (levels ?? {}) as Record<string, unknown>
+          const at = (period: string) => (typeof l[period] === 'number' ? String(l[period]) : '—')
+          return `${isCategory(category) ? NOISY_LABEL[category][0] : category} ${at('day')}/${at('evening')}/${at('night')}`
+        })
+        .join('; ')
     const { min, max } = value as { min?: unknown; max?: unknown }
     if (typeof min === 'number' || typeof max === 'number')
       return bandLabel({
@@ -217,24 +277,15 @@ export function noiseToolResult(
       limitations: LIMITATIONS,
     })
 
-  // EEA's layers at the point, the loudest first.
-  const layers = new Map<string, { source: SourceNoise; claims: HotelClaim[] }>()
-  const layer = (name: string) => {
-    const known = layers.get(name) ?? { source: { source: name }, claims: [] }
-    layers.set(name, known)
-    return known
-  }
+  // The estimate at the facade, the counts and the nearest place of each kind.
+  const estimates = new Map<string, HotelClaim>()
   const counts = new Map<NoisyCategory, HotelClaim>()
   const nearest = new Map<NoisyCategory, HotelClaim>()
   for (const claim of claims) {
-    const band = BAND.exec(claim.property)
-    const day = DAY.exec(claim.property)
+    const estimate = ESTIMATE.exec(claim.property)
     const count = COUNT.exec(claim.property)
-    if (band && bandOf(claim)) {
-      const known = layer(band[2])
-      known.source[band[1] as 'lden' | 'lnight'] = bandOf(claim)!
-      known.claims.push(claim)
-    } else if (day && claim.value.kind === 'range') layer(day[1]).claims.push(claim)
+    const key = estimate && `${estimate[1]}.${estimate[2]}`
+    if (key && ESTIMATE_LABEL[key] && estimateValue(claim)) estimates.set(key, claim)
     else if (count && isCategory(count[1]) && countOf(claim)) counts.set(count[1], claim)
     else if (claim.property === DISTANCE && claim.value.kind === 'number') {
       const category = (claim.method.categories as unknown[] | undefined)?.find(isCategory)
@@ -243,32 +294,13 @@ export function noiseToolResult(
         nearest.set(category, claim)
     }
   }
-  const sorted = [...layers.values()]
-    .filter((l) => l.source.lden || l.source.lnight)
-    .sort((a, b) => louderSource(a.source, b.source))
 
-  const order = (claim: HotelClaim) => (DAY.test(claim.property) ? 0 : claim.property.includes('.lnight.') ? 1 : 2)
-  const chosen: { claim: HotelClaim; label: string; value: string; entity: string }[] = []
-  for (const { source, claims: own } of sorted)
-    for (const claim of [...own].sort((a, b) => order(a) - order(b))) {
-      const where = noiseSourceLabel(source.source).toLocaleLowerCase('ru')
-      const range = claim.value.kind === 'range' ? claim.value : null
-      if (!range) continue
-      if (DAY.test(claim.property))
-        chosen.push({
-          claim,
-          label: `Днём (07:00–19:00), оценка: ${where}`,
-          value: dayLabel({ min: range.min ?? -Infinity, max: range.max ?? Infinity }),
-          entity: hotelId,
-        })
-      else
-        chosen.push({
-          claim,
-          label: claim.property.includes('.lnight.') ? `Ночью (Lnight): ${where}` : `За сутки (Lden): ${where}`,
-          value: bandLabel(bandOf(claim)!),
-          entity: hotelId,
-        })
-    }
+  const chosen: { claim: HotelClaim; label: string; value: string; entity: string }[] = ESTIMATE_ORDER.flatMap(
+    (key) => {
+      const claim = estimates.get(key)
+      return claim ? [{ claim, label: ESTIMATE_LABEL[key], value: estimateValue(claim)!, entity: hotelId }] : []
+    },
+  )
   for (const category of NOISY_CATEGORIES) {
     const count = counts.get(category)
     const place = nearest.get(category)
@@ -328,30 +360,32 @@ export function noiseToolResult(
     calculation_id: claim.calculation && shownIds.has(claim.calculation.id) ? claim.calculation.id : null,
   }))
 
-  const hasEea = sorted.length > 0
+  const hasEea = [...estimates.keys()].some((key) => key.startsWith('street.'))
   const limitations = [
     ...(hasEea ? [] : [`${NO_EEA}.`]),
     ...(chunks === null ? ['Отзывы прочитать не удалось'] : []),
-    ...new Set(picked.flatMap(({ claim }) => claim.limitations)),
+    ...new Set(picked.flatMap(({ claim }) => [...claim.limitations, ...(claim.calculation?.limitations ?? [])])),
     ...LIMITATIONS,
   ].slice(0, 20)
-
-  const loudest = sorted[0]
-  const night = sorted.find((l) => l.source.lnight)
-  const dayClaim = loudest && chosen.find((c) => c.claim.property === `noise.lday.estimate.${loudest.source.source}`)
   const placeCounts = [...counts.values()].flatMap((c) => countOf(c) ?? [])
   const places = placeCounts.reduce((sum, c) => sum + c.n, 0)
   const more = placeCounts.some((c) => c.more)
+  const shown = (key: string) => {
+    const claim = estimates.get(key)
+    return claim && estimateValue(claim)
+  }
+  const side = (name: string, keys: [string, string][]) => {
+    const parts = keys.flatMap(([key, label]) => (shown(key) ? [`${label} ${shown(key)}`] : []))
+    return parts.length ? `${name}: ${parts.join(', ')}` : ''
+  }
   const summary = [
     hasEea
-      ? [
-          night &&
-            `ночью ${bandLabel(night.source.lnight!)} (${noiseSourceLabel(night.source.source).toLocaleLowerCase('ru')})`,
-          dayClaim && `днём оценка ${dayClaim.value}`,
-        ]
-          .filter(Boolean)
-          .join(', ')
+      ? side('у фасада на улицу', [
+          ['street.lday', 'днём'],
+          ['street.lnight', 'ночью'],
+        ])
       : 'нет данных EEA',
+    side('окна во двор', [['yard.lnight', 'ночью']]),
     places > 0 ? `шумных мест OpenStreetMap в ${NOISY_RADIUS_M} м: ${places}${more ? ' и больше' : ''}` : '',
     chunks === null ? '' : `отзывов о шуме и тишине: ${reviews}`,
   ]

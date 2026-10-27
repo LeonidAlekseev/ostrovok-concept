@@ -16,6 +16,8 @@ const dates = { checkIn: '2026-11-10', checkOut: '2026-11-12' } as const
 /** The noise of a hotel on a loud street. */
 const noise: HotelNoise = {
   sources: [{ source: 'roadsInAgglomeration', lden: { min: 65, max: 69 }, lnight: { min: 55, max: 59 } }],
+  yard: [{ source: 'roadsInAgglomeration', lden: { max: 39 }, lnight: { max: 39 } }],
+  zone: { kind: 'building', buildingId: 'b-1', bufferM: 5 },
   places: [{ category: 'bar', name: 'Homenaje', distanceM: 92, lat: 39.47, lon: -0.376 }],
   placesCovered: ['bar'],
 }
@@ -140,12 +142,18 @@ describe('ruleAnswer', () => {
         .map((line) => `• ${line}`)
         .join('\n')}`,
     )
-    expect(answer).toContain('Ночью (Lnight, 23:00–07:00): 55–59 дБ')
+    expect(answer).toContain('ночью 55–60 дБ')
     expect(ruleAnswer('Здесь тихо?', hotel).answer).toBe('Сейчас не могу ответить: данных о шуме у этого отеля нет.')
   })
 
   it('says «нет данных EEA», not «тихо», for a hotel outside the noise maps', () => {
-    const { answer } = ruleAnswer('Шумно?', hotel, undefined, null, { sources: [], places: [], placesCovered: [] })
+    const { answer } = ruleAnswer('Шумно?', hotel, undefined, null, {
+      sources: [],
+      yard: [],
+      zone: null,
+      places: [],
+      placesCovered: [],
+    })
     expect(answer).toMatch(/Нет данных EEA/)
     expect(answer).not.toMatch(/тихо/i)
   })

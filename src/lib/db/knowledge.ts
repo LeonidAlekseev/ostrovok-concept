@@ -202,11 +202,11 @@ const levelRow = z.object({
   entity: z.object({ ref: z.string() }),
 })
 
-/** The properties of the index: the night bands of EEA, the day estimates, the building's height. */
+/** The properties of the index: the night and the day at the facade to the street (noise-estimate-v1), the height. */
 export const LEVEL_PROPERTIES =
-  'property.like.noise.lnight.*,property.like.noise.lday.estimate.*,property.eq.building.height'
+  'property.eq.noise.estimate.street.lnight,property.eq.noise.estimate.street.lday,property.eq.building.height'
 
-const readLevels = catalogCached(['knowledge-levels', 'v1'], async (): Promise<LevelRow[]> => {
+const readLevels = catalogCached(['knowledge-levels', 'v2'], async (): Promise<LevelRow[]> => {
   const client = anonClient()
   const rows = await allRows((from, to) =>
     client

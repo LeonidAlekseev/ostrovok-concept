@@ -712,7 +712,7 @@ describe('POST /api/assistant: a question about a hotel', () => {
       {
         agent: 'features',
         title: 'Анализ шума',
-        params: 'карты шума EEA, места OpenStreetMap, отзывы гостей',
+        params: 'оценка шума у фасада (карты шума EEA и места OpenStreetMap), отзывы гостей',
         status: 'done',
         result: sampleResult.summary,
         run: { id: expect.stringMatching(/^[0-9a-f-]{36}$/), result: sampleResult },
@@ -1172,9 +1172,9 @@ describe('POST /api/assistant: the choice by the tools of the store', () => {
   async function store() {
     const [a, b, c] = await lisbon()
     vi.mocked(loadLevelIndex).mockResolvedValue([
-      { hotelId: a.id, property: 'noise.lnight.roadsInAgglomeration', min: 45, max: 49, value: null },
-      { hotelId: b.id, property: 'noise.lnight.roadsInAgglomeration', min: 60, max: 64, value: null },
-      { hotelId: c.id, property: 'noise.lnight.roadsInAgglomeration', min: null, max: 39, value: null },
+      { hotelId: a.id, property: 'noise.estimate.street.lnight', min: 45, max: 49, value: null },
+      { hotelId: b.id, property: 'noise.estimate.street.lnight', min: 60, max: 64, value: null },
+      { hotelId: c.id, property: 'noise.estimate.street.lnight', min: null, max: 39, value: null },
     ])
     vi.mocked(loadNearIndex).mockResolvedValue([
       { hotelId: a.id, claimId: 'c-a', distanceM: 180, name: 'Farmacia', kind: 'osm_place' },

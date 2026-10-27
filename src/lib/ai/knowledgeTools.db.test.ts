@@ -33,21 +33,24 @@ describe.runIf(process.env.LIVE_DB === '1' && isSupabaseConfigured)('the tools o
       deps,
     })
     expect(outcome.complete).toBe(true)
-    expect(outcome.chosen.length).toBe(6)
+    // The night at the facade to the street (noise-estimate-v1): fewer hotels are quiet than by the point's bands.
+    expect(outcome.chosen.length).toBeGreaterThan(0)
+    expect(outcome.chosen.length).toBeLessThanOrEqual(6)
     const [features, pharmacy, reviews] = outcome.runs.map((r) => r.run.result)
     for (const result of [features, pharmacy, reviews]) {
       expect(toolResultSchema.safeParse(result).success).toBe(true)
       expect(result.status).toBe('success')
     }
     expect(features.summary).toMatch(/^Ночью тише 50 дБ: подходят \d+ из \d+ отелей/)
-    // Each chosen hotel: its loudest night band of EEA below 50 dB, at 90 %, from the dataset of EEA.
+    // Each chosen hotel: its night at the facade to the street below 50 dB, by the policy, from the dataset of EEA.
     for (const id of outcome.chosen) {
       const group = features.groups!.find((g) => g.id === id)!
       const night = features.claims.find((c) => c.id === group.claim_ids[0])!
-      expect(night.label).toMatch(/^Ночью \(Lnight\), (громче всего|все источники шума EEA)/)
-      expect(night.value).toMatch(/^(ниже 40|4[05]–4[49]) дБ$/)
-      expect(night.confidence).toBe(0.9)
-      expect(features.evidence.find((e) => e.id === night.evidence_ids[0])).toMatchObject({ source_name: 'EEA' })
+      expect(night.label).toBe('Фасад на улицу, ночью (23:00–07:00)')
+      expect(night.value).toMatch(/^(ниже|≈)?\s?\d+(–\d+)? дБ$/)
+      expect([0.5, 0.8]).toContain(night.confidence)
+      const sources = night.evidence_ids.map((e) => features.evidence.find((f) => f.id === e)?.source_name)
+      expect(sources).toContain('EEA')
       // Its pharmacy within 500 m: a claim of the distance with its source of OSM or Островок.
       const near = pharmacy.groups!.find((g) => g.id === id)!
       expect(near.note).toMatch(/в пределах 500 м$/)

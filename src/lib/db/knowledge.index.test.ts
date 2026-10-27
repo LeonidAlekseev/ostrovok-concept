@@ -43,7 +43,7 @@ beforeEach(() => {
 
 const level = (i: number) => ({
   id: `c${i}`,
-  property: 'noise.lnight.roadsInAgglomeration',
+  property: 'noise.estimate.street.lnight',
   value_min: 45,
   value_max: 49,
   value_numeric: null,
@@ -60,7 +60,7 @@ describe('the indexes of the store', () => {
     expect(rows).toHaveLength(1001)
     expect(rows![0]).toEqual({
       hotelId: 'ota-0',
-      property: 'noise.lnight.roadsInAgglomeration',
+      property: 'noise.estimate.street.lnight',
       min: 45,
       max: 49,
       value: null,

@@ -38,6 +38,13 @@ export const ASSUMPTION_PENALTY = {
   evening_equals_day: 0.05,
   /** Lday from Lden and Lnight: the day is not quieter than the night. */
   day_not_quieter_than_night: 0.05,
+  /**
+   * noise-estimate-v1: a loud place of OSM is as loud as the reference level of its kind at 10 m (a typical terrace
+   * or open door, not a measurement of the place), open in the periods of its kind.
+   */
+  venue_reference_level: 0.2,
+  /** noise-estimate-v1: a place is a point source in the open — the level falls by 20·lg(d/10), no building screens it. */
+  point_source_no_screening: 0.1,
 } as const
 
 export type Assumption = keyof typeof ASSUMPTION_PENALTY
@@ -82,6 +89,38 @@ export const CONFIDENCE_RULES = {
   building_distance: { inputs: ['ostrovok', 'eubucco'], assumptions: [] },
   /** Lday from the bands of Lden and Lnight. */
   day_estimate: { inputs: ['eea'], assumptions: ['evening_equals_day', 'day_not_quieter_than_night'] },
+  /** noise-estimate-v1: the EEA bands at the facade (the building's contour of EUBUCCO widened), Lden and Lnight. */
+  facade_band: { inputs: ['eea', 'eubucco'], assumptions: [] },
+  /** noise-estimate-v1: Lday and Levening at the facade from the bands of Lden and Lnight. */
+  facade_day: { inputs: ['eea', 'eubucco'], assumptions: ['evening_equals_day', 'day_not_quieter_than_night'] },
+  /** noise-estimate-v1: the level the loud OSM places give at the hotel. */
+  venue_level: {
+    inputs: ['ostrovok', 'osm'],
+    assumptions: ['osm_complete', 'venue_reference_level', 'point_source_no_screening'],
+  },
+  /** noise-estimate-v1: the facade and the places summed, Lnight and Lden. */
+  noise_estimate: {
+    inputs: ['eea', 'eubucco', 'ostrovok', 'osm'],
+    assumptions: ['osm_complete', 'venue_reference_level', 'point_source_no_screening'],
+  },
+  /** noise-estimate-v1: the facade and the places summed, Lday and Levening. */
+  noise_estimate_day: {
+    inputs: ['eea', 'eubucco', 'ostrovok', 'osm'],
+    assumptions: [
+      'osm_complete',
+      'venue_reference_level',
+      'point_source_no_screening',
+      'evening_equals_day',
+      'day_not_quieter_than_night',
+    ],
+  },
+  /** noise-estimate-v1 without a loud place in OSM around: the facade alone, if OSM misses none. */
+  noise_estimate_no_places: { inputs: ['eea', 'eubucco', 'ostrovok', 'osm'], assumptions: ['osm_complete'] },
+  /** The same, Lday and Levening. */
+  noise_estimate_no_places_day: {
+    inputs: ['eea', 'eubucco', 'ostrovok', 'osm'],
+    assumptions: ['osm_complete', 'evening_equals_day', 'day_not_quieter_than_night'],
+  },
   /** A conclusion of a language model. */
   inferred: { inputs: ['model'], assumptions: [] },
 } as const satisfies Record<string, ConfidenceRule>

@@ -69,8 +69,8 @@ const candidates: Candidate[] = [
   { id: 'ota-3', name: 'Hotel Unknown' },
 ]
 const levels: LevelRow[] = [
-  { hotelId: 'ota-1', property: 'noise.lnight.roadsInAgglomeration', min: 45, max: 49, value: null },
-  { hotelId: 'ota-2', property: 'noise.lnight.roadsInAgglomeration', min: 55, max: 59, value: null },
+  { hotelId: 'ota-1', property: 'noise.estimate.street.lnight', min: 45, max: 49, value: null },
+  { hotelId: 'ota-2', property: 'noise.estimate.street.lnight', min: 55, max: 59, value: null },
 ]
 const near: NearRow[] = [
   { hotelId: 'ota-1', claimId: 'c1', distanceM: 182, name: 'Farmacia San Petrillo', kind: 'osm_place' },
