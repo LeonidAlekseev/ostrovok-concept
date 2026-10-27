@@ -37,6 +37,7 @@ import {
   sunsetOf,
   sunsetRange,
   targetReach,
+  VERDICT_LABEL,
   VERDICT_TONE,
   verdictText,
   VIEW_ASSUMPTIONS,
@@ -241,11 +242,23 @@ export function HotelView({
   )
   const inView = landmarks.filter(({ target }) => inSide(target.bearing, shownSide))
   const summary = ready ? sideSummary(ready.rays, shownSide, eyeM) : null
-  const mapTargets = [...(sideSea?.point ? [sideSea.point] : []), ...inView.map(({ target }) => target)].map((t) => ({
-    lat: t.lat,
-    lon: t.lon,
-    tone: VERDICT_TONE[lineVerdict(t.line, eyeM)],
-  }))
+  const mapTargets = useMemo(
+    () =>
+      [...(sideSea?.point ? [sideSea.point] : []), ...inView.map(({ target }) => target)].map((t) => {
+        const verdict = lineVerdict(t.line, eyeM)
+        return {
+          name: t.name,
+          category: t.category,
+          lat: t.lat,
+          lon: t.lon,
+          distanceM: t.distanceM,
+          tone: VERDICT_TONE[verdict],
+          verdict: VERDICT_LABEL[verdict],
+        }
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sideSea?.point, shownSide, ready, eyeM],
+  )
   const blockers = [
     ...sunBlockers(sunsetSun?.ray, eyeM),
     ...sunBlockers(sunriseSun?.ray, eyeM),
