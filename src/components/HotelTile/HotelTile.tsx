@@ -11,7 +11,8 @@ import { GeneratedBadge } from '../GeneratedBadge/GeneratedBadge'
 import { GuruLogo } from '../GuruLogo/GuruLogo'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import { PhotoCarousel } from '../PhotoCarousel/PhotoCarousel'
-import { PhotoBadges } from './PhotoBadges'
+import { FavoriteButton } from '../FavoriteButton/FavoriteButton'
+import { TileBadges } from './TileBadges'
 
 interface Props extends Omit<ComponentProps<'article'>, 'children'> {
   hotel: TileHotel
@@ -27,11 +28,11 @@ interface Props extends Omit<ComponentProps<'article'>, 'children'> {
 }
 
 /**
- * The hotel card of the vibe, the stars, favourites and search results: the photo carousel with the free
- * cancellation, the guest rating, the favourite toggle and the stars on it, then the name, the distance to
- * the city centre and the regular and GURU prices. The kind of stay is shown on the hotel's page only.
- * The plain card has the first photo alone and no badges. A made-up hotel has the «generated» mark on the
- * photo in both.
+ * The hotel card of the vibe, the stars, favourites and search results: the photo carousel, then the name with
+ * the favourite toggle, the guest rating, the stars and the free cancellation, the distance to the city centre
+ * and the regular and GURU prices. The kind of stay is shown on the hotel's page only. The plain card has the
+ * first photo alone and no badges or toggle. Nothing lies on the photos but the «generated» mark of a made-up
+ * hotel, in both.
  */
 export function HotelTile({
   hotel,
@@ -70,21 +71,29 @@ export function HotelTile({
           href={href}
           className="@container z-10 aspect-[4/3] w-full rounded-xl"
         >
-          <PhotoBadges hotel={hotel} freeCancellation={freeCancellation} />
           <GeneratedBadge hotel={hotel} className="absolute bottom-3 left-1/2 -translate-x-1/2" />
         </PhotoCarousel>
       )}
 
       <div className="flex flex-1 flex-col gap-1 px-2 pt-3 pb-1">
-        <Heading className="text-[17px]/[1.25] font-bold">
-          {/* The link covers the card; the photos and the favourite button sit above it. */}
-          <Link
-            href={href}
-            className="rounded-sm after:absolute after:inset-0 after:rounded-2xl after:content-[''] hover:text-primary"
-          >
-            {hotel.name}
-          </Link>
-        </Heading>
+        <div className="flex items-start gap-2">
+          <Heading className="min-w-0 flex-1 text-[17px]/[1.25] font-bold">
+            {/* The link covers the card; the photos and the favourite button sit above it. */}
+            <Link
+              href={href}
+              className="rounded-sm after:absolute after:inset-0 after:rounded-2xl after:content-[''] hover:text-primary"
+            >
+              {hotel.name}
+            </Link>
+          </Heading>
+          {!plain && (
+            <FavoriteButton
+              hotelId={hotel.id}
+              className="relative z-10 -mt-1.5 -mr-1.5 size-9 shrink-0 border-0 shadow-none [&_svg]:size-5"
+            />
+          )}
+        </div>
+        {!plain && <TileBadges hotel={hotel} freeCancellation={freeCancellation} />}
         <p className="flex items-center gap-1 text-sm/[normal] text-muted-foreground">
           <MapPin className="size-4 shrink-0" aria-hidden />
           {/* From 281px the city follows the distance; the screen reader always gets the whole text. */}

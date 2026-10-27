@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
-import { BedDouble, ChevronRight } from 'lucide-react'
+import { Building2, ChevronRight } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import type { Destination } from '@/data/destinations'
-import type { HotelSummary } from '@/lib/catalog'
+import type { SpotlightHotel } from '@/lib/catalog'
 import { hotelHref } from '@/lib/search'
 import { GLOBE_CENTER, viewPlacing, type GlobeView } from '../../lib/globe'
 import { appEnv, isProduction } from '../../lib/env'
@@ -26,8 +27,8 @@ import { StatsPanel, type StatsPanelHandle } from './StatsPanel'
 interface Props {
   /** The cities with new hotels: a pin each. */
   cities: Destination[]
-  /** The new hotels the cards show. */
-  hotels: readonly HotelSummary[]
+  /** The new hotels the cards show, with their first photos. */
+  hotels: readonly SpotlightHotel[]
   /** City spotlighted first (and in the server-rendered page). */
   featured: Destination
 }
@@ -131,8 +132,8 @@ const placeCard = [
   'hover:shadow-[0_18px_40px_color-mix(in_srgb,var(--decor-hotel-shadow)_32%,transparent)] hover:[--card-lift:4px]',
 ].join(' ')
 const placeIcon =
-  // Concentric with the card's corner.
-  'grid aspect-square w-[calc(1.25_*_(var(--badge-size)_+_var(--name-size)_+_var(--meta-size))_+_2_*_var(--text-gap))] flex-none place-items-center rounded-[calc(clamp(10px,3vw,14px)_-_var(--card-pad)_+_2px)] bg-[linear-gradient(135deg,var(--decor-hotel-from),var(--decor-hotel-to))] text-primary-foreground [&_svg]:h-auto [&_svg]:w-[48%]'
+  // Concentric with the card's corner. The hotel's first photo fills it; without one, the gradient and a building.
+  'grid aspect-square overflow-hidden w-[calc(1.25_*_(var(--badge-size)_+_var(--name-size)_+_var(--meta-size))_+_2_*_var(--text-gap))] flex-none place-items-center rounded-[calc(clamp(10px,3vw,14px)_-_var(--card-pad)_+_2px)] bg-[linear-gradient(135deg,var(--decor-hotel-from),var(--decor-hotel-to))] text-primary-foreground [&_svg]:h-auto [&_svg]:w-[48%]'
 
 export function Hero({ cities: markers, hotels, featured }: Props) {
   const [feed] = useState(() => createHotelFeed(hotels))
@@ -500,7 +501,7 @@ export function Hero({ cities: markers, hotels, featured }: Props) {
               className="flex animate-in items-center gap-[clamp(7px,2vw,12px)] animation-duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] fade-in zoom-in-97 slide-in-from-bottom-2 motion-reduce:animate-none"
             >
               <span className={placeIcon} aria-hidden>
-                <BedDouble />
+                {hotel.photo ? <PhotoPlaceholder photo={hotel.photo} className="size-full" /> : <Building2 />}
               </span>
               <div className="flex min-w-0 flex-col gap-(--text-gap) leading-[1.25]">
                 {/* Line height 1.25 and no vertical padding: the picture is sized from the three text lines. */}

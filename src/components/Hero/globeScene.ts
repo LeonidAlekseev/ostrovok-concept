@@ -1,12 +1,12 @@
 import type { Destination } from '../../data/destinations'
-import type { HotelSummary } from '../../lib/catalog'
+import type { SpotlightHotel } from '../../lib/catalog'
 import { projectToGlobe, type GlobePoint, type GlobeView } from '../../lib/globe'
 
 /** A city's new hotel highlighted on the globe. */
 export interface Spotlight {
   destination: Destination
   /** The hotel shown: one of the city's new hotels; none in a city without them. */
-  hotel: HotelSummary | null
+  hotel: SpotlightHotel | null
 }
 
 export interface Scene {
@@ -26,15 +26,15 @@ export function sceneAt(markers: Destination[], spotlight: Spotlight, view: Glob
 }
 
 /** Cycles through each city's hotels so consecutive visits show different ones. */
-export function createHotelFeed(hotels: readonly HotelSummary[]) {
-  const byCity = new Map<string, HotelSummary[]>()
+export function createHotelFeed(hotels: readonly SpotlightHotel[]) {
+  const byCity = new Map<string, SpotlightHotel[]>()
   for (const hotel of hotels) byCity.set(hotel.destinationId, [...(byCity.get(hotel.destinationId) ?? []), hotel])
   const cursor = new Map<string, number>()
   return {
     has: (destinationId: string) => byCity.has(destinationId),
     /** All the city's hotels, in their order. */
-    all: (destinationId: string): HotelSummary[] => byCity.get(destinationId) ?? [],
-    next(destinationId: string): HotelSummary | undefined {
+    all: (destinationId: string): SpotlightHotel[] => byCity.get(destinationId) ?? [],
+    next(destinationId: string): SpotlightHotel | undefined {
       const list = byCity.get(destinationId)
       if (!list) return undefined
       const i = cursor.get(destinationId) ?? 0
