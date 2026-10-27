@@ -1,4 +1,3 @@
-import { z } from 'zod'
 import { apiError } from '@/lib/api'
 import { firstAnswer } from '@/lib/ai/chain'
 import { geoTurn } from '@/lib/ai/geoTurn'
@@ -12,8 +11,6 @@ import { MATCHES, runTurn, type TurnContext } from '@/lib/ai/turn'
 import { MODEL_TIMEOUT_MS, understandWish } from '@/lib/ai/understand'
 import {
   INTENT_TIMEOUT_MS,
-  MAX_PHOTO_URL_LENGTH,
-  PHOTO_DATA_URL,
   modelPhotoIntent,
   ownWords,
   photoIntent,
@@ -24,9 +21,7 @@ import {
   type PhotoSight,
 } from '@/lib/ai/vision'
 import {
-  MAX_HISTORY,
   MAX_MESSAGE_LENGTH,
-  MAX_PHOTOS,
   foldBrief,
   mergeBrief,
   nextQuestion,
@@ -45,20 +40,7 @@ import { loadHotelNoise } from '@/lib/db/noise'
 import { isHotelGeoQuestion, isHotelViewQuestion } from '@/lib/noise'
 import { todayIso, type IsoDate } from '@/lib/dates'
 import type { Hotel } from '@/lib/catalog'
-
-const requestSchema = z
-  .object({
-    messages: z
-      .array(z.object({ role: z.enum(['user', 'assistant']), text: z.string().trim().min(1).max(MAX_MESSAGE_LENGTH) }))
-      .min(1)
-      .max(MAX_HISTORY),
-    brief: z.record(z.string(), z.unknown()).default({}),
-    // The parameters changed by hand: the hotels by the brief, the dialog only for the wish's words.
-    rerun: z.literal(true).optional(),
-    // About 4 × 300 KB of optimised photos: the body stays within the 4.5 MB of a Vercel function.
-    photos: z.array(z.string().max(MAX_PHOTO_URL_LENGTH).regex(PHOTO_DATA_URL)).max(MAX_PHOTOS).optional(),
-  })
-  .refine(({ messages, rerun }) => rerun || messages.at(-1)?.role === 'user', 'The last message is the traveller’s')
+import { assistantRequestSchema } from './schema'
 
 /** The answer is due in 15 s: the client waits 16. The steps of the turn get what the model left. */
 const ANSWER_BUDGET_MS = 15_000
@@ -403,7 +385,7 @@ async function photoTurn(photos: readonly string[], ip: string, context: WishCon
 export async function POST(request: Request) {
   const ip = clientIp(request)
   if (!(await allowRequest(ip))) return apiError(429, 'Too many requests')
-  const parsedBody = requestSchema.safeParse(await request.json().catch(() => null))
+  const parsedBody = assistantRequestSchema.safeParse(await request.json().catch(() => null))
   if (!parsedBody.success) return apiError(400, 'Invalid request')
 
   const { messages, photos = [], rerun } = parsedBody.data

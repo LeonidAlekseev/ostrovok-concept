@@ -33,11 +33,16 @@ export function boxAround(view: MapBox): MapBox {
   return [west, south, east, north]
 }
 
+/** A degree of `?bbox=`: up to 3 digits and 6 decimals. */
+const DEGREE = String.raw`-?\d{1,3}(\.\d{1,6})?`
+
+/** The shape of `?bbox=`: four degrees with commas; `parseBox` checks their order and the box's size. */
+export const BBOX_PATTERN = new RegExp(`^${DEGREE}(,${DEGREE}){3}$`)
+
 /** `west,south,east,north` of `?bbox=`, or `null` for anything else: not four numbers, out of order or too wide. */
 export function parseBox(value: string): MapBox | null {
-  const parts = value.split(',')
-  if (parts.length !== 4 || parts.some((p) => !/^-?\d{1,3}(\.\d{1,6})?$/.test(p))) return null
-  const [west, south, east, north] = parts.map(Number)
+  if (!BBOX_PATTERN.test(value)) return null
+  const [west, south, east, north] = value.split(',').map(Number)
   const valid =
     west >= -180 &&
     east <= 180 &&

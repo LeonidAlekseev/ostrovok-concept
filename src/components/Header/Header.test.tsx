@@ -115,10 +115,25 @@ describe('Header', () => {
       ['Избранное', '/favorites'],
       ['Уведомления', null],
       ['Поддержка', '/help'],
+      ['API', '/api/docs'],
       ['Войти', '/login'],
     ])
     await user.click(screen.getByRole('link', { name: 'Избранное' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Меню' })).toBeNull())
+  })
+
+  // site-header, Requirement: Уведомления и меню разделов, Scenario: Документация API
+  it.each(['production', 'preview', 'development'])('links the API docs in %s', async (env) => {
+    vi.stubEnv('APP_ENV', env)
+    vi.resetModules()
+    const { Header: EnvHeader } = await import('./Header')
+    const user = userEvent.setup()
+    render(<EnvHeader />)
+    await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
+    expect(screen.getByRole('link', { name: 'API' }).getAttribute('href')).toBe('/api/docs')
+    await user.click(screen.getByRole('link', { name: 'API' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Меню' })).toBeNull())
+    vi.unstubAllEnvs()
   })
 
   it('shows the notifications inside the menu, and "Понятно" folds them', async () => {

@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server'
 import { CDN_CACHE_HEADERS, loadVisibleHotel } from '@/lib/api'
 import { loadHotelDetails } from '@/lib/db/hotelDetails'
 import { loadHotelView } from '@/lib/db/view'
+import type { ViewResponse } from './schema'
 
 /**
  * «Вид из отеля» of a real hotel for every floor at once for the page (`HotelView`): `{ view: null }` for a synthetic
@@ -14,5 +15,5 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ ho
   const details = hotel ? await loadHotelDetails(hotel.id) : null
   const view =
     hotel && details ? await loadHotelView(hotel, details.building, details.facts.roomFloors, details.nearby) : null
-  return Response.json({ view }, { headers: CDN_CACHE_HEADERS })
+  return Response.json({ view } satisfies ViewResponse, { headers: CDN_CACHE_HEADERS })
 }

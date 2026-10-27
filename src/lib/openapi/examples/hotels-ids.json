@@ -1,0 +1,124 @@
+{
+  "query": {
+    "ids": "ota-9096882"
+  },
+  "response": {
+    "hotels": [
+      {
+        "id": "ota-9096882",
+        "lat": 39.3833,
+        "lon": -0.33254,
+        "name": "You & Co. Saler Beach Boutique Hotel",
+        "isNew": false,
+        "metro": null,
+        "rooms": [
+          {
+            "id": "room-3202",
+            "area": 20,
+            "beds": "двуспальная кровать",
+            "name": "Номер Standard",
+            "rates": [
+              {
+                "id": "rate-1",
+                "meal": "none",
+                "payment": "now",
+                "cancellation": {
+                  "kind": "free",
+                  "daysBefore": 4
+                },
+                "pricePerNight": 9600
+              }
+            ],
+            "photos": [
+              {
+                "id": "room-1",
+                "tone": 0,
+                "caption": "Номер Standard"
+              }
+            ],
+            "capacity": 2
+          }
+        ],
+        "stars": 3,
+        "photos": [
+          {
+            "id": "photo-1",
+            "url": "https://cdn.ostrovok.ru/t/{size}/content/07/3e/073e735bba54b575932b4454e91beb4be685911c.jpeg",
+            "tone": 0,
+            "caption": "You & Co. Saler Beach Boutique Hotel, фото 1"
+          },
+          {
+            "id": "photo-2",
+            "url": "https://cdn.ostrovok.ru/t/{size}/content/cf/fe/cffe0431127d7bcef61b778d64ddad90c885f986.jpeg",
+            "tone": 1,
+            "caption": "You & Co. Saler Beach Boutique Hotel, фото 2"
+          },
+          {
+            "id": "photo-3",
+            "url": "https://cdn.ostrovok.ru/t/{size}/content/29/f8/29f82eb8cd42550f9f75b980467a1de539afe213.jpeg",
+            "tone": 2,
+            "caption": "You & Co. Saler Beach Boutique Hotel, фото 3"
+          },
+          {
+            "id": "photo-4",
+            "url": "https://cdn.ostrovok.ru/t/{size}/content/2d/0e/2d0ef1935da2a145249674ea934498764b74f684.jpeg",
+            "tone": 3,
+            "caption": "You & Co. Saler Beach Boutique Hotel, фото 4"
+          },
+          {
+            "id": "photo-5",
+            "url": "https://cdn.ostrovok.ru/t/{size}/content/38/29/38296f9aaf180cbe5ad9f66c8bad05c21dbaf013.jpeg",
+            "tone": 0,
+            "caption": "You & Co. Saler Beach Boutique Hotel, фото 5"
+          },
+          {
+            "id": "photo-6",
+            "url": "https://cdn.ostrovok.ru/t/{size}/content/81/42/814250fad1adc936cbf232eaa85de3998b04a535.jpeg",
+            "tone": 1,
+            "caption": "You & Co. Saler Beach Boutique Hotel, фото 6"
+          },
+          {
+            "id": "photo-7",
+            "url": "https://cdn.ostrovok.ru/t/{size}/content/8b/23/8b23624c58549830dbaaf5d3bc0e6a066a7c1f53.JPEG",
+            "tone": 2,
+            "caption": "You & Co. Saler Beach Boutique Hotel, фото 7"
+          },
+          {
+            "id": "photo-8",
+            "url": "https://cdn.ostrovok.ru/t/{size}/content/eb/c9/ebc9333a8d07c888e0ae60309d5ede9e6319f47d.jpeg",
+            "tone": 3,
+            "caption": "You & Co. Saler Beach Boutique Hotel, фото 8"
+          },
+          {
+            "id": "photo-9",
+            "url": "https://cdn.ostrovok.ru/t/{size}/content/24/7b/247b085fc7d5d87a40ce0f772e2e66f60a13949b.jpeg",
+            "tone": 0,
+            "caption": "You & Co. Saler Beach Boutique Hotel, фото 9"
+          },
+          {
+            "id": "photo-10",
+            "url": "https://cdn.ostrovok.ru/t/{size}/content/6d/89/6d89666ee203eda3a0ea00abeda3e80b3a4c548a.jpeg",
+            "tone": 1,
+            "caption": "You & Co. Saler Beach Boutique Hotel, фото 10"
+          }
+        ],
+        "rating": 9.5,
+        "address": "Avinguda dels Pinars 8, Валенсия",
+        "reviews": [],
+        "stayType": "hotel",
+        "wifiMbps": null,
+        "amenities": ["wifi", "air-conditioning", "accessible", "restaurant", "shuttle", "family", "pets"],
+        "priceFrom": 9600,
+        "workspace": false,
+        "distanceKm": 10.3,
+        "checkInTime": "15:00",
+        "description": "«You & Co. Saler Beach Boutique Hotel» располагается в Валенсии. Этот бутик-отель находится в 10 км от центра города. Рядом с бутик-отелем — La Casa de la Demanà, Platja de l'Arbre del Gos и Океанографический парк.\n\nСкоротать вечер или приятно провести время перед сном в уютной атмосфере можно в баре. Для гостей работает ресторан. Кафе бутик-отеля — удобное место для перекуса. Хотите оставаться на связи? В бутик-отеле есть бесплатный Wi-Fi.\n\nТакже для гостей в бутик-отеле: врач. Чтобы забронировать экскурсию, обратитесь в экскурсионное бюро бутик-отеля. Берите питомца с собой. В бутик-отеле возможно размещение с домашним любимцем. Сотрудники бутик-отеля по запросу организуют гостям трансфер.\n\nУдобно для гостей с ограниченными возможностями: на верхние этажи гостей поднимает лифт. А ещё в распоряжении гостей сейф и консьерж. Персонал бутик-отеля говорит на английском, испанском и итальянском.",
+        "guestPhotos": [],
+        "reviewCount": 2,
+        "checkOutTime": "12:00",
+        "destinationId": "valencia",
+        "sectionScores": []
+      }
+    ]
+  }
+}

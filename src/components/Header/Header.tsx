@@ -122,6 +122,11 @@ export function Header() {
                       Поддержка
                     </Link>
                   </li>
+                  <li>
+                    <Link className={menuItemClass} href="/api/docs" onClick={close}>
+                      API
+                    </Link>
+                  </li>
                   {!session && (
                     <li>
                       <Link className={menuItemClass} href="/login" onClick={close}>

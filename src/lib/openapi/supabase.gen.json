@@ -1,0 +1,1612 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "О!бъективно — Supabase",
+    "version": "1",
+    "description": "Таблицы, представления и функции Supabase, которые вызывает код сайта (`x-used-in` — где). Сгенерировано из `src/lib/db/database.types.ts` командой `npm run docs:supabase`."
+  },
+  "tags": [
+    {
+      "name": "Таблицы",
+      "description": "Чтение строк"
+    },
+    {
+      "name": "Представления",
+      "description": "Чтение строк представлений"
+    },
+    {
+      "name": "Функции",
+      "description": "RPC"
+    }
+  ],
+  "security": [
+    {
+      "anonKey": []
+    },
+    {
+      "anonKey": [],
+      "session": []
+    }
+  ],
+  "paths": {
+    "/assistant_chat_shares": {
+      "get": {
+        "operationId": "select_assistant_chat_shares",
+        "tags": ["Таблицы"],
+        "summary": "assistant_chat_shares",
+        "description": "Строки `assistant_chat_shares` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/assistantShare.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/assistant_chat_shares"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assistant_chats": {
+      "get": {
+        "operationId": "select_assistant_chats",
+        "tags": ["Таблицы"],
+        "summary": "assistant_chats",
+        "description": "Строки `assistant_chats` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/assistantChatsRemote.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/assistant_chats"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assistant_messages": {
+      "get": {
+        "operationId": "select_assistant_messages",
+        "tags": ["Таблицы"],
+        "summary": "assistant_messages",
+        "description": "Строки `assistant_messages` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/assistantChatsRemote.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/assistant_messages"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/destinations": {
+      "get": {
+        "operationId": "select_destinations",
+        "tags": ["Таблицы"],
+        "summary": "destinations",
+        "description": "Строки `destinations` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/db/catalog.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/destinations"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hotel_features": {
+      "get": {
+        "operationId": "select_hotel_features",
+        "tags": ["Таблицы"],
+        "summary": "hotel_features",
+        "description": "Строки `hotel_features` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/db/features.ts", "src/lib/db/hotelDetails.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/hotel_features"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hotel_room_views_named": {
+      "get": {
+        "operationId": "select_hotel_room_views_named",
+        "tags": ["Представления"],
+        "summary": "hotel_room_views_named",
+        "description": "Строки `hotel_room_views_named` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/db/features.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/hotel_room_views_named"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hotels": {
+      "get": {
+        "operationId": "select_hotels",
+        "tags": ["Таблицы"],
+        "summary": "hotels",
+        "description": "Строки `hotels` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/db/catalog.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/hotels"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/osm_places": {
+      "get": {
+        "operationId": "select_osm_places",
+        "tags": ["Таблицы"],
+        "summary": "osm_places",
+        "description": "Строки `osm_places` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/geo/save.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/osm_places"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ota_hotel_pages": {
+      "get": {
+        "operationId": "select_ota_hotel_pages",
+        "tags": ["Таблицы"],
+        "summary": "ota_hotel_pages",
+        "description": "Строки `ota_hotel_pages` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/db/features.ts", "src/lib/db/hotelDetails.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ota_hotel_pages"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ota_hotel_places": {
+      "get": {
+        "operationId": "select_ota_hotel_places",
+        "tags": ["Представления"],
+        "summary": "ota_hotel_places",
+        "description": "Строки `ota_hotel_places` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/db/hotelDetails.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ota_hotel_places"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profiles": {
+      "get": {
+        "operationId": "select_profiles",
+        "tags": ["Таблицы"],
+        "summary": "profiles",
+        "description": "Строки `profiles` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/session.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/profiles"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/assistant_chat_share": {
+      "post": {
+        "operationId": "rpc_assistant_chat_share",
+        "tags": ["Функции"],
+        "summary": "assistant_chat_share",
+        "description": "Функция `assistant_chat_share` базы через PostgREST.",
+        "x-used-in": ["src/lib/assistantShare.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "share_id": {
+                    "type": "string"
+                  }
+                },
+                "required": ["share_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "created_at": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "snapshot": {
+                        "description": "JSON"
+                      },
+                      "title": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["created_at", "id", "snapshot", "title"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/hotel_geo": {
+      "post": {
+        "operationId": "rpc_hotel_geo",
+        "tags": ["Функции"],
+        "summary": "hotel_geo",
+        "description": "Функция `hotel_geo` базы через PostgREST.",
+        "x-used-in": ["src/lib/db/noise.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "lat": {
+                    "type": "number"
+                  },
+                  "lon": {
+                    "type": "number"
+                  }
+                },
+                "required": ["lat", "lon"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "JSON"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/hotel_geo_features": {
+      "post": {
+        "operationId": "rpc_hotel_geo_features",
+        "tags": ["Функции"],
+        "summary": "hotel_geo_features",
+        "description": "Функция `hotel_geo_features` базы через PostgREST.",
+        "x-used-in": ["src/lib/db/noise.ts", "src/lib/db/view.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "lat": {
+                    "type": "number"
+                  },
+                  "lon": {
+                    "type": "number"
+                  },
+                  "radius_m": {
+                    "type": "number"
+                  }
+                },
+                "required": ["lat", "lon"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "JSON"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/hotel_noise_day": {
+      "post": {
+        "operationId": "rpc_hotel_noise_day",
+        "tags": ["Функции"],
+        "summary": "hotel_noise_day",
+        "description": "Функция `hotel_noise_day` базы через PostgREST.",
+        "x-used-in": ["src/lib/db/noise.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "lat": {
+                    "type": "number"
+                  },
+                  "lon": {
+                    "type": "number"
+                  },
+                  "radius_m": {
+                    "type": "number"
+                  }
+                },
+                "required": ["lat", "lon"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "JSON"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/hotel_noise_map": {
+      "post": {
+        "operationId": "rpc_hotel_noise_map",
+        "tags": ["Функции"],
+        "summary": "hotel_noise_map",
+        "description": "Функция `hotel_noise_map` базы через PostgREST.",
+        "x-used-in": ["src/lib/db/noise.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "lat": {
+                    "type": "number"
+                  },
+                  "lon": {
+                    "type": "number"
+                  },
+                  "radius_m": {
+                    "type": "number"
+                  }
+                },
+                "required": ["lat", "lon"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "JSON"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/hotel_noise_quiet": {
+      "post": {
+        "operationId": "rpc_hotel_noise_quiet",
+        "tags": ["Функции"],
+        "summary": "hotel_noise_quiet",
+        "description": "Функция `hotel_noise_quiet` базы через PostgREST.",
+        "x-used-in": ["src/lib/db/noise.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "lat": {
+                    "type": "number"
+                  },
+                  "lon": {
+                    "type": "number"
+                  },
+                  "radius_m": {
+                    "type": "number"
+                  }
+                },
+                "required": ["lat", "lon"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "JSON"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/hotel_sea_distances": {
+      "post": {
+        "operationId": "rpc_hotel_sea_distances",
+        "tags": ["Функции"],
+        "summary": "hotel_sea_distances",
+        "description": "Функция `hotel_sea_distances` базы через PostgREST.",
+        "x-used-in": ["src/lib/db/features.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "hotel_id": {
+                        "type": "string"
+                      },
+                      "sea_m": {
+                        "type": "number"
+                      }
+                    },
+                    "required": ["hotel_id", "sea_m"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/hotel_view_eyes": {
+      "post": {
+        "operationId": "rpc_hotel_view_eyes",
+        "tags": ["Функции"],
+        "summary": "hotel_view_eyes",
+        "description": "Функция `hotel_view_eyes` базы через PostgREST.",
+        "x-used-in": ["src/lib/db/view.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "lat": {
+                    "type": "number"
+                  },
+                  "lon": {
+                    "type": "number"
+                  },
+                  "targets": {
+                    "description": "JSON"
+                  }
+                },
+                "required": ["lat", "lon", "targets"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "JSON"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/hotels_outside_noise": {
+      "post": {
+        "operationId": "rpc_hotels_outside_noise",
+        "tags": ["Функции"],
+        "summary": "hotels_outside_noise",
+        "description": "Функция `hotels_outside_noise` базы через PostgREST.",
+        "x-used-in": ["src/lib/db/catalog.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/match_embeddings": {
+      "post": {
+        "operationId": "rpc_match_embeddings",
+        "tags": ["Функции"],
+        "summary": "match_embeddings",
+        "description": "Функция `match_embeddings` базы через PostgREST.",
+        "x-used-in": ["src/lib/ai/semantic.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "destination_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "match_count": {
+                    "type": "number"
+                  },
+                  "match_kind": {
+                    "type": "string"
+                  },
+                  "query_embedding": {}
+                },
+                "required": ["match_kind", "query_embedding"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "content": {
+                        "type": "string"
+                      },
+                      "destination_id": {
+                        "type": "string"
+                      },
+                      "ref_id": {
+                        "type": "string"
+                      },
+                      "similarity": {
+                        "type": "number"
+                      }
+                    },
+                    "required": ["content", "destination_id", "ref_id", "similarity"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/osm_place_area_add": {
+      "post": {
+        "operationId": "rpc_osm_place_area_add",
+        "tags": ["Функции"],
+        "summary": "osm_place_area_add",
+        "description": "Функция `osm_place_area_add` базы через PostgREST.",
+        "x-used-in": ["src/lib/geo/store.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "categories": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "lat": {
+                    "type": "number"
+                  },
+                  "lon": {
+                    "type": "number"
+                  },
+                  "origin": {
+                    "type": "string"
+                  },
+                  "radius_m": {
+                    "type": "number"
+                  }
+                },
+                "required": ["categories", "lat", "lon", "radius_m"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/osm_places_named": {
+      "post": {
+        "operationId": "rpc_osm_places_named",
+        "tags": ["Функции"],
+        "summary": "osm_places_named",
+        "description": "Функция `osm_places_named` базы через PostgREST.",
+        "x-used-in": ["src/lib/geo/store.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "max_places": {
+                    "type": "number"
+                  },
+                  "q": {
+                    "type": "string"
+                  }
+                },
+                "required": ["q"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "JSON"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/osm_places_near": {
+      "post": {
+        "operationId": "rpc_osm_places_near",
+        "tags": ["Функции"],
+        "summary": "osm_places_near",
+        "description": "Функция `osm_places_near` базы через PostgREST.",
+        "x-used-in": ["src/lib/db/noise.ts", "src/lib/db/view.ts", "src/lib/geo/store.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "lat": {
+                    "type": "number"
+                  },
+                  "lon": {
+                    "type": "number"
+                  },
+                  "per_category": {
+                    "type": "number"
+                  },
+                  "radius_m": {
+                    "type": "number"
+                  },
+                  "wanted": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": ["lat", "lon", "radius_m", "wanted"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "JSON"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/rate_limit_hit": {
+      "post": {
+        "operationId": "rpc_rate_limit_hit",
+        "tags": ["Функции"],
+        "summary": "rate_limit_hit",
+        "description": "Функция `rate_limit_hit` базы через PostgREST.",
+        "x-used-in": ["src/lib/ai/rateLimit.ts", "src/lib/geo/store.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "hit_key": {
+                    "type": "string"
+                  },
+                  "hit_limit": {
+                    "type": "number"
+                  },
+                  "window_seconds": {
+                    "type": "number"
+                  }
+                },
+                "required": ["hit_key", "hit_limit", "window_seconds"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "assistant_chat_shares": {
+        "type": "object",
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "snapshot": {
+            "type": ["object", "array", "string", "number", "boolean"],
+            "description": "JSON"
+          },
+          "title": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          }
+        },
+        "required": ["created_at", "id", "snapshot", "title", "user_id"]
+      },
+      "assistant_chats": {
+        "type": "object",
+        "properties": {
+          "brief": {
+            "type": ["object", "array", "string", "number", "boolean"],
+            "description": "JSON"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "question": {
+            "anyOf": [
+              {
+                "description": "JSON"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "unread": {
+            "type": "boolean"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          }
+        },
+        "required": ["brief", "created_at", "id", "question", "title", "unread", "updated_at", "user_id"]
+      },
+      "assistant_messages": {
+        "type": "object",
+        "properties": {
+          "chat_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "data": {
+            "type": ["object", "array", "string", "number", "boolean"],
+            "description": "JSON"
+          },
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          }
+        },
+        "required": ["chat_id", "created_at", "data", "id", "role", "status", "text", "updated_at", "user_id"]
+      },
+      "destinations": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": ["object", "array", "string", "number", "boolean"],
+            "description": "JSON"
+          },
+          "id": {
+            "type": "string"
+          },
+          "position": {
+            "type": ["number", "null"]
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": ["data", "id", "position", "updated_at"]
+      },
+      "hotel_features": {
+        "type": "object",
+        "properties": {
+          "building_dataset": {
+            "type": ["string", "null"]
+          },
+          "building_id": {
+            "type": ["string", "null"]
+          },
+          "floors": {
+            "type": ["number", "null"]
+          },
+          "floors_lower": {
+            "type": ["number", "null"]
+          },
+          "floors_source": {
+            "type": ["string", "null"]
+          },
+          "floors_upper": {
+            "type": ["number", "null"]
+          },
+          "geometry_source": {
+            "type": ["string", "null"]
+          },
+          "height_lower_m": {
+            "type": ["number", "null"]
+          },
+          "height_m": {
+            "type": ["number", "null"]
+          },
+          "height_source": {
+            "type": ["string", "null"]
+          },
+          "height_upper_m": {
+            "type": ["number", "null"]
+          },
+          "hotel_id": {
+            "type": "string"
+          },
+          "lden_max": {
+            "type": ["number", "null"]
+          },
+          "lden_min": {
+            "type": ["number", "null"]
+          },
+          "lden_source": {
+            "type": ["string", "null"]
+          },
+          "lnight_max": {
+            "type": ["number", "null"]
+          },
+          "lnight_min": {
+            "type": ["number", "null"]
+          },
+          "lnight_source": {
+            "type": ["string", "null"]
+          },
+          "noise_dataset": {
+            "type": ["string", "null"]
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "building_dataset",
+          "building_id",
+          "floors",
+          "floors_lower",
+          "floors_source",
+          "floors_upper",
+          "geometry_source",
+          "height_lower_m",
+          "height_m",
+          "height_source",
+          "height_upper_m",
+          "hotel_id",
+          "lden_max",
+          "lden_min",
+          "lden_source",
+          "lnight_max",
+          "lnight_min",
+          "lnight_source",
+          "noise_dataset",
+          "updated_at"
+        ]
+      },
+      "hotel_room_views_named": {
+        "type": "object",
+        "properties": {
+          "hotel_id": {
+            "type": ["string", "null"]
+          },
+          "rg_hash": {
+            "type": ["string", "null"]
+          },
+          "room_name": {
+            "type": ["string", "null"]
+          },
+          "source": {
+            "type": ["string", "null"]
+          },
+          "view": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["hotel_id", "rg_hash", "room_name", "source", "view"]
+      },
+      "hotels": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": ["object", "array", "string", "number", "boolean"],
+            "description": "JSON"
+          },
+          "destination_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lat": {
+            "type": "number"
+          },
+          "lon": {
+            "type": "number"
+          },
+          "position": {
+            "type": ["number", "null"]
+          },
+          "price_from": {
+            "type": "number"
+          },
+          "rating": {
+            "type": "number"
+          },
+          "stars": {
+            "type": "number"
+          },
+          "stay_type": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "wifi_mbps": {
+            "type": ["number", "null"]
+          },
+          "workspace": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "destination_id",
+          "id",
+          "lat",
+          "lon",
+          "position",
+          "price_from",
+          "rating",
+          "stars",
+          "stay_type",
+          "updated_at",
+          "wifi_mbps",
+          "workspace"
+        ]
+      },
+      "osm_places": {
+        "type": "object",
+        "properties": {
+          "attribution": {
+            "type": "string"
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fetched_at": {
+            "type": "string"
+          },
+          "geom": {},
+          "lat": {
+            "type": "number"
+          },
+          "lon": {
+            "type": "number"
+          },
+          "name": {
+            "type": ["string", "null"]
+          },
+          "origin": {
+            "type": "string"
+          },
+          "osm_id": {
+            "type": "number"
+          },
+          "osm_type": {
+            "type": "string"
+          },
+          "tags": {
+            "type": ["object", "array", "string", "number", "boolean"],
+            "description": "JSON"
+          }
+        },
+        "required": [
+          "attribution",
+          "categories",
+          "fetched_at",
+          "geom",
+          "lat",
+          "lon",
+          "name",
+          "origin",
+          "osm_id",
+          "osm_type",
+          "tags"
+        ]
+      },
+      "ota_hotel_pages": {
+        "type": "object",
+        "properties": {
+          "hotel": {
+            "type": ["object", "array", "string", "number", "boolean"],
+            "description": "JSON"
+          },
+          "master_id": {
+            "type": "number"
+          },
+          "reviews": {
+            "type": ["object", "array", "string", "number", "boolean"],
+            "description": "JSON"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": ["hotel", "master_id", "reviews", "updated_at"]
+      },
+      "ota_hotel_places": {
+        "type": "object",
+        "properties": {
+          "bearing_deg": {
+            "type": ["number", "null"]
+          },
+          "distance_m": {
+            "type": ["number", "null"]
+          },
+          "hotel_id": {
+            "type": ["string", "null"]
+          },
+          "is_nearby": {
+            "type": ["boolean", "null"]
+          },
+          "is_top_poi": {
+            "type": ["boolean", "null"]
+          },
+          "is_transport_hub": {
+            "type": ["boolean", "null"]
+          },
+          "lat": {
+            "type": ["number", "null"]
+          },
+          "lon": {
+            "type": ["number", "null"]
+          },
+          "master_id": {
+            "type": ["number", "null"]
+          },
+          "name": {
+            "type": ["string", "null"]
+          },
+          "name_en": {
+            "type": ["string", "null"]
+          },
+          "region_id": {
+            "type": ["number", "null"]
+          },
+          "straight_m": {
+            "type": ["number", "null"]
+          },
+          "subtype": {
+            "type": ["string", "null"]
+          },
+          "type": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": [
+          "bearing_deg",
+          "distance_m",
+          "hotel_id",
+          "is_nearby",
+          "is_top_poi",
+          "is_transport_hub",
+          "lat",
+          "lon",
+          "master_id",
+          "name",
+          "name_en",
+          "region_id",
+          "straight_m",
+          "subtype",
+          "type"
+        ]
+      },
+      "profiles": {
+        "type": "object",
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["created_at", "id", "name"]
+      }
+    },
+    "securitySchemes": {
+      "anonKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "apikey",
+        "description": "Публичный anon-ключ проекта (`NEXT_PUBLIC_SUPABASE_ANON_KEY`) в `apikey` и, для данных пользователя, его сессия в `Authorization: Bearer`. Что можно читать и вызывать, решают RLS и права базы; ключ service role приложению в браузере не нужен и здесь не публикуется."
+      },
+      "session": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Сессия пользователя Supabase"
+      }
+    }
+  }
+}
