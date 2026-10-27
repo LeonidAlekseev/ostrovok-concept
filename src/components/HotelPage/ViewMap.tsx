@@ -12,7 +12,13 @@ import {
 import { cn } from 'cn'
 import type { ViewMap as ViewMapData } from '@/lib/db/view'
 import { pointAt, SIDE_HALF_WIDTH_DEG, VIEW_MAP_RADIUS_M, type Tone } from '@/lib/view'
-import { ATTRIBUTION_CLASS, MAP_ATTRIBUTION, MAP_STYLE, manageAttribution } from '../SearchResultsPage/mapSetup'
+import {
+  ATTRIBUTION_CLASS,
+  EUBUCCO_ATTRIBUTION,
+  MAP_ATTRIBUTION,
+  MAP_STYLE,
+  manageAttribution,
+} from '../SearchResultsPage/mapSetup'
 import {
   BLOCKER_COLOR,
   BUILDING_COLOR,
@@ -23,10 +29,6 @@ import {
   SUNSET_COLOR,
   TONE_COLOR,
 } from './viewColors'
-
-/** EUBUCCO's credit for the buildings' heights, next to OpenStreetMap's. */
-const EUBUCCO_ATTRIBUTION =
-  '<a href="https://eubucco.com/data/download/v0.2" target="_blank" rel="noopener">© EUBUCCO v0.2</a>'
 
 /** The blocks around the hotel, tilted so the buildings stand. */
 const ZOOM = 16

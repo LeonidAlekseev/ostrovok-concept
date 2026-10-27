@@ -8,7 +8,6 @@ import { cn } from 'cn'
 import type { NoiseMap as NoiseMapData } from '@/lib/db/noise'
 import { distanceLabel } from '@/lib/hotelDetails'
 import {
-  EEA_NOISE_URL,
   LEGEND_STEPS,
   NOISE_COLORS,
   NOISE_UNKNOWN_COLOR,
@@ -18,10 +17,13 @@ import {
   type NoiseMapIndicator,
   type NoisyPlace,
 } from '@/lib/noise'
-import { ATTRIBUTION_CLASS, MAP_ATTRIBUTION, MAP_STYLE, manageAttribution } from '../SearchResultsPage/mapSetup'
-
-/** EEA's credit for the contours, next to OpenStreetMap's. */
-export const EEA_ATTRIBUTION = `<a href="${EEA_NOISE_URL}" target="_blank" rel="noopener">© EEA, END 2022</a>`
+import {
+  ATTRIBUTION_CLASS,
+  EEA_ATTRIBUTION,
+  MAP_ATTRIBUTION,
+  MAP_STYLE,
+  manageAttribution,
+} from '../SearchResultsPage/mapSetup'
 
 /** The streets around the hotel, seen from above. */
 const ZOOM = 16.3

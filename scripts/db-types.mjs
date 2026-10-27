@@ -18,3 +18,5 @@ writeFileSync(out, result.stdout)
 // The CLI output is unformatted; format it like the rest of the code so `format:check` covers it.
 spawnSync('npx', ['prettier', '--write', out.pathname], { stdio: 'inherit' })
 console.log(`Wrote ${out.pathname}`)
+// The Supabase part of the API docs follows the types.
+spawnSync('node', [new URL('./openapi-supabase.ts', import.meta.url).pathname], { stdio: 'inherit' })

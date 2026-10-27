@@ -1,0 +1,916 @@
+{
+  "view": {
+    "window": {
+      "source": "building",
+      "floors": 2,
+      "storeyM": 6.35,
+      "heightM": 12.7,
+      "estimated": true
+    },
+    "ownBuilding": "938f21e4dfee4849-4",
+    "rays": [
+      {
+        "bearing": 0,
+        "line": {
+          "distanceM": 1500,
+          "checked": true,
+          "crossed": 4,
+          "coveredM": 1500,
+          "eyes": [
+            {
+              "eyeM": 12.3,
+              "eyeLowerM": 8.9,
+              "eyeUpperM": 15.9,
+              "blockers": [
+                {
+                  "id": "4634a0e3fd374e44-0",
+                  "distanceM": 87.5,
+                  "heightM": 11.2,
+                  "heightLowerM": 6.6,
+                  "heightUpperM": 15.9,
+                  "estimated": true,
+                  "eyeLowerM": 6.6,
+                  "eyeM": 11.2,
+                  "eyeUpperM": 15.9
+                },
+                {
+                  "id": "5b21f23295cc430d-0",
+                  "distanceM": 158.8,
+                  "heightM": 12.3,
+                  "heightLowerM": 8.9,
+                  "heightUpperM": 15.8,
+                  "estimated": true,
+                  "eyeLowerM": 8.9,
+                  "eyeM": 12.3,
+                  "eyeUpperM": 15.8
+                }
+              ]
+            },
+            {
+              "eyeM": 8.14,
+              "eyeLowerM": 3.54,
+              "eyeUpperM": 12.84,
+              "blockers": [
+                {
+                  "id": "4634a0e3fd374e44-0",
+                  "distanceM": 87.5,
+                  "heightM": 11.2,
+                  "heightLowerM": 6.6,
+                  "heightUpperM": 15.9,
+                  "estimated": true,
+                  "eyeLowerM": 3.54,
+                  "eyeM": 8.14,
+                  "eyeUpperM": 12.84
+                },
+                {
+                  "id": "5b21f23295cc430d-0",
+                  "distanceM": 158.8,
+                  "heightM": 12.3,
+                  "heightLowerM": 8.9,
+                  "heightUpperM": 15.8,
+                  "estimated": true,
+                  "eyeLowerM": 3.35,
+                  "eyeM": 6.75,
+                  "eyeUpperM": 10.25
+                }
+              ]
+            }
+          ],
+          "targetBuilding": null
+        }
+      },
+      {
+        "bearing": 30,
+        "line": {
+          "distanceM": 1500,
+          "checked": true,
+          "crossed": 0,
+          "coveredM": 1500,
+          "eyes": [
+            {
+              "eyeM": null,
+              "eyeLowerM": null,
+              "eyeUpperM": null,
+              "blockers": []
+            },
+            {
+              "eyeM": null,
+              "eyeLowerM": null,
+              "eyeUpperM": null,
+              "blockers": []
+            }
+          ],
+          "targetBuilding": null
+        }
+      },
+      {
+        "bearing": 60,
+        "line": {
+          "distanceM": 1500,
+          "checked": true,
+          "crossed": 0,
+          "coveredM": 1500,
+          "eyes": [
+            {
+              "eyeM": null,
+              "eyeLowerM": null,
+              "eyeUpperM": null,
+              "blockers": []
+            },
+            {
+              "eyeM": null,
+              "eyeLowerM": null,
+              "eyeUpperM": null,
+              "blockers": []
+            }
+          ],
+          "targetBuilding": null
+        }
+      },
+      {
+        "bearing": 90,
+        "line": {
+          "distanceM": 1500,
+          "checked": true,
+          "crossed": 0,
+          "coveredM": 1500,
+          "eyes": [
+            {
+              "eyeM": null,
+              "eyeLowerM": null,
+              "eyeUpperM": null,
+              "blockers": []
+            },
+            {
+              "eyeM": null,
+              "eyeLowerM": null,
+              "eyeUpperM": null,
+              "blockers": []
+            }
+          ],
+          "targetBuilding": null
+        }
+      },
+      {
+        "bearing": 120,
+        "line": {
+          "distanceM": 1500,
+          "checked": true,
+          "crossed": 0,
+          "coveredM": 1500,
+          "eyes": [
+            {
+              "eyeM": null,
+              "eyeLowerM": null,
+              "eyeUpperM": null,
+              "blockers": []
+            },
+            {
+              "eyeM": null,
+              "eyeLowerM": null,
+              "eyeUpperM": null,
+              "blockers": []
+            }
+          ],
+          "targetBuilding": null
+        }
+      },
+      {
+        "bearing": 150,
+        "line": {
+          "distanceM": 1500,
+          "checked": true,
+          "crossed": 4,
+          "coveredM": 1500,
+          "eyes": [
+            {
+              "eyeM": 12.3,
+              "eyeLowerM": 9.5,
+              "eyeUpperM": 15,
+              "blockers": [
+                {
+                  "id": "158ea7e3522a409d-0",
+                  "distanceM": 137,
+                  "heightM": 12.3,
+                  "heightLowerM": 9.5,
+                  "heightUpperM": 15,
+                  "estimated": true,
+                  "eyeLowerM": 9.5,
+                  "eyeM": 12.3,
+                  "eyeUpperM": 15
+                },
+                {
+                  "id": "e5cc6f0ccf264eae-0",
+                  "distanceM": 233.3,
+                  "heightM": 11.2,
+                  "heightLowerM": 8.1,
+                  "heightUpperM": 14.4,
+                  "estimated": true,
+                  "eyeLowerM": 8.1,
+                  "eyeM": 11.2,
+                  "eyeUpperM": 14.4
+                }
+              ]
+            },
+            {
+              "eyeM": 7.51,
+              "eyeLowerM": 4.71,
+              "eyeUpperM": 10.21,
+              "blockers": [
+                {
+                  "id": "158ea7e3522a409d-0",
+                  "distanceM": 137,
+                  "heightM": 12.3,
+                  "heightLowerM": 9.5,
+                  "heightUpperM": 15,
+                  "estimated": true,
+                  "eyeLowerM": 4.71,
+                  "eyeM": 7.51,
+                  "eyeUpperM": 10.21
+                },
+                {
+                  "id": "e5cc6f0ccf264eae-0",
+                  "distanceM": 233.3,
+                  "heightM": 11.2,
+                  "heightLowerM": 8.1,
+                  "heightUpperM": 14.4,
+                  "estimated": true,
+                  "eyeLowerM": -0.05,
+                  "eyeM": 3.05,
+                  "eyeUpperM": 6.25
+                }
+              ]
+            }
+          ],
+          "targetBuilding": null
+        }
+      },
+      {
+        "bearing": 180,
+        "line": {
+          "distanceM": 1500,
+          "checked": true,
+          "crossed": 8,
+          "coveredM": 961.9,
+          "eyes": [
+            {
+              "eyeM": 17.5,
+              "eyeLowerM": 13.7,
+              "eyeUpperM": 21.4,
+              "blockers": [
+                {
+                  "id": "938f21e4dfee4849-2",
+                  "distanceM": 39.5,
+                  "heightM": 17.5,
+                  "heightLowerM": 13.7,
+                  "heightUpperM": 21.4,
+                  "estimated": true,
+                  "eyeLowerM": 13.7,
+                  "eyeM": 17.5,
+                  "eyeUpperM": 21.4
+                },
+                {
+                  "id": "9efb7426ebf54362-3",
+                  "distanceM": 116.3,
+                  "heightM": 16.4,
+                  "heightLowerM": 13.2,
+                  "heightUpperM": 19.6,
+                  "estimated": true,
+                  "eyeLowerM": 13.2,
+                  "eyeM": 16.4,
+                  "eyeUpperM": 19.6
+                }
+              ]
+            },
+            {
+              "eyeM": 16.12,
+              "eyeLowerM": 12.32,
+              "eyeUpperM": 20.02,
+              "blockers": [
+                {
+                  "id": "938f21e4dfee4849-2",
+                  "distanceM": 39.5,
+                  "heightM": 17.5,
+                  "heightLowerM": 13.7,
+                  "heightUpperM": 21.4,
+                  "estimated": true,
+                  "eyeLowerM": 12.32,
+                  "eyeM": 16.12,
+                  "eyeUpperM": 20.02
+                },
+                {
+                  "id": "9efb7426ebf54362-3",
+                  "distanceM": 116.3,
+                  "heightM": 16.4,
+                  "heightLowerM": 13.2,
+                  "heightUpperM": 19.6,
+                  "estimated": true,
+                  "eyeLowerM": 9.14,
+                  "eyeM": 12.34,
+                  "eyeUpperM": 15.54
+                }
+              ]
+            }
+          ],
+          "targetBuilding": null
+        }
+      },
+      {
+        "bearing": 210,
+        "line": {
+          "distanceM": 1500,
+          "checked": true,
+          "crossed": 7,
+          "coveredM": 377.3,
+          "eyes": [
+            {
+              "eyeM": 17.9,
+              "eyeLowerM": 13.1,
+              "eyeUpperM": 22.8,
+              "blockers": [
+                {
+                  "id": "938f21e4dfee4849-1",
+                  "distanceM": 18.6,
+                  "heightM": 17.9,
+                  "heightLowerM": 13.1,
+                  "heightUpperM": 22.8,
+                  "estimated": true,
+                  "eyeLowerM": 13.1,
+                  "eyeM": 17.9,
+                  "eyeUpperM": 22.8
+                },
+                {
+                  "id": "2669534ad13a486e-0",
+                  "distanceM": 43.4,
+                  "heightM": 13.7,
+                  "heightLowerM": 10.1,
+                  "heightUpperM": 17.2,
+                  "estimated": true,
+                  "eyeLowerM": 10.1,
+                  "eyeM": 13.7,
+                  "eyeUpperM": 17.2
+                }
+              ]
+            },
+            {
+              "eyeM": 17.25,
+              "eyeLowerM": 12.45,
+              "eyeUpperM": 22.15,
+              "blockers": [
+                {
+                  "id": "938f21e4dfee4849-1",
+                  "distanceM": 18.6,
+                  "heightM": 17.9,
+                  "heightLowerM": 13.1,
+                  "heightUpperM": 22.8,
+                  "estimated": true,
+                  "eyeLowerM": 12.45,
+                  "eyeM": 17.25,
+                  "eyeUpperM": 22.15
+                },
+                {
+                  "id": "2669534ad13a486e-0",
+                  "distanceM": 43.4,
+                  "heightM": 13.7,
+                  "heightLowerM": 10.1,
+                  "heightUpperM": 17.2,
+                  "estimated": true,
+                  "eyeLowerM": 8.58,
+                  "eyeM": 12.18,
+                  "eyeUpperM": 15.68
+                }
+              ]
+            }
+          ],
+          "targetBuilding": null
+        }
+      },
+      {
+        "bearing": 240,
+        "line": {
+          "distanceM": 1500,
+          "checked": true,
+          "crossed": 3,
+          "coveredM": 305.8,
+          "eyes": [
+            {
+              "eyeM": 18.3,
+              "eyeLowerM": 16.3,
+              "eyeUpperM": 20.3,
+              "blockers": [
+                {
+                  "id": "5c7324cfc3e34f5c-6",
+                  "distanceM": 81.1,
+                  "heightM": 18.3,
+                  "heightLowerM": 16.3,
+                  "heightUpperM": 20.3,
+                  "estimated": true,
+                  "eyeLowerM": 16.3,
+                  "eyeM": 18.3,
+                  "eyeUpperM": 20.3
+                },
+                {
+                  "id": "d0eeb366e3f04b3f-1",
+                  "distanceM": 24.5,
+                  "heightM": 14.2,
+                  "heightLowerM": 9.6,
+                  "heightUpperM": 18.9,
+                  "estimated": true,
+                  "eyeLowerM": 9.6,
+                  "eyeM": 14.2,
+                  "eyeUpperM": 18.9
+                }
+              ]
+            },
+            {
+              "eyeM": 15.47,
+              "eyeLowerM": 13.47,
+              "eyeUpperM": 18.05,
+              "blockers": [
+                {
+                  "id": "d0eeb366e3f04b3f-1",
+                  "distanceM": 24.5,
+                  "heightM": 14.2,
+                  "heightLowerM": 9.6,
+                  "heightUpperM": 18.9,
+                  "estimated": true,
+                  "eyeLowerM": 8.75,
+                  "eyeM": 13.35,
+                  "eyeUpperM": 18.05
+                },
+                {
+                  "id": "5c7324cfc3e34f5c-6",
+                  "distanceM": 81.1,
+                  "heightM": 18.3,
+                  "heightLowerM": 16.3,
+                  "heightUpperM": 20.3,
+                  "estimated": true,
+                  "eyeLowerM": 13.47,
+                  "eyeM": 15.47,
+                  "eyeUpperM": 17.47
+                }
+              ]
+            }
+          ],
+          "targetBuilding": null
+        }
+      },
+      {
+        "bearing": 270,
+        "line": {
+          "distanceM": 1500,
+          "checked": true,
+          "crossed": 3,
+          "coveredM": 332.2,
+          "eyes": [
+            {
+              "eyeM": 17.5,
+              "eyeLowerM": 15.6,
+              "eyeUpperM": 19.4,
+              "blockers": [
+                {
+                  "id": "5c7324cfc3e34f5c-0",
+                  "distanceM": 75.5,
+                  "heightM": 17.5,
+                  "heightLowerM": 15.6,
+                  "heightUpperM": 19.4,
+                  "estimated": true,
+                  "eyeLowerM": 15.6,
+                  "eyeM": 17.5,
+                  "eyeUpperM": 19.4
+                },
+                {
+                  "id": "b6921ea6bd194097-1",
+                  "distanceM": 43.8,
+                  "heightM": 16.1,
+                  "heightLowerM": 13.7,
+                  "heightUpperM": 18.5,
+                  "estimated": true,
+                  "eyeLowerM": 13.7,
+                  "eyeM": 16.1,
+                  "eyeUpperM": 18.5
+                }
+              ]
+            },
+            {
+              "eyeM": 14.86,
+              "eyeLowerM": 12.96,
+              "eyeUpperM": 16.97,
+              "blockers": [
+                {
+                  "id": "b6921ea6bd194097-1",
+                  "distanceM": 43.8,
+                  "heightM": 16.1,
+                  "heightLowerM": 13.7,
+                  "heightUpperM": 18.5,
+                  "estimated": true,
+                  "eyeLowerM": 12.17,
+                  "eyeM": 14.57,
+                  "eyeUpperM": 16.97
+                },
+                {
+                  "id": "5c7324cfc3e34f5c-0",
+                  "distanceM": 75.5,
+                  "heightM": 17.5,
+                  "heightLowerM": 15.6,
+                  "heightUpperM": 19.4,
+                  "estimated": true,
+                  "eyeLowerM": 12.96,
+                  "eyeM": 14.86,
+                  "eyeUpperM": 16.76
+                }
+              ]
+            }
+          ],
+          "targetBuilding": null
+        }
+      },
+      {
+        "bearing": 300,
+        "line": {
+          "distanceM": 1500,
+          "checked": true,
+          "crossed": 5,
+          "coveredM": 567.1,
+          "eyes": [
+            {
+              "eyeM": 15.6,
+              "eyeLowerM": 11.9,
+              "eyeUpperM": 19.2,
+              "blockers": [
+                {
+                  "id": "d0eeb366e3f04b3f-0",
+                  "distanceM": 28.6,
+                  "heightM": 15.6,
+                  "heightLowerM": 11.9,
+                  "heightUpperM": 19.2,
+                  "estimated": true,
+                  "eyeLowerM": 11.9,
+                  "eyeM": 15.6,
+                  "eyeUpperM": 19.2
+                },
+                {
+                  "id": "ff02455a36524efb-0",
+                  "distanceM": 83.6,
+                  "heightM": 11.8,
+                  "heightLowerM": 8.6,
+                  "heightUpperM": 14.9,
+                  "estimated": true,
+                  "eyeLowerM": 8.6,
+                  "eyeM": 11.8,
+                  "eyeUpperM": 14.9
+                }
+              ]
+            },
+            {
+              "eyeM": 14.6,
+              "eyeLowerM": 10.9,
+              "eyeUpperM": 18.2,
+              "blockers": [
+                {
+                  "id": "d0eeb366e3f04b3f-0",
+                  "distanceM": 28.6,
+                  "heightM": 15.6,
+                  "heightLowerM": 11.9,
+                  "heightUpperM": 19.2,
+                  "estimated": true,
+                  "eyeLowerM": 10.9,
+                  "eyeM": 14.6,
+                  "eyeUpperM": 18.2
+                },
+                {
+                  "id": "938f21e4dfee4849-3",
+                  "distanceM": 4.6,
+                  "heightM": 11.9,
+                  "heightLowerM": 10.1,
+                  "heightUpperM": 13.7,
+                  "estimated": true,
+                  "eyeLowerM": 9.94,
+                  "eyeM": 11.74,
+                  "eyeUpperM": 13.54
+                }
+              ]
+            }
+          ],
+          "targetBuilding": null
+        }
+      },
+      {
+        "bearing": 330,
+        "line": {
+          "distanceM": 1500,
+          "checked": true,
+          "crossed": 4,
+          "coveredM": 1500,
+          "eyes": [
+            {
+              "eyeM": 12.9,
+              "eyeLowerM": 10.7,
+              "eyeUpperM": 15.5,
+              "blockers": [
+                {
+                  "id": "2b98a4283ed3478e-0",
+                  "distanceM": 102.6,
+                  "heightM": 12,
+                  "heightLowerM": 8.6,
+                  "heightUpperM": 15.5,
+                  "estimated": true,
+                  "eyeLowerM": 8.6,
+                  "eyeM": 12,
+                  "eyeUpperM": 15.5
+                },
+                {
+                  "id": "938f21e4dfee4849-6",
+                  "distanceM": 11.8,
+                  "heightM": 12.9,
+                  "heightLowerM": 10.7,
+                  "heightUpperM": 15,
+                  "estimated": true,
+                  "eyeLowerM": 10.7,
+                  "eyeM": 12.9,
+                  "eyeUpperM": 15
+                }
+              ]
+            },
+            {
+              "eyeM": 12.49,
+              "eyeLowerM": 10.29,
+              "eyeUpperM": 14.59,
+              "blockers": [
+                {
+                  "id": "938f21e4dfee4849-6",
+                  "distanceM": 11.8,
+                  "heightM": 12.9,
+                  "heightLowerM": 10.7,
+                  "heightUpperM": 15,
+                  "estimated": true,
+                  "eyeLowerM": 10.29,
+                  "eyeM": 12.49,
+                  "eyeUpperM": 14.59
+                },
+                {
+                  "id": "938f21e4dfee4849-3",
+                  "distanceM": 8.9,
+                  "heightM": 11.9,
+                  "heightLowerM": 10.1,
+                  "heightUpperM": 13.7,
+                  "estimated": true,
+                  "eyeLowerM": 9.79,
+                  "eyeM": 11.59,
+                  "eyeUpperM": 13.39
+                }
+              ]
+            }
+          ],
+          "targetBuilding": null
+        }
+      }
+    ],
+    "sea": [
+      {
+        "kind": "sea",
+        "name": "Берег моря",
+        "category": "море",
+        "lat": 39.385934,
+        "lon": -0.324201,
+        "distanceM": 768.5,
+        "bearing": 67.76883073008105,
+        "line": {
+          "distanceM": 774.4,
+          "checked": true,
+          "crossed": 0,
+          "coveredM": 774.4,
+          "eyes": [
+            {
+              "eyeM": null,
+              "eyeLowerM": null,
+              "eyeUpperM": null,
+              "blockers": []
+            }
+          ],
+          "targetBuilding": null
+        }
+      },
+      {
+        "kind": "sea",
+        "name": "Берег моря",
+        "category": "море",
+        "lat": 39.3968334,
+        "lon": -0.3269952,
+        "distanceM": 1576.6,
+        "bearing": 17.568293373403378,
+        "line": {
+          "distanceM": 1570.7,
+          "checked": true,
+          "crossed": 0,
+          "coveredM": 1570.7,
+          "eyes": [
+            {
+              "eyeM": null,
+              "eyeLowerM": null,
+              "eyeUpperM": null,
+              "blockers": []
+            }
+          ],
+          "targetBuilding": null
+        }
+      },
+      {
+        "kind": "sea",
+        "name": "Берег моря",
+        "category": "море",
+        "lat": 39.4140357,
+        "lon": -0.3328112,
+        "distanceM": 3412.5,
+        "bearing": 359.6094246150444,
+        "line": {
+          "distanceM": 3398.6,
+          "checked": true,
+          "crossed": 4,
+          "coveredM": 3398.6,
+          "eyes": [
+            {
+              "eyeM": 12.59,
+              "eyeLowerM": 9.15,
+              "eyeUpperM": 16.13,
+              "blockers": [
+                {
+                  "id": "5b21f23295cc430d-0",
+                  "distanceM": 158.4,
+                  "heightM": 12.3,
+                  "heightLowerM": 8.9,
+                  "heightUpperM": 15.8,
+                  "estimated": true,
+                  "eyeLowerM": 9.15,
+                  "eyeM": 12.59,
+                  "eyeUpperM": 16.13
+                },
+                {
+                  "id": "4634a0e3fd374e44-0",
+                  "distanceM": 87.7,
+                  "heightM": 11.2,
+                  "heightLowerM": 6.6,
+                  "heightUpperM": 15.9,
+                  "estimated": true,
+                  "eyeLowerM": 6.72,
+                  "eyeM": 11.35,
+                  "eyeUpperM": 16.08
+                }
+              ]
+            }
+          ],
+          "targetBuilding": null
+        }
+      }
+    ],
+    "seaChecked": true,
+    "landmarks": [
+      {
+        "kind": "ostrovok",
+        "name": "La Casa de la Demanà",
+        "category": "достопримечательность",
+        "lat": 39.3824005126953,
+        "lon": -0.333335995674133,
+        "distanceM": 121,
+        "bearing": 214.3721403322768,
+        "line": {
+          "distanceM": 120.8,
+          "checked": true,
+          "crossed": 6,
+          "coveredM": 120.8,
+          "eyes": [
+            {
+              "eyeM": 22.3,
+              "eyeLowerM": 13.45,
+              "eyeUpperM": 33.3,
+              "blockers": [
+                {
+                  "id": "799fbe9b59654992-3",
+                  "distanceM": 83.4,
+                  "heightM": 14.7,
+                  "heightLowerM": 11.2,
+                  "heightUpperM": 18.1,
+                  "estimated": true,
+                  "eyeLowerM": 10.98,
+                  "eyeM": 22.3,
+                  "eyeUpperM": 33.3
+                },
+                {
+                  "id": "938f21e4dfee4849-1",
+                  "distanceM": 19.6,
+                  "heightM": 17.9,
+                  "heightLowerM": 13.1,
+                  "heightUpperM": 22.8,
+                  "estimated": true,
+                  "eyeLowerM": 13.45,
+                  "eyeM": 19.18,
+                  "eyeUpperM": 25.03
+                }
+              ]
+            }
+          ],
+          "targetBuilding": {
+            "id": "0f477ac8d1b34a94-0",
+            "heightM": 11.3,
+            "estimated": true
+          }
+        }
+      },
+      {
+        "kind": "attraction",
+        "name": "Port del Saler",
+        "category": "достопримечательность",
+        "lat": 39.3824781,
+        "lon": -0.3349885,
+        "distanceM": 229,
+        "bearing": 246.5258196735875,
+        "line": {
+          "distanceM": 229.4,
+          "checked": true,
+          "crossed": 4,
+          "coveredM": 229.4,
+          "eyes": [
+            {
+              "eyeM": 33.06,
+              "eyeLowerM": 29.45,
+              "eyeUpperM": 36.67,
+              "blockers": [
+                {
+                  "id": "5c7324cfc3e34f5c-6",
+                  "distanceM": 102.4,
+                  "heightM": 18.3,
+                  "heightLowerM": 16.3,
+                  "heightUpperM": 20.3,
+                  "estimated": true,
+                  "eyeLowerM": 29.45,
+                  "eyeM": 33.06,
+                  "eyeUpperM": 36.67
+                },
+                {
+                  "id": "799fbe9b59654992-0",
+                  "distanceM": 63.9,
+                  "heightM": 14.2,
+                  "heightLowerM": 11,
+                  "heightUpperM": 17.5,
+                  "estimated": true,
+                  "eyeLowerM": 15.25,
+                  "eyeM": 19.68,
+                  "eyeUpperM": 24.26
+                }
+              ]
+            }
+          ],
+          "targetBuilding": null
+        }
+      },
+      {
+        "kind": "ostrovok",
+        "name": "Platja de l'Arbre del Gos",
+        "category": "пляж",
+        "lat": 39.4037017822266,
+        "lon": -0.330794990062714,
+        "distanceM": 2274,
+        "bearing": 3.781183630168073,
+        "line": {
+          "distanceM": 2260.9,
+          "checked": true,
+          "crossed": 8,
+          "coveredM": 2260.9,
+          "eyes": [
+            {
+              "eyeM": 17.18,
+              "eyeLowerM": 14.35,
+              "eyeUpperM": 20,
+              "blockers": [
+                {
+                  "id": "e2ddade5eb8c4a7f-0",
+                  "distanceM": 1381.2,
+                  "heightM": 6.6,
+                  "heightLowerM": 5.5,
+                  "heightUpperM": 7.7,
+                  "estimated": true,
+                  "eyeLowerM": 14.35,
+                  "eyeM": 17.18,
+                  "eyeUpperM": 20
+                },
+                {
+                  "id": "d62520abacf24bc2-0",
+                  "distanceM": 545.5,
+                  "heightM": 10.9,
+                  "heightLowerM": 8,
+                  "heightUpperM": 13.8,
+                  "estimated": true,
+                  "eyeLowerM": 10.63,
+                  "eyeM": 14.45,
+                  "eyeUpperM": 18.27
+                }
+              ]
+            }
+          ],
+          "targetBuilding": null
+        }
+      }
+    ],
+    "windowSides": []
+  }
+}

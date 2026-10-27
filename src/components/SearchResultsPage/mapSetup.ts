@@ -1,4 +1,5 @@
 import { setWorkerUrl, type Map as MapLibreMap } from 'maplibre-gl'
+import { EEA_NOISE_URL } from '@/lib/noise'
 
 /** What the MapLibre maps share: the results map, the hotel on the map and the map of Эвал's answer. */
 
@@ -11,6 +12,13 @@ export const MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty'
 /** The only credit the map shows: the style's own list (OpenFreeMap, OpenMapTiles, ...) is dropped. */
 export const MAP_ATTRIBUTION =
   '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>'
+
+/** EUBUCCO's credit for the buildings' heights, next to OpenStreetMap's. */
+export const EUBUCCO_ATTRIBUTION =
+  '<a href="https://eubucco.com/data/download/v0.2" target="_blank" rel="noopener">© EUBUCCO v0.2</a>'
+
+/** EEA's credit for the noise contours, next to OpenStreetMap's. */
+export const EEA_ATTRIBUTION = `<a href="${EEA_NOISE_URL}" target="_blank" rel="noopener">© EEA, END 2022</a>`
 
 /**
  * Keeps the style's sources from crediting anyone but `MAP_ATTRIBUTION`. A source takes its credit from its TileJSON

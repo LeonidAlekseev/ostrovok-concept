@@ -3,6 +3,7 @@ import { revalidateTag } from 'next/cache'
 import { apiError } from '@/lib/api'
 import { CATALOG_TAG } from '@/lib/db/anon'
 import { getSecret } from '@/lib/secrets'
+import { FORBIDDEN, type RevalidateResponse } from './schema'
 
 const sameSecret = (given: string, expected: string) =>
   given.length === expected.length && timingSafeEqual(Buffer.from(given), Buffer.from(expected))
@@ -14,7 +15,7 @@ const sameSecret = (given: string, expected: string) =>
 export async function POST(request: Request) {
   const expected = await getSecret('SUPABASE_SERVICE_ROLE_KEY')
   const given = request.headers.get('authorization')?.replace(/^Bearer /, '') ?? ''
-  if (!expected || !sameSecret(given, expected)) return apiError(403, 'Forbidden')
+  if (!expected || !sameSecret(given, expected)) return apiError(403, FORBIDDEN)
   revalidateTag(CATALOG_TAG, { expire: 0 })
-  return Response.json({ revalidated: [CATALOG_TAG] })
+  return Response.json({ revalidated: [CATALOG_TAG] } satisfies RevalidateResponse)
 }

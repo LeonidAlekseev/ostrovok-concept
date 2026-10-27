@@ -25,13 +25,16 @@
     "db:features": "node --env-file-if-exists=.env.local scripts/hotel-features.ts",
     "db:osm-places": "node --env-file-if-exists=.env.local scripts/load-osm-places.ts",
     "db:city-places": "node --env-file-if-exists=.env.local scripts/load-city-places.ts",
-    "db:clean:shared-photos": "node --env-file-if-exists=.env.local scripts/clean-shared-photos.ts"
+    "db:clean:shared-photos": "node --env-file-if-exists=.env.local scripts/clean-shared-photos.ts",
+    "docs:supabase": "node scripts/openapi-supabase.ts",
+    "docs:examples": "node scripts/openapi-examples.ts"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.75",
     "@base-ui/react": "^1.9.0",
     "@fontsource-variable/onest": "^5.3.1",
     "@fontsource/caveat": "^5.3.0",
+    "@scalar/api-reference-react": "^0.9.83",
     "@shadcn/react": "^0.3.1",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
@@ -48,6 +51,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@seriousme/openapi-schema-validator": "^2.11.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.8",
@@ -55,6 +59,7 @@
     "@types/pngjs": "^6.0.5",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
+    "ajv": "^8.20.0",
     "jsdom": "^30.1.3",
     "oxlint": "^1.81.0",
     "pixelmatch": "^8.0.0",

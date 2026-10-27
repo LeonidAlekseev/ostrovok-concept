@@ -90,7 +90,8 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 
 - `npm run db:types` — `scripts/db-types.mjs`: `supabase gen types typescript` по базе (`SUPABASE_DB_URL` из `.env.local`, схема
   только читается) в `src/lib/db/database.types.ts`, затем Prettier. Клиенты Supabase типизированы `Database`. **Перегенерируйте
-  после каждой миграции** (`db:push`) и коммитьте файл вместе с ней.
+  после каждой миграции** (`db:push`) и коммитьте файл вместе с ней. Следом скрипт обновляет раздел Supabase документации API
+  (`npm run docs:supabase`, см. «Документация API»).
 - `npm run db:push` — применяет миграции (`supabase db push --db-url "$SUPABASE_DB_URL"`, строка из `.env.local`).
   Прямой адрес `db.<ref>.supabase.co` доступен только по IPv6; без IPv6 подставьте строку пулера
   (Dashboard → Connect → Transaction pooler, порт 6543) в `SUPABASE_DB_URL` окружения.
@@ -164,6 +165,8 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 | `db-push.mjs`, `db-types.mjs` (`db:push`, `db:types`)                                 | миграции и типы `Database`                                                                         |
 | `secrets.mjs` (`secrets:*`)                                                           | ключи `.env.local.secret`                                                                          |
 | `screenshots.mjs`                                                                     | визуальная проверка страниц                                                                        |
+| `openapi-supabase.ts` (`docs:supabase`)                                               | раздел Supabase документации API из `database.types.ts`                                            |
+| `openapi-examples.ts` (`docs:examples`)                                               | реальные примеры ответов документации API с запущенного сайта                                      |
 | `build-images.py`, `build-star-assets.mjs`, `build-draw-images.mjs`, `build-globe.py` | изображения и глобус из исходников вне репозитория (см. «Изображения»)                             |
 
 ### Загрузка мест другого города
@@ -361,7 +364,7 @@ node scripts/screenshots.mjs --label after --against before --mask canvas / /sea
 
 Шапка (`src/components/Header`) и подвал (`src/components/Footer`) рендерятся в
 `src/app/layout.tsx` на каждой странице; страница сама рендерит свой `main`. Сейчас есть `/`,
-`/search` (результаты поиска), `/hotels/<id>`, `/hotels/<id>/rooms`, `/booking`, `/booking/confirmation`, `/login`, `/register`, `/trips`, `/trips/booking`, `/favorites`, `/help`, `/legal/terms`, `/legal/privacy`, `/legal/cookies`, `/auth/callback` (обработчик ссылки из письма) и страница 404 (`src/app/not-found.tsx`). Шапка и подвал ссылаются на разделы. Все страницы пререндерятся статически и перестраиваются в фоне раз в час (каталог, см. «Supabase»).
+`/search` (результаты поиска), `/hotels/<id>`, `/hotels/<id>/rooms`, `/booking`, `/booking/confirmation`, `/login`, `/register`, `/trips`, `/trips/booking`, `/favorites`, `/help`, `/api/docs` (документация API), `/legal/terms`, `/legal/privacy`, `/legal/cookies`, `/auth/callback` (обработчик ссылки из письма) и страница 404 (`src/app/not-found.tsx`). Шапка и подвал ссылаются на разделы. Все страницы пререндерятся статически и перестраиваются в фоне раз в час (каталог, см. «Supabase»).
 
 ### Каталог
 
@@ -533,6 +536,25 @@ Supabase; `src/proxy.ts` обновляет её на запросах с это
 `/help#<id вопроса>` раскрывает вопрос и прокручивает к нему. Форма обращения (имя, email,
 сообщение; номер бронирования необязателен) только проверяет поля и показывает «Обращение
 отправлено (демо)»: данные не отправляются и не сохраняются.
+
+### Документация API
+
+`/api/docs` (ссылка «API» в меню, во всех окружениях): интерактивная документация Scalar
+(`@scalar/api-reference-react`, грузится только на этой странице) двух документов OpenAPI 3.1 и карта MapLibre ответа
+гео-маршрута рядом с ответом «Try it» (`src/components/ApiDocs`). «Try it» шлёт запрос в то окружение, где открыта
+страница (сервер документа — `/`).
+
+- `GET /api/openapi.json` — маршруты `src/app/api`. Схемы zod запроса и ответа лежат рядом с каждым маршрутом
+  (`schema.ts`): маршрут разбирает ими запрос, его ответ — `satisfies` схемы, а схема сверяется с доменным типом
+  (`sameType<z.output<…>, Hotel>()` падает на `npm run typecheck`, если поле есть только в одном). Документ собирает
+  `src/lib/openapi/document.ts` через `z.toJSONSchema` (JSON Schema 2020-12); новый маршрут добавьте в `API_OPERATIONS` —
+  тест падает, если `route.ts` или его метод не описан. Примеры — реальные ответы по отелю ota-9096882 с сокращёнными
+  массивами: `npm run dev`, затем `npm run docs:examples [-- http://localhost:3000]`.
+- `GET /api/openapi/supabase.json` — таблицы, представления и функции Supabase, которые вызывает код `src` (`.from`,
+  `.rpc`), со схемами из `database.types.ts`; файл `src/lib/openapi/supabase.gen.json` пишет `npm run docs:supabase`
+  (без ключей: свой OpenAPI PostgREST отдаёт только ключу service role). Тест сверяет файл с типами и кодом.
+- Ключей в документах нет: `POST /api/revalidate` описан со схемой bearer без значения, у Supabase `apikey` вводится
+  вручную.
 
 `/legal/terms`, `/legal/privacy`, `/legal/cookies`: тексты-шаблоны лежат в `src/data/legal.ts`,
 разметку даёт общий `src/components/LegalPage` (дата обновления, демо-пометка, оглавление по
