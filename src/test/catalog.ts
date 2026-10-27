@@ -1,5 +1,6 @@
 import { destinations } from '@/data/destinations'
 import { isVisibleHotel, type Hotel } from '@/lib/catalog'
+import { inBox, parseBox, type MapBox } from '@/lib/mapBox'
 import { buildCatalog, fullHotelsIn, getHotel, hotels, newHotels } from '@/lib/catalogGenerator'
 
 /**
@@ -25,6 +26,7 @@ export const loadHotels = async (ids: readonly string[]) =>
   ids.filter((id) => isVisibleHotel({ id })).flatMap((id) => getHotel(id) ?? [])
 export const loadCityHotels = async (destinationIds: readonly string[]) =>
   destinationIds.flatMap(fullHotelsIn).filter(isVisibleHotel)
+export const loadBoxHotels = async (box: MapBox) => allHotels().filter((h) => inBox(box, h.lon, h.lat))
 export const loadAllHotels = async () => (await loadHotelSummaries()).map((h) => getHotel(h.id)!)
 
 /** The whole catalogue, built once, for the tests that need every full hotel the catalogue shows. */
@@ -37,8 +39,11 @@ const listOf = (value: string | null) => value?.split(',').filter(Boolean) ?? []
 export async function catalogFetch(input: RequestInfo | URL): Promise<Response> {
   const url = new URL(input instanceof Request ? input.url : String(input), 'http://localhost')
   if (url.pathname !== '/api/hotels') throw new Error(`Unexpected fetch in a test: ${url}`)
-  const found = url.searchParams.has('ids')
-    ? await loadHotels(listOf(url.searchParams.get('ids')))
-    : await loadCityHotels(listOf(url.searchParams.get('destinations')))
+  const box = url.searchParams.get('bbox')
+  const found = box
+    ? await loadBoxHotels(parseBox(box)!)
+    : url.searchParams.has('ids')
+      ? await loadHotels(listOf(url.searchParams.get('ids')))
+      : await loadCityHotels(listOf(url.searchParams.get('destinations')))
   return Response.json({ hotels: found })
 }

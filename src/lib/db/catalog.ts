@@ -4,6 +4,7 @@ import { unstable_cache } from 'next/cache'
 import type { Destination } from '@/data/destinations'
 import type { Database } from '@/lib/db/database.types'
 import { isVisibleHotel, type Hotel, type HotelSummary, type Photo, type SpotlightHotel } from '@/lib/catalog'
+import type { MapBox } from '@/lib/mapBox'
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/config'
 
 /**
@@ -194,6 +195,34 @@ const readCityHotels = cached('city', async (destinationId: string): Promise<Hot
 export async function loadCityHotels(destinationIds: readonly string[]): Promise<Hotel[]> {
   const [cities, shown] = await Promise.all([Promise.all(destinationIds.map((id) => readCityHotels(id))), shownTest()])
   return cities.flat().filter(shown)
+}
+
+/** The most hotels of a box: a box is a few blocks of a city, the margin round the view of the map included. */
+export const BOX_HOTELS = 200
+
+/** Full hotels in a box of the map in the catalogue's order, at most `BOX_HOTELS`: one cache entry a box. */
+const readBoxHotels = cached(
+  'box',
+  async (west: number, south: number, east: number, north: number): Promise<Hotel[]> =>
+    rowsOf(
+      await database()
+        .from('hotels')
+        .select('data')
+        .gte('lon', west)
+        .lte('lon', east)
+        .gte('lat', south)
+        .lte('lat', north)
+        .order('position', { nullsFirst: false })
+        .order('id')
+        .limit(BOX_HOTELS)
+        .overrideTypes<{ data: Hotel }[], { merge: false }>(),
+    ).map((row) => row.data),
+)
+
+/** Full hotels shown in a box of the map (`MapBox`), for the map around one hotel. */
+export async function loadBoxHotels(box: MapBox): Promise<Hotel[]> {
+  const [hotels, shown] = await Promise.all([readBoxHotels(...box), shownTest()])
+  return hotels.filter(shown)
 }
 
 /** Every full hotel shown, in the order of `loadHotelSummaries`. */

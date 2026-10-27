@@ -7,14 +7,7 @@ import { LngLatBounds, Map as MapLibreMap, Marker, NavigationControl } from 'map
 import { BedDouble } from 'lucide-react'
 import { cn } from 'cn'
 import { placeNumbers, type ChatMap } from '@/lib/geo/chatMap'
-import {
-  ATTRIBUTION_CLASS,
-  ATTRIBUTION_SHOWN_MS,
-  foldAttribution,
-  MAP_ATTRIBUTION,
-  MAP_STYLE,
-  silenceSourceAttribution,
-} from '../SearchResultsPage/mapSetup'
+import { ATTRIBUTION_CLASS, MAP_ATTRIBUTION, MAP_STYLE, manageAttribution } from '../SearchResultsPage/mapSetup'
 
 /** The routes' colour when the page has no `--brand-blue`: the brand's blue. */
 const ROUTE_COLOR = '#0645e8'
@@ -101,12 +94,7 @@ export default function PlacesMap({ map: data, onFail }: { map: ChatMap; onFail:
       }
       instance.addControl(new NavigationControl({ showCompass: false }), 'top-right')
       let loaded = false
-      let foldTimer: ReturnType<typeof setTimeout> | undefined
-      const fold = () => {
-        clearTimeout(foldTimer)
-        foldAttribution(instance)
-      }
-      instance.on('styledata', () => silenceSourceAttribution(instance))
+      const stopAttribution = manageAttribution(instance)
       instance.on('load', () => {
         loaded = true
         const color = getComputedStyle(container).getPropertyValue('--brand-blue').trim() || ROUTE_COLOR
@@ -117,14 +105,12 @@ export default function PlacesMap({ map: data, onFail }: { map: ChatMap; onFail:
             .addTo(instance),
         )
         setMap(instance)
-        foldTimer = setTimeout(fold, ATTRIBUTION_SHOWN_MS)
-        for (const type of ['mousedown', 'touchstart', 'wheel'] as const) instance.once(type, fold)
       })
       instance.on('error', () => {
         if (!loaded) onFail()
       })
       return () => {
-        clearTimeout(foldTimer)
+        stopAttribution()
         instance.remove()
       }
     },

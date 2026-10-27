@@ -8,6 +8,8 @@ import {
   NOISY_CATEGORIES,
   NOISY_PER_CATEGORY,
   NOISY_RADIUS_M,
+  NOISE_MAP_RADIUS_M,
+  QUIET_SOURCE,
   louderSource,
   type HotelNoise,
   type NoisyCategory,
@@ -133,9 +135,6 @@ export async function loadHotelNoise(hotel: { id: string; lat: number; lon: numb
   }
 }
 
-/** The radius of the noise map, m: the streets around the hotel at ~100 KB a night layer. */
-export const NOISE_MAP_RADIUS_M = 300
-
 /** A contour of the map: one band of one layer and indicator, cut to the circle. */
 export interface NoiseMapFeature {
   type: 'Feature'
@@ -163,33 +162,49 @@ const mapFeature = z.object({
 const rounded = (value: unknown): unknown =>
   Array.isArray(value) ? value.map(rounded) : typeof value === 'number' ? Math.round(value * 1e5) / 1e5 : value
 
-/** The noise contours of `hotel_geo_features().features`; the buildings are left out. */
-export function noiseMapOf(features: readonly unknown[]): NoiseMap {
+const featureOf = (value: unknown): NoiseMapFeature[] => {
+  const parsed = mapFeature.safeParse(value)
+  if (!parsed.success) return []
+  const { geometry, properties } = parsed.data
+  const { source, indicator, db_min, db_max } = properties
+  return [
+    {
+      type: 'Feature' as const,
+      geometry: { type: geometry.type, coordinates: rounded(geometry.coordinates) },
+      properties: { source, indicator, db_min, db_max },
+    },
+  ]
+}
+
+/**
+ * The map's contours: the bands from 40 dB of `hotel_geo_features().features` (the buildings and the layers' bands
+ * below 40 dB, which cover the louder bands of the other layers, are left out) and the quiet of `hotel_noise_quiet()`.
+ */
+export function noiseMapOf(contours: readonly unknown[], quiet: readonly unknown[] = []): NoiseMap {
   return {
     type: 'FeatureCollection',
-    features: features.flatMap((value) => {
-      const parsed = mapFeature.safeParse(value)
-      if (!parsed.success) return []
-      const { geometry, properties } = parsed.data
-      const { source, indicator, db_min, db_max } = properties
-      return [
-        {
-          type: 'Feature' as const,
-          geometry: { type: geometry.type, coordinates: rounded(geometry.coordinates) },
-          properties: { source, indicator, db_min, db_max },
-        },
-      ]
-    }),
+    features: [
+      ...contours.flatMap(featureOf).filter((f) => f.properties.db_min !== null),
+      ...quiet.flatMap(featureOf).filter((f) => f.properties.source === QUIET_SOURCE),
+    ],
   }
 }
 
 const readNoiseMap = unstable_cache(
   async (_hotelId: string, lat: number, lon: number): Promise<NoiseMap> => {
-    const { data, error } = await database().rpc('hotel_geo_features', { lat, lon, radius_m: NOISE_MAP_RADIUS_M })
-    if (error) throw error
-    return noiseMapOf(z.object({ features: z.array(z.unknown()) }).parse(data).features)
+    const db = database()
+    const args = { lat, lon, radius_m: NOISE_MAP_RADIUS_M }
+    const [contours, quiet] = await Promise.all([db.rpc('hotel_geo_features', args), db.rpc('hotel_noise_quiet', args)])
+    if (contours.error) throw contours.error
+    const features = z.object({ features: z.array(z.unknown()) })
+    // Without the quiet the louder bands still stand: the map leaves the quiet uncoloured.
+    if (quiet.error) warn('noise map: no quiet', quiet.error)
+    return noiseMapOf(
+      features.parse(contours.data).features,
+      quiet.error ? [] : (features.safeParse(quiet.data).data?.features ?? []),
+    )
   },
-  [CATALOG_TAG, 'hotel-noise-map'],
+  [CATALOG_TAG, 'hotel-noise-map', 'quiet'],
   { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME },
 )
 
