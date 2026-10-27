@@ -104,6 +104,20 @@ describe('the catalogue from Supabase', () => {
     expect(db.calls).toContainEqual(['order', 'position', { nullsFirst: false }])
   })
 
+  it('gives each new hotel its first photo, read alone, or null', async () => {
+    const photo = { id: 'photo-1', caption: 'Фасад', tone: 0, url: 'https://cdn.ostrovok.ru/t/{size}/a.jpeg' }
+    db.result.data = [
+      { id: 'a', isNew: true, photo },
+      { id: 'c', isNew: true, photo: null },
+    ]
+    expect((await loadNewHotels()).map((h) => [h.id, h.photo])).toEqual([
+      ['a', photo],
+      ['c', null],
+    ])
+    expect(db.calls).toContainEqual(['select', 'id, photo:data->photos->0'])
+    expect(db.calls).toContainEqual(['in', 'id', ['a', 'c']])
+  })
+
   it('turns a database error into CatalogUnavailableError', async () => {
     db.result = { data: null, error: { message: 'connection refused' } }
     await expect(loadHotel(lantern.id)).rejects.toThrow(CatalogUnavailableError)

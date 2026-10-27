@@ -1,4 +1,5 @@
 import { getDefaultNormalizer, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { type Hotel } from '../../lib/catalog'
 import { fullHotelsIn, getHotel } from '../../lib/catalogGenerator'
@@ -20,40 +21,56 @@ const nonRefundable: Hotel = {
 
 afterEach(() => localStorage.clear())
 
-// hotel-tile, Requirement: Метки на фото карточки
-describe('HotelTile photo', () => {
-  it('lays the free cancellation, the rating, the heart, the counter and the stars over the photos', () => {
+// hotel-tile, Requirement: Метки под фото карточки
+describe('HotelTile badges', () => {
+  it('leaves the photos to the counter and lays the heart, the rating, the stars and the free cancellation under them', () => {
     render(<HotelTile hotel={hotel} href={`/hotels/${hotel.id}`} />)
     const card = screen.getByRole('article')
     const photos = within(card).getByRole('group', { name: 'Фото отеля' })
     const carousel = photos.parentElement!
     expect(card.firstElementChild).toBe(carousel)
     expect(carousel.className).toMatch(/\brounded-xl\b/)
+    expect(within(carousel).getByText('1 / 5').parentElement!.className).toMatch(/\bbottom-2\b/)
 
-    const corners = [
-      [within(carousel).getByText('1 / 5').parentElement!, /\bbottom-2\b/, /\bleft-2\b/],
-      [
-        within(carousel).getByRole('img', { name: countRu(hotel.stars, ['звезда', 'звезды', 'звёзд']) }),
-        /\bbottom-2\b/,
-        /\bright-2\b/,
-      ],
-    ] as const
-    for (const [badge, y, x] of corners) {
-      expect(badge.className).toMatch(y)
-      expect(badge.className).toMatch(x)
-    }
-
-    const button = within(carousel).getByRole('button', { name: 'Добавить в избранное' })
-    const rating = within(carousel).getByText(formatDecimal(hotel.rating))
+    const stars = countRu(hotel.stars, ['звезда', 'звезды', 'звёзд'])
+    const button = within(card).getByRole('button', { name: 'Добавить в избранное' })
+    const rating = within(card).getByText(formatDecimal(hotel.rating))
+    for (const badge of [
+      button,
+      rating,
+      within(card).getByRole('img', { name: stars }),
+      screen.getByText('Бесплатная отмена'),
+    ])
+      expect(carousel.contains(badge)).toBe(false)
     expect(rating.textContent).toBe(`Оценка гостей ${formatDecimal(hotel.rating)}`)
-    expect(button.previousElementSibling).toBe(rating)
-    // The top row: the free cancellation on the left, the rating pushed right, the heart last.
-    const top = button.parentElement!
-    expect(top.className).toMatch(/\btop-2\b/)
-    expect(top.className).toMatch(/\binset-x-2\b/)
-    expect(top.firstElementChild).toBe(within(carousel).getByText('Бесплатная отмена'))
-    expect(rating.className).toMatch(/\bml-auto\b/)
-    expect(top.lastElementChild).toBe(button)
+
+    // The heart beside the name, above the card link; the badges on the line under the name.
+    const name = within(card).getByRole('heading', { name: hotel.name })
+    expect(name.nextElementSibling).toBe(button)
+    expect(button.className).toMatch(/\bz-10\b/)
+    expect(button.closest('a')).toBeNull()
+    const line = rating.parentElement!
+    expect(name.parentElement!.nextElementSibling).toBe(line)
+    expect([...line.children].map((el) => el.textContent || el.getAttribute('aria-label'))).toEqual([
+      `Оценка гостей ${formatDecimal(hotel.rating)}`,
+      stars,
+      'Бесплатная отмена',
+    ])
+  })
+
+  it('toggles the favourite from the keyboard without opening the hotel (Scenario: Избранное с клавиатуры)', async () => {
+    const user = userEvent.setup()
+    render(<HotelTile hotel={hotel} href={`/hotels/${hotel.id}`} />)
+    const button = screen.getByRole('button', { name: 'Добавить в избранное' })
+    // In the tab order, after the name.
+    expect(button.tabIndex).toBe(0)
+    expect(screen.getByRole('link', { name: hotel.name }).compareDocumentPosition(button)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+    button.focus()
+    await user.keyboard('{Enter}')
+    expect(button.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Убрать из избранного' })).toBe(button)
   })
 })
 

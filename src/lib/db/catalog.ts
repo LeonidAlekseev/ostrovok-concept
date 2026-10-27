@@ -3,7 +3,7 @@ import { createClient, type PostgrestError } from '@supabase/supabase-js'
 import { unstable_cache } from 'next/cache'
 import type { Destination } from '@/data/destinations'
 import type { Database } from '@/lib/db/database.types'
-import { isVisibleHotel, type Hotel, type HotelSummary } from '@/lib/catalog'
+import { isVisibleHotel, type Hotel, type HotelSummary, type Photo, type SpotlightHotel } from '@/lib/catalog'
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/config'
 
 /**
@@ -121,17 +121,31 @@ const SPOTLIGHT_PER_CITY = 3
  * The hotels the hero globe spotlights, in the catalogue's order: the hand-picked "recently added" ones, and the
  * first hotels of a city with none of them, so every city shown has its pin (the real hotels are never picked).
  */
-export async function loadNewHotels(): Promise<HotelSummary[]> {
+export async function loadNewHotels(): Promise<SpotlightHotel[]> {
   const hotels = await loadHotelSummaries()
   const picked = new Set(hotels.filter((h) => h.isNew).map((h) => h.destinationId))
   const taken = new Map<string, number>()
-  return hotels.filter((h) => {
+  const spotlit = hotels.filter((h) => {
     if (picked.has(h.destinationId)) return h.isNew
     const count = taken.get(h.destinationId) ?? 0
     taken.set(h.destinationId, count + 1)
     return count < SPOTLIGHT_PER_CITY
   })
+  if (spotlit.length === 0) return []
+  const photos = new Map((await readFirstPhotos(spotlit.map((h) => h.id).sort())).map((row) => [row.id, row.photo]))
+  return spotlit.map((h) => ({ ...h, photo: photos.get(h.id) ?? null }))
 }
+
+/** The first photo of each hotel by id: only that, not the whole hotel. */
+const readFirstPhotos = cached('first-photos', async (ids: string[]) =>
+  rowsOf(
+    await database()
+      .from('hotels')
+      .select('id, photo:data->photos->0')
+      .in('id', ids)
+      .overrideTypes<{ id: string; photo: Photo | null }[], { merge: false }>(),
+  ),
+)
 
 const readHotel = cached('hotel', async (id: string): Promise<Hotel | null> => {
   const rows = rowsOf(

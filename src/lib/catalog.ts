@@ -254,6 +254,12 @@ export interface HotelSummary {
   isNew: boolean
 }
 
+/** A hotel of the hero globe: the summary and the first photo of the hotel, the one its card and page start with. */
+export interface SpotlightHotel extends HotelSummary {
+  /** `null` for a hotel without photos; absent where the summaries come without them. */
+  photo?: Photo | null
+}
+
 /** The id of a real hotel starts so: `ota-<master_id>`, from an Ostrovok search (`npm run db:seed:valencia`). */
 export const REAL_HOTEL_ID_PREFIX = 'ota-'
 
