@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import ViewMap, { type MapTarget } from './ViewMap'
@@ -10,6 +10,7 @@ const mapMock = vi.hoisted(() => ({
   hidden: [] as string[],
   data: {} as Record<string, unknown>,
   rotation: [] as string[],
+  fit: [] as { bounds: unknown; options: unknown }[],
 }))
 vi.mock('maplibre-gl', () => {
   type Handler = () => void
@@ -56,6 +57,9 @@ vi.mock('maplibre-gl', () => {
       return this
     }
     easeTo() {}
+    fitBounds(bounds: unknown, options: unknown) {
+      mapMock.fit.push({ bounds, options })
+    }
     setFilter() {}
     setPaintProperty() {}
     getContainer() {
@@ -114,6 +118,7 @@ const targets: MapTarget[] = [
     distanceM: 1200,
     tone: 'seen',
     verdict: 'видно',
+    line: true,
   },
   {
     name: 'Башни Серранос',
@@ -123,6 +128,7 @@ const targets: MapTarget[] = [
     distanceM: 900,
     tone: 'closed',
     verdict: 'закрыто',
+    line: false,
   },
 ]
 
@@ -152,6 +158,15 @@ describe('ViewMap', () => {
     expect(
       within(map).getByRole('button', { name: 'Башни Серранос, достопримечательность: закрыто' }).style.backgroundColor,
     ).toBe('rgb(220, 38, 38)')
+  })
+
+  it('fits the hotel and every dot, a far one without a line too', async () => {
+    renderMap()
+    await within(screen.getByRole('region', { name: 'Карта вида из отеля' })).findAllByRole('button')
+    await waitFor(() => expect(mapMock.fit.length).toBeGreaterThan(0))
+    // The dots span 0.0099° × 0.0065° of the hotel; the box has 30 % of the larger span round them.
+    const [[west, south], [east, north]] = mapMock.fit.at(-1)!.bounds as [[number, number], [number, number]]
+    expect([west, south, east, north].map((n) => Math.round(n * 1e4) / 1e4)).toEqual([-0.3829, 39.4705, -0.367, 39.483])
   })
 
   it('names the place, its kind, distance and verdict on hover, and on press by click or keyboard', async () => {

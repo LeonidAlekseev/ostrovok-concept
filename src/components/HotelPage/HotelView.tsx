@@ -242,23 +242,28 @@ export function HotelView({
   )
   const inView = landmarks.filter(({ target }) => inSide(target.bearing, shownSide))
   const summary = ready ? sideSummary(ready.rays, shownSide, eyeM) : null
-  const mapTargets = useMemo(
-    () =>
-      [...(sideSea?.point ? [sideSea.point] : []), ...inView.map(({ target }) => target)].map((t) => {
-        const verdict = lineVerdict(t.line, eyeM)
-        return {
-          name: t.name,
-          category: t.category,
-          lat: t.lat,
-          lon: t.lon,
-          distanceM: t.distanceM,
-          tone: VERDICT_TONE[verdict],
-          verdict: VERDICT_LABEL[verdict],
-        }
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sideSea?.point, shownSide, ready, eyeM],
-  )
+  // A dot for the sea and every landmark of the list, on any side; the line only for the ones of the shown side.
+  const sidePoint = sideSea?.point
+  const dots = [
+    ...new Set([
+      ...(sea?.point ? [sea.point] : []),
+      ...(sidePoint ? [sidePoint] : []),
+      ...landmarks.map((l) => l.target),
+    ]),
+  ]
+  const mapTargets = dots.map((t) => {
+    const verdict = lineVerdict(t.line, eyeM)
+    return {
+      name: t.name,
+      category: t.category,
+      lat: t.lat,
+      lon: t.lon,
+      distanceM: t.distanceM,
+      tone: VERDICT_TONE[verdict],
+      verdict: VERDICT_LABEL[verdict],
+      line: t === sidePoint || inView.some(({ target }) => target === t),
+    }
+  })
   const blockers = [
     ...sunBlockers(sunsetSun?.ray, eyeM),
     ...sunBlockers(sunriseSun?.ray, eyeM),

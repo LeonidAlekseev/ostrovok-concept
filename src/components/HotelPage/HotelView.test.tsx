@@ -27,7 +27,7 @@ vi.mock('./ViewMap', () => ({
     buildings: { features: unknown[] } | null
     blockers: string[]
     hotelBuilding: string | null
-    targets: { name: string; verdict: string }[]
+    targets: { name: string; verdict: string; line: boolean }[]
   }) => (
     <div data-testid="view-map">
       {bearing} {buildings?.features.length ?? 'none'} [{[...new Set(blockers)].join(',')}] {hotelBuilding}
@@ -35,6 +35,7 @@ vi.mock('./ViewMap', () => ({
         {targets.map((t) => (
           <li key={t.name}>
             {t.name}: {t.verdict}
+            {t.line ? ' (линия)' : ''}
           </li>
         ))}
       </ul>
@@ -202,16 +203,16 @@ describe('HotelView', () => {
     expect(screen.getByTestId('view-map').textContent).toMatch(/\[.*b1.*\]/)
   })
 
-  it('gives the map the places of the side with their verdicts, once each', async () => {
+  it('gives the map a dot for the sea and every landmark, a line only on the shown side', async () => {
     render(<HotelView hotel={hotel} building={building} roomFloors={null} />)
     await waitFor(() => expect(screen.getByText('Окно на 12-м этаже на восток')).toBeTruthy())
     const map = screen.getByTestId('view-map')
-    // East: the sea's point and La Lonja (75°); Torres de Serranos is north.
+    // East: lines to the sea's point and La Lonja (75°); Torres de Serranos (north) has a dot only.
     expect(
       within(map)
         .getAllByRole('listitem')
         .map((li) => li.textContent),
-    ).toEqual(['Берег моря: видно', 'Ла-Лонха: видно'])
+    ).toEqual(['Берег моря: видно (линия)', 'Ла-Лонха: видно (линия)', 'Torres de Serranos: закрыто'])
     await userEvent.click(
       within(screen.getByRole('region', { name: 'Положение окна' })).getByRole('button', { name: 'С' }),
     )
@@ -219,7 +220,7 @@ describe('HotelView', () => {
       within(map)
         .getAllByRole('listitem')
         .map((li) => li.textContent),
-    ).toEqual(['Torres de Serranos: закрыто'])
+    ).toEqual(['Берег моря: видно', 'Ла-Лонха: видно', 'Torres de Serranos: закрыто (линия)'])
   })
 
   it('tells the sunset and the sunrise of the date and from which floor the sun is seen', async () => {

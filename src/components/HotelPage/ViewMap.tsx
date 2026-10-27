@@ -37,6 +37,9 @@ import {
 const ZOOM = 16
 const PITCH = 55
 
+/** The room round the dots when the map fits them, of their span. */
+const FIT_ROOM = 0.3
+
 /** The fan of the chosen side and the sun's line, m. */
 const SECTOR_M = 450
 const SUN_M = 700
@@ -63,6 +66,8 @@ export interface MapTarget {
   tone: Tone
   /** The verdict from the chosen floor in words («видно», «закрыто», …). */
   verdict: string
+  /** A line runs to it: it is on the shown side. */
+  line: boolean
 }
 
 const empty = { type: 'FeatureCollection' as const, features: [] }
@@ -95,7 +100,7 @@ export default function ViewMap({
   bearing,
   sunsetAzimuth,
   sunriseAzimuth,
-  targets,
+  targets: given,
   blockers,
   hotelBuilding,
   onFail,
@@ -114,6 +119,9 @@ export default function ViewMap({
   const [map, setMap] = useState<MapLibreMap | null>(null)
   /** The style's own 3D buildings (OSM's heights) and their filters. */
   const styleBuildings = useRef<{ id: string; filter: FilterSpecification | undefined }[]>([])
+  // The targets by value: the dots and the fit stay while the list is the same.
+  const targetsKey = JSON.stringify(given)
+  const targets = useMemo(() => JSON.parse(targetsKey) as MapTarget[], [targetsKey])
   const fail = useRef(onFail)
   useEffect(() => {
     fail.current = onFail
@@ -231,28 +239,41 @@ export default function ViewMap({
     map.setPaintProperty('view-buildings', 'fill-extrusion-color', buildingColor(blockers, hotelBuilding))
   }, [map, blockers, hotelBuilding])
 
-  // The chosen side faces up.
+  // The chosen side faces up, the hotel and all the dots in view under the legend.
   useEffect(() => {
     if (!map) return
     map.getSource<GeoJSONSource>('view-sector')?.setData(sector(center, bearing))
-    map.easeTo({ bearing, duration: 600 })
-  }, [map, center, bearing])
+    const lons = [center.lon, ...targets.map((t) => t.lon)]
+    const lats = [center.lat, ...targets.map((t) => t.lat)]
+    // The tilt widens what stands near the bottom and the fit does not know it: the box has some room.
+    const [west, east, south, north] = [Math.min(...lons), Math.max(...lons), Math.min(...lats), Math.max(...lats)]
+    const room = FIT_ROOM * Math.max(east - west, north - south, 0.002)
+    map.fitBounds(
+      [
+        [west - room, south - room],
+        [east + room, north + room],
+      ],
+      { bearing, padding: { top: 110, bottom: 40, left: 40, right: 40 }, maxZoom: ZOOM, duration: 600 },
+    )
+  }, [map, center, bearing, targets])
 
   useEffect(() => {
     if (!map) return
     map.getSource<GeoJSONSource>('view-lines')?.setData({
       type: 'FeatureCollection',
-      features: targets.map((t) => ({
-        type: 'Feature',
-        properties: { color: TONE_COLOR[t.tone] },
-        geometry: {
-          type: 'LineString',
-          coordinates: [
-            [center.lon, center.lat],
-            [t.lon, t.lat],
-          ],
-        },
-      })),
+      features: targets
+        .filter((t) => t.line)
+        .map((t) => ({
+          type: 'Feature',
+          properties: { color: TONE_COLOR[t.tone] },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [center.lon, center.lat],
+              [t.lon, t.lat],
+            ],
+          },
+        })),
     })
   }, [map, center, targets])
 
