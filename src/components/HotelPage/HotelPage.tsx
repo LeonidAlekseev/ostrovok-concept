@@ -63,7 +63,9 @@ export function HotelPage({ hotel, details, noise }: Props) {
                   {hasGuestReviews(hotel, details) && <HotelRating hotel={hotel} details={details} />}
                   <HotelLocation hotel={hotel} details={details} />
                   {noise && <HotelNoise hotel={hotel} noise={noise} building={details?.building} />}
-                  {details && <HotelView hotel={hotel} building={details.building} />}
+                  {details && (
+                    <HotelView hotel={hotel} building={details.building} roomFloors={details.facts.roomFloors} />
+                  )}
                   <HotelRules hotel={hotel} details={details} />
                 </div>
               </div>
