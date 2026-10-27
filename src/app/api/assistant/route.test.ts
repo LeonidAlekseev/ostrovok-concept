@@ -15,6 +15,8 @@ import { runOwner } from '@/lib/db/toolRuns'
 import { loadLevelIndex, loadNearIndex } from '@/lib/db/knowledge'
 import { errorResult, toolResultSchema } from '@/lib/toolResult'
 import { sampleResult } from '@/test/toolResult'
+import { addDays, todayIso } from '@/lib/dates'
+import { stayTotal } from '@/lib/offer'
 import { POST } from './route'
 
 vi.mock('@/lib/ai/model', () => ({ getTextModels: vi.fn(), getVisionModels: vi.fn(), REMARK_MODEL_ID: 'remark' }))
@@ -1269,5 +1271,74 @@ describe('POST /api/assistant: the choice by the tools of the store', () => {
     expect(body.findings).toBe('Данные хранилища не прочитались (ночью тише 50 дБ) — по ним не подбирал.')
     expect(body.steps.at(-1)).toMatchObject({ title: 'Проверяю данные о шуме', status: 'done' })
     expect(body.matches.map((h: { id: string }) => h.id).slice(0, 2)).toEqual([b.id, a.id])
+  })
+})
+
+// trips-assistant: the bookings come with the request, checked by the schema; the change is a proposal
+describe('POST /api/assistant: a chat about the bookings', () => {
+  const lantern = getHotel('prague-old-town-lantern')!
+  const rate = lantern.rooms[0].rates[0]
+  const checkIn = addDays(todayIso(), 20)
+  const checkOut = addDays(checkIn, 2)
+  const trip = {
+    id: 'OS-TRIP01',
+    createdAt: '2026-10-20T10:00:00.000Z',
+    status: 'confirmed',
+    hotelId: lantern.id,
+    roomId: lantern.rooms[0].id,
+    rateId: rate.id,
+    checkIn,
+    checkOut,
+    guests: { adults: 2, children: 0, rooms: 1 },
+    payment: 'at-hotel',
+    total: stayTotal(rate.pricePerNight, checkIn, checkOut, 1),
+    cancellation: rate.cancellation,
+  }
+  const askTrips = (text: string, bookings: unknown[] = [trip]) =>
+    post({ messages: [{ role: 'user', text }], brief: { trips: true }, bookings })
+
+  it('proposes the new dates of the booking with the price of its rate', async () => {
+    setModel(undefined)
+    const newIn = addDays(checkIn, 7)
+    const newOut = addDays(newIn, 3)
+    const [d1, m1] = [Number(newIn.slice(8)), Number(newIn.slice(5, 7))]
+    const [d2, m2] = [Number(newOut.slice(8)), Number(newOut.slice(5, 7))]
+    const response = await askTrips(`Перенеси на ${d1}.${m1}–${d2}.${m2}`)
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body.change).toEqual({
+      bookingId: 'OS-TRIP01',
+      from: { checkIn, checkOut, total: trip.total },
+      checkIn: newIn,
+      checkOut: newOut,
+      total: stayTotal(rate.pricePerNight, newIn, newOut, 1),
+      cancellation: expect.any(Object),
+    })
+    expect(body.steps[0]).toMatchObject({ agent: 'trips', title: 'Пересчёт при смене дат' })
+    expect(toolResultSchema.safeParse(body.steps[0].run.result).success).toBe(true)
+  })
+
+  it('answers about the booking from its data', async () => {
+    setModel(undefined)
+    const body = await (await askTrips('Какие условия отмены?')).json()
+    expect(body).toMatchObject({ source: 'rules', brief: { trips: true } })
+    expect(body.reply).toContain(lantern.name)
+    expect(body.change).toBeUndefined()
+  })
+
+  it('refuses bookings off the schema', async () => {
+    expect((await askTrips('Что с бронью?', [{ ...trip, id: 'nope' }])).status).toBe(400)
+    expect((await askTrips('Что с бронью?', [{ ...trip, total: -5 }])).status).toBe(400)
+    expect((await askTrips('Что с бронью?', [{ ...trip, checkIn: '10 ноября' }])).status).toBe(400)
+  })
+
+  it('reads no personal fields of a booking', async () => {
+    setModel(undefined)
+    const body = await (
+      await askTrips('Какие у меня поездки?', [
+        { ...trip, roomGuests: [{ firstName: 'Анна', lastName: 'Петрова' }], contact: { email: 'a@b.co', phone: '1' } },
+      ])
+    ).json()
+    expect(JSON.stringify(body)).not.toMatch(/Анна|a@b\.co/)
   })
 })

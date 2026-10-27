@@ -57,6 +57,8 @@ import { todayIso } from '@/lib/dates'
 import { isHotelGeoQuestion, isHotelViewQuestion, isNoiseQuestion } from '@/lib/noise'
 import type { OptimizedPhoto } from '@/lib/imageOptimize'
 import { getBrowserClient } from '@/lib/supabase/client'
+import { bookingsStore, findBooking, saveBooking } from '@/lib/storage'
+import { MAX_BOOKINGS, applyDateChange, tripBooking } from '@/lib/trips'
 
 /** The shortest pause before the assistant replies, so the answer reads as a reply rather than an echo. */
 export const THINK_MS = 650
@@ -78,6 +80,8 @@ const GEO_STEP = { agent: 'geo', title: 'Проверяю места рядом 
 const VIEW_STEP = { agent: 'geo', title: 'Проверяю, что видно из окна' } as const
 /** The step of the tool «Анализ шума» while it runs: its block with the sources comes with the answer. */
 const NOISE_STEP = { agent: 'features', title: 'Анализ шума' } as const
+/** The step of a chat about the bookings while they are read: the blocks of its tools come with the answer. */
+const TRIPS_STEP = { agent: 'trips', title: 'Смотрю бронирования' } as const
 /** How long a turn of a signed-in user waits for its chat to be saved: the server records the tools' runs in it. */
 const SAVE_WAIT_MS = 3000
 
@@ -110,6 +114,16 @@ export function compose(
 ): { brief: Brief; question: Question | null; text: string; data: ChatMessage['data'] } {
   const { brief, reply: remark, matches, features, missing = [], photo } = response
   const today = todayIso()
+  // A chat about the bookings: the answer and the change of the dates it proposes, to be confirmed.
+  if (brief.trips) {
+    const { change } = response
+    return {
+      brief,
+      question: null,
+      text: remark ?? HOTEL_UNAVAILABLE,
+      data: change ? { change: { proposal: change, state: 'proposed' } } : {},
+    }
+  }
   // A chat about a hotel: the answer is the text, the model's general knowledge goes apart; no questions, no plan.
   if (brief.hotelId) {
     const { unverified, map } = response
@@ -180,6 +194,12 @@ export interface HotelContext {
   dates?: StayDates
 }
 
+/** «Мои поездки» or a booking's page: the chat the traveller starts is about the bookings, or that booking. */
+export interface TripsContext {
+  trips: true
+  bookingId?: string
+}
+
 export interface Chats {
   /** Newest first. */
   chats: Chat[]
@@ -195,6 +215,11 @@ export interface Chats {
   send: (text: string, options?: { more?: boolean; photos?: readonly OptimizedPhoto[] }) => void
   /** Asks the failed answer again. */
   retry: (chatId: string, messageId: string) => void
+  /**
+   * «Подтвердить» of a proposed change of a booking's dates: the booking of this browser gets the new dates, price
+   * and cancellation terms, unless it changed since the change was counted — then the proposal is outdated.
+   */
+  confirmChange: (chatId: string, messageId: string) => void
   rename: (chatId: string, title: string) => void
   /** Deletes the chat with its messages, here and in the account. */
   remove: (chatId: string) => void
@@ -223,9 +248,11 @@ export function useChats(
   newHotels: readonly HotelSummary[],
   /** The chat of the address (`/assistant/<id>`); `null` or an id not in the list is a new, empty chat. */
   activeId: string | null,
-  /** On a hotel's page: the chat the traveller starts is about the hotel. */
-  hotel?: HotelContext,
+  /** On a hotel's page the chat the traveller starts is about the hotel; on the trips' pages, about the bookings. */
+  scope?: HotelContext | TripsContext,
 ): Chats {
+  const hotel = scope && !('trips' in scope) ? scope : undefined
+  const trips = scope && 'trips' in scope ? scope : undefined
   const session = useSession()
   const [mode, setMode] = useState<Mode>({ kind: 'loading' })
   const [chats, setChats] = useState<Chat[]>([])
@@ -408,15 +435,17 @@ export function useChats(
         !found &&
         !chat.brief.hotelId &&
         !nextQuestion(rerun ? chat.brief : mergeBrief(chat.brief, input, question, destinations), today)
-      const waitStep = planDue
-        ? SEARCH_STEP
-        : chat.brief.hotelId && isHotelViewQuestion(input)
-          ? VIEW_STEP
-          : chat.brief.hotelId && isHotelGeoQuestion(input)
-            ? GEO_STEP
-            : chat.brief.hotelId && isNoiseQuestion(input)
-              ? NOISE_STEP
-              : null
+      const waitStep = chat.brief.trips
+        ? TRIPS_STEP
+        : planDue
+          ? SEARCH_STEP
+          : chat.brief.hotelId && isHotelViewQuestion(input)
+            ? VIEW_STEP
+            : chat.brief.hotelId && isHotelGeoQuestion(input)
+              ? GEO_STEP
+              : chat.brief.hotelId && isNoiseQuestion(input)
+                ? NOISE_STEP
+                : null
       const stepId = newId()
       update(chatId, (c) => ({
         ...c,
@@ -453,6 +482,8 @@ export function useChats(
               ...(sent && { photos: sent }),
               ...(rerun && { rerun }),
               ...(remote && { chatId, messageId: pendingId }),
+              // The bookings of this browser as they are now, without the personal fields.
+              ...(chat.brief.trips && { bookings: bookingsStore.get().slice(0, MAX_BOOKINGS).map(tripBooking) }),
             },
             rerun ? null : question,
             destinations,
@@ -615,13 +646,21 @@ export function useChats(
       data: {},
       createdAt: later(now, ANSWER_GAP_MS),
     }
-    // A chat about a hotel is named after it, and the page's dates go to the next answer.
+    // A chat about a hotel is named after it, and the page's dates go to the next answer; a chat of the trips' pages
+    // is about the bookings.
     const about = hotel && (!current.brief.hotelId || current.brief.hotelId === hotel.id)
+    const ownTrips = trips && current.messages.length === 0
+    const title = ownTrips
+      ? chatTitle(trips.bookingId ? `Бронирование ${trips.bookingId}` : 'Мои поездки')
+      : about && hotel
+        ? chatTitle(hotel.name)
+        : chatTitle(text || PHOTO_TEXT)
     const chat: Chat = {
       ...current,
-      title: current.title || (about && hotel ? chatTitle(hotel.name) : chatTitle(text || PHOTO_TEXT)),
-      brief:
-        about && hotel
+      title: current.title || title,
+      brief: ownTrips
+        ? { trips: true, ...(trips.bookingId && { bookingId: trips.bookingId }) }
+        : about && hotel
           ? { ...current.brief, hotelId: hotel.id, ...(hotel.dates && briefWithStay(hotel.dates)) }
           : current.brief,
       messages: [...current.messages, user, pending],
@@ -660,6 +699,23 @@ export function useChats(
     update(chatId, (chat) => ({
       ...chat,
       messages: chat.messages.map((m) => (m.id === messageId ? { ...m, status: 'pending', text: '' } : m)),
+    }))
+  }
+
+  const confirmChange = (chatId: string, messageId: string) => {
+    const message = chatsRef.current.find((c) => c.id === chatId)?.messages.find((m) => m.id === messageId)
+    const change = message?.data.change
+    if (!change || change.state !== 'proposed') return
+    const booking = findBooking(bookingsStore.get(), change.proposal.bookingId)
+    const next = booking && applyDateChange(booking, change.proposal, todayIso())
+    if (next) saveBooking(next)
+    const state = next ? 'applied' : 'outdated'
+    update(chatId, (chat) => ({
+      ...chat,
+      messages: chat.messages.map((m) =>
+        m.id === messageId && m.data.change ? { ...m, data: { ...m.data, change: { ...m.data.change, state } } } : m,
+      ),
+      updatedAt: new Date().toISOString(),
     }))
   }
 
@@ -746,6 +802,7 @@ export function useChats(
     signedIn: mode.kind === 'remote',
     send,
     retry,
+    confirmChange,
     rename,
     remove,
     setBrief,

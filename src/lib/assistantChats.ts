@@ -11,6 +11,7 @@ import { clearDialog, isBrief, isPlan, isQuestion, loadDialog } from './assistan
 import { parseChatMap, type ChatMap } from './geo/chatMap'
 import { parseParams, type SessionParam } from './sessionMemory'
 import { parseToolRun, type ToolRun } from './toolResult'
+import { parseDateChange, type DateChange, type DateChangeState } from './trips'
 
 /**
  * The chats with Эвал. A message has a role, a status and structured data, so the feed holds the steps of Эвал's
@@ -74,6 +75,11 @@ export interface MessageData {
   notFound?: Brief
   /** An answer to the parameters changed by hand: the route picks by the brief, the dialog is not read again. */
   rerun?: true
+  /**
+   * A chat about the bookings: the change of a booking's dates Эвал proposed and what came of it — applied in the
+   * browser only with «Подтвердить».
+   */
+  change?: { proposal: DateChange; state: DateChangeState }
 }
 
 export interface ChatMessage {
@@ -130,6 +136,13 @@ export const isPending = (chat: Chat) => chat.messages.some((m) => m.status === 
 /** The hotels the chat's answers have shown. */
 export const shownHotels = (chat: Chat): Set<string> =>
   new Set(chat.messages.flatMap((m) => m.data.plan?.options.flatMap((o) => (o.hotel ? [o.hotel.id] : [])) ?? []))
+
+/**
+ * The newest chat about the bookings the trips page continues: the one opened on the booking `bookingId`, or the one of
+ * all the trips without it.
+ */
+export const tripsChatOf = (chats: readonly Chat[], bookingId?: string): Chat | undefined =>
+  chats.filter((c) => c.brief.trips && c.brief.bookingId === bookingId && c.messages.length > 0).sort(byRecent)[0]
 
 /** The newest chat about the hotel (`brief.hotelId`), the one its page continues. */
 export const hotelChatOf = (chats: readonly Chat[], hotelId: string): Chat | undefined =>
@@ -221,7 +234,16 @@ export function parseData(value: unknown): MessageData | null {
     ...(parseParams(value.memory) && { memory: parseParams(value.memory) }),
     ...(isBrief(value.notFound) && { notFound: value.notFound }),
     ...(value.rerun === true && { rerun: true as const }),
+    ...(parseChange(value.change) && { change: parseChange(value.change) }),
   }
+}
+
+const CHANGE_STATES: readonly DateChangeState[] = ['proposed', 'applied', 'outdated']
+
+function parseChange(value: unknown): MessageData['change'] {
+  if (!isObject(value) || !CHANGE_STATES.includes(value.state as DateChangeState)) return undefined
+  const proposal = parseDateChange(value.proposal)
+  return proposal && { proposal, state: value.state as DateChangeState }
 }
 
 export function parseMessage(value: unknown): ChatMessage | null {

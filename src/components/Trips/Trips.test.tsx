@@ -97,7 +97,7 @@ describe('BookingDetailsPage', () => {
     expect(screen.getByText('anna@example.com, +7 900 123-45-67')).toBeTruthy()
     expect(screen.getByText('Оплата в отеле при заселении')).toBeTruthy()
     expect(screen.getByText(/Бесплатная отмена до/)).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Напишите в поддержку' }).getAttribute('href')).toBe('/help')
+    expect(screen.getByRole('button', { name: 'Изменить даты с Эвалом' })).toBeTruthy()
   })
 
   it('cancels for free before the free-cancellation date', async () => {

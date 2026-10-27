@@ -75,7 +75,7 @@ export function BookingForm({ offer }: { offer: Offer }) {
       let id = newBookingId()
       while (bookings.some((b) => b.id === id)) id = newBookingId()
       saveBooking(createBooking(offer, values, id, new Date(), todayIso()))
-      router.replace(`/booking/confirmation?id=${id}`)
+      router.replace(`/trips?new=${id}`)
     }, PROCESSING_MS)
   }
 
