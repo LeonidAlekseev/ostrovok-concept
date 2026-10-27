@@ -11,8 +11,9 @@ import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supaba
  * here and hand them to the calculations and to the client components as props. The catalogue lives in
  * Supabase (read with the anon key under RLS) and is cached by Next under the `catalog` tag: for an hour,
  * or until `POST /api/revalidate` after `npm run db:seed`. Every loader gives only the hotels shown in this
- * environment (`isVisibleHotel`: production hides the synthetic ones) and only the destinations with such hotels;
- * the cache keeps the whole catalogue, so a build of another environment reads the same entries.
+ * environment (`isVisibleHotel`: production hides the synthetic ones), never the real hotels outside the loaded noise
+ * maps (`hotels_outside_noise`), and only the destinations with such hotels; the cache keeps the whole catalogue, so
+ * a build of another environment reads the same entries.
  */
 
 export const CATALOG_TAG = 'catalog'
@@ -84,9 +85,34 @@ const readHotelSummaries = cached('summaries', async (): Promise<HotelSummary[]>
   ),
 )
 
+const readOutsideNoise = cached('outside-noise', async (): Promise<string[]> =>
+  rowsOf(await database().rpc('hotels_outside_noise')),
+)
+
+/**
+ * The real hotels outside the loaded EEA noise maps (`hotels_outside_noise`: the page would say «Нет данных EEA»),
+ * hidden everywhere while their rows stay. A failed read hides none: the catalogue does not fail with it.
+ */
+export async function loadHiddenHotelIds(): Promise<ReadonlySet<string>> {
+  try {
+    return new Set(await readOutsideNoise())
+  } catch (error) {
+    console.warn(`catalog: no hotels outside the noise maps (${String((error as Error)?.message).slice(0, 200)})`)
+    return new Set()
+  }
+}
+
+/** The test of the hotels shown: `isVisibleHotel` and not outside the noise maps. */
+async function shownTest(): Promise<(hotel: Pick<HotelSummary, 'id'>) => boolean> {
+  const hidden = await loadHiddenHotelIds()
+  return (hotel) => isVisibleHotel(hotel) && !hidden.has(hotel.id)
+}
+
 /** Summaries of the hotels shown, grouped by city in the order of the destinations. */
-export const loadHotelSummaries = async (): Promise<HotelSummary[]> =>
-  (await readHotelSummaries()).filter(isVisibleHotel)
+export async function loadHotelSummaries(): Promise<HotelSummary[]> {
+  const [hotels, shown] = await Promise.all([readHotelSummaries(), shownTest()])
+  return hotels.filter(shown)
+}
 
 /** Hotels the hero globe spotlights in a city without hand-picked ones: as many as the generator picks. */
 const SPOTLIGHT_PER_CITY = 3
@@ -116,7 +142,7 @@ const readHotel = cached('hotel', async (id: string): Promise<Hotel | null> => {
 
 /** The full hotel, or `undefined` for an unknown id or a hotel not shown. */
 export async function loadHotel(id: string): Promise<Hotel | undefined> {
-  if (!isVisibleHotel({ id })) return undefined
+  if (!isVisibleHotel({ id }) || (await loadHiddenHotelIds()).has(id)) return undefined
   return (await readHotel(id)) ?? undefined
 }
 
@@ -128,7 +154,10 @@ const readHotels = cached('hotels', async (ids: string[]): Promise<Hotel[]> =>
 
 /** Full hotels by id, in the order of the ids; unknown ids and the hotels not shown are skipped. */
 export async function loadHotels(ids: readonly string[]): Promise<Hotel[]> {
-  const unique = [...new Set(ids)].filter((id) => isVisibleHotel({ id })).sort()
+  const visible = [...new Set(ids)].filter((id) => isVisibleHotel({ id }))
+  if (visible.length === 0) return []
+  const hidden = await loadHiddenHotelIds()
+  const unique = visible.filter((id) => !hidden.has(id)).sort()
   if (unique.length === 0) return []
   const byId = new Map((await readHotels(unique)).map((h) => [h.id, h]))
   return ids.flatMap((id) => byId.get(id) ?? [])
@@ -148,8 +177,10 @@ const readCityHotels = cached('city', async (destinationId: string): Promise<Hot
 )
 
 /** Full hotels shown of the cities, city by city in the given order. */
-export const loadCityHotels = async (destinationIds: readonly string[]): Promise<Hotel[]> =>
-  (await Promise.all(destinationIds.map((id) => readCityHotels(id)))).flat().filter(isVisibleHotel)
+export async function loadCityHotels(destinationIds: readonly string[]): Promise<Hotel[]> {
+  const [cities, shown] = await Promise.all([Promise.all(destinationIds.map((id) => readCityHotels(id))), shownTest()])
+  return cities.flat().filter(shown)
+}
 
 /** Every full hotel shown, in the order of `loadHotelSummaries`. */
 export const loadAllHotels = async (): Promise<Hotel[]> => loadCityHotels((await loadDestinations()).map((d) => d.id))

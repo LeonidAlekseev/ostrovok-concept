@@ -46,7 +46,13 @@ vi.mock('@supabase/supabase-js', () => {
     db.calls.push(['from', table])
     return query(table)
   }
-  return { createClient: () => ({ from }) }
+  // A function answers with its `db.tables['rpc:<name>']`, none by default.
+  const rpc = (name: string) => {
+    db.calls.push(['rpc', name])
+    db.tables[`rpc:${name}`] ??= { data: [], error: null }
+    return query(`rpc:${name}`)
+  }
+  return { createClient: () => ({ from, rpc }) }
 })
 vi.mock('@/lib/env', () => import('@/test/env'))
 // Next's cache needs the server; the reads themselves are what is tested here.
@@ -164,5 +170,26 @@ describe('the hotels shown', () => {
 
     db.tables.hotels = { data: [{ data: lantern }, { data: valencian }], error: null }
     expect((await loadCityHotels(['prague'])).map((h) => h.id)).toEqual(['ota-1'])
+  })
+
+  // hotel-catalog, Requirement: Отели вне карт шума скрыты
+  it('hides the real hotels outside the noise maps everywhere (Scenario: Отель у аэропорта)', async () => {
+    db.tables['rpc:hotels_outside_noise'] = { data: ['ota-2'], error: null }
+    expect((await loadHotelSummaries()).map((h) => h.id)).not.toContain('ota-2')
+    expect(await loadHotel('ota-2')).toBeUndefined()
+
+    const valencian = (id: string) => ({ data: { ...lantern, id, destinationId: 'valencia' } })
+    db.tables.hotels = { data: [valencian('ota-1')], error: null }
+    expect((await loadHotels(['ota-1', 'ota-2'])).map((h) => h.id)).toEqual(['ota-1'])
+    expect(db.calls).toContainEqual(['in', 'id', ['ota-1']])
+    db.tables.hotels = { data: [valencian('ota-1'), valencian('ota-2')], error: null }
+    expect((await loadCityHotels(['valencia'])).map((h) => h.id)).toEqual(['ota-1'])
+  })
+
+  // hotel-catalog, Requirement: Скрытие по данным шума (Scenario: Сбой чтения)
+  it('hides none when the hotels outside the noise maps cannot be read', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    db.tables['rpc:hotels_outside_noise'] = { data: null, error: { message: 'no function' } }
+    expect((await loadHotelSummaries()).map((h) => h.id)).toEqual(summaries.map((h) => h.id))
   })
 })

@@ -1,11 +1,11 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AMENITIES, cheapestRate, POPULAR_AMENITIES, workLabels } from '@/lib/catalog'
+import { AMENITIES, cheapestRate, POPULAR_AMENITIES, workLabels, type Hotel } from '@/lib/catalog'
 import { fullHotelsIn, getHotel } from '@/lib/catalogGenerator'
 import { formatPrice } from '@/lib/format'
 import { guruPrice, stayTotal } from '@/lib/offer'
-import type { Stay } from '@/lib/search'
+import { setStayParams, type Stay } from '@/lib/search'
 import { scoreColor } from '@/lib/reviews'
 import { AboutHotel, HotelAmenities } from './AboutHotel'
 import { HotelPage } from './HotelPage'
@@ -31,9 +31,11 @@ beforeEach(() => {
 })
 afterEach(() => vi.useRealTimers())
 
-/** The hotel inside the dialog of the results map: the stay is held by the caller. */
-const renderLocal = (stay: Stay, onChange = vi.fn()) =>
-  render(<HotelPage hotel={hotel} titleId="t" stay={{ value: stay, onChange }} />)
+/** The hotel page with the stay in its address. */
+const renderStay = (stay: Stay, page: Hotel = hotel) => {
+  nav.query = setStayParams(new URLSearchParams(), stay).toString()
+  return render(<HotelPage hotel={page} />)
+}
 
 // hotel-page, Requirement: Блок оценки
 describe('HotelRating', () => {
@@ -222,7 +224,7 @@ describe('HotelAmenities', () => {
 // hotel-page, Requirement: Блок дат проживания
 describe('StayDates', () => {
   it('shows check-in and check-out with the hotel times and the guests with the nights', () => {
-    renderLocal({ checkIn: '2026-10-24', checkOut: '2026-10-25', guests })
+    renderStay({ checkIn: '2026-10-24', checkOut: '2026-10-25', guests })
     const block = screen.getByRole('region', { name: 'Даты проживания' })
     for (const text of ['24 окт, сб', 'с 14:00', '25 окт, вс', 'до 12:00'])
       expect(within(block).getByText(text)).toBeDefined()
@@ -231,22 +233,22 @@ describe('StayDates', () => {
 
   it('changes the dates with "Изменить" and the guests with their row', async () => {
     const user = userEvent.setup()
-    const onChange = vi.fn()
-    renderLocal({ checkIn: '2026-10-24', checkOut: '2026-10-25', guests }, onChange)
+    const stay = { checkIn: '2026-10-24', checkOut: '2026-10-25', guests }
+    renderStay(stay)
+    const address = (next: Stay) => [
+      `/hotels/x?${setStayParams(new URLSearchParams(nav.query), next)}`,
+      { scroll: false },
+    ]
     const block = screen.getByRole('region', { name: 'Даты проживания' })
 
     await user.click(within(block).getByRole('button', { name: 'Изменить' }))
     await user.click(await screen.findByRole('button', { name: / 28 октября 2026/ }))
     await user.click(screen.getByRole('button', { name: / 30 октября 2026/ }))
-    expect(onChange).toHaveBeenLastCalledWith({ checkIn: '2026-10-28', checkOut: '2026-10-30', guests })
+    expect(nav.replace).toHaveBeenLastCalledWith(...address({ checkIn: '2026-10-28', checkOut: '2026-10-30', guests }))
 
     await user.click(within(block).getByRole('button', { name: /^Гости: / }))
     await user.click(await screen.findByRole('button', { name: 'Взрослые: увеличить' }))
-    expect(onChange).toHaveBeenLastCalledWith({
-      checkIn: '2026-10-24',
-      checkOut: '2026-10-25',
-      guests: { ...guests, adults: 3 },
-    })
+    expect(nav.replace).toHaveBeenLastCalledWith(...address({ ...stay, guests: { ...guests, adults: 3 } }))
   })
 
   it('without dates shows "Выберите даты"', () => {
@@ -271,7 +273,7 @@ describe('BookingCard', () => {
   })
 
   it('with dates shows the cheapest rate for the stay, the days and the guests', () => {
-    renderLocal({ checkIn: '2026-10-22', checkOut: '2026-10-25', guests: { adults: 3, children: 0, rooms: 2 } })
+    renderStay({ checkIn: '2026-10-22', checkOut: '2026-10-25', guests: { adults: 3, children: 0, rooms: 2 } })
     const total = stayTotal(cheapest, '2026-10-22', '2026-10-25', 2)
     expect(card().querySelector('s')!.textContent).toBe(`Обычная цена ${formatPrice(total)}`)
     expect(card().textContent).toContain(`Цена GURU ${formatPrice(guruPrice(total))}`)
@@ -303,13 +305,7 @@ describe('BookingCard', () => {
       cancellation: daysBefore === null ? { kind: 'non-refundable' as const } : { kind: 'free' as const, daysBefore },
     })
     const rooms = [{ ...hotel.rooms[0], rates: [rate('a', 3000, null), rate('b', 4000, 2)] }]
-    render(
-      <HotelPage
-        hotel={{ ...hotel, rooms }}
-        titleId="t"
-        stay={{ value: { checkIn: '2026-10-25', checkOut: '2026-10-26', guests }, onChange: vi.fn() }}
-      />,
-    )
+    renderStay({ checkIn: '2026-10-25', checkOut: '2026-10-26', guests }, { ...hotel, rooms })
     expect(within(card()).getByText('Бесплатная отмена до 23 окт, пт')).toBeDefined()
     expect(screen.queryByText(/Лучшая цена/)).toBeNull()
   })
@@ -319,15 +315,9 @@ describe('BookingCard', () => {
       ...room,
       rates: room.rates.map((r) => ({ ...r, cancellation: { kind: 'non-refundable' as const } })),
     }))
-    renderLocal({ checkIn: '2026-10-25', checkOut: '2026-10-26', guests })
+    renderStay({ checkIn: '2026-10-25', checkOut: '2026-10-26', guests })
     expect(screen.getAllByText(/^Бесплатная отмена до/).length).toBeGreaterThan(0)
-    render(
-      <HotelPage
-        hotel={{ ...hotel, rooms: strict }}
-        titleId="u"
-        stay={{ value: { checkIn: '2026-10-25', checkOut: '2026-10-26', guests }, onChange: vi.fn() }}
-      />,
-    )
+    renderStay({ checkIn: '2026-10-25', checkOut: '2026-10-26', guests }, { ...hotel, rooms: strict })
     const cards = screen.getAllByRole('region', { name: 'Цена' })
     expect(within(cards[1]).queryByText(/Бесплатная отмена/)).toBeNull()
   })
@@ -358,15 +348,6 @@ describe('BookingCard', () => {
     render(<HotelPage hotel={hotel} />)
     const total = stayTotal(cheapest, '2026-10-22', '2026-10-25', 1)
     expect(screen.getByRole('button', { name: `Забронировать · ${formatPrice(guruPrice(total))}` })).toBeDefined()
-  })
-
-  // hotel-page, Requirement: Кнопки страницы отеля
-  it('in the hotel dialog is one column with the booking card at the end and nothing stuck to the bottom', () => {
-    renderLocal({ checkIn: '2026-10-24', checkOut: '2026-10-25', guests })
-    expect(screen.queryByRole('complementary')).toBeNull()
-    expect(screen.queryByRole('button', { name: /^Выбрать даты$|^Забронировать ·/ })).toBeNull()
-    const rules = screen.getByRole('region', { name: 'Правила' })
-    expect(rules.compareDocumentPosition(card()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })
 
@@ -451,13 +432,6 @@ describe('HotelPage', () => {
     ]
     expect(buttons).toHaveLength(5)
     for (const button of buttons) expect(button.getAttribute('aria-haspopup')).toBe('dialog')
-  })
-
-  it('opens the reviews dialog inside the hotel dialog of the results map', async () => {
-    const user = userEvent.setup()
-    renderLocal({ checkIn: '2026-10-24', checkOut: '2026-10-25', guests })
-    await user.click(screen.getByRole('button', { name: /^Читать отзывы/ }))
-    expect(screen.getByRole('dialog', { name: 'Отзывы' })).toBeDefined()
   })
 
   // hotel-page, Requirement: Вкладки страницы отеля
@@ -547,7 +521,7 @@ describe('ShareButton', () => {
     const share = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'share', { value: share, configurable: true })
     const user = userEvent.setup()
-    renderLocal(stay)
+    renderStay(stay)
     await user.click(shareButton())
     expect(share).toHaveBeenCalledWith({ title: hotel.name, url })
   })
@@ -557,7 +531,7 @@ describe('ShareButton', () => {
     Object.defineProperty(navigator, 'share', { value: undefined, configurable: true })
     const user = userEvent.setup()
     const writeText = vi.fn().mockResolvedValue(undefined)
-    renderLocal(stay)
+    renderStay(stay)
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     await user.click(shareButton())
     expect(writeText).toHaveBeenCalledWith(url)
@@ -581,16 +555,10 @@ describe('HotelPage generated', () => {
 
 // hotel-page, Requirement: Вкладки страницы отеля
 describe('HotelTabs', () => {
-  it('runs to the phone edges on the page and in the dialog, and leaves lg alone (Scenario: Вкладки на телефоне)', () => {
-    const { unmount } = render(<HotelPage hotel={hotel} />)
+  it('runs to the phone edges and leaves lg alone (Scenario: Вкладки на телефоне)', () => {
+    render(<HotelPage hotel={hotel} />)
     const pageNav = screen.getByRole('navigation', { name: 'Разделы отеля' })
     expect(pageNav.className).toContain('max-lg:-mx-(--page-x)')
     expect(pageNav.querySelector('ul')!.className).toContain('max-lg:px-(--page-x)')
-    unmount()
-
-    render(<HotelPage hotel={hotel} titleId="t" />)
-    const dialogNav = screen.getByRole('navigation', { name: 'Разделы отеля' })
-    expect(dialogNav.className).toContain('max-lg:-mx-4')
-    expect(dialogNav.querySelector('ul')!.className).toContain('max-lg:px-4')
   })
 })

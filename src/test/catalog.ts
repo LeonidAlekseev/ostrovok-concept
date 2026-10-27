@@ -14,6 +14,8 @@ export const CATALOG_LIFETIME = 3600
 
 export class CatalogUnavailableError extends Error {}
 
+/** The generator has no hotels outside the noise maps. */
+export const loadHiddenHotelIds = async (): Promise<ReadonlySet<string>> => new Set<string>()
 export const loadDestinations = async () => destinations
 export const loadDestination = async (id: string) => destinations.find((d) => d.id === id)
 export const loadHotelSummaries = async () => hotels.filter(isVisibleHotel)
