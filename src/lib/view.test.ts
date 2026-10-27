@@ -1,83 +1,101 @@
 import { describe, expect, it } from 'vitest'
 import {
   asksSea,
+  asksSunrise,
   asksSunset,
   bearingDeg,
-  bestVerdict,
-  buildingLabel,
+  bestReach,
+  blockersAt,
   curvatureDrop,
-  elevationAngle,
+  eyeOf,
+  floorLabel,
   isViewQuestion,
   lineVerdict,
   localTime,
   nearestRay,
-  observerLabel,
-  observerOf,
   openestSide,
   pointAt,
-  pointVerdict,
   RAY_BEARINGS,
-  seaHorizonAngle,
-  seaLineVerdict,
+  reachLabel,
+  reachOf,
   seaPoints,
-  seaVerdict,
+  seaReach,
   sideSummary,
   sunPosition,
+  sunReach,
+  sunriseOf,
+  sunriseRange,
   sunsetOf,
   sunsetRange,
   verdictReason,
+  windowLabel,
+  windowOf,
+  type LineBlocker,
   type SightLine,
-  type ViewObserver,
   type ViewRay,
   type ViewTarget,
+  type ViewWindow,
 } from './view'
 
 const valencia = { lat: 39.4735, lon: -0.3799 }
 
-const line = (over: Partial<SightLine> = {}): SightLine => ({
+const blocker = (over: Partial<LineBlocker> = {}): LineBlocker => ({
+  id: 'b1',
+  distanceM: 200,
+  heightM: 30,
+  estimated: true,
+  eyeM: 20,
+  eyeUpperM: 26,
+  ...over,
+})
+
+/** A line clear from an eye above 26 m, with EUBUCCO's height above 20 m. */
+const line = (
+  over: Partial<SightLine> = {},
+  eye: { eyeM?: number | null; eyeUpperM?: number | null } = {},
+): SightLine => ({
   distanceM: 1000,
   checked: true,
   crossed: 3,
-  maxAngle: -2,
-  maxAngleUpper: -1.5,
-  firstAboveM: null,
   coveredM: 1000,
-  blocker: { id: 'b1', distanceM: 200, heightM: 30, estimated: true },
+  eyes: [{ eyeM: 20, eyeUpperM: 26, blockers: [blocker()], ...eye }],
   targetBuilding: null,
   ...over,
 })
 
-const observer: ViewObserver = { floor: 12, floors: 12, heightM: 36, heightEstimated: true, eyeM: 34.5 }
+/** 12 floors of 3 m: the eyes at 1,5, 4,5, …, 34,5 m. */
+const window12: ViewWindow = { source: 'building', floors: 12, storeyM: 3, heightM: 36, estimated: true }
 
-// hotel-page, Requirement: Вид из отеля настоящего отеля
+// hotel-page, Requirement: Этаж и сторона окна
 describe('the window', () => {
-  it('stands on the chosen floor, the top one by default, at the storey of the height by the floors', () => {
+  it('has the floors of EUBUCCO’s building at the storey of its height by its floors', () => {
     const building = { floors: 12, heightM: 36, estimated: false, heightEstimated: true }
-    expect(observerOf(building)).toEqual({ floor: 12, floors: 12, heightM: 36, heightEstimated: true, eyeM: 34.5 })
-    expect(observerOf(building, 1)?.eyeM).toBe(1.5)
-    expect(observerOf(building, 4)?.eyeM).toBe(10.5)
-    expect(observerOf(building, 40)?.floor).toBe(12)
+    expect(windowOf(building, 6)).toEqual(window12)
+    expect(eyeOf(window12, 1)).toBe(1.5)
+    expect(eyeOf(window12, 4)).toBe(10.5)
+    expect(eyeOf(window12, 40)).toBe(34.5)
   })
 
-  it('is at the roof without the floors, and none without a height (no building or a doubtful one)', () => {
-    expect(observerOf({ floors: null, heightM: 20, estimated: true })).toMatchObject({ floor: null, eyeM: 18.5 })
-    expect(observerOf({ floors: 5, heightM: null, estimated: false })).toBeNull()
-    expect(observerOf(null)).toBeNull()
+  it('takes the floors the rooms take at a typical storey without exact data of the building, else none', () => {
+    expect(windowOf(null, 10)).toEqual({ source: 'rooms', floors: 10, storeyM: 3, heightM: null, estimated: true })
+    expect(windowOf({ floors: null, heightM: 20, estimated: true }, 4)).toMatchObject({ source: 'rooms', floors: 4 })
+    expect(windowOf(null, null)).toBeNull()
+    expect(windowOf(null, 0)).toBeNull()
   })
 
-  it('is told with «≈» for an estimated height', () => {
-    expect(observerLabel(observer)).toBe('окно 12-го этажа, ≈ 34,5 м над землёй')
-    expect(buildingLabel(observer)).toBe('здание 12 этажей, ≈ 36 м (по оценке EUBUCCO)')
-    expect(buildingLabel({ ...observer, heightEstimated: false, floors: null })).toBe('здание 36 м')
+  it('is told with «≈» for an estimate, never comparing the rooms with the building', () => {
+    expect(floorLabel(window12, 12)).toBe('окно 12-го этажа, ≈ 34,5 м над землёй')
+    expect(windowLabel(window12)).toBe('здание 12 этажей, ≈ 36 м (по оценке EUBUCCO)')
+    expect(windowLabel({ ...window12, estimated: false })).toBe('здание 12 этажей, 36 м')
+    const rooms = windowOf(null, 6)!
+    expect(windowLabel(rooms)).toBe('нет точных данных о здании, номера на 6 этажах (Островок)')
+    expect(floorLabel(rooms, 2)).toBe('окно 2-го этажа, ≈ 4,5 м над землёй')
   })
 })
 
 describe('the geometry', () => {
   it('lowers far points by the curvature with the refraction', () => {
     expect(curvatureDrop(5000)).toBeCloseTo(1.71, 2)
-    expect(elevationAngle(34.5, 100, 34.5)).toBeCloseTo(0, 2)
-    expect(elevationAngle(0, 5000, 34.5)).toBeCloseTo(-0.415, 2)
-    expect(seaHorizonAngle(34.5)).toBeCloseTo(-0.176, 2)
   })
 
   it('measures bearings and points around the hotel', () => {
@@ -95,49 +113,63 @@ describe('the geometry', () => {
 })
 
 describe('the verdicts', () => {
-  it('are three: seen, obstacles possible, not enough data', () => {
-    expect(lineVerdict(line(), 0)).toBe('visible')
-    expect(lineVerdict(line({ maxAngle: 1 }), 0)).toBe('obstructed')
+  it('are three from an eye: seen, obstacles possible, no data', () => {
+    expect(lineVerdict(line(), 30)).toBe('visible')
+    expect(lineVerdict(line(), 20)).toBe('obstructed')
     // Clear with EUBUCCO's height, not with the upper bound of its interval.
-    expect(lineVerdict(line({ maxAngleUpper: 0.2 }), 0)).toBe('obstructed')
+    expect(lineVerdict(line(), 24)).toBe('obstructed')
     // The dataset stops before the target: nothing is known past it.
-    expect(lineVerdict(line({ coveredM: 600 }), 0)).toBe('unknown')
+    expect(lineVerdict(line({ coveredM: 600 }), 30)).toBe('unknown')
     // A building in the covered part blocks it whatever lies beyond.
-    expect(lineVerdict(line({ coveredM: 600, maxAngle: 3 }), 0)).toBe('obstructed')
-    expect(lineVerdict(line({ checked: false }), 0)).toBe('unknown')
-    expect(lineVerdict(undefined, 0)).toBe('unknown')
+    expect(lineVerdict(line({ coveredM: 600 }), 10)).toBe('obstructed')
+    // No building on the line: seen from the ground.
+    expect(lineVerdict(line({}, { eyeM: null, eyeUpperM: null }), 1.5)).toBe('visible')
+    expect(lineVerdict(line({ checked: false }), 30)).toBe('unknown')
+    expect(lineVerdict(undefined, 30)).toBe('unknown')
   })
 
-  it('see a place by the top of its building, else by the ground at its point', () => {
-    expect(pointVerdict(line({ maxAngle: -3, maxAngleUpper: -2.5 }), 34.5)).toBe('visible')
-    expect(pointVerdict(line({ maxAngle: -1.5, maxAngleUpper: -1 }), 34.5)).toBe('obstructed')
+  it('tell from which floor the line is seen', () => {
+    // The eye of the 10th floor is 28,5 m, of the 9th 25,5 m: under 26 m.
+    expect(reachOf(line(), window12)).toEqual({ kind: 'from', floor: 10 })
+    expect(reachOf(line({}, { eyeM: -3, eyeUpperM: 0 }), window12)).toEqual({ kind: 'all' })
+    expect(reachOf(line({}, { eyeM: 40, eyeUpperM: 45 }), window12)).toEqual({ kind: 'none' })
+    expect(reachOf(line({ coveredM: 600 }), window12)).toEqual({ kind: 'unknown' })
+    expect(reachOf(null, window12)).toEqual({ kind: 'unknown' })
     expect(
-      pointVerdict(
-        line({ maxAngle: -1, maxAngleUpper: -0.5, targetBuilding: { id: 't', heightM: 60, estimated: true } }),
-        34.5,
+      [{ kind: 'from', floor: 10 }, { kind: 'all' }, { kind: 'none' }, { kind: 'from', floor: 2 }].map((r) =>
+        reachLabel(r as never),
       ),
-    ).toBe('visible')
+    ).toEqual(['видно с 10-го этажа', 'видно со всех этажей', 'не видно ни с одного этажа', 'видно со 2-го этажа'])
+    expect(reachLabel({ kind: 'unknown' })).toBe('нет данных')
+    expect(bestReach([{ kind: 'unknown' }, { kind: 'none' }])).toEqual({ kind: 'none' })
+    expect(
+      bestReach([
+        { kind: 'from', floor: 5 },
+        { kind: 'from', floor: 3 },
+      ]),
+    ).toEqual({ kind: 'from', floor: 3 })
   })
 
-  it('see the sea over the buildings up to its horizon', () => {
-    expect(seaLineVerdict(line({ maxAngle: -0.5, maxAngleUpper: -0.3 }), 34.5)).toBe('visible')
-    expect(seaLineVerdict(line({ maxAngle: -0.1 }), 34.5)).toBe('obstructed')
-    expect(bestVerdict(['unknown', 'obstructed'])).toBe('obstructed')
-    expect(bestVerdict(['obstructed', 'visible'])).toBe('visible')
-    expect(bestVerdict([])).toBe('unknown')
-  })
-
-  it('say why: the building in the way or the gap in the data', () => {
-    expect(verdictReason(line({ maxAngle: 2 }), 'obstructed')).toBe(
-      'мешает здание ≈ 30 м (по оценке EUBUCCO) в 200 м от отеля',
+  it('say why: the building in the way of the eye or the gap in the data', () => {
+    expect(verdictReason(line(), 'obstructed', 10)).toBe('мешает здание ≈ 30 м (по оценке EUBUCCO) в 200 м от отеля')
+    expect(verdictReason(line({ coveredM: 600 }), 'unknown', 30)).toBe(
+      'данные о зданиях есть только на первые 600 м пути',
     )
-    expect(verdictReason(line({ coveredM: 600 }), 'unknown')).toBe('данные о зданиях есть только на первые 600 м пути')
-    expect(verdictReason(line({ checked: false }), 'unknown')).toBe('дальше 6 км — не проверяем')
+    expect(verdictReason(line({ checked: false }), 'unknown', 30)).toBe('дальше 6 км — не проверяем')
+  })
+
+  it('colour the buildings in the way of the eye, by EUBUCCO’s height first', () => {
+    const two = line({}, {
+      blockers: [blocker({ id: 'a', eyeM: 10, eyeUpperM: 30 }), blocker({ id: 'b', eyeM: 22, eyeUpperM: 25 })],
+    } as never)
+    expect(blockersAt(two, 15).map((b) => b.id)).toEqual(['b', 'a'])
+    expect(blockersAt(two, 24).map((b) => b.id)).toEqual(['a', 'b'])
+    expect(blockersAt(two, 31)).toEqual([])
   })
 })
 
 describe('the sea', () => {
-  const target = (bearing: number, over: Partial<SightLine> = {}): ViewTarget => ({
+  const target = (bearing: number, eye: { eyeM: number; eyeUpperM: number }): ViewTarget => ({
     kind: 'sea',
     name: 'Берег моря',
     category: 'море',
@@ -145,14 +177,18 @@ describe('the sea', () => {
     lon: -0.33,
     distanceM: 4400,
     bearing,
-    line: line({ distanceM: 4400, coveredM: 4400, ...over }),
+    line: line({ distanceM: 4400, coveredM: 4400 }, eye),
   })
 
-  it('is seen when one of its points is, with that point', () => {
-    const view = { observer, seaChecked: true, sea: [target(100, { maxAngle: 2 }), target(80)] }
-    expect(seaVerdict(view)).toMatchObject({ verdict: 'visible', point: { bearing: 80 } })
-    expect(seaVerdict(view, 's')).toMatchObject({ verdict: 'unknown', point: undefined })
-    expect(seaVerdict({ ...view, seaChecked: false }).verdict).toBe('unknown')
+  it('is seen from the lowest floor of its points, with that point', () => {
+    const view = {
+      window: window12,
+      seaChecked: true,
+      sea: [target(100, { eyeM: 30, eyeUpperM: 33 }), target(80, { eyeM: 5, eyeUpperM: 8 })],
+    }
+    expect(seaReach(view)).toMatchObject({ reach: { kind: 'from', floor: 4 }, point: { bearing: 80 } })
+    expect(seaReach(view, 's')).toMatchObject({ reach: { kind: 'unknown' }, point: undefined })
+    expect(seaReach({ ...view, seaChecked: false }).reach).toEqual({ kind: 'unknown' })
   })
 
   it('is checked at the nearest points of different bearings', () => {
@@ -167,19 +203,30 @@ describe('the sea', () => {
 })
 
 describe('the sides', () => {
-  const rays: ViewRay[] = RAY_BEARINGS.map((bearing) => ({
+  const ray = (bearing: number, roofs: number, sun: number): ViewRay => ({
     bearing,
-    line: line({
-      distanceM: 1500,
-      coveredM: 1500,
-      ...(bearing >= 75 && bearing <= 105 ? {} : { maxAngle: 5, firstAboveM: 25 }),
-    }),
-  }))
+    line: {
+      ...line({ distanceM: 1500, coveredM: 1500 }),
+      eyes: [
+        { eyeM: roofs - 2, eyeUpperM: roofs, blockers: [] },
+        { eyeM: sun - 2, eyeUpperM: sun, blockers: [] },
+      ],
+    },
+  })
+  const rays = RAY_BEARINGS.map((bearing) =>
+    bearing >= 75 && bearing <= 105 ? ray(bearing, 10, 4) : ray(bearing, 50, 40),
+  )
 
-  it('count the rays over the roofs and the nearest building above the window', () => {
-    expect(sideSummary(rays, 'e')).toEqual({ rays: 15, open: 11, nearestAboveM: 25 })
-    expect(sideSummary(rays, 'w')).toEqual({ rays: 15, open: 0, nearestAboveM: 25 })
-    expect(openestSide(rays)).toBe('e')
+  it('count the rays over the roofs from the eye', () => {
+    expect(sideSummary(rays, 'e', 34.5)).toEqual({ rays: 15, open: 11 })
+    expect(sideSummary(rays, 'e', 4.5)).toEqual({ rays: 15, open: 0 })
+    expect(sideSummary(rays, 'w', 34.5)).toEqual({ rays: 15, open: 0 })
+    expect(openestSide(rays, 34.5)).toBe('e')
+  })
+
+  it('see the sun at 2° on its ray', () => {
+    expect(sunReach({ rays, window: window12 }, 90).reach).toEqual({ kind: 'from', floor: 2 })
+    expect(sunReach({ rays, window: window12 }, 270).reach).toEqual({ kind: 'none' })
   })
 })
 
@@ -195,6 +242,17 @@ describe('the sun', () => {
     const range = sunsetRange(2026, valencia.lat, valencia.lon)!
     expect([Math.round(range.winter), Math.round(range.summer)]).toEqual([240, 302])
     expect(sunsetOf('не дата', valencia.lat, valencia.lon)).toBeNull()
+  })
+
+  it('rises in Valencia where and when the almanacs say', () => {
+    const summer = sunriseOf('2026-06-21', valencia.lat, valencia.lon)!
+    // The almanacs: 06:36; the first minute the sun is up is told.
+    expect(localTime(summer.at)).toBe('06:35')
+    expect(summer.azimuth).toBeCloseTo(58, 0)
+    expect(summer.checkAt > summer.at).toBe(true)
+    const range = sunriseRange(2026, valencia.lat, valencia.lon)!
+    expect([Math.round(range.summer), Math.round(range.winter)]).toEqual([58, 120])
+    expect(sunriseOf('не дата', valencia.lat, valencia.lon)).toBeNull()
   })
 
   it('stands at its height at noon', () => {
@@ -217,5 +275,10 @@ describe('the questions', () => {
     expect([asksSea('Видно ли море?'), asksSea('Видно ли Морской музей?')]).toEqual([true, true])
     expect(asksSea('Видно ли собор?')).toBe(false)
     expect(asksSunset('А закат видно?')).toBe(true)
+    expect([isViewQuestion('Увижу ли рассвет?'), asksSunrise('Увижу ли рассвет?'), asksSunrise('А закат?')]).toEqual([
+      true,
+      true,
+      false,
+    ])
   })
 })

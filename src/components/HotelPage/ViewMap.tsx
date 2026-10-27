@@ -2,18 +2,27 @@
 
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Map as MapLibreMap, Marker, type ExpressionSpecification, type GeoJSONSource } from 'maplibre-gl'
+import {
+  Map as MapLibreMap,
+  Marker,
+  type ExpressionSpecification,
+  type FilterSpecification,
+  type GeoJSONSource,
+} from 'maplibre-gl'
 import { cn } from 'cn'
 import type { ViewMap as ViewMapData } from '@/lib/db/view'
-import { pointAt, SIDE_HALF_WIDTH_DEG, type Verdict } from '@/lib/view'
+import { pointAt, SIDE_HALF_WIDTH_DEG, VIEW_MAP_RADIUS_M, type Verdict } from '@/lib/view'
+import { ATTRIBUTION_CLASS, MAP_ATTRIBUTION, MAP_STYLE, manageAttribution } from '../SearchResultsPage/mapSetup'
 import {
-  ATTRIBUTION_CLASS,
-  ATTRIBUTION_SHOWN_MS,
-  foldAttribution,
-  MAP_ATTRIBUTION,
-  MAP_STYLE,
-  silenceSourceAttribution,
-} from '../SearchResultsPage/mapSetup'
+  BLOCKER_COLOR,
+  BUILDING_COLOR,
+  ESTIMATED_BUILDING_COLOR,
+  HOTEL_BUILDING_COLOR,
+  SECTOR_COLOR,
+  SUNRISE_COLOR,
+  SUNSET_COLOR,
+  VERDICT_COLOR,
+} from './viewColors'
 
 /** EUBUCCO's credit for the buildings' heights, next to OpenStreetMap's. */
 const EUBUCCO_ATTRIBUTION =
@@ -27,20 +36,16 @@ const PITCH = 55
 const SECTOR_M = 450
 const SUN_M = 700
 
-const VERDICT_COLOR: Record<Verdict, string> = {
-  visible: '#16a34a',
-  obstructed: '#d97706',
-  unknown: '#94a3b8',
-}
-
-/** A building in the way of a line is orange; the rest grey, the estimated heights a little lighter. */
-const BUILDING_COLOR = (blockers: readonly string[]): ExpressionSpecification => [
+/** The hotel's building is blue, a building in the way of a line orange; the rest grey, the estimated lighter. */
+const buildingColor = (blockers: readonly string[], hotel: string | null): ExpressionSpecification => [
   'case',
+  ['==', ['get', 'id'], hotel ?? ''],
+  HOTEL_BUILDING_COLOR,
   ['in', ['get', 'id'], ['literal', blockers]],
-  '#f97316',
+  BLOCKER_COLOR,
   ['get', 'estimated'],
-  '#d4d4d8',
-  '#a1a1aa',
+  ESTIMATED_BUILDING_COLOR,
+  BUILDING_COLOR,
 ]
 
 export interface MapTarget {
@@ -67,29 +72,36 @@ function sector(center: { lat: number; lon: number }, bearing: number): Data {
 }
 
 /**
- * The buildings of EUBUCCO around the hotel standing by their heights (OpenFreeMap's own 3D buildings are hidden), the
- * fan of the chosen side with the map turned to it, the lines to the places coloured by their verdict and the sun's
- * line at the sunset. `onFail` when the map cannot load (no WebGL, no tiles).
+ * The buildings of EUBUCCO around the hotel standing by their heights (OpenFreeMap's own 3D buildings beyond them), the
+ * hotel's and the ones in the way from the chosen floor coloured, the fan of the chosen side with the map turned to it,
+ * the lines to the places coloured by their verdict from the floor and the sun's lines at the sunset and the sunrise.
+ * `onFail` when the map cannot load (no WebGL, no tiles).
  */
 export default function ViewMap({
   center: point,
   buildings,
   bearing,
-  sunAzimuth,
+  sunsetAzimuth,
+  sunriseAzimuth,
   targets,
   blockers,
+  hotelBuilding,
   onFail,
 }: {
   center: { lat: number; lon: number }
   buildings: ViewMapData | null
   bearing: number
-  sunAzimuth: number | null
+  sunsetAzimuth: number | null
+  sunriseAzimuth: number | null
   targets: readonly MapTarget[]
   blockers: readonly string[]
+  hotelBuilding: string | null
   onFail: () => void
 }) {
   const center = useMemo(() => ({ lat: point.lat, lon: point.lon }), [point.lat, point.lon])
   const [map, setMap] = useState<MapLibreMap | null>(null)
+  /** The style's own 3D buildings (OSM's heights) and their filters. */
+  const styleBuildings = useRef<{ id: string; filter: FilterSpecification | undefined }[]>([])
   const fail = useRef(onFail)
   useEffect(() => {
     fail.current = onFail
@@ -116,14 +128,13 @@ export default function ViewMap({
         return
       }
       let loaded = false
-      instance.on('styledata', () => silenceSourceAttribution(instance))
-      let foldTimer: ReturnType<typeof setTimeout> | undefined
+      const stopAttribution = manageAttribution(instance)
       instance.on('load', () => {
         loaded = true
         const layers = instance.getStyle().layers
-        // The style's 3D buildings are OSM's heights: EUBUCCO's stand instead.
-        for (const layer of layers)
-          if (layer.type === 'fill-extrusion') instance.setLayoutProperty(layer.id, 'visibility', 'none')
+        styleBuildings.current = layers.flatMap((layer) =>
+          layer.type === 'fill-extrusion' ? [{ id: layer.id, filter: layer.filter }] : [],
+        )
         const labels = layers.find((layer) => layer.type === 'symbol')?.id
         instance.addSource('view-sector', { type: 'geojson', data: empty })
         instance.addLayer(
@@ -131,7 +142,7 @@ export default function ViewMap({
             id: 'view-sector',
             type: 'fill',
             source: 'view-sector',
-            paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0.3 },
+            paint: { 'fill-color': SECTOR_COLOR, 'fill-opacity': 0.3 },
           },
           labels,
         )
@@ -153,7 +164,7 @@ export default function ViewMap({
           source: 'view-buildings',
           paint: {
             'fill-extrusion-height': ['get', 'height'],
-            'fill-extrusion-color': BUILDING_COLOR([]),
+            'fill-extrusion-color': buildingColor([], null),
             'fill-extrusion-opacity': 0.85,
           },
         })
@@ -163,17 +174,16 @@ export default function ViewMap({
           type: 'line',
           source: 'view-sun',
           layout: { 'line-cap': 'round' },
-          paint: { 'line-color': '#f59e0b', 'line-width': 4 },
+          paint: { 'line-color': ['get', 'color'], 'line-width': 4 },
         })
         new Marker({ color: '#0f172a' }).setLngLat([center.lon, center.lat]).addTo(instance)
         setMap(instance)
-        foldTimer = setTimeout(() => foldAttribution(instance), ATTRIBUTION_SHOWN_MS)
       })
       instance.on('error', () => {
         if (!loaded) fail.current()
       })
       return () => {
-        clearTimeout(foldTimer)
+        stopAttribution()
         instance.remove()
       }
     },
@@ -181,15 +191,27 @@ export default function ViewMap({
     [center.lat, center.lon],
   )
 
+  // EUBUCCO's buildings stand within their radius, the style's own 3D buildings beyond it (everywhere without EUBUCCO's):
+  // the whole view stands, the heights the lines are checked by in the middle.
   useEffect(() => {
     if (!map) return
     map.getSource<GeoJSONSource>('view-buildings')?.setData((buildings ?? empty) as Data)
-  }, [map, buildings])
+    const beyond: FilterSpecification = [
+      '>',
+      ['distance', { type: 'Point', coordinates: [center.lon, center.lat] }],
+      VIEW_MAP_RADIUS_M,
+    ]
+    for (const { id, filter } of styleBuildings.current)
+      map.setFilter(
+        id,
+        buildings?.features.length ? (filter ? ['all', filter as ExpressionSpecification, beyond] : beyond) : filter,
+      )
+  }, [map, buildings, center])
 
   useEffect(() => {
     if (!map) return
-    map.setPaintProperty('view-buildings', 'fill-extrusion-color', BUILDING_COLOR(blockers))
-  }, [map, blockers])
+    map.setPaintProperty('view-buildings', 'fill-extrusion-color', buildingColor(blockers, hotelBuilding))
+  }, [map, blockers, hotelBuilding])
 
   // The chosen side faces up.
   useEffect(() => {
@@ -218,23 +240,31 @@ export default function ViewMap({
 
   useEffect(() => {
     if (!map) return
-    const end = sunAzimuth === null ? null : pointAt(center, sunAzimuth, SUN_M)
-    map.getSource<GeoJSONSource>('view-sun')?.setData(
-      end
-        ? {
-            type: 'Feature',
-            properties: {},
+    const suns = [
+      { azimuth: sunsetAzimuth, color: SUNSET_COLOR },
+      { azimuth: sunriseAzimuth, color: SUNRISE_COLOR },
+    ]
+    map.getSource<GeoJSONSource>('view-sun')?.setData({
+      type: 'FeatureCollection',
+      features: suns.flatMap(({ azimuth, color }) => {
+        if (azimuth === null) return []
+        const end = pointAt(center, azimuth, SUN_M)
+        return [
+          {
+            type: 'Feature' as const,
+            properties: { color },
             geometry: {
-              type: 'LineString',
+              type: 'LineString' as const,
               coordinates: [
                 [center.lon, center.lat],
                 [end.lon, end.lat],
               ],
             },
-          }
-        : empty,
-    )
-  }, [map, center, sunAzimuth])
+          },
+        ]
+      }),
+    })
+  }, [map, center, sunsetAzimuth, sunriseAzimuth])
 
   return <div ref={containerRef} className={cn('size-full', ATTRIBUTION_CLASS)} />
 }

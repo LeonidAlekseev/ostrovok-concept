@@ -37,7 +37,7 @@ export function foldAttribution(map: MapLibreMap) {
 }
 
 /**
- * The attribution of every map but the view's: the style's sources credit no one (`silenceSourceAttribution`), the
+ * The attribution of every map: the style's sources credit no one (`silenceSourceAttribution`), the
  * credit shows after the load and folds into its "i" after `ATTRIBUTION_SHOWN_MS` or on the first interaction. Call
  * right after the map is made, with `ATTRIBUTION_CLASS` on its container; returns the cleanup.
  */

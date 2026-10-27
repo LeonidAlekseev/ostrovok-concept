@@ -1,58 +1,70 @@
 import { describe, expect, it } from 'vitest'
 import type { NearbyPlace } from '@/lib/hotelDetails'
-import { linesOf, nearOf, ostrovokLandmarks, viewLandmarks, viewMapOf } from './view'
+import { linesOf, nearOf, ownBuildingOf, ostrovokLandmarks, viewLandmarks, viewMapOf } from './view'
 
 // hotel-page, Requirement: Вид из отеля настоящего отеля
 describe('linesOf', () => {
-  it('reads the lines of hotel_view_lines by their index, a line it cannot read as none', () => {
-    const lines = linesOf(
-      {
-        own_building: 'own',
-        lines: [
-          {
-            i: 1,
-            distance_m: 4423,
-            checked: true,
-            crossed: 124,
-            max_angle: 2.377,
-            max_angle_upper: 3.635,
-            first_above_m: 276.9,
-            covered_m: 4423,
-            blocker: { id: 'b6', distance_m: 276.9, height: 45, height_source: 'estimated', angle: 2.377 },
-            target_building: null,
-          },
-          {
-            i: 0,
-            distance_m: 7000,
-            checked: false,
-            crossed: 0,
-            max_angle: null,
-            max_angle_upper: null,
-            first_above_m: null,
-            covered_m: null,
-            blocker: null,
-            target_building: { id: 't', height: 20, height_source: 'gov-spain' },
-          },
-          { i: 2, distance_m: 'far' },
-          { i: 9, distance_m: 1 },
-        ],
-      },
-      3,
-    )
+  it('reads the lines of hotel_view_eyes by their index, a line it cannot read as none', () => {
+    const answer = {
+      own_building: 'own',
+      lines: [
+        {
+          i: 1,
+          distance_m: 4423,
+          checked: true,
+          crossed: 124,
+          covered_m: 4423,
+          eyes: [
+            {
+              eye_m: 49.81,
+              eye_upper_m: 59.13,
+              blockers: [
+                {
+                  id: 'b6',
+                  distance_m: 276.9,
+                  height: 45,
+                  height_source: 'estimated',
+                  eye_m: 44.9,
+                  eye_upper_m: 59.13,
+                },
+              ],
+            },
+          ],
+          target_building: null,
+        },
+        {
+          i: 0,
+          distance_m: 7000,
+          checked: false,
+          crossed: 0,
+          covered_m: null,
+          eyes: [],
+          target_building: { id: 't', height: 20, height_source: 'gov-spain' },
+        },
+        { i: 2, distance_m: 'far' },
+        { i: 9, distance_m: 1 },
+      ],
+    }
+    const lines = linesOf(answer, 3)
     expect(lines[1]).toEqual({
       distanceM: 4423,
       checked: true,
       crossed: 124,
-      maxAngle: 2.377,
-      maxAngleUpper: 3.635,
-      firstAboveM: 276.9,
       coveredM: 4423,
-      blocker: { id: 'b6', distanceM: 276.9, heightM: 45, estimated: true },
+      eyes: [
+        {
+          eyeM: 49.81,
+          eyeUpperM: 59.13,
+          blockers: [{ id: 'b6', distanceM: 276.9, heightM: 45, estimated: true, eyeM: 44.9, eyeUpperM: 59.13 }],
+        },
+      ],
       targetBuilding: null,
     })
     expect(lines[0]).toMatchObject({ checked: false, targetBuilding: { id: 't', heightM: 20, estimated: false } })
     expect(lines[2]).toBeNull()
     expect(linesOf(null, 2)).toEqual([null, null])
+    expect(ownBuildingOf(answer)).toBe('own')
+    expect(ownBuildingOf(null)).toBeNull()
   })
 })
 

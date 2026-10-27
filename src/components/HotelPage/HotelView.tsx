@@ -2,40 +2,59 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import dynamic from 'next/dynamic'
-import { Building2, ChevronDown, Landmark, Sunset, Waves } from 'lucide-react'
+import { Building2, ChevronDown, Landmark, Sunrise, Sunset, Waves } from 'lucide-react'
 import { cn } from 'cn'
+import { Slider } from '@/components/ui/slider'
 import type { Hotel } from '@/lib/catalog'
 import type { ViewMap as ViewMapData } from '@/lib/db/view'
 import { todayIso } from '@/lib/dates'
 import { distanceLabel, type HotelBuilding } from '@/lib/hotelDetails'
 import {
   bearingLabel,
-  buildingLabel,
+  blockersAt,
+  eyeOf,
+  floorLabel,
+  fromFloor,
   inSide,
+  lineVerdict,
   localTime,
-  nearestRay,
-  observerLabel,
-  observerOf,
-  openestSide,
   RAY_LENGTH_M,
-  rayVerdict,
-  seaVerdict,
+  reachLabel,
+  reachVerdict,
+  seaReach,
   sideOf,
   sideSummary,
   SIDES,
+  openestSide,
   SUN_CHECK_ALTITUDE_DEG,
+  sunBlockers,
+  sunReach,
+  sunriseOf,
+  sunriseRange,
   sunsetOf,
   sunsetRange,
-  targetVerdict,
+  targetReach,
   VERDICT_LABEL,
   verdictReason,
   VIEW_ASSUMPTIONS,
+  windowLabel,
+  windowOf,
   type HotelView as HotelViewData,
+  type Reach,
   type SideId,
+  type SightLine,
   type Verdict,
   type ViewTarget,
 } from '@/lib/view'
 import { HotelMapUnavailable } from './HotelMapUnavailable'
+import {
+  BLOCKER_COLOR,
+  HOTEL_BUILDING_COLOR,
+  SECTOR_COLOR,
+  SUNRISE_COLOR,
+  SUNSET_COLOR,
+  VERDICT_COLOR,
+} from './viewColors'
 
 // MapLibre is loaded only in the browser.
 const ViewMap = dynamic(() => import('./ViewMap').catch(() => ({ default: () => <HotelMapUnavailable /> })), {
@@ -59,24 +78,24 @@ const noChanges = () => () => {}
 /** The compass as a 3×3 grid: the sides around the building. */
 const COMPASS: (SideId | null)[] = ['nw', 'n', 'ne', 'w', null, 'e', 'sw', 's', 'se']
 
-/** The view from the floor (`GET /api/hotels/<id>/view?floor=`): `null` while it comes and when there is none. */
-function useView(hotelId: string, floor: number | null, enabled: boolean) {
+/** «254° (запад)» kept on one line. */
+const unbroken = (text: string) => text.replace(/ /g, ' ')
+
+/** The view from every floor (`GET /api/hotels/<id>/view`): `null` while it comes and when there is none. */
+function useView(hotelId: string, enabled: boolean) {
   const [state, setState] = useState<{ key: string; view: HotelViewData | null } | null>(null)
-  const key = `${hotelId}:${floor ?? ''}`
   useEffect(() => {
     if (!enabled) return
     const controller = new AbortController()
-    fetch(`/api/hotels/${encodeURIComponent(hotelId)}/view${floor ? `?floor=${floor}` : ''}`, {
-      signal: controller.signal,
-    })
+    fetch(`/api/hotels/${encodeURIComponent(hotelId)}/view`, { signal: controller.signal })
       .then((response) => (response.ok ? (response.json() as Promise<{ view: HotelViewData | null }>) : null))
-      .then((body) => setState({ key, view: body?.view ?? null }))
+      .then((body) => setState({ key: hotelId, view: body?.view ?? null }))
       .catch(() => {
-        if (!controller.signal.aborted) setState({ key, view: null })
+        if (!controller.signal.aborted) setState({ key: hotelId, view: null })
       })
     return () => controller.abort()
-  }, [hotelId, floor, key, enabled])
-  return { view: state?.view ?? null, loading: enabled && state?.key !== key }
+  }, [hotelId, enabled])
+  return { view: state?.view ?? null, loading: enabled && state?.key !== hotelId }
 }
 
 /** The buildings around the hotel (`GET /api/hotels/<id>/view-map`): `null` until they come and on a failure. */
@@ -93,25 +112,27 @@ function useViewMap(hotelId: string) {
   return map
 }
 
-function VerdictBadge({ verdict }: { verdict: Verdict }) {
+function ReachBadge({ reach }: { reach: Reach }) {
   return (
-    <span className={cn('shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold', VERDICT_CLASS[verdict])}>
-      {VERDICT_LABEL[verdict]}
+    <span
+      className={cn('shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold', VERDICT_CLASS[reachVerdict(reach)])}
+    >
+      {reachLabel(reach)}
     </span>
   )
 }
 
-/** A line of a list: the icon, what is checked and how far, the verdict and why. */
+/** A line of a list: the icon, what is checked and how far, from which floor it is seen and why. */
 function Row({
   icon: Icon,
   title,
   lines,
-  verdict,
+  reach,
 }: {
   icon: typeof Waves
   title: string
   lines: (string | null | false | undefined)[]
-  verdict: Verdict
+  reach: Reach
 }) {
   return (
     <li className="flex gap-3">
@@ -119,10 +140,10 @@ function Row({
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <span className="font-semibold">{title}</span>
-          <VerdictBadge verdict={verdict} />
+          <ReachBadge reach={reach} />
         </span>
         {lines.filter(Boolean).map((line) => (
-          <span key={line as string} className="text-sm text-muted-foreground">
+          <span key={line as string} className="text-sm text-pretty text-muted-foreground">
             {line}
           </span>
         ))}
@@ -131,57 +152,119 @@ function Row({
   )
 }
 
-const targetLines = (target: ViewTarget, verdict: Verdict) => [
-  `${target.category} · ${distanceLabel(target.distanceM)} · азимут ${bearingLabel(target.bearing)}`,
-  verdictReason(target.line, verdict),
+/** «С 12-го этажа — возможны препятствия: мешает здание …». */
+function floorLine(line: SightLine | null | undefined, floor: number, eyeM: number, angle = 0) {
+  const verdict = lineVerdict(line, eyeM, angle)
+  const reason = verdictReason(line ?? null, verdict, eyeM, angle)
+  const from = fromFloor(floor)
+  return `${from.charAt(0).toLocaleUpperCase('ru')}${from.slice(1)} этажа — ${VERDICT_LABEL[verdict]}${reason ? `: ${reason}` : ''}`
+}
+
+const targetLines = (target: ViewTarget, floor: number, eyeM: number) => [
+  `${target.category} · ${distanceLabel(target.distanceM)} · азимут ${unbroken(bearingLabel(target.bearing))}`,
+  floorLine(target.line, floor, eyeM),
 ]
 
+/** The legend of the map, over it on a wide screen and above it on a narrow one. */
+function Legend({ side, floor }: { side: SideId; floor: number | null }) {
+  const lineItem = (color: string, label: string, dashed = false) => (
+    <li key={label} className="flex items-center gap-1.5">
+      <span
+        className={cn('w-4 shrink-0 rounded-full', dashed ? 'h-0 border-t-2 border-dashed' : 'h-1')}
+        style={dashed ? { borderColor: color } : { backgroundColor: color }}
+        aria-hidden
+      />
+      {label}
+    </li>
+  )
+  const boxItem = (color: string, label: string, opacity = 1) => (
+    <li key={label} className="flex items-center gap-1.5">
+      <span className="size-3 shrink-0 rounded-sm" style={{ backgroundColor: color, opacity }} aria-hidden />
+      {label}
+    </li>
+  )
+  return (
+    <div className="flex flex-col gap-1.5 rounded-xl bg-card p-2.5 text-xs text-foreground shadow-sm md:pointer-events-none md:absolute md:top-2 md:left-2 md:max-w-64 md:bg-white/90 md:dark:bg-card/90">
+      <span className="font-semibold">
+        Вверху — {sideOf(side).label.toLocaleLowerCase('ru')}
+        {floor ? `, вид ${fromFloor(floor)} этажа` : ''}
+      </span>
+      <ul className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
+        {boxItem(SECTOR_COLOR, 'сторона окон', 0.3)}
+        {lineItem(SUNSET_COLOR, 'закат')}
+        {lineItem(SUNRISE_COLOR, 'восход')}
+        {lineItem(VERDICT_COLOR.visible, 'видно', true)}
+        {lineItem(VERDICT_COLOR.obstructed, 'есть помехи', true)}
+        {lineItem(VERDICT_COLOR.unknown, 'нет данных', true)}
+        {boxItem(HOTEL_BUILDING_COLOR, 'отель')}
+        {boxItem(BLOCKER_COLOR, 'здание мешает')}
+      </ul>
+    </div>
+  )
+}
+
 /**
- * «Вид из отеля» of a real hotel: from a floor of its building (EUBUCCO) — the sea, the sunset of a date and the
- * attractions of OSM and the places of Ostrovok, each «вероятно видно», «возможны препятствия» or «недостаточно
- * данных» by the lines of sight over the buildings; the compass picks the side of the windows, which no data gives yet.
- * The map stands EUBUCCO's buildings around the hotel, turned to the side. Without a reliable height of the hotel's
- * building nothing is checked: «недостаточно данных».
+ * «Вид из отеля» of a real hotel: from which floor the sea, the sunset and the sunrise of a date and the attractions of
+ * OSM and the places of Ostrovok are seen, by the lines of sight over the buildings of EUBUCCO; the slider picks a
+ * floor (1 to the top one: EUBUCCO's building, else the floors the rooms take) and the map and the lists show what is
+ * seen from it; the compass picks the side of the windows, which no data gives yet. The map stands EUBUCCO's buildings
+ * around the hotel, turned to the side. With neither a building's height nor the rooms' floors: «нет точных данных».
  */
-export function HotelView({ hotel, building }: { hotel: Hotel; building: HotelBuilding | null | undefined }) {
-  const top = observerOf(building)
-  const [floor, setFloor] = useState<number | null>(top?.floor ?? null)
-  const { view, loading } = useView(hotel.id, floor, Boolean(top))
+export function HotelView({
+  hotel,
+  building,
+  roomFloors,
+}: {
+  hotel: Hotel
+  building: HotelBuilding | null | undefined
+  roomFloors: number | null | undefined
+}) {
+  const viewWindow = windowOf(building, roomFloors)
+  const [picked, setPickedFloor] = useState<number | null>(null)
+  const floor = viewWindow ? Math.min(picked ?? viewWindow.floors, viewWindow.floors) : null
+  const { view, loading } = useView(hotel.id, Boolean(viewWindow))
   const buildings = useViewMap(hotel.id)
   const [failed, setFailed] = useState(false)
   // The date is the visitor's today in the browser (the prerendered page has none) until one is picked.
   const today = useSyncExternalStore(noChanges, todayIso, () => '')
-  const [picked, setPicked] = useState<string | null>(null)
-  const date = picked ?? today
+  const [pickedDate, setPickedDate] = useState<string | null>(null)
+  const date = pickedDate ?? today
   const [side, setSide] = useState<SideId | null>(null)
   const [allLandmarks, setAllLandmarks] = useState(false)
 
-  const shownSide = side ?? (view ? openestSide(view.rays) : 'w')
+  const eyeM = viewWindow && floor ? eyeOf(viewWindow, floor) : 0
+  const ready = view && !loading && floor ? view : null
+  // The side the page opens on is the openest from the top floor: it does not jump with the slider.
+  const shownSide = side ?? (ready ? openestSide(ready.rays, eyeOf(ready.window, ready.window.floors)) : 'w')
+  const year = Number(date.slice(0, 4))
   const sunset = date ? sunsetOf(date, hotel.lat, hotel.lon) : null
-  const range = date ? sunsetRange(Number(date.slice(0, 4)), hotel.lat, hotel.lon) : null
-  const sunRay = view && sunset ? nearestRay(view.rays, sunset.checkAzimuth) : undefined
-  const sunVerdict: Verdict = sunRay ? rayVerdict(sunRay, SUN_CHECK_ALTITUDE_DEG) : 'unknown'
-  const sea = view ? seaVerdict(view) : null
-  const sideSea = view ? seaVerdict(view, shownSide) : null
-  const eyeM = view?.observer.eyeM ?? 0
+  const sunrise = date ? sunriseOf(date, hotel.lat, hotel.lon) : null
+  const setRange = date ? sunsetRange(year, hotel.lat, hotel.lon) : null
+  const riseRange = date ? sunriseRange(year, hotel.lat, hotel.lon) : null
+  const sunsetSun = ready && sunset ? sunReach(ready, sunset.checkAzimuth) : null
+  const sunriseSun = ready && sunrise ? sunReach(ready, sunrise.checkAzimuth) : null
+  const sea = ready ? seaReach(ready) : null
+  const sideSea = ready ? seaReach(ready, shownSide) : null
   const landmarks = useMemo(
-    () => (view?.landmarks ?? []).map((target) => ({ target, verdict: targetVerdict(target, eyeM) })),
-    [view, eyeM],
+    () => (ready ? ready.landmarks.map((target) => ({ target, reach: targetReach(target, ready.window) })) : []),
+    [ready],
   )
   const inView = landmarks.filter(({ target }) => inSide(target.bearing, shownSide))
-  const summary = view ? sideSummary(view.rays, shownSide) : null
-  const mapTargets = [
-    ...(sideSea?.point ? [{ ...sideSea.point, verdict: sideSea.verdict }] : []),
-    ...inView.map(({ target, verdict }) => ({ lat: target.lat, lon: target.lon, verdict })),
-  ]
+  const summary = ready ? sideSummary(ready.rays, shownSide, eyeM) : null
+  const mapTargets = [...(sideSea?.point ? [sideSea.point] : []), ...inView.map(({ target }) => target)].map((t) => ({
+    lat: t.lat,
+    lon: t.lon,
+    verdict: lineVerdict(t.line, eyeM),
+  }))
   const blockers = [
-    ...(sunVerdict === 'obstructed' && sunRay?.line.blocker ? [sunRay.line.blocker.id] : []),
-    ...(sideSea?.verdict === 'obstructed' && sideSea.point?.line?.blocker ? [sideSea.point.line.blocker.id] : []),
-    ...inView.flatMap(({ target, verdict }) =>
-      verdict === 'obstructed' && target.line?.blocker ? [target.line.blocker.id] : [],
-    ),
-  ]
+    ...sunBlockers(sunsetSun?.ray, eyeM),
+    ...sunBlockers(sunriseSun?.ray, eyeM),
+    ...(sideSea?.point ? blockersAt(sideSea.point.line, eyeM) : []),
+    ...inView.flatMap(({ target }) => blockersAt(target.line, eyeM)),
+  ].map((b) => b.id)
   const sunInSide = sunset && inSide(sunset.azimuth, shownSide)
+  const riseInSide = sunrise && inSide(sunrise.azimuth, shownSide)
+  const unknown: Reach = { kind: 'unknown' }
 
   return (
     <section id="view" tabIndex={-1} aria-labelledby="view-title" className="flex flex-col gap-4 outline-none">
@@ -190,29 +273,30 @@ export function HotelView({ hotel, building }: { hotel: Hotel; building: HotelBu
           Вид из отеля
         </h2>
         <p className="text-muted-foreground">
-          Видно ли море, закат и места рядом из окна — по высотам зданий EUBUCCO и линии взгляда над крышами.
+          С какого этажа видно море, закат, восход и места рядом — по высотам зданий EUBUCCO и линии взгляда над
+          крышами.
         </p>
       </div>
 
-      <div className="relative h-[clamp(18rem,55vw,28rem)] overflow-hidden rounded-2xl bg-muted">
-        {failed ? (
-          <HotelMapUnavailable />
-        ) : (
-          <ViewMap
-            center={{ lat: hotel.lat, lon: hotel.lon }}
-            buildings={buildings}
-            bearing={sideOf(shownSide).bearing}
-            sunAzimuth={sunset?.azimuth ?? null}
-            targets={mapTargets}
-            blockers={blockers}
-            onFail={() => setFailed(true)}
-          />
-        )}
-        {!failed && (
-          <p className="pointer-events-none absolute top-2 left-2 rounded-xl bg-white/90 px-2.5 py-1.5 text-xs text-foreground shadow-sm dark:bg-card/90">
-            Вверху — {sideOf(shownSide).label.toLocaleLowerCase('ru')}; оранжевая линия — закат, оранжевые здания мешают
-          </p>
-        )}
+      <div className="flex flex-col gap-2 md:relative">
+        {!failed && <Legend side={shownSide} floor={ready ? floor : null} />}
+        <div className="relative h-[clamp(18rem,55vw,28rem)] overflow-hidden rounded-2xl bg-muted md:order-first">
+          {failed ? (
+            <HotelMapUnavailable />
+          ) : (
+            <ViewMap
+              center={{ lat: hotel.lat, lon: hotel.lon }}
+              buildings={buildings}
+              bearing={sideOf(shownSide).bearing}
+              sunsetAzimuth={sunset?.azimuth ?? null}
+              sunriseAzimuth={sunrise?.azimuth ?? null}
+              targets={mapTargets}
+              blockers={blockers}
+              hotelBuilding={view?.ownBuilding ?? null}
+              onFail={() => setFailed(true)}
+            />
+          )}
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -220,68 +304,85 @@ export function HotelView({ hotel, building }: { hotel: Hotel; building: HotelBu
           <h3 id="view-window-title" className="text-lg font-bold">
             Окно
           </h3>
-          {top ? (
+          {viewWindow && floor ? (
             <>
               <p className="flex gap-3">
                 <Building2 className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
                 <span className="flex flex-col">
-                  <b>{buildingLabel(top)}</b>
-                  <span className="text-sm text-muted-foreground">
-                    {observerLabel(observerOf(building, floor) ?? top)}
-                  </span>
+                  <b>{windowLabel(viewWindow)}</b>
+                  <span className="text-sm text-muted-foreground">{floorLabel(viewWindow, floor)}</span>
                 </span>
               </p>
-              {top.floors && top.floors > 1 && (
-                <label className="flex items-center justify-between gap-3 text-sm">
-                  Этаж
-                  <select
-                    value={floor ?? top.floors}
-                    onChange={(event) => setFloor(Number(event.target.value))}
-                    className="rounded-lg border border-input bg-background px-2 py-1"
-                  >
-                    {Array.from({ length: top.floors }, (_, i) => top.floors! - i).map((n) => (
-                      <option key={n} value={n}>
-                        {n === top.floors ? `${n} (верхний)` : n}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              {viewWindow.floors > 1 && (
+                <div className="flex flex-col gap-1">
+                  <span className="flex items-center justify-between gap-3 text-sm">
+                    <span>Этаж</span>
+                    <b>
+                      {floor}-й{floor === viewWindow.floors ? ' (верхний)' : ''}
+                    </b>
+                  </span>
+                  <Slider
+                    min={1}
+                    max={viewWindow.floors}
+                    step={1}
+                    value={[floor]}
+                    thumbLabels={['Этаж']}
+                    onValueChange={(value) => setPickedFloor((value as number[])[0])}
+                  />
+                  <span className="flex justify-between text-xs text-muted-foreground" aria-hidden>
+                    <span>1</span>
+                    <span>{viewWindow.floors}</span>
+                  </span>
+                </div>
               )}
+              <p className="text-xs text-pretty text-muted-foreground">
+                Из какого окна смотрит номер, неизвестно: проверяем каждый этаж и пишем, с какого видна цель.
+              </p>
             </>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              Высоты здания отеля нет в EUBUCCO или она сомнительна (номера занимают больше этажей, чем у найденного
-              здания), поэтому видимость не проверяем — недостаточно данных.
-            </p>
+            <p className="text-sm text-muted-foreground">Нет точных данных.</p>
           )}
         </section>
 
         <section aria-labelledby="view-sun-title" className={card}>
           <h3 id="view-sun-title" className="text-lg font-bold">
-            Закат
+            Закат и восход
           </h3>
           <label className="flex items-center justify-between gap-3 text-sm">
             Дата
             <input
               type="date"
               value={date}
-              onChange={(event) => event.target.value && setPicked(event.target.value)}
+              onChange={(event) => event.target.value && setPickedDate(event.target.value)}
               className="rounded-lg border border-input bg-background px-2 py-1"
             />
           </label>
-          {sunset ? (
+          {sunset || sunrise ? (
             <ul className="flex flex-col gap-3">
-              <Row
-                icon={Sunset}
-                title={`Закат в ${localTime(sunset.at)}`}
-                verdict={top ? (loading ? 'unknown' : sunVerdict) : 'unknown'}
-                lines={[
-                  `Азимут ${bearingLabel(sunset.azimuth)}; на высоте ${SUN_CHECK_ALTITUDE_DEG}° — в ${localTime(sunset.checkAt)}, азимут ${Math.round(sunset.checkAzimuth)}°`,
-                  range &&
-                    `За год закат смещается от ${Math.round(range.winter)}° зимой до ${Math.round(range.summer)}° летом`,
-                  top && !loading && sunRay && verdictReason(sunRay.line, sunVerdict),
-                ]}
-              />
+              {sunset && (
+                <Row
+                  icon={Sunset}
+                  title={`Закат в ${localTime(sunset.at)}`}
+                  reach={sunsetSun?.reach ?? unknown}
+                  lines={[
+                    `Азимут ${unbroken(bearingLabel(sunset.azimuth))}${setRange ? `, за год — от ${unbroken(`${Math.round(setRange.winter)}° зимой`)} до ${unbroken(`${Math.round(setRange.summer)}° летом`)}` : ''}.`,
+                    `Солнце на ${SUN_CHECK_ALTITUDE_DEG}° над горизонтом — в ${localTime(sunset.checkAt)}, азимут ${Math.round(sunset.checkAzimuth)}°.`,
+                    ready && floor ? floorLine(sunsetSun?.ray?.line, floor, eyeM, 1) : null,
+                  ]}
+                />
+              )}
+              {sunrise && (
+                <Row
+                  icon={Sunrise}
+                  title={`Восход в ${localTime(sunrise.at)}`}
+                  reach={sunriseSun?.reach ?? unknown}
+                  lines={[
+                    `Азимут ${unbroken(bearingLabel(sunrise.azimuth))}${riseRange ? `, за год — от ${unbroken(`${Math.round(riseRange.summer)}° летом`)} до ${unbroken(`${Math.round(riseRange.winter)}° зимой`)}` : ''}.`,
+                    `Солнце на ${SUN_CHECK_ALTITUDE_DEG}° над горизонтом — в ${localTime(sunrise.checkAt)}, азимут ${Math.round(sunrise.checkAzimuth)}°.`,
+                    ready && floor ? floorLine(sunriseSun?.ray?.line, floor, eyeM, 1) : null,
+                  ]}
+                />
+              )}
             </ul>
           ) : (
             <p className="text-sm text-muted-foreground">Выберите дату.</p>
@@ -292,25 +393,23 @@ export function HotelView({ hotel, building }: { hotel: Hotel; building: HotelBu
           <h3 id="view-sea-title" className="text-lg font-bold">
             Море
           </h3>
-          {!top ? (
-            <p className="text-sm text-muted-foreground">Недостаточно данных: нет надёжной высоты здания отеля.</p>
+          {!viewWindow ? (
+            <p className="text-sm text-muted-foreground">Нет точных данных.</p>
           ) : loading ? (
             <p className="h-12 animate-pulse rounded-xl bg-muted" aria-label="Проверяем" />
-          ) : !view ? (
-            <p className="text-sm text-muted-foreground">Не удалось проверить — недостаточно данных.</p>
-          ) : !view.seaChecked ? (
-            <p className="text-sm text-muted-foreground">
-              Берег моря OpenStreetMap у отеля не загружен — недостаточно данных.
-            </p>
-          ) : sea?.point ? (
+          ) : !ready ? (
+            <p className="text-sm text-muted-foreground">Не удалось проверить — нет данных.</p>
+          ) : !ready.seaChecked ? (
+            <p className="text-sm text-muted-foreground">Берег моря OpenStreetMap у отеля не загружен — нет данных.</p>
+          ) : sea?.point && floor ? (
             <ul className="flex flex-col gap-3">
               <Row
                 icon={Waves}
                 title={`Берег в ${distanceLabel(sea.point.distanceM)}`}
-                verdict={sea.verdict}
+                reach={sea.reach}
                 lines={[
-                  `Азимут ${bearingLabel(sea.point.bearing)}; проверено ${view.sea.length} направлений на берег`,
-                  verdictReason(sea.point.line, sea.verdict),
+                  `Азимут ${unbroken(bearingLabel(sea.point.bearing))}; проверено ${ready.sea.length} направлений на берег.`,
+                  floorLine(sea.point.line, floor, eyeM),
                 ]}
               />
             </ul>
@@ -355,65 +454,68 @@ export function HotelView({ hotel, building }: { hotel: Hotel; building: HotelBu
               {SIDES.find((s) => s.id === shownSide)!.bearing}° ± 22,5°).
             </p>
           </div>
-          {top && summary && !loading && (
+          {ready && summary && floor && (
             <p className="text-sm">
-              Поверх крыш до {distanceLabel(RAY_LENGTH_M)}: {summary.open} из {summary.rays} направлений.{' '}
-              {summary.nearestAboveM !== null
-                ? `Ближайшее здание выше окна — в ${distanceLabel(summary.nearestAboveM)}.`
-                : `Зданий выше окна до ${distanceLabel(RAY_LENGTH_M)} нет.`}
+              Поверх крыш до {distanceLabel(RAY_LENGTH_M)} {fromFloor(floor)} этажа: {summary.open} из {summary.rays}{' '}
+              направлений.
             </p>
           )}
-          {top && view && !loading && (
+          {ready && floor && (
             <ul aria-label="Что видно с этой стороны" className="flex flex-col gap-3">
               {sideSea?.point && (
                 <Row
                   icon={Waves}
                   title="Море"
-                  verdict={sideSea.verdict}
-                  lines={[
-                    `берег в ${distanceLabel(sideSea.point.distanceM)}`,
-                    verdictReason(sideSea.point.line, sideSea.verdict),
-                  ]}
+                  reach={sideSea.reach}
+                  lines={[`берег в ${distanceLabel(sideSea.point.distanceM)}`]}
                 />
               )}
               {sunInSide && sunset && (
                 <Row
                   icon={Sunset}
                   title="Закат"
-                  verdict={sunVerdict}
+                  reach={sunsetSun?.reach ?? unknown}
                   lines={[`азимут ${Math.round(sunset.azimuth)}°`]}
                 />
               )}
-              {inView.map(({ target, verdict }, i) => (
+              {riseInSide && sunrise && (
+                <Row
+                  icon={Sunrise}
+                  title="Восход"
+                  reach={sunriseSun?.reach ?? unknown}
+                  lines={[`азимут ${Math.round(sunrise.azimuth)}°`]}
+                />
+              )}
+              {inView.map(({ target, reach }, i) => (
                 <Row
                   key={`${target.kind}-${target.name}-${i}`}
                   icon={Landmark}
                   title={target.name}
-                  verdict={verdict}
-                  lines={targetLines(target, verdict)}
+                  reach={reach}
+                  lines={[`${target.category} · ${distanceLabel(target.distanceM)}`]}
                 />
               ))}
-              {!sideSea?.point && !sunInSide && inView.length === 0 && (
-                <li className="text-sm text-muted-foreground">Моря, заката и ориентиров с этой стороны нет.</li>
+              {!sideSea?.point && !sunInSide && !riseInSide && inView.length === 0 && (
+                <li className="text-sm text-muted-foreground">Моря, солнца и ориентиров с этой стороны нет.</li>
               )}
             </ul>
           )}
         </section>
       </div>
 
-      {top && view && landmarks.length > 0 && (
+      {ready && floor && landmarks.length > 0 && (
         <section aria-labelledby="view-landmarks-title" className={card}>
           <h3 id="view-landmarks-title" className="text-lg font-bold">
             Ориентиры до 3 км
           </h3>
           <ul id="view-landmarks-list" className="grid gap-3 md:grid-cols-2">
-            {(allLandmarks ? landmarks : landmarks.slice(0, LANDMARKS_SHOWN)).map(({ target, verdict }, i) => (
+            {(allLandmarks ? landmarks : landmarks.slice(0, LANDMARKS_SHOWN)).map(({ target, reach }, i) => (
               <Row
                 key={`${target.kind}-${target.name}-${i}`}
                 icon={Landmark}
                 title={target.name}
-                verdict={verdict}
-                lines={targetLines(target, verdict)}
+                reach={reach}
+                lines={targetLines(target, floor, eyeM)}
               />
             ))}
           </ul>
@@ -460,7 +562,8 @@ export function HotelView({ hotel, building }: { hotel: Hotel; building: HotelBu
             >
               © OpenStreetMap
             </a>{' '}
-            (берег, достопримечательности), Островок (места рядом); солнце — астрономический расчёт (приближение NOAA).
+            (берег, достопримечательности), Островок (места рядом, этажи номеров); солнце — астрономический расчёт
+            (приближение NOAA).
           </li>
         </ul>
       </details>
