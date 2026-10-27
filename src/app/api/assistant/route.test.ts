@@ -10,6 +10,10 @@ import { loadHotelFeatures } from '@/lib/db/features'
 import type { HotelFeatures } from '@/lib/features'
 import { nextQuestion } from '@/lib/assistant'
 import { getHotel } from '@/lib/catalogGenerator'
+import { runNoiseTool } from '@/lib/ai/noiseTool'
+import { runOwner } from '@/lib/db/toolRuns'
+import { errorResult, toolResultSchema } from '@/lib/toolResult'
+import { sampleResult } from '@/test/toolResult'
 import { POST } from './route'
 
 vi.mock('@/lib/ai/model', () => ({ getTextModels: vi.fn(), getVisionModels: vi.fn() }))
@@ -17,6 +21,14 @@ vi.mock('@/lib/ai/semantic', () => ({ SEMANTIC_TIMEOUT_MS: 8000, semanticSearch:
 vi.mock('@/lib/db/catalog', () => import('@/test/catalog'))
 vi.mock('@/lib/db/features', () => ({ loadHotelFeatures: vi.fn() }))
 vi.mock('@/lib/ai/geoTurn', () => ({ geoTurn: vi.fn() }))
+vi.mock('@/lib/ai/noiseTool', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/ai/noiseTool')>()
+  return { ...actual, runNoiseTool: vi.fn(actual.runNoiseTool) }
+})
+vi.mock('@/lib/db/toolRuns', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/db/toolRuns')>()
+  return { ...actual, runOwner: vi.fn(async () => null) }
+})
 
 const usage = {
   inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
@@ -673,9 +685,61 @@ describe('POST /api/assistant: a question about a hotel', () => {
     setModel(undefined)
     const body = await (await aboutHotel('Шумно ли рядом с отелем ночью?')).json()
     expect(geoTurn).not.toHaveBeenCalled()
-    expect(body).toMatchObject({ reply: 'Сейчас не могу ответить: данных о шуме у этого отеля нет.', source: 'rules' })
+    expect(body).toMatchObject({
+      reply: 'Сейчас не могу ответить: данных о шуме у этого отеля нет. Это не значит, что там тихо.',
+      source: 'rules',
+    })
     await aboutHotel('Есть ли рядом бар?')
     expect(geoTurn).toHaveBeenCalledTimes(1)
+  })
+
+  // assistant-search, Requirement: Инструмент «Анализ шума»
+  it('runs «Анализ шума» on a noise question: its step carries the run with the sources', async () => {
+    setModel(undefined)
+    vi.mocked(runNoiseTool).mockResolvedValueOnce(sampleResult)
+    const body = await (await aboutHotel('Тут шумно ночью?')).json()
+    expect(runNoiseTool).toHaveBeenCalledWith(hotelId)
+    expect(body.steps).toEqual([
+      {
+        agent: 'features',
+        title: 'Анализ шума',
+        params: 'карты шума EEA, места OpenStreetMap, отзывы гостей',
+        status: 'done',
+        result: sampleResult.summary,
+        run: { id: expect.stringMatching(/^[0-9a-f-]{36}$/), result: sampleResult },
+      },
+    ])
+    // The answer goes by the tool's characteristics.
+    expect(body.reply).toContain('Ночью (Lnight): дороги города: 55–59 дБ')
+  })
+
+  it('gives a hotel with no data a run with no sources, said so (Scenario: Источников нет)', async () => {
+    setModel(undefined)
+    const body = await (await aboutHotel('Здесь тихо?')).json()
+    const [step] = body.steps
+    expect(toolResultSchema.safeParse(step.run.result).success).toBe(true)
+    expect(step.run.result).toMatchObject({ status: 'success', evidence: [], claims: [] })
+  })
+
+  it('marks the step failed when the tool fails, and still answers (Scenario: Ошибка инструмента)', async () => {
+    setModel(undefined)
+    vi.mocked(runNoiseTool).mockResolvedValueOnce(errorResult('store_unavailable', 'Хранилище недоступно'))
+    const body = await (await aboutHotel('Шумно ли тут?')).json()
+    expect(body.steps[0]).toMatchObject({ status: 'failed', run: { result: { status: 'error' } } })
+    expect(body.reply).toBe('Сейчас не могу ответить: данные о шуме не прочитались.')
+  })
+
+  it('asks for the owner of the runs with the chat and the pending message, not on other questions', async () => {
+    setModel(undefined)
+    const chatId = '7d1f0a52-3b8e-4c1d-9a6f-0e2b4c6d8f10'
+    const messageId = '8e2a1b63-4c9f-4d2e-8b7a-1f3c5d7e9a21'
+    const body = { messages: [{ role: 'user', text: 'Шумно ли ночью?' }], brief: { hotelId }, chatId, messageId }
+    expect((await post(body)).status).toBe(200)
+    expect(runOwner).toHaveBeenCalledWith(chatId, messageId)
+    vi.mocked(runOwner).mockClear()
+    await aboutHotel('Есть ли парковка?')
+    expect(runOwner).not.toHaveBeenCalled()
+    expect((await post({ ...body, chatId: 'not-a-uuid' })).status).toBe(400)
   })
 
   it('says the models are down when none chose the geo calls', async () => {

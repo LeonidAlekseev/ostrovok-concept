@@ -27,6 +27,7 @@ import { Trace, TraceIcon, TraceLine, TraceTitle } from '@/components/ui/trace'
 import type { Destination } from '@/data/destinations'
 import { GUEST_LIMITS, VIBE_LABEL, briefWithStay, stayDates, type Brief, type VibeId } from '../../lib/assistant'
 import type { AgentStep } from '../../lib/assistantChats'
+import { EPISTEMIC_LABEL, isSafeUrl, type ToolEvidence, type ToolResult, type ToolRun } from '../../lib/toolResult'
 import type { IsoDate } from '../../lib/dates'
 import { VIEW_LABEL, type ViewKind } from '../../lib/features'
 import { formatMeters } from '../../lib/format'
@@ -100,6 +101,212 @@ export function ToolCard({ step, failed }: { step: AgentStep; failed?: boolean }
       failed={failed}
       label={failed ? 'Инструмент, не удалось:' : 'Инструмент, готово:'}
     />
+  )
+}
+
+const RUN_STATUS: Record<ToolResult['status'], string> = {
+  running: 'Выполняется',
+  success: 'Готово',
+  error: 'Ошибка',
+}
+
+const SOURCE_TYPE: Record<ToolEvidence['source_type'], string> = {
+  dataset: 'Набор данных',
+  osm: 'Объект OpenStreetMap',
+  review: 'Отзыв гостя',
+  ota_page: 'Страница Островка',
+  calculation: 'Расчёт',
+}
+
+/** «26 октября 2026 г.»; nothing for a date that does not read. */
+function dateLabel(iso: string | null): string | null {
+  const time = iso ? Date.parse(iso) : NaN
+  return Number.isNaN(time)
+    ? null
+    : new Date(time).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+/** A heading of a part of «Источники и данные». */
+function RunSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-1.5">
+      <h4 className="text-sm font-semibold text-foreground">{title}</h4>
+      {children}
+    </section>
+  )
+}
+
+/** A source of the run: its provider and title (a link only to http(s)), its id, date and the words used. */
+function SourceItem({ source }: { source: ToolEvidence }) {
+  const date = dateLabel(source.retrieved_at)
+  const meta = [
+    SOURCE_TYPE[source.source_type],
+    source.source_id && `ID: ${source.source_id}`,
+    date && `получено ${date}`,
+  ].filter(Boolean)
+  return (
+    <li className="flex flex-col gap-0.5 rounded-xl bg-card px-3 py-2 text-sm/[1.35]">
+      <span className="font-semibold text-foreground">{source.source_name}</span>
+      {source.source_url && isSafeUrl(source.source_url) ? (
+        <a
+          href={source.source_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="break-words text-primary underline underline-offset-2"
+        >
+          {source.title}
+        </a>
+      ) : (
+        <span className="break-words text-foreground">{source.title}</span>
+      )}
+      <span className="text-muted-foreground">{meta.join(' · ')}</span>
+      {source.excerpt && (
+        <blockquote className="mt-1 border-l-2 border-border pl-2 break-words whitespace-pre-line text-foreground">
+          {source.excerpt}
+        </blockquote>
+      )}
+    </li>
+  )
+}
+
+/** «Источники и данные» of a run: the characteristics with their origin, the calculations, the sources, the limits. */
+function RunDetails({ result }: { result: ToolResult }) {
+  const names = new Map(result.evidence.map((e) => [e.id, e.source_name]))
+  return (
+    <div className="flex flex-col gap-3 pt-2">
+      {result.error && <p className="text-sm/[1.35] text-destructive">{result.error.message}</p>}
+      {result.claims.length > 0 && (
+        <RunSection title="Полученные характеристики">
+          <ul className="flex flex-col gap-1.5">
+            {result.claims.map((claim) => {
+              const sources = [...new Set(claim.evidence_ids.flatMap((id) => names.get(id) ?? []))]
+              const origin = [
+                EPISTEMIC_LABEL[claim.status],
+                claim.confidence !== null && `уверенность ${Math.round(claim.confidence * 100)} %`,
+                sources.length > 0 && `источник: ${sources.join(', ')}`,
+              ].filter(Boolean)
+              return (
+                <li key={claim.id} className="text-sm/[1.35]">
+                  <span className="text-foreground">
+                    {claim.label}: <span className="font-semibold">{claim.value}</span>
+                  </span>
+                  <span className={`block ${greyMutedText}`}>{origin.join(' · ')}</span>
+                </li>
+              )
+            })}
+          </ul>
+        </RunSection>
+      )}
+      {result.calculations.length > 0 && (
+        <RunSection title="Расчёты">
+          <ul className="flex flex-col gap-2">
+            {result.calculations.map((calculation) => (
+              <li key={calculation.id} className="flex flex-col gap-0.5 text-sm/[1.35]">
+                <span className="text-foreground">
+                  {calculation.name} <span className={greyMutedText}>(версия {calculation.version})</span>
+                </span>
+                {calculation.inputs.length > 0 && (
+                  <span className={greyMutedText}>
+                    Входные данные: {calculation.inputs.map((i) => `${i.label} — ${i.value}`).join('; ')}
+                  </span>
+                )}
+                {calculation.assumptions.length > 0 && (
+                  <span className={greyMutedText}>Допущения: {calculation.assumptions.join('; ')}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </RunSection>
+      )}
+      <RunSection title="Источники">
+        {result.evidence.length > 0 ? (
+          <ul className="flex flex-col gap-1.5">
+            {result.evidence.map((source) => (
+              <SourceItem key={source.id} source={source} />
+            ))}
+          </ul>
+        ) : (
+          <p className={`text-sm/[1.35] ${greyMutedText}`}>Источников нет: инструмент не нашёл данных с источником.</p>
+        )}
+      </RunSection>
+      {result.method && (
+        <RunSection title="Метод">
+          <p className="text-sm/[1.35] text-foreground">
+            {result.method.name} <span className={greyMutedText}>(версия {result.method.version})</span>
+          </p>
+          {result.method.inputs.length > 0 && (
+            <p className={`text-sm/[1.35] ${greyMutedText}`}>
+              Входные данные: {result.method.inputs.map((i) => `${i.label} — ${i.value}`).join('; ')}
+            </p>
+          )}
+          {result.method.assumptions.length > 0 && (
+            <p className={`text-sm/[1.35] ${greyMutedText}`}>Допущения: {result.method.assumptions.join('; ')}</p>
+          )}
+        </RunSection>
+      )}
+      {result.limitations.length > 0 && (
+        <RunSection title="Ограничения">
+          <ul className={`list-disc pl-5 text-sm/[1.35] ${greyMutedText}`}>
+            {result.limitations.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </RunSection>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The block of a tool's run: what it does, its status and short result, and «Источники и данные» that opens in place.
+ * Each block keeps its own state; nothing of the model's reasoning, no JSON and no names of functions are shown.
+ */
+export function ToolRunCard({ step, run }: { step: AgentStep; run: ToolRun }) {
+  const [open, setOpen] = useState(false)
+  const { result } = run
+  const status = result.status
+  return (
+    <div
+      className={cn(cardClass, 'flex w-full flex-col sm:w-[min(100%,36rem)]')}
+      data-run={run.id}
+      data-run-status={status}
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className={cn(circleClass, 'grid flex-none place-items-center', status === 'error' && 'text-destructive')}
+        >
+          {status === 'running' ? (
+            <Loader2 className="motion-safe:animate-spin" aria-hidden />
+          ) : status === 'error' ? (
+            <X strokeWidth={2.5} aria-hidden />
+          ) : (
+            <Check strokeWidth={2.5} aria-hidden />
+          )}
+        </span>
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-[15px]/[1.3] font-semibold text-foreground">{step.title}</span>
+          {step.params && <span className={`text-sm/[1.35] ${greyMutedText}`}>{step.params}</span>}
+          <span
+            className={cn('text-sm/[1.35] font-semibold', status === 'error' ? 'text-destructive' : 'text-foreground')}
+          >
+            {RUN_STATUS[status]}
+          </span>
+          {result.summary && <span className="text-sm/[1.35] text-foreground">{result.summary}</span>}
+        </span>
+      </div>
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <CollapsibleTrigger
+          className="mt-2 flex w-full items-center justify-between gap-2 rounded-md py-1 text-sm font-semibold text-primary focus-visible:outline-3 focus-visible:outline-ring"
+          aria-label={`Источники и данные: ${step.title}`}
+        >
+          Источники и данные
+          <ChevronDown className={cn('size-4 flex-none transition-transform', open && 'rotate-180')} aria-hidden />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <RunDetails result={result} />
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
   )
 }
 

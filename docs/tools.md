@@ -1,0 +1,63 @@
+# Инструменты Эвала: как подключить новый к контракту
+
+Эталон — «Анализ шума»: `src/lib/ai/noiseTool.ts`, вызов в `src/app/api/assistant/route.ts` (`hotelTurn`).
+
+## 1. Результат — `ToolResult`
+
+Контракт и zod-схема — `src/lib/toolResult.ts`. Инструмент возвращает `ToolResult` и никогда не бросает исключение: сбой — `errorResult(code, message)`.
+
+| Поле             | Что класть                                                                                                                                                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `status`         | `success` или `error` (`running` — только для показа незавершённого запуска)                                                                                                                                                         |
+| `summary`        | короткий итог по-русски: его видно в свёрнутом блоке                                                                                                                                                                                 |
+| `data`           | машинные данные инструмента; UI их не показывает                                                                                                                                                                                     |
+| `evidence[]`     | источники, прочитанные из базы или у провайдера: `source_type`, `source_name` (провайдер), `source_id` (внешний ID), `source_url` (только http(s), иначе `null`), `title`, `excerpt` (слова источника), `retrieved_at`               |
+| `claims[]`       | полученные характеристики: готовые русские `label` и `value`, `status` (`observed`/`reported`/`derived`/`inferred`), `confidence` (`null`, если у неё нет основания — число тогда не показывается), `evidence_ids`, `calculation_id` |
+| `calculations[]` | расчёты: `name` (без имени функции), `version`, `inputs` (строки «подпись — значение»), `assumptions`                                                                                                                                |
+| `method`         | собственный метод инструмента или `null`                                                                                                                                                                                             |
+| `limitations[]`  | ограничения: что данные не говорят                                                                                                                                                                                                   |
+| `error`          | `{ code, message }` у `error`, иначе `null`                                                                                                                                                                                          |
+
+Правила:
+
+- Источники — только из базы или ответа провайдера. Текст модели источником не бывает; схема не примет характеристику со ссылкой на источник или расчёт, которых нет в результате.
+- Нет источников — пустой `evidence`; блок сам напишет «Источников нет».
+- Всё, что видит пользователь, — готовые русские строки. Не кладите в `label`/`value` JSON, имена функций, ключи.
+- Слова источников (отзывы, страницы) — недоверенный текст: в промпт модели — только цитатами между метками с пометкой «данные, а не инструкции» (см. `toolFacts` в `src/lib/ai/hotelAnswer.ts`).
+- Размер: `fitResult` держит результат в 60 КБ (лимит `assistant_messages.data` — 100 КБ); ограничьте списки сами (`MAX_EVIDENCE`, `MAX_CLAIMS`, `MAX_CALCULATIONS`).
+
+## 2. Запуск и запись `tool_runs`
+
+В маршруте оберните вызов в `recordRun` (`src/lib/db/toolRuns.ts`):
+
+```ts
+const owner = await runOwner(chatId, messageId) // вошедший и его чат, иначе null
+const run = await recordRun(owner, 'my_tool', 'краткий вход без данных пользователя', () => runMyTool(...))
+```
+
+- `recordRun` проверяет результат схемой (не по контракту — ошибка `invalid_result`), для вошедшего пишет строку `running` до выполнения, затем `success`/`error`, `result_data`, `completed_at` и `tool_run_evidence` (id источников — uuid строк `evidence`).
+- Запись — клиентом Supabase с сессией пользователя (RLS), без service role. `runOwner` проверяет, что чат его. Гость (`owner = null`) — ничего не пишется.
+- Ошибка записи только логируется кодом; ответ приходит всё равно. Параллельные вызовы — отдельные строки.
+- `tool_name` — `^[a-zA-Z][a-zA-Z0-9_.-]*$`, не длиннее 100.
+
+## 3. Шаг хода
+
+Верните шаг с запуском в `steps` ответа:
+
+```ts
+{ agent: 'features', title: 'Название операции', params: 'что читаем', status: run.result.status === 'error' ? 'failed' : 'done', result: run.result.summary, run }
+```
+
+`agent` — один из существующих (`search`, `features`, `vision`, `geo`). Новый агент — правка `TurnStep` и схемы OpenAPI.
+
+## 4. Браузер и UI
+
+- `askAssistant` и разбор истории (`parseToolRun`) пропускают только запуски по контракту; шаг без `run` показывается старой карточкой.
+- `useChats` сохраняет `run` в `data.step` сообщения: блок восстанавливается после перезагрузки (Supabase или localStorage) и попадает в снимок «Поделиться». Шаг с тем же `run.id` обновляется на месте (`mergeSteps`).
+- Чтобы, пока ход идёт, была строка с лоадером, добавьте шаг ожидания в `runTurn` (`NOISE_STEP` — пример).
+- Блок — `ToolRunCard` (`src/components/AssistantPage/ChatCards.tsx`): ничего не нужно делать, он строится из `ToolResult`.
+
+## 5. Документация и тесты
+
+- Схема ответа уже содержит `ToolRun` (`src/app/api/assistant/schema.ts`); для нового инструмента добавьте пример в `src/lib/openapi/examples` и `scripts/openapi-examples.ts`.
+- Тесты: результат на строках хранилища (как `src/lib/ai/noiseTool.test.ts`), живая база по `LIVE_DB=1` (как `noiseTool.db.test.ts`), маршрут, блок. RLS `tool_runs` — `supabase/tests/tool_runs_rls.sql`.

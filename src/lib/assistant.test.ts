@@ -13,7 +13,9 @@ import {
   normalizeBrief,
   parseWish,
   presetChips,
+  type AssistantRequest,
 } from './assistant'
+import { RUN_ID, sampleResult } from '@/test/toolResult'
 
 describe('parseWish', () => {
   it('reads theme, month and budget from a full request', () => {
@@ -508,5 +510,35 @@ describe('askAssistant: the models down', () => {
     const response = await askAssistant({ messages: [{ role: 'user', text: 'в горы' }], brief: {} }, null, destinations)
     expect(response.modelsDown).toBe(true)
     vi.unstubAllGlobals()
+  })
+})
+
+// assistant-search, Requirement: Контракт результата инструмента
+describe('askAssistant: the runs of the tools', () => {
+  const step = { agent: 'features', title: 'Анализ шума', status: 'done', result: 'Ночью 55–59 дБ' }
+  const ask = async (steps: unknown[], request: Partial<AssistantRequest> = {}) => {
+    const fetch = vi.fn(async () => Response.json({ brief: { hotelId: 'ota-9096882' }, source: 'model', steps }))
+    vi.stubGlobal('fetch', fetch)
+    const response = await askAssistant(
+      { messages: [{ role: 'user', text: 'Шумно?' }], brief: { hotelId: 'ota-9096882' }, ...request },
+      null,
+      destinations,
+    )
+    vi.unstubAllGlobals()
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+    return { response, sent: JSON.parse(init.body as string) }
+  }
+
+  it('keeps a run of the contract, sends the chat and the message', async () => {
+    const run = { id: RUN_ID, result: sampleResult }
+    const chat = { chatId: '7d1f0a52-3b8e-4c1d-9a6f-0e2b4c6d8f10', messageId: '8e2a1b63-4c9f-4d2e-8b7a-1f3c5d7e9a21' }
+    const { response, sent } = await ask([{ ...step, run }], chat)
+    expect(response.steps).toEqual([{ ...step, run }])
+    expect(sent).toMatchObject(chat)
+  })
+
+  it('drops a run off the contract and keeps the step as an older one', async () => {
+    const run = { id: RUN_ID, result: { ...sampleResult, evidence: [{ id: 'x', source_url: 'javascript:alert(1)' }] } }
+    expect((await ask([{ ...step, run }])).response.steps).toEqual([step])
   })
 })

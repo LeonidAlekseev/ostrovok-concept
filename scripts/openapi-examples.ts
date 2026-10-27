@@ -98,6 +98,9 @@ const geoRequest = {
 }
 write('assistant-geo', { request: geoRequest, response: await call('/api/assistant', geoRequest) })
 
+const noiseRequest = { messages: [{ role: 'user', text: 'Тут шумно ночью?' }], brief: { hotelId: HOTEL } }
+write('assistant-noise', { request: noiseRequest, response: await call('/api/assistant', noiseRequest) })
+
 const wishRequest = {
   messages: [
     { role: 'user', text: 'Тихий отель у моря в Валенсии с 10 по 14 ноября' },

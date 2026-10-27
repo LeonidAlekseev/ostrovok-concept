@@ -1,0 +1,528 @@
+{
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "text": "Тут шумно ночью?"
+      }
+    ],
+    "brief": {
+      "hotelId": "ota-9096882"
+    }
+  },
+  "response": {
+    "brief": {
+      "hotelId": "ota-9096882",
+      "destinationId": "valencia"
+    },
+    "reply": "Согласно данным анализа шума, ночью (Lnight) уровень шума от дорог города составляет 55–59 дБ.",
+    "source": "model",
+    "steps": [
+      {
+        "agent": "features",
+        "title": "Анализ шума",
+        "params": "карты шума EEA, места OpenStreetMap, отзывы гостей",
+        "status": "done",
+        "result": "Ночью 55–59 дБ (дороги города), днём оценка 55–63 дБ; шумных мест OpenStreetMap в 200 м: 4; отзывов о шуме и тишине: 0",
+        "run": {
+          "id": "a6c2ff60-335a-4df0-addf-18a061fcd737",
+          "result": {
+            "status": "success",
+            "summary": "Ночью 55–59 дБ (дороги города), днём оценка 55–63 дБ; шумных мест OpenStreetMap в 200 м: 4; отзывов о шуме и тишине: 0",
+            "data": {
+              "eea": true,
+              "places": 4,
+              "reviews": 0
+            },
+            "evidence": [
+              {
+                "id": "ee159ffb-c245-47de-acbc-0d7a329216d0",
+                "source_type": "dataset",
+                "source_name": "EEA",
+                "source_id": "eea-noise-end2022-v01_r00",
+                "source_url": "https://sdi.eea.europa.eu/datastore/public?path=/eea_v_3035_1_k_noise-contours-end2022_p_2026_v01_r00",
+                "title": "EEA noise contours, Environmental Noise Directive, round 2022 v01_r00",
+                "excerpt": null,
+                "retrieved_at": "2026-10-26T18:06:03.471+00:00",
+                "entity_id": "ota-9096882",
+                "claim_id": null
+              },
+              {
+                "id": "1138bddd-4e7b-415d-b637-0fcc78d88037",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/1632037135",
+                "source_url": "https://www.openstreetmap.org/node/1632037135",
+                "title": "Vicent",
+                "excerpt": null,
+                "retrieved_at": "2026-10-26T19:30:00.378+00:00",
+                "entity_id": "ota-9096882",
+                "claim_id": "6b6cc810-2a3f-4334-8199-2546c928e469"
+              },
+              {
+                "id": "91cef08f-aad9-4074-9067-048d58e98a0a",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/9270705402",
+                "source_url": "https://www.openstreetmap.org/node/9270705402",
+                "title": "Bar Restaurante Casa Pote",
+                "excerpt": null,
+                "retrieved_at": "2026-10-26T19:30:00.378+00:00",
+                "entity_id": "ota-9096882",
+                "claim_id": "6b6cc810-2a3f-4334-8199-2546c928e469"
+              },
+              {
+                "id": "b7b322c1-9e17-49d7-aa9a-0bbae744ffb9",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/6551271385",
+                "source_url": "https://www.openstreetmap.org/node/6551271385",
+                "title": "Ca Pepe",
+                "excerpt": null,
+                "retrieved_at": "2026-10-26T19:30:00.378+00:00",
+                "entity_id": "ota-9096882",
+                "claim_id": "6b6cc810-2a3f-4334-8199-2546c928e469"
+              },
+              {
+                "id": "fe3835a0-1e8b-4a7d-9c31-0cd370fd7f09",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/1632037131",
+                "source_url": "https://www.openstreetmap.org/node/1632037131",
+                "title": "Pinares 14",
+                "excerpt": null,
+                "retrieved_at": "2026-10-26T19:30:00.378+00:00",
+                "entity_id": "ota-9096882",
+                "claim_id": null
+              }
+            ],
+            "claims": [
+              {
+                "id": "7126d6f4-1361-41c3-9065-92897bf24241",
+                "label": "Днём (07:00–19:00), оценка: дороги города",
+                "value": "55–63 дБ",
+                "status": "derived",
+                "confidence": null,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": "fb64ec8c-9dbf-4076-a108-2e71a6086e9f"
+              },
+              {
+                "id": "6fb7a521-feb4-45b7-b740-4b8ea11f97e5",
+                "label": "Ночью (Lnight): дороги города",
+                "value": "55–59 дБ",
+                "status": "reported",
+                "confidence": null,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": null
+              },
+              {
+                "id": "93e62945-b183-4a64-91e1-5a4319aed076",
+                "label": "За сутки (Lden): дороги города",
+                "value": "60–64 дБ",
+                "status": "reported",
+                "confidence": null,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": null
+              },
+              {
+                "id": "3c28e578-1cca-41ff-807a-661b573baf0b",
+                "label": "Днём (07:00–19:00), оценка: магистрали",
+                "value": "34–45 дБ",
+                "status": "derived",
+                "confidence": null,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": "66707e29-cfb0-4b96-a67c-f92be0b0eb96"
+              },
+              {
+                "id": "19e5fb7f-dea5-4a77-9343-8aeda8dfee9e",
+                "label": "Ночью (Lnight): магистрали",
+                "value": "ниже 40 дБ",
+                "status": "reported",
+                "confidence": null,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": null
+              },
+              {
+                "id": "640302b5-85f2-4c2b-800a-957a92bd51a0",
+                "label": "За сутки (Lden): магистрали",
+                "value": "40–44 дБ",
+                "status": "reported",
+                "confidence": null,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": null
+              },
+              {
+                "id": "b69958d8-c391-454f-a282-c95c466c7d44",
+                "label": "Днём (07:00–19:00), оценка: промышленность",
+                "value": "ниже 40 дБ",
+                "status": "derived",
+                "confidence": null,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": "32cb07a6-d401-429f-a803-6cff144e3020"
+              },
+              {
+                "id": "89aeaa5f-d080-4be7-98b0-b52bee3a561a",
+                "label": "Ночью (Lnight): промышленность",
+                "value": "ниже 40 дБ",
+                "status": "reported",
+                "confidence": null,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": null
+              },
+              {
+                "id": "5c40af30-f8e9-46bc-a6a7-42e6abf1ddf9",
+                "label": "За сутки (Lden): промышленность",
+                "value": "ниже 40 дБ",
+                "status": "reported",
+                "confidence": null,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": null
+              },
+              {
+                "id": "303a006d-f806-40a3-84d1-c14772579414",
+                "label": "Днём (07:00–19:00), оценка: железная дорога в городе",
+                "value": "ниже 40 дБ",
+                "status": "derived",
+                "confidence": null,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": "d46279c3-1c11-43fc-ac09-ff4ca5418f3f"
+              },
+              {
+                "id": "2f4a1493-f951-4bee-8e4b-9025fbf440f7",
+                "label": "Ночью (Lnight): железная дорога в городе",
+                "value": "ниже 40 дБ",
+                "status": "reported",
+                "confidence": null,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": null
+              },
+              {
+                "id": "4f4bb376-7642-4178-a5a1-454af33c428b",
+                "label": "За сутки (Lden): железная дорога в городе",
+                "value": "ниже 40 дБ",
+                "status": "reported",
+                "confidence": null,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": null
+              },
+              {
+                "id": "6b6cc810-2a3f-4334-8199-2546c928e469",
+                "label": "Рестораны в 200 м",
+                "value": "4",
+                "status": "derived",
+                "confidence": null,
+                "evidence_ids": [
+                  "1138bddd-4e7b-415d-b637-0fcc78d88037",
+                  "91cef08f-aad9-4074-9067-048d58e98a0a",
+                  "b7b322c1-9e17-49d7-aa9a-0bbae744ffb9",
+                  "fe3835a0-1e8b-4a7d-9c31-0cd370fd7f09"
+                ],
+                "calculation_id": "af6336dd-b378-4dc4-be84-e0b328ec5f38"
+              },
+              {
+                "id": "62ad14c2-9e9b-4f6f-a81a-171f88bddb8c",
+                "label": "Ближайшее место: ресторан «Pinares 14»",
+                "value": "40 м",
+                "status": "derived",
+                "confidence": null,
+                "evidence_ids": ["fe3835a0-1e8b-4a7d-9c31-0cd370fd7f09"],
+                "calculation_id": "af6336dd-b378-4dc4-be84-e0b328ec5f38"
+              }
+            ],
+            "calculations": [
+              {
+                "name": "Директива ЕС 2002/49/EC, приложение I: Lday из Lden и Lnight",
+                "version": "1",
+                "inputs": [
+                  {
+                    "label": "Lden (сутки)",
+                    "value": "60–64 дБ"
+                  },
+                  {
+                    "label": "Источник шума",
+                    "value": "Дороги города"
+                  },
+                  {
+                    "label": "Lnight (ночь)",
+                    "value": "55–59 дБ"
+                  },
+                  {
+                    "label": "Отель",
+                    "value": "ota-9096882"
+                  },
+                  {
+                    "label": "Часов дня",
+                    "value": "12"
+                  },
+                  {
+                    "label": "Часов ночи",
+                    "value": "8"
+                  },
+                  {
+                    "label": "Часов вечера",
+                    "value": "4"
+                  },
+                  {
+                    "label": "Поправка ночи, дБ",
+                    "value": "10"
+                  },
+                  {
+                    "label": "Вечер так же громок, как день",
+                    "value": "да"
+                  },
+                  {
+                    "label": "Поправка вечера, дБ",
+                    "value": "5"
+                  },
+                  {
+                    "label": "День не тише ночи",
+                    "value": "да"
+                  }
+                ],
+                "assumptions": [
+                  "Допущение: вечер так же громок, как день",
+                  "Допущение: день не тише ночи",
+                  "Оценка из полос 5 дБ модельной карты, не измерение"
+                ],
+                "id": "fb64ec8c-9dbf-4076-a108-2e71a6086e9f"
+              },
+              {
+                "name": "Директива ЕС 2002/49/EC, приложение I: Lday из Lden и Lnight",
+                "version": "1",
+                "inputs": [
+                  {
+                    "label": "Lden (сутки)",
+                    "value": "40–44 дБ"
+                  },
+                  {
+                    "label": "Источник шума",
+                    "value": "Магистрали"
+                  },
+                  {
+                    "label": "Lnight (ночь)",
+                    "value": "ниже 40 дБ"
+                  },
+                  {
+                    "label": "Отель",
+                    "value": "ota-9096882"
+                  },
+                  {
+                    "label": "Часов дня",
+                    "value": "12"
+                  },
+                  {
+                    "label": "Часов ночи",
+                    "value": "8"
+                  },
+                  {
+                    "label": "Часов вечера",
+                    "value": "4"
+                  },
+                  {
+                    "label": "Поправка ночи, дБ",
+                    "value": "10"
+                  },
+                  {
+                    "label": "Вечер так же громок, как день",
+                    "value": "да"
+                  },
+                  {
+                    "label": "Поправка вечера, дБ",
+                    "value": "5"
+                  },
+                  {
+                    "label": "День не тише ночи",
+                    "value": "да"
+                  }
+                ],
+                "assumptions": [
+                  "Допущение: вечер так же громок, как день",
+                  "Допущение: день не тише ночи",
+                  "Оценка из полос 5 дБ модельной карты, не измерение"
+                ],
+                "id": "66707e29-cfb0-4b96-a67c-f92be0b0eb96"
+              },
+              {
+                "name": "Директива ЕС 2002/49/EC, приложение I: Lday из Lden и Lnight",
+                "version": "1",
+                "inputs": [
+                  {
+                    "label": "Lden (сутки)",
+                    "value": "ниже 40 дБ"
+                  },
+                  {
+                    "label": "Источник шума",
+                    "value": "Промышленность"
+                  },
+                  {
+                    "label": "Lnight (ночь)",
+                    "value": "ниже 40 дБ"
+                  },
+                  {
+                    "label": "Отель",
+                    "value": "ota-9096882"
+                  },
+                  {
+                    "label": "Часов дня",
+                    "value": "12"
+                  },
+                  {
+                    "label": "Часов ночи",
+                    "value": "8"
+                  },
+                  {
+                    "label": "Часов вечера",
+                    "value": "4"
+                  },
+                  {
+                    "label": "Поправка ночи, дБ",
+                    "value": "10"
+                  },
+                  {
+                    "label": "Вечер так же громок, как день",
+                    "value": "да"
+                  },
+                  {
+                    "label": "Поправка вечера, дБ",
+                    "value": "5"
+                  },
+                  {
+                    "label": "День не тише ночи",
+                    "value": "да"
+                  }
+                ],
+                "assumptions": [
+                  "Допущение: вечер так же громок, как день",
+                  "Допущение: день не тише ночи",
+                  "Оценка из полос 5 дБ модельной карты, не измерение"
+                ],
+                "id": "32cb07a6-d401-429f-a803-6cff144e3020"
+              },
+              {
+                "name": "Директива ЕС 2002/49/EC, приложение I: Lday из Lden и Lnight",
+                "version": "1",
+                "inputs": [
+                  {
+                    "label": "Lden (сутки)",
+                    "value": "ниже 40 дБ"
+                  },
+                  {
+                    "label": "Источник шума",
+                    "value": "Железная дорога в городе"
+                  },
+                  {
+                    "label": "Lnight (ночь)",
+                    "value": "ниже 40 дБ"
+                  },
+                  {
+                    "label": "Отель",
+                    "value": "ota-9096882"
+                  },
+                  {
+                    "label": "Часов дня",
+                    "value": "12"
+                  },
+                  {
+                    "label": "Часов ночи",
+                    "value": "8"
+                  },
+                  {
+                    "label": "Часов вечера",
+                    "value": "4"
+                  },
+                  {
+                    "label": "Поправка ночи, дБ",
+                    "value": "10"
+                  },
+                  {
+                    "label": "Вечер так же громок, как день",
+                    "value": "да"
+                  },
+                  {
+                    "label": "Поправка вечера, дБ",
+                    "value": "5"
+                  },
+                  {
+                    "label": "День не тише ночи",
+                    "value": "да"
+                  }
+                ],
+                "assumptions": [
+                  "Допущение: вечер так же громок, как день",
+                  "Допущение: день не тише ночи",
+                  "Оценка из полос 5 дБ модельной карты, не измерение"
+                ],
+                "id": "d46279c3-1c11-43fc-ac09-ff4ca5418f3f"
+              },
+              {
+                "name": "Расстояние по прямой от точки отеля до формы объекта OSM",
+                "version": "1",
+                "inputs": [
+                  {
+                    "label": "Широта точки отеля",
+                    "value": "39.3833"
+                  },
+                  {
+                    "label": "Долгота точки отеля",
+                    "value": "-0.33254"
+                  },
+                  {
+                    "label": "Отель",
+                    "value": "ota-9096882"
+                  },
+                  {
+                    "label": "Радиус, м",
+                    "value": "200"
+                  },
+                  {
+                    "label": "Категории мест",
+                    "value": "ночной клуб, бар, ресторан, фастфуд, остановка трамвая, ж/д станция"
+                  },
+                  {
+                    "label": "Мест каждой категории не больше",
+                    "value": "20"
+                  }
+                ],
+                "assumptions": [
+                  "Данные OpenStreetMap могут быть неполными: места нет в данных — не значит, что его нет на месте",
+                  "Расстояние по прямой до формы объекта, не путь пешком",
+                  "Не более 20 мест каждой категории"
+                ],
+                "id": "af6336dd-b378-4dc4-be84-e0b328ec5f38"
+              }
+            ],
+            "method": {
+              "name": "Сводка данных о шуме из хранилища: карты шума EEA, места OpenStreetMap, отзывы гостей",
+              "version": "1",
+              "inputs": [
+                {
+                  "label": "Отель",
+                  "value": "ota-9096882"
+                },
+                {
+                  "label": "Слова в отзывах",
+                  "value": "шум, шумно, шумный, шумновато, тихо, тихий, тишина, громко, слышно, слышимость, звукоизоляция"
+                }
+              ],
+              "assumptions": [
+                "Источники шума EEA показаны от самого громкого",
+                "Из мест OpenStreetMap показано ближайшее каждой категории",
+                "Отзывы — не больше 5, найденные по словам о шуме и тишине"
+              ]
+            },
+            "limitations": [
+              "Оценка по допущению «вечер = день», не измерение",
+              "Модельная стратегическая карта шума EEA (END, раунд 2022), не измерение у окна",
+              "Полоса 5 дБ, а не уровень",
+              "Нижняя полоса открыта: ниже 40 дБ карта уровни не различает",
+              "Нет данных EEA — не значит «тихо»: карты шума не покрывают точку или ниже порога картирования",
+              "Звукоизоляция окон и номеров не оценивается: уровни — снаружи здания",
+              "Отзывы — слова гостей, а не измерение"
+            ],
+            "error": null
+          }
+        }
+      }
+    ]
+  }
+}
