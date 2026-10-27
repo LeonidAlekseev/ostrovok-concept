@@ -158,6 +158,9 @@ export async function understandWish(
   // A view `any` is «с видом», not a handed-over question.
   for (const key of Object.keys(parsed) as (keyof Brief)[])
     if ((parsed[key] === 'any' && key !== 'view') || !grounded(key, parsed, input, destinations)) delete parsed[key]
+  // The distance to the sea is the rules' own: «близко к морю» is 1 km, a named distance is taken as it is.
+  const sea = parseWish(input, destinations).seaMaxM
+  if (sea) parsed.seaMaxM = sea
   // Days are taken only when the message names them: a day number or a month (a guess at them is not).
   if (/\d/.test(input) || typeof parseWish(input, destinations).when === 'number') {
     const named = namedStay(output, brief, today)

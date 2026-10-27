@@ -42,11 +42,8 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
   const destinations = useDestinations()
   const today = useToday()
   const pathId = useChatPath()
-  const { chats, active, ready, signedIn, send, retry, rename, remove, setBrief, photoUrl, photoError } = useChats(
-    destinations,
-    newHotels,
-    pathId,
-  )
+  const { chats, active, ready, signedIn, send, retry, rename, remove, setBrief, research, photoUrl, photoError } =
+    useChats(destinations, newHotels, pathId)
   const [text, setText] = useState('')
   const attach = useAttachPhotos()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -229,6 +226,10 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
             onChoose={onChoose}
             onRetry={(messageId) => retry(active.id, messageId)}
             planActions={planActions}
+            onResearch={(brief) => research(active.id, brief)}
+            busy={thinking || !ready}
+            destinations={destinations}
+            today={today ?? undefined}
           />
         ) : (
           <div className="flex-1" />
@@ -278,64 +279,67 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
 
         <form className="flex-none" onSubmit={onSubmit}>
           <AttachedPhotos photos={attach.photos} onRemove={attach.remove} />
-          <InputGroup
-            className={`h-auto items-end gap-2 rounded-[28px] border-0 p-1.5 pl-4 ${fieldClass} has-disabled:bg-muted has-disabled:opacity-100 transition-shadow duration-200 has-[[data-slot=input-group-control]:focus-visible]:ring-0 has-[[data-slot=input-group-control]:focus-visible]:shadow-[inset_0_0_0_2px_var(--ring),0_0_0_4px_color-mix(in_srgb,var(--ring)_25%,transparent)]`}
-          >
-            <label htmlFor={inputId} className="sr-only">
-              Опишите поездку
-            </label>
-            {/* The group draws the box and the focus state; the textarea is bare inside it and grows with the text. */}
-            <InputGroupTextarea
-              ref={inputRef}
-              id={inputId}
-              className="max-h-[min(9.5rem,30dvh)] min-h-[2.6em] self-center overflow-y-auto p-0 py-2 text-base leading-[1.4] field-sizing-content placeholder:text-(--decor-assistant-text-2)"
-              rows={1}
-              value={text}
-              enterKeyHint="send"
-              maxLength={MAX_MESSAGE_LENGTH}
-              placeholder="Напишите, что ищете…"
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={onKeyDown}
-            />
-            <InputGroupAddon align="inline-end" className="flex-col gap-1 p-0">
-              <input
-                ref={fileRef}
-                type="file"
-                accept={PHOTO_TYPES.join(',')}
-                multiple
-                hidden
-                aria-label="Выбрать фото"
-                onChange={(e) => {
-                  const files = [...(e.target.files ?? [])]
-                  // The same file chosen again is a new choice.
-                  e.target.value = ''
-                  void attach.add(files)
-                }}
+          <div className="flex items-end gap-2">
+            <InputGroup
+              className={`h-auto min-h-13 flex-1 items-center gap-1 rounded-[28px] border-0 p-1 pr-4 ${fieldClass} has-disabled:bg-muted has-disabled:opacity-100 transition-shadow duration-200 has-[[data-slot=input-group-control]:focus-visible]:ring-0 has-[[data-slot=input-group-control]:focus-visible]:shadow-[inset_0_0_0_2px_var(--ring),0_0_0_4px_color-mix(in_srgb,var(--ring)_25%,transparent)]`}
+            >
+              <InputGroupAddon align="inline-start" className="self-end p-0">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept={PHOTO_TYPES.join(',')}
+                  multiple
+                  hidden
+                  aria-label="Выбрать фото"
+                  onChange={(e) => {
+                    const files = [...(e.target.files ?? [])]
+                    // The same file chosen again is a new choice.
+                    e.target.value = ''
+                    void attach.add(files)
+                  }}
+                />
+                <InputGroupButton
+                  type="button"
+                  variant="ghost"
+                  className="size-11 flex-none rounded-full p-0 text-foreground"
+                  aria-label={`Приложить фото, до ${MAX_PHOTOS}`}
+                  disabled={!ready || attach.busy}
+                  onClick={() => {
+                    if (!signedIn) setGuestWarned(true)
+                    fileRef.current?.click()
+                  }}
+                >
+                  <Paperclip className="size-5.5" aria-hidden />
+                </InputGroupButton>
+              </InputGroupAddon>
+              <label htmlFor={inputId} className="sr-only">
+                Опишите поездку
+              </label>
+              {/* The group draws the box and the focus state; the textarea is bare inside it and grows with the text. */}
+              <InputGroupTextarea
+                ref={inputRef}
+                id={inputId}
+                className="max-h-[min(9.5rem,30dvh)] min-h-[2.6em] self-center overflow-y-auto p-0 py-2 text-base leading-[1.4] field-sizing-content placeholder:text-(--decor-assistant-text-2)"
+                rows={1}
+                value={text}
+                enterKeyHint="send"
+                maxLength={MAX_MESSAGE_LENGTH}
+                placeholder="Напишите, что ищете…"
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={onKeyDown}
               />
-              <InputGroupButton
-                type="submit"
-                variant="default"
-                className="size-11 flex-none rounded-full bg-primary p-0 text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
-                aria-label="Отправить"
-                disabled={(!text.trim() && attach.photos.length === 0) || attach.busy || thinking || !ready}
-              >
-                <SendHorizontal className="size-5" aria-hidden />
-              </InputGroupButton>
-              <InputGroupButton
-                type="button"
-                variant="ghost"
-                className="size-9 flex-none rounded-full p-0 text-foreground"
-                aria-label={`Приложить фото, до ${MAX_PHOTOS}`}
-                disabled={!ready || attach.busy}
-                onClick={() => {
-                  if (!signedIn) setGuestWarned(true)
-                  fileRef.current?.click()
-                }}
-              >
-                <Paperclip className="size-5" aria-hidden />
-              </InputGroupButton>
-            </InputGroupAddon>
-          </InputGroup>
+            </InputGroup>
+            <Button
+              type="submit"
+              size="icon"
+              shape="pill"
+              className="size-13 flex-none bg-primary p-0 text-primary-foreground shadow-(--shadow-primary) hover:bg-primary/90 disabled:opacity-60"
+              aria-label="Отправить"
+              disabled={(!text.trim() && attach.photos.length === 0) || attach.busy || thinking || !ready}
+            >
+              <SendHorizontal className="size-6" aria-hidden />
+            </Button>
+          </div>
           {(attach.error || photoError) && (
             <p className="mt-1.5 px-2 text-sm text-destructive" role="alert">
               {attach.error ?? photoError}

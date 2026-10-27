@@ -1,13 +1,12 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRef, useState } from 'react'
-import { ChevronLeft, EllipsisVertical, Pencil, Trash2 } from 'lucide-react'
+import { ChevronLeft, EllipsisVertical, Pencil, Share2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { Chat } from '../../lib/assistantChats'
 import { hotelHref, DEFAULT_GUESTS } from '../../lib/search'
-import { DeleteDialog, RenameForm, SharePopover } from './ChatActions'
-import { ChatIcon } from './ChatList'
+import { DeleteDialog, RenameForm, ShareDialog, SharePopover } from './ChatActions'
 
 interface Props {
   chat: Chat
@@ -19,21 +18,25 @@ interface Props {
   onDelete: () => void
 }
 
+/** The round grey buttons of the header. */
+const circleButton = 'size-11 flex-none rounded-full bg-muted text-foreground hover:bg-secondary [&_svg]:size-5.5'
+
 /**
- * The open chat's header: «назад» to the list on phones, the title with its pencil, the line of the trip, «Поделиться»
- * and the menu with «Переименовать» and «Удалить» (after a confirmation).
+ * The open chat's header: «назад» to the list on phones, the title and under it the line of the trip from the saved
+ * parameters, the pencil (rename) and the menu «⋮» with «Поделиться», «Переименовать» and «Удалить» (after a
+ * confirmation), in grey circles; from `sm` «Поделиться» has a circle of its own too.
  */
 export function ChatHeader({ chat, trip, signedIn, onBack, onRename, onDelete }: Props) {
   const [editing, setEditing] = useState(false)
   const [confirm, setConfirm] = useState(false)
+  const [sharing, setSharing] = useState(false)
   // «Переименовать» of the menu: the focus stays in the title's field, not back on the menu's button.
   const renaming = useRef(false)
   return (
     <header className="flex flex-none items-center gap-2 sm:gap-3">
-      <Button variant="ghost" size="icon-sm" className="-ml-1 lg:hidden" aria-label="Назад к чатам" onClick={onBack}>
-        <ChevronLeft className="size-6" aria-hidden />
+      <Button variant="ghost" size="icon-sm" className="-ml-1.5 lg:hidden" aria-label="Назад к чатам" onClick={onBack}>
+        <ChevronLeft className="size-7" aria-hidden />
       </Button>
-      <ChatIcon chat={chat} className="max-sm:hidden" />
       <div className="flex min-w-0 flex-1 flex-col">
         {editing ? (
           <RenameForm
@@ -46,7 +49,7 @@ export function ChatHeader({ chat, trip, signedIn, onBack, onRename, onDelete }:
           />
         ) : (
           <div className="flex min-w-0 items-center gap-1">
-            <h2 className="min-w-0 truncate text-[clamp(16px,4.2vw,19px)]/[1.3] font-bold tracking-[-0.01em]">
+            <h2 className="min-w-0 truncate text-[clamp(18px,5vw,22px)]/[1.25] font-bold tracking-[-0.01em]">
               {chat.brief.hotelId ? (
                 <Link
                   href={hotelHref(
@@ -61,28 +64,32 @@ export function ChatHeader({ chat, trip, signedIn, onBack, onRename, onDelete }:
                 chat.title || 'Новый чат'
               )}
             </h2>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="size-8 flex-none text-muted-foreground"
-              aria-label="Переименовать чат"
-              onClick={() => setEditing(true)}
-            >
-              <Pencil className="size-4" aria-hidden />
-            </Button>
           </div>
         )}
-        {trip && <p className="truncate text-sm/[1.35] text-muted-foreground">{trip}</p>}
+        {trip && <p className="truncate text-[15px]/[1.35] text-muted-foreground">{trip}</p>}
       </div>
-      <SharePopover chat={chat} signedIn={signedIn} />
+      <SharePopover chat={chat} signedIn={signedIn} className={`${circleButton} max-sm:hidden`} />
+      <Button
+        variant="ghost"
+        size="icon"
+        className={circleButton}
+        aria-label="Переименовать чат"
+        onClick={() => setEditing(true)}
+      >
+        <Pencil aria-hidden />
+      </Button>
       <DropdownMenu>
         <DropdownMenuTrigger
-          render={<Button variant="outline" size="icon-sm" className="bg-(--decor-light) text-foreground" />}
+          render={<Button variant="ghost" size="icon" className={circleButton} />}
           aria-label="Действия с чатом"
         >
-          <EllipsisVertical className="size-5" aria-hidden />
+          <EllipsisVertical aria-hidden />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44" finalFocus={() => !renaming.current}>
+          <DropdownMenuItem onClick={() => setSharing(true)}>
+            <Share2 aria-hidden />
+            Поделиться
+          </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => {
               renaming.current = true
@@ -98,6 +105,7 @@ export function ChatHeader({ chat, trip, signedIn, onBack, onRename, onDelete }:
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <ShareDialog chat={chat} signedIn={signedIn} open={sharing} onOpenChange={setSharing} />
       <DeleteDialog chat={chat} open={confirm} onOpenChange={setConfirm} onDelete={onDelete} />
     </header>
   )

@@ -3,9 +3,10 @@ import type { Destination } from '@/data/destinations'
 import { planCities, type Brief, type TurnStep } from '@/lib/assistant'
 import type { HotelSummary } from '@/lib/catalog'
 import type { IsoDate } from '@/lib/dates'
-import { countRu } from '@/lib/format'
+import { countRu, formatMeters } from '@/lib/format'
 import {
   CRITERION_LABEL,
+  VIEW_LABEL,
   criteriaOf,
   missingCriteria,
   rankByFeatures,
@@ -50,6 +51,8 @@ export interface Step {
   agent: TurnStep['agent']
   /** The line of the step, or `null` to skip it in this turn. */
   title: (context: TurnContext) => string | null
+  /** What the step is called with, briefly in Russian: «Валенсия», «до моря до 1 км». */
+  params?: (context: TurnContext) => string | undefined
   /** What came of it, for the line; changes `state` for the next steps. */
   run: (context: TurnContext, state: TurnState) => Promise<string | undefined>
 }
@@ -60,6 +63,28 @@ export const MATCHES = 6
 const MIN_SEMANTIC_MS = 1500
 
 const stayCount = (n: number) => countRu(n, ['отель', 'отеля', 'отелей'])
+
+/** The cities a step looks in: «Валенсия», «Валенсия, Барселона, Лиссабон и ещё 10». */
+const CITIES_SHOWN = 3
+export function citiesParam(cities: readonly Destination[]): string | undefined {
+  if (cities.length === 0) return undefined
+  const named = cities
+    .slice(0, CITIES_SHOWN)
+    .map((d) => d.name)
+    .join(', ')
+  return cities.length > CITIES_SHOWN ? `${named} и ещё ${cities.length - CITIES_SHOWN}` : named
+}
+
+/** What the features step checks: «до моря до 1 км · тихо ночью · здание повыше · вид на море». */
+export function criteriaParam(wish: FeatureWish): string | undefined {
+  const parts = [
+    wish.seaMaxM && `до моря до ${formatMeters(wish.seaMaxM)}`,
+    wish.quiet && 'тихо ночью',
+    wish.height && (wish.height === 'high' ? 'здание повыше' : 'здание пониже'),
+    wish.view && (wish.view === 'any' ? 'вид из окна' : `вид ${VIEW_LABEL[wish.view]}`),
+  ].filter(Boolean)
+  return parts.length > 0 ? parts.join(' · ') : undefined
+}
 
 /** Failures a retry may fix; with `no-key`, `aborted` or an empty result the search is not down. */
 const retryable = (result: SemanticResult) =>
@@ -73,6 +98,7 @@ const retryable = (result: SemanticResult) =>
 export const searchStep: Step = {
   agent: 'search',
   title: () => 'Подбираю отели по вашему описанию',
+  params: ({ brief, today, destinations }) => citiesParam(planCities(brief, today, destinations)),
   async run(context, state) {
     const left = context.deadline - Date.now()
     if (left < MIN_SEMANTIC_MS) return 'подобрал по каталогу'
@@ -112,6 +138,7 @@ export const featuresStep: Step = {
     const criteria = criteriaOf(brief)
     return criteria.length ? criteriaTitle(criteria) : null
   },
+  params: ({ brief }) => criteriaParam(brief),
   async run(context, state) {
     const { brief } = context
     const cities = new Set(planCities(brief, context.today, context.destinations).map((d) => d.id))
@@ -123,18 +150,21 @@ export const featuresStep: Step = {
       .sort((a, b) => (semantic.get(a.id) ?? Infinity) - (semantic.get(b.id) ?? Infinity) || b.rating - a.rating)
       .map((h) => h.id)
     state.missing = missingCriteria(ids, features, brief)
-    const wish: FeatureWish = { quiet: brief.quiet, height: brief.height, view: brief.view }
+    const wish: FeatureWish = { seaMaxM: brief.seaMaxM, quiet: brief.quiet, height: brief.height, view: brief.view }
     const criteria = criteriaOf(wish).filter((c) => !state.missing!.includes(c))
     let ranked: string[] = []
     for (let keep = criteria.length; keep > 0 && ranked.length === 0; keep--) {
       const kept = new Set(criteria.slice(0, keep))
       ranked = rankByFeatures(ids, features, {
+        ...(kept.has('sea') && { seaMaxM: wish.seaMaxM }),
         ...(kept.has('quiet') && { quiet: wish.quiet }),
         ...(kept.has('height') && { height: wish.height }),
         ...(kept.has('view') && { view: wish.view }),
       })
     }
-    if (ranked.length === 0) return 'нет данных'
+    // The sea is never let go: no hotel within the distance is the answer «ничего не нашёл».
+    if (ranked.length === 0)
+      return criteria.includes('sea') ? `ни одного ближе ${formatMeters(wish.seaMaxM!)} к морю` : 'нет данных'
     const byId = new Map(inCities.map((h) => [h.id, h]))
     state.matches = ranked.slice(0, MATCHES).map((id) => byId.get(id)!)
     state.features = Object.fromEntries(
@@ -156,14 +186,16 @@ export async function runTurn(
   for (const step of steps) {
     const title = step.title(context)
     if (title === null) continue
+    const params = step.params?.(context)
+    const call = { agent: step.agent, title, ...(params && { params }) }
     try {
       const result = await step.run(context, state)
-      done.push({ agent: step.agent, title, status: 'done', ...(result && { result }) })
+      done.push({ ...call, status: 'done', ...(result && { result }) })
     } catch (error) {
       if (context.signal.aborted) throw error
       // The kind and the provider's short message; never the request itself.
       console.warn(`assistant: the ${step.agent} step failed (${error instanceof Error ? error.name : 'error'})`)
-      done.push({ agent: step.agent, title, status: 'failed', result: 'не получилось — подобрал без этого шага' })
+      done.push({ ...call, status: 'failed', result: 'не получилось — подобрал без этого шага' })
     }
   }
   return { state, steps: done }

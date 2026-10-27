@@ -45,16 +45,19 @@ import { isHotelGeoQuestion, isHotelViewQuestion } from '@/lib/noise'
 import { todayIso, type IsoDate } from '@/lib/dates'
 import type { Hotel } from '@/lib/catalog'
 
-const requestSchema = z.object({
-  messages: z
-    .array(z.object({ role: z.enum(['user', 'assistant']), text: z.string().trim().min(1).max(MAX_MESSAGE_LENGTH) }))
-    .min(1)
-    .max(MAX_HISTORY)
-    .refine((messages) => messages.at(-1)?.role === 'user', 'The last message is the traveller’s'),
-  brief: z.record(z.string(), z.unknown()).default({}),
-  // About 4 × 300 KB of optimised photos: the body stays within the 4.5 MB of a Vercel function.
-  photos: z.array(z.string().max(MAX_PHOTO_URL_LENGTH).regex(PHOTO_DATA_URL)).max(MAX_PHOTOS).optional(),
-})
+const requestSchema = z
+  .object({
+    messages: z
+      .array(z.object({ role: z.enum(['user', 'assistant']), text: z.string().trim().min(1).max(MAX_MESSAGE_LENGTH) }))
+      .min(1)
+      .max(MAX_HISTORY),
+    brief: z.record(z.string(), z.unknown()).default({}),
+    // The parameters changed by hand: the hotels by the brief, the dialog only for the wish's words.
+    rerun: z.literal(true).optional(),
+    // About 4 × 300 KB of optimised photos: the body stays within the 4.5 MB of a Vercel function.
+    photos: z.array(z.string().max(MAX_PHOTO_URL_LENGTH).regex(PHOTO_DATA_URL)).max(MAX_PHOTOS).optional(),
+  })
+  .refine(({ messages, rerun }) => rerun || messages.at(-1)?.role === 'user', 'The last message is the traveller’s')
 
 /** The answer is due in 15 s: the client waits 16. The steps of the turn get what the model left. */
 const ANSWER_BUDGET_MS = 15_000
@@ -243,6 +246,22 @@ async function wishTurn({ messages, brief, today, destinations, deadline, signal
 }
 
 /**
+ * The parameters were changed by hand after «ничего не нашёл»: the hotels by the brief as it is, nothing of the
+ * dialog is read again (the newest message would take back what was changed). The wish's words still lead the search.
+ */
+async function rerunTurn({ messages, brief, today, destinations, deadline, signal }: WishContext) {
+  const wish = messages
+    .filter((m) => m.role === 'user')
+    .map((m) => m.text)
+    .join('. ')
+  return {
+    brief,
+    source: 'rules',
+    ...(await planTurn({ brief, wish, today, destinations, deadline, signal })),
+  } satisfies AssistantResponse
+}
+
+/**
  * What the photos show, by the models that see photos in turn (each with the same photos), with the step of the
  * switch when the first failed; `null` without the models or the time for them; `limited` over the limit (ours, or
  * the provider's 429 of every model); `failed` when none answered (an error, a timeout, an answer not in Russian).
@@ -386,7 +405,7 @@ export async function POST(request: Request) {
   const parsedBody = requestSchema.safeParse(await request.json().catch(() => null))
   if (!parsedBody.success) return Response.json({ error: 'Invalid request' }, { status: 400 })
 
-  const { messages, photos = [] } = parsedBody.data
+  const { messages, photos = [], rerun } = parsedBody.data
   const deadline = Date.now() + (photos.length > 0 ? PHOTO_BUDGET_MS : ANSWER_BUDGET_MS)
   const destinations = await loadDestinations().catch(() => null)
   if (!destinations) return Response.json({ error: 'Catalog unavailable' }, { status: 503 })
@@ -397,5 +416,6 @@ export async function POST(request: Request) {
   if (brief.hotelId && !hotel) delete brief.hotelId
   if (hotel) return hotelTurn(hotel, { brief, messages, signal: request.signal, deadline })
   const context: WishContext = { messages, brief, today, destinations, deadline, signal: request.signal }
+  if (rerun) return Response.json(await rerunTurn(context))
   return Response.json(photos.length > 0 ? await photoTurn(photos, ip, context) : await wishTurn(context))
 }

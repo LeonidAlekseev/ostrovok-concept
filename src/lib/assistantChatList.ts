@@ -1,9 +1,10 @@
 import type { Destination } from '../data/destinations'
 import { PARTY_GUESTS, type Brief, type Plan } from './assistant'
 import type { Chat } from './assistantChats'
-import { fromIso, nightsBetween, toIso, type IsoDate } from './dates'
+import { nightsBetween, toIso, type IsoDate } from './dates'
 import { countRu, guestsLabel } from './format'
 import { selectionHref, type Guests } from './search'
+import { stayLabel } from './sessionParams'
 
 /**
  * The list of chats on `/assistant`: the groups by the day of the last change, the icon of the trip, the start of
@@ -143,7 +144,9 @@ export function tripParams(chat: Chat, destinations: readonly Destination[]): Tr
   const { brief } = chat
   const plan = lastPlan(chat)
   const dates = brief.dates ?? (plan && { checkIn: plan.query.checkIn, checkOut: plan.query.checkOut })
-  const guests = brief.party && brief.party !== 'any' ? PARTY_GUESTS[brief.party] : plan ? plan.query.guests : undefined
+  const guests =
+    brief.guests ??
+    (brief.party && brief.party !== 'any' ? PARTY_GUESTS[brief.party] : plan ? plan.query.guests : undefined)
   const planCities = new Set(plan?.options.map((o) => o.destination.id))
   const cityId = brief.destinationId ?? (planCities.size === 1 ? [...planCities][0] : undefined)
   const city = destinations.find((d) => d.id === cityId)
@@ -154,21 +157,11 @@ export function tripParams(chat: Chat, destinations: readonly Destination[]): Tr
   }
 }
 
-const shortDay = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' })
-const sameMonth = (a: IsoDate, b: IsoDate) => a.slice(0, 7) === b.slice(0, 7)
-
-/** «25–26 окт», «30 окт – 2 нояб». */
-export function tripDates(checkIn: IsoDate, checkOut: IsoDate): string {
-  const [a, b] = [fromIso(checkIn), fromIso(checkOut)]
-  const end = shortDay.format(b).replace('.', '')
-  return sameMonth(checkIn, checkOut) ? `${a.getDate()}–${end}` : `${shortDay.format(a).replace('.', '')} – ${end}`
-}
-
-/** «2 гостя · 25–26 окт · Валенсия»: the line under the chat's title; empty when the chat knows none of it. */
+/** «1 гость · 25–30 нояб. · Валенсия»: the line under the chat's title; empty when the chat knows none of it. */
 export function tripLine(params: TripParams): string {
   return [
     params.guests && guestsLabel(params.guests),
-    params.checkIn && params.checkOut && tripDates(params.checkIn, params.checkOut),
+    params.checkIn && params.checkOut && stayLabel(params.checkIn, params.checkOut),
     params.city?.name,
   ]
     .filter(Boolean)

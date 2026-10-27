@@ -123,7 +123,8 @@ describe('the photos of a message', () => {
     await user.upload(picker(), photo('a.jpg'))
     await user.type(input(), 'найди похожий{Enter}')
     expect(await within(log()).findByText(/^Вижу на фото: Только цветные полосы\./)).toBeTruthy()
-    expect(within(log()).getByText('Модель фото не ответила, смотрю другой — посмотрел')).toBeTruthy()
+    expect(within(log()).getByText('Модель фото не ответила, смотрю другой')).toBeTruthy()
+    expect(within(log()).getByText('посмотрел')).toBeTruthy()
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
@@ -134,7 +135,7 @@ describe('the photos of a message', () => {
     await user.type(input(), 'хочу в Валенсию{Enter}')
     expect(
       await within(log()).findByText(
-        /^Модель распознавания фото сейчас недоступна — ответил без фото\. Записал: Валенсия/,
+        /^Модель распознавания фото сейчас недоступна — ответил без фото\. Когда планируете поехать\?/,
       ),
     ).toBeTruthy()
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -294,7 +295,8 @@ describe('what Эвал does with the photos', () => {
       await within(log()).findByText('Вижу на фото: Светлый номер с видом на море. Нашёл похожие отели.'),
     ).toBeTruthy()
     expect(within(log()).getAllByText('Похоже: вид на море').length).toBeGreaterThan(0)
-    expect(within(log()).getByText('Ищу отели, похожие на фото — нашёл 2')).toBeTruthy()
+    expect(within(log()).getByText('Ищу отели, похожие на фото')).toBeTruthy()
+    expect(within(log()).getByText('нашёл 2')).toBeTruthy()
     expect(screen.queryByRole('list', { name: 'Быстрые ответы' })).toBeNull()
   })
 
@@ -326,7 +328,8 @@ describe('what Эвал does with the photos', () => {
     expect(
       await within(log()).findByText(/^Вижу на фото: Номер у моря\. Поиск похожих отелей сейчас не ответил/),
     ).toBeTruthy()
-    expect(within(log()).getByText('Ищу отели, похожие на фото — поиск не ответил')).toBeTruthy()
+    expect(within(log()).getByText('Ищу отели, похожие на фото')).toBeTruthy()
+    expect(within(log()).getByText('поиск не ответил')).toBeTruthy()
     expect(within(log()).queryAllByRole('article')).toHaveLength(0)
   })
 
@@ -337,7 +340,10 @@ describe('what Эвал does with the photos', () => {
     const { user } = renderAssistant()
     await user.upload(picker(), photo('a.jpg'))
     await user.type(input(), 'учти{Enter}')
-    expect(await within(log()).findByText(/^Вижу на фото: Вид на море с балкона\. Записал: вид на море\./)).toBeTruthy()
+    expect(
+      await within(log()).findByText(/^Вижу на фото: Вид на море с балкона\. Какое настроение у поездки\?/),
+    ).toBeTruthy()
+    expect(within(log()).getByText('Вид из окна: на море')).toBeTruthy()
   })
 })
 
@@ -526,7 +532,7 @@ describe('the rules instead of the models', () => {
     const { user } = renderAssistant()
     await user.type(input(), 'хочу в Валенсию{Enter}')
     const warning = await within(log()).findByText(DOWN)
-    const answerText = within(log()).getByText(/^Записал: Валенсия/)
+    const answerText = within(log()).getByText('Когда планируете поехать?')
     // The warning comes right after the answer.
     expect(answerText.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
@@ -535,7 +541,8 @@ describe('the rules instead of the models', () => {
     fetchMock.mockResolvedValue(Response.json({ brief: { destinationId: 'valencia' }, source: 'rules' }))
     const { user } = renderAssistant()
     await user.type(input(), 'хочу в Валенсию{Enter}')
-    expect(await within(log()).findByText(/^Записал: Валенсия/)).toBeTruthy()
+    expect(await within(log()).findByText('Когда планируете поехать?')).toBeTruthy()
+    expect(within(log()).getByText('Город: Валенсия')).toBeTruthy()
     expect(within(log()).queryByText(DOWN)).toBeNull()
   })
 })
