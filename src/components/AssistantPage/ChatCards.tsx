@@ -6,6 +6,7 @@ import {
   Check,
   ChevronDown,
   Eye,
+  Loader2,
   MapPin,
   Minus,
   Moon,
@@ -102,16 +103,14 @@ export function ToolCard({ step, failed }: { step: AgentStep; failed?: boolean }
   )
 }
 
-/** «Ищу подходящие варианты…» with the three dots: Эвал is at work. */
+/** «Ищу подходящие варианты…» with a spinning loader: Эвал is at work. */
 export function WorkingRow({
   text,
   label = text,
-  icon: Icon = Waves,
 }: {
   text: string
   /** What a screen reader hears. */
   label?: string
-  icon?: ComponentType<{ className?: string }>
 }) {
   return (
     <div
@@ -120,19 +119,10 @@ export function WorkingRow({
       className="flex w-[min(100%,22rem)] items-center gap-3 rounded-[18px] bg-muted py-2 pr-4 pl-2"
     >
       <span className="grid size-9 flex-none place-items-center rounded-full bg-card text-muted-foreground" aria-hidden>
-        <Icon className="size-5" />
+        <Loader2 className="size-5 motion-safe:animate-spin" data-testid="working-loader" />
       </span>
       <span className={`min-w-0 flex-1 truncate text-sm ${greyMutedText}`} aria-hidden>
         {text}
-      </span>
-      <span className="flex flex-none gap-1" aria-hidden>
-        {[0, 1, 2].map((i) => (
-          <span
-            key={i}
-            className="size-1.5 rounded-full bg-muted-foreground/70 motion-safe:animate-pulse"
-            style={{ animationDelay: `${i * 200}ms` }}
-          />
-        ))}
       </span>
     </div>
   )
@@ -534,8 +524,16 @@ function ParamEditor({ param, ...props }: ParamsProps & { param: SessionParam; o
         <Choices
           disabled={disabled}
           options={[
-            { label: 'спокойно', active: brief.mood === 'calm', apply: () => onChange({ ...brief, mood: 'calm' }) },
-            { label: 'активно', active: brief.mood === 'active', apply: () => onChange({ ...brief, mood: 'active' }) },
+            {
+              label: 'спокойно',
+              active: brief.mood === 'calm',
+              apply: () => onChange({ ...brief, mood: 'calm' }),
+            },
+            {
+              label: 'активно',
+              active: brief.mood === 'active',
+              apply: () => onChange({ ...brief, mood: 'active' }),
+            },
             removal('mood'),
           ]}
         />
@@ -547,8 +545,16 @@ function ParamEditor({ param, ...props }: ParamsProps & { param: SessionParam; o
         <Choices
           disabled={disabled}
           options={[
-            { label: 'повыше', active: brief.height === 'high', apply: () => onChange({ ...brief, height: 'high' }) },
-            { label: 'пониже', active: brief.height === 'low', apply: () => onChange({ ...brief, height: 'low' }) },
+            {
+              label: 'повыше',
+              active: brief.height === 'high',
+              apply: () => onChange({ ...brief, height: 'high' }),
+            },
+            {
+              label: 'пониже',
+              active: brief.height === 'low',
+              apply: () => onChange({ ...brief, height: 'low' }),
+            },
             removal('height'),
           ]}
         />

@@ -200,10 +200,7 @@ function MessageItem({ message, photoUrl, onChoose, onRetry, actions, params }: 
       <Message>
         <MessageContent className="gap-1">
           {status === 'pending' ? (
-            <WorkingRow
-              text={workingText(data.step)}
-              icon={data.step.agent === 'geo' ? (data.step.title.includes('видно') ? Eye : MapPin) : undefined}
-            />
+            <WorkingRow text={workingText(data.step)} />
           ) : (
             <>
               <ToolCard step={data.step} failed={status === 'failed'} />
