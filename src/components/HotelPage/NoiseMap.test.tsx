@@ -107,14 +107,19 @@ const places: NoisyPlace[] = [
   { category: 'bar', name: 'Homenaje', distanceM: 92, lat: 39.47, lon: -0.366 },
   { category: 'tram', name: null, distanceM: 180, lat: 39.468, lon: -0.367 },
 ]
-const band = (source: string, indicator: 'Lden' | 'Lnight', db_min: number | null) => ({
+const shape = (source: string, indicator: 'Lday' | 'Lnight', level: number | null) => ({
   type: 'Feature' as const,
   geometry: { type: 'Polygon' as const, coordinates: [] },
-  properties: { source, indicator, db_min, db_max: db_min === null ? 39 : db_min + 4 },
+  properties: { source, indicator, db_min: level, db_max: level === null ? null : level + 4, level },
 })
 const contours: NoiseMapData = {
   type: 'FeatureCollection',
-  features: [band('roadsInAgglomeration', 'Lden', 60), band('quiet', 'Lden', null), band('quiet', 'Lnight', null)],
+  features: [
+    shape('roadsInAgglomeration', 'Lday', 62.4),
+    shape('quiet', 'Lday', null),
+    shape('roadsInAgglomeration', 'Lnight', 55),
+    shape('quiet', 'Lnight', null),
+  ],
 }
 
 beforeEach(() => {
@@ -126,7 +131,7 @@ beforeEach(() => {
 })
 
 const renderMap = () =>
-  render(<NoiseMap center={center} contours={contours} indicator="Lden" places={places} onFail={() => {}} />)
+  render(<NoiseMap center={center} contours={contours} indicator="Lday" places={places} onFail={() => {}} />)
 
 // hotel-page, Requirement: Шум и окружение настоящего отеля
 describe('NoiseMap', () => {
@@ -138,12 +143,12 @@ describe('NoiseMap', () => {
     expect(mapMock.hidden).toEqual(['building-3d'])
   })
 
-  it('draws the quiet below 40 dB first and the louder bands above it', async () => {
+  it('draws the day: the quiet below 40 dB first and the louder pieces above it', async () => {
     renderMap()
     await waitFor(() => expect(mapMock.data.noise).toBeDefined())
-    expect(mapMock.data.noise.features.map((f) => [f.properties.source, f.properties.db_min])).toEqual([
+    expect(mapMock.data.noise.features.map((f) => [f.properties.source, f.properties.level])).toEqual([
       ['quiet', null],
-      ['roadsInAgglomeration', 60],
+      ['roadsInAgglomeration', 62.4],
     ])
   })
 

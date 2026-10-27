@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  dayColorLevel,
   dayCurve,
   dayEstimate,
   dayLabel,
@@ -53,16 +54,44 @@ describe('dayEstimate', () => {
     expect(dayLabel(day)).toBe('64–70 дБ')
   })
 
-  it('keeps the night lower bound when the quiet end does not fit', () => {
+  it('keeps the day no quieter than the night when the quiet end does not fit', () => {
     const day = dayEstimate({ min: 65, max: 69 }, { min: 60, max: 64 })!
     expect(day.min).toBe(60)
     expect(day.max).toBeCloseTo(dayLevel(70, 60)!, 6)
+    // Lden 65 with the day as loud as the night: 58.6 dB, above the night band's 55.
+    const even = dayEstimate({ min: 65, max: 69 }, { min: 55, max: 59 })!
+    expect(lden(even.min, even.min, even.min)).toBeCloseTo(65, 6)
+    expect(dayLabel(even)).toBe('59–69 дБ')
   })
 
-  it('has none for an open band', () => {
-    expect(dayEstimate({ min: 75 }, { min: 65, max: 69 })).toBeNull()
-    expect(dayEstimate({ min: 40, max: 44 }, { max: 39 })).toBeNull()
+  it('opens at the top with an Lden open at the top', () => {
+    const day = dayEstimate({ min: 75 }, { min: 65, max: 69 })!
+    expect(day.max).toBe(Infinity)
+    expect(lden(day.min, day.min, day.min)).toBeCloseTo(75, 6)
+    expect(dayLabel(day)).toBe('от 69 дБ')
+    expect(dayColorLevel(day)).toBe(day.min)
+  })
+
+  it('takes a night band open below as a night unbounded below', () => {
+    const day = dayEstimate({ min: 40, max: 44 }, { max: 39 })!
+    expect(day.max).toBeCloseTo(dayLevel(45, -Infinity)!, 6)
+    expect(lden(day.min, day.min, day.min)).toBeCloseTo(40, 6)
+    expect(dayColorLevel(day)).toBeCloseTo((day.min + day.max) / 2, 6)
+  })
+
+  it('is below 40 dB with an Lden below 40 dB: the day is quieter than the Lden', () => {
+    const day = dayEstimate({ max: 39 }, { max: 39 })!
+    expect(day.min).toBe(-Infinity)
+    expect(day.max).toBeLessThan(40)
+    expect(dayLabel(day)).toBe('ниже 40 дБ')
+    expect(dayColorLevel(day)).toBe(day.max)
+  })
+
+  it('has none without both bands or for bands that fit no day', () => {
     expect(dayEstimate(undefined, { min: 50, max: 54 })).toBeNull()
+    expect(dayEstimate({ min: 60, max: 64 }, undefined)).toBeNull()
+    // A night of 55 dB alone makes an Lden of 60.2 dB.
+    expect(dayEstimate({ min: 55, max: 59 }, { min: 55, max: 59 })).toBeNull()
   })
 })
 
@@ -89,6 +118,9 @@ describe('the day curve', () => {
   it('is not drawn for open bands', () => {
     expect(
       dayCurve({ sources: [{ source: 'roadsInAgglomeration', lden: { min: 75 }, lnight: { min: 65, max: 69 } }] }),
+    ).toBeNull()
+    expect(
+      dayCurve({ sources: [{ source: 'roadsInAgglomeration', lden: { min: 40, max: 44 }, lnight: { max: 39 } }] }),
     ).toBeNull()
   })
 })
@@ -136,13 +168,15 @@ describe('the questions', () => {
 })
 
 describe('noiseLines', () => {
-  it('state the bands, the day estimate, the layers and the places', () => {
+  it('state the day estimate, the bands, the layers and the places, the day and the night first like the switch', () => {
     const lines = noiseLines(roads)
     expect(lines[0]).toBe(
-      'За сутки (Lden) по карте шума EEA 2022: 65–69 дБ, громче всего — дороги города; выше рекомендации ВОЗ (53 дБ за сутки).',
+      'Днём (07:00–19:00): 59–69 дБ, громче всего — дороги города; это оценка из Lden и Lnight карты шума EEA 2022 по директиве ЕС 2002/49/EC (вечер принят равным дню, день — не тише ночи).',
     )
     expect(lines[1]).toMatch(/^Ночью \(Lnight, 23:00–07:00\): 55–59 дБ/)
-    expect(lines[2]).toMatch(/директива ЕС 2002\/49\/EC.*55–69 дБ/)
+    expect(lines[2]).toBe(
+      'За сутки (Lden) по карте шума EEA 2022: 65–69 дБ, громче всего — дороги города; выше рекомендации ВОЗ (53 дБ за сутки).',
+    )
     expect(lines[3]).toMatch(/^Источники EEA у отеля: Промышленность ниже 40 дБ за сутки/)
     expect(lines[4]).toBe(
       'Шумные места OpenStreetMap в 200 м: 2 бара, ближайшее место «Homenaje» — 90 м; 1 остановка трамвая, ближайшее место — 120 м.',
