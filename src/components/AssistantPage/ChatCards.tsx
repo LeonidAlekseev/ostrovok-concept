@@ -155,7 +155,7 @@ const ICONS: Record<ParamKey, ComponentType<{ className?: string }>> = {
 }
 
 /** The distances to the sea the card offers. */
-export const SEA_CHOICES = [300, 500, 1000, 2000, 5000] as const
+const SEA_CHOICES = [300, 500, 1000, 2000, 5000] as const
 const VIEWS: readonly (ViewKind | 'any')[] = ['sea', 'water', 'city', 'park', 'garden', 'pool', 'any']
 const DEFAULT_GUESTS: Guests = { adults: 2, children: 0, rooms: 1 }
 

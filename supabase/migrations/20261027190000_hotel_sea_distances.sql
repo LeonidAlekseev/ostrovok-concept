@@ -12,7 +12,7 @@ stable
 security definer
 set search_path = ''
 as $$
-  with h as (
+  with h as materialized (
     select h.id, extensions.st_setsrid(extensions.st_makepoint(h.lon, h.lat), 4326)::extensions.geography as g
     from public.hotels h
     where exists (
@@ -21,11 +21,19 @@ as $$
         and extensions.st_intersects(a.area, extensions.st_setsrid(extensions.st_makepoint(h.lon, h.lat), 4326))
     )
   ),
-  d as (
+  -- The distance on the spheroid is dear (seconds for all the hotels): the nearest coastlines are found on the plane
+  -- first, and only the three nearest of them are measured on the spheroid.
+  d as materialized (
     select h.id, h.g, (
-      select min(extensions.st_distance(h.g, p.geom))
-      from public.osm_places p
-      where p.categories @> array['sea'] and extensions.st_dwithin(h.g, p.geom, 10000)
+      select min(extensions.st_distance(h.g, c.geom))
+      from (
+        select p.geom
+        from public.osm_places p
+        where p.categories @> array['sea']
+        order by extensions.st_distance(h.g::extensions.geometry, p.geom::extensions.geometry)
+        limit 3
+      ) c
+      where extensions.st_dwithin(h.g, c.geom, 10000)
     ) as m
     from h
   )
