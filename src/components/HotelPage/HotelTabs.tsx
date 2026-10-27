@@ -27,7 +27,7 @@ const SLACK = 12
 
 /**
  * The tabs under the photos: anchors to the sections, stuck to the top of the page (on a phone under the compact
- * header) or of the hotel dialog. The current one is underlined: the one clicked, then, as the page scrolls,
+ * header). The current one is underlined: the one clicked, then, as the page scrolls,
  * the last section whose top has passed under the tabs.
  */
 export function HotelTabs({
@@ -36,7 +36,6 @@ export function HotelTabs({
   noise = false,
   view = false,
   className,
-  inDialog,
 }: {
   hotel: Hotel
   details?: HotelDetails | null
@@ -45,7 +44,6 @@ export function HotelTabs({
   /** The page has «Вид из отеля». */
   view?: boolean
   className?: string
-  inDialog?: boolean
 }) {
   const sections = hotelSections(hotel, details, noise, view)
   const ids = sections.map((s) => s.id).join(' ')
@@ -69,7 +67,7 @@ export function HotelTabs({
       pinned.current = false
     }
     update()
-    // Captured: the hotel dialog scrolls its own box, not the window.
+    // Captured: a scrolling box of the page moves the sections too.
     window.addEventListener('scroll', update, { capture: true, passive: true })
     window.addEventListener('resize', update)
     for (const type of ['wheel', 'touchstart', 'keydown'] as const)
@@ -94,21 +92,16 @@ export function HotelTabs({
 
   // On a phone the bar leaves the side insets of its container, and the inset returns inside the scrolling row, so
   // the first tab stays on the content line and the row scrolls to the edge. From `lg` nothing changes.
-  const bleed = inDialog ? 'max-lg:-mx-4' : 'max-lg:-mx-(--page-x)'
-  const inset = inDialog ? 'max-lg:px-4' : 'max-lg:px-(--page-x)'
-
   return (
     <nav
       ref={nav}
       aria-label="Разделы отеля"
-      className={cn('sticky top-0 z-20 border-b border-border bg-(--decor-surface-soft)', bleed, className)}
+      className={cn(
+        'sticky top-0 z-20 border-b border-border bg-(--decor-surface-soft) max-lg:-mx-(--page-x)',
+        className,
+      )}
     >
-      <ul
-        className={cn(
-          '-mb-px flex gap-[clamp(16px,3vw,32px)] overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-          inset,
-        )}
-      >
+      <ul className="-mb-px flex gap-[clamp(16px,3vw,32px)] overflow-x-auto [scrollbar-width:none] max-lg:px-(--page-x) [&::-webkit-scrollbar]:hidden">
         {sections.map(({ id, label }) => (
           <li key={id} className="shrink-0">
             <button

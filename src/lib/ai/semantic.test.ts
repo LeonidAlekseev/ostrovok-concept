@@ -5,7 +5,9 @@ import { getSecret } from '../secrets'
 import { semanticSearch } from './semantic'
 
 const rpc = vi.fn()
+const hidden = vi.hoisted(() => ({ ids: new Set<string>() }))
 
+vi.mock('@/lib/db/catalog', () => ({ loadHiddenHotelIds: async () => hidden.ids }))
 vi.mock('../secrets', () => ({ getSecret: vi.fn() }))
 vi.mock('@/lib/env', () => import('@/test/env'))
 vi.mock('@/lib/supabase/config', () => ({
@@ -39,7 +41,10 @@ beforeEach(() => {
   vi.mocked(embed).mockResolvedValue({ embedding: [0.1, 0.2] } as Awaited<ReturnType<typeof embed>>)
   rpc.mockResolvedValue({ data: matches, error: null })
 })
-afterEach(() => setProduction(false))
+afterEach(() => {
+  setProduction(false)
+  hidden.ids = new Set()
+})
 
 const reranked = (ranking: { originalIndex: number; score: number }[]) =>
   ({ ranking }) as unknown as Awaited<ReturnType<typeof rerank>>
@@ -209,6 +214,19 @@ describe('semanticSearch in production', () => {
       hits: [{ id: 'ota-1', destinationId: 'valencia', score: 0.8 }],
     })
     expect(vi.mocked(rerank).mock.calls[0][0]).toMatchObject({ documents: ['Отель у моря'], topN: 1 })
+  })
+
+  // hotel-catalog, Requirement: Отели вне карт шума скрыты
+  it('does not find a hotel outside the noise maps', async () => {
+    setProduction(true)
+    hidden.ids = new Set(['ota-2'])
+    const real = (id: string) => ({ ref_id: id, destination_id: 'valencia', content: id, similarity: 0.4 })
+    rpc.mockResolvedValue({ data: [real('ota-2'), real('ota-1')], error: null })
+    vi.mocked(rerank).mockResolvedValue(reranked([{ originalIndex: 0, score: 0.8 }]))
+    expect(await semanticSearch(words(), { k: 2 })).toEqual({
+      status: 'found',
+      hits: [{ id: 'ota-1', destinationId: 'valencia', score: 0.8 }],
+    })
   })
 
   it('finds nothing when every match is synthetic', async () => {
