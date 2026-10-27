@@ -10,8 +10,11 @@ import {
   NOISY_RADIUS_M,
   NOISE_MAP_RADIUS_M,
   QUIET_SOURCE,
+  dayColorLevel,
+  dayEstimate,
   louderSource,
   type HotelNoise,
+  type NoiseMapIndicator,
   type NoisyCategory,
   type SourceNoise,
 } from '@/lib/noise'
@@ -20,8 +23,9 @@ import { CATALOG_LIFETIME, CATALOG_TAG } from './catalog'
 
 /**
  * «Шум и окружение» of a real hotel for its page and for Эвал (`HotelNoise`): the EEA bands at its point by layer
- * (`hotel_geo`) and the loud places of the OSM cache around it (`osm_places_near`), and the noise contours around it
- * for the map (`hotel_geo_features`). Read with the anon key and cached with the catalogue; a synthetic hotel, a
+ * (`hotel_geo`) and the loud places of the OSM cache around it (`osm_places_near`), and the noise around it for the
+ * map: the day estimate of the pieces of `hotel_noise_day`, the Lnight contours of `hotel_geo_features` and the quiet of
+ * `hotel_noise_quiet`. Read with the anon key and cached with the catalogue; a synthetic hotel, a
  * database without the functions or a failure read as `null`, and the page and Эвал say they do not know.
  */
 
@@ -135,11 +139,22 @@ export async function loadHotelNoise(hotel: { id: string; lat: number; lon: numb
   }
 }
 
-/** A contour of the map: one band of one layer and indicator, cut to the circle. */
+/**
+ * A shape of the map, cut to the circle: a band of a layer's Lnight; a piece of a layer with one Lden and one Lnight
+ * band and the day estimate of the two (`db_max` `null` for an estimate open at the top, both bounds `null` when the
+ * pair fits no day); or the quiet below 40 dB (`source` `quiet`). `level` is the dB the shape is coloured by: the band's
+ * lower bound or the estimate's `dayColorLevel`, `null` for the quiet and for a piece without an estimate.
+ */
 export interface NoiseMapFeature {
   type: 'Feature'
   geometry: { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown }
-  properties: { source: string; indicator: 'Lden' | 'Lnight'; db_min: number | null; db_max: number | null }
+  properties: {
+    source: string
+    indicator: NoiseMapIndicator
+    db_min: number | null
+    db_max: number | null
+    level: number | null
+  }
 }
 
 export interface NoiseMap {
@@ -147,14 +162,27 @@ export interface NoiseMap {
   features: NoiseMapFeature[]
 }
 
+const geometry = z.object({ type: z.enum(['Polygon', 'MultiPolygon']), coordinates: z.unknown() })
+const db = z.number().nullable()
 const mapFeature = z.object({
-  geometry: z.object({ type: z.enum(['Polygon', 'MultiPolygon']), coordinates: z.unknown() }),
+  geometry,
   properties: z.object({
     layer: z.literal('noise'),
     source: z.string(),
     indicator: z.enum(['Lden', 'Lnight']),
-    db_min: z.number().nullable(),
-    db_max: z.number().nullable(),
+    db_min: db,
+    db_max: db,
+  }),
+})
+const dayPiece = z.object({
+  geometry,
+  properties: z.object({
+    layer: z.literal('noise'),
+    source: z.string(),
+    lden_min: db,
+    lden_max: db,
+    lnight_min: db,
+    lnight_max: db,
   }),
 })
 
@@ -162,31 +190,68 @@ const mapFeature = z.object({
 const rounded = (value: unknown): unknown =>
   Array.isArray(value) ? value.map(rounded) : typeof value === 'number' ? Math.round(value * 1e5) / 1e5 : value
 
-const featureOf = (value: unknown): NoiseMapFeature[] => {
+const shape = (
+  { type, coordinates }: z.infer<typeof geometry>,
+  properties: NoiseMapFeature['properties'],
+): NoiseMapFeature => ({ type: 'Feature', geometry: { type, coordinates: rounded(coordinates) }, properties })
+
+/** The Lnight bands from 40 dB of `hotel_geo_features` (the buildings, Lden and the bands below 40 dB left out). */
+const nightOf = (value: unknown): NoiseMapFeature[] => {
   const parsed = mapFeature.safeParse(value)
   if (!parsed.success) return []
-  const { geometry, properties } = parsed.data
-  const { source, indicator, db_min, db_max } = properties
-  return [
-    {
-      type: 'Feature' as const,
-      geometry: { type: geometry.type, coordinates: rounded(geometry.coordinates) },
-      properties: { source, indicator, db_min, db_max },
-    },
-  ]
+  const { source, indicator, db_min, db_max } = parsed.data.properties
+  if (indicator !== 'Lnight' || db_min === null) return []
+  return [shape(parsed.data.geometry, { source, indicator, db_min, db_max, level: db_min })]
 }
 
 /**
- * The map's contours: the bands from 40 dB of `hotel_geo_features().features` (the buildings and the layers' bands
- * below 40 dB, which cover the louder bands of the other layers, are left out) and the quiet of `hotel_noise_quiet()`.
+ * The quiet of `hotel_noise_quiet`: Lnight's as it is; Lden's as the day's, for the day level is below the Lden when
+ * the evening is as loud as the day (`dayLevel`), so below 40 dB where the Lden is.
  */
-export function noiseMapOf(contours: readonly unknown[], quiet: readonly unknown[] = []): NoiseMap {
+const quietOf = (value: unknown): NoiseMapFeature[] => {
+  const parsed = mapFeature.safeParse(value)
+  if (!parsed.success || parsed.data.properties.source !== QUIET_SOURCE) return []
+  const { indicator, db_max } = parsed.data.properties
+  return [
+    shape(parsed.data.geometry, {
+      source: QUIET_SOURCE,
+      indicator: indicator === 'Lden' ? 'Lday' : 'Lnight',
+      db_min: null,
+      db_max,
+      level: null,
+    }),
+  ]
+}
+
+const band = (min: number | null, max: number | null): NoiseBand | undefined =>
+  min === null && max === null ? undefined : { ...(min !== null && { min }), ...(max !== null && { max }) }
+
+/** A piece of `hotel_noise_day` with the day estimate of its two bands, rounded to whole dB. */
+const dayOf = (value: unknown): NoiseMapFeature[] => {
+  const parsed = dayPiece.safeParse(value)
+  if (!parsed.success) return []
+  const { source, lden_min, lden_max, lnight_min, lnight_max } = parsed.data.properties
+  const day = dayEstimate(band(lden_min, lden_max), band(lnight_min, lnight_max))
+  return [
+    shape(parsed.data.geometry, {
+      source,
+      indicator: 'Lday',
+      db_min: day && Math.round(day.min),
+      db_max: day && Number.isFinite(day.max) ? Math.round(day.max) : null,
+      level: day && Math.round(dayColorLevel(day) * 10) / 10,
+    }),
+  ]
+}
+
+/** The map's shapes: the day pieces, the Lnight bands from 40 dB and the quiet of both. */
+export function noiseMapOf(
+  contours: readonly unknown[],
+  quiet: readonly unknown[] = [],
+  day: readonly unknown[] = [],
+): NoiseMap {
   return {
     type: 'FeatureCollection',
-    features: [
-      ...contours.flatMap(featureOf).filter((f) => f.properties.db_min !== null),
-      ...quiet.flatMap(featureOf).filter((f) => f.properties.source === QUIET_SOURCE),
-    ],
+    features: [...day.flatMap(dayOf), ...contours.flatMap(nightOf), ...quiet.flatMap(quietOf)],
   }
 }
 
@@ -194,17 +259,24 @@ const readNoiseMap = unstable_cache(
   async (_hotelId: string, lat: number, lon: number): Promise<NoiseMap> => {
     const db = database()
     const args = { lat, lon, radius_m: NOISE_MAP_RADIUS_M }
-    const [contours, quiet] = await Promise.all([db.rpc('hotel_geo_features', args), db.rpc('hotel_noise_quiet', args)])
+    const [contours, quiet, day] = await Promise.all([
+      db.rpc('hotel_geo_features', args),
+      db.rpc('hotel_noise_quiet', args),
+      db.rpc('hotel_noise_day', args),
+    ])
+    // The day is the map's default: a map without it is not cached, the next request asks again.
     if (contours.error) throw contours.error
+    if (day.error) throw day.error
     const features = z.object({ features: z.array(z.unknown()) })
-    // Without the quiet the louder bands still stand: the map leaves the quiet uncoloured.
+    // Without the quiet the louder shapes still stand: the map leaves the quiet uncoloured.
     if (quiet.error) warn('noise map: no quiet', quiet.error)
     return noiseMapOf(
       features.parse(contours.data).features,
       quiet.error ? [] : (features.safeParse(quiet.data).data?.features ?? []),
+      features.parse(day.data).features,
     )
   },
-  [CATALOG_TAG, 'hotel-noise-map', 'quiet'],
+  [CATALOG_TAG, 'hotel-noise-map', 'day'],
   { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME },
 )
 

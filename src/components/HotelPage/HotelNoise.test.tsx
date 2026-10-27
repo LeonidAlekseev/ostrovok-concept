@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getHotel } from '@/lib/catalogGenerator'
-import type { HotelNoise as HotelNoiseData, NoiseIndicator } from '@/lib/noise'
+import type { HotelNoise as HotelNoiseData, NoiseMapIndicator } from '@/lib/noise'
 import { HotelNoise } from './HotelNoise'
 import { HotelPage } from './HotelPage'
 
@@ -14,7 +14,7 @@ vi.mock('next/navigation', () => ({
 
 // jsdom has no WebGL: the map stands in as the indicator and the contours it was given.
 vi.mock('./NoiseMap', () => ({
-  default: ({ indicator, contours }: { indicator: NoiseIndicator; contours: { features: unknown[] } | null }) => (
+  default: ({ indicator, contours }: { indicator: NoiseMapIndicator; contours: { features: unknown[] } | null }) => (
     <div data-testid="noise-map">
       {indicator} {contours?.features.length ?? 'none'}
     </div>
@@ -32,9 +32,21 @@ const loud: HotelNoiseData = {
   placesCovered: ['nightclub', 'bar', 'restaurant', 'fast_food', 'tram', 'train_station'],
 }
 
+const shape = (source: string, indicator: NoiseMapIndicator, level: number | null) => ({
+  type: 'Feature',
+  geometry: { type: 'Polygon', coordinates: [] },
+  properties: { source, indicator, db_min: level, db_max: level, level },
+})
 const fetchMock = vi.fn()
 beforeEach(() => {
-  fetchMock.mockResolvedValue(Response.json({ map: { type: 'FeatureCollection', features: [{}, {}] } }))
+  fetchMock.mockResolvedValue(
+    Response.json({
+      map: {
+        type: 'FeatureCollection',
+        features: [shape('roadsInAgglomeration', 'Lday', 64.2), shape('roadsInAgglomeration', 'Lnight', 55)],
+      },
+    }),
+  )
   vi.stubGlobal('fetch', fetchMock)
 })
 afterEach(() => vi.unstubAllGlobals())
@@ -47,11 +59,11 @@ describe('HotelNoise', () => {
     const level = screen.getByRole('region', { name: 'Уровень шума у отеля' })
     expect(within(level).getByText('65–69 дБ')).toBeTruthy()
     expect(within(level).getByText(/выше рекомендации ВОЗ \(45 дБ ночью\)/)).toBeTruthy()
-    expect(within(level).getAllByText('55–69 дБ')).toHaveLength(2)
+    expect(within(level).getAllByText('59–69 дБ')).toHaveLength(2)
     const hours = screen.getByRole('region', { name: 'Шум в течение суток' })
     expect(within(hours).getByRole('img').getAttribute('aria-label')).toMatch(/ночью около 58 дБ/)
     expect(within(hours).getByText(/2002\/49\/EC.*Точность и монотонность не гарантируются\./)).toBeTruthy()
-    await waitFor(() => expect(screen.getByTestId('noise-map').textContent).toMatch('Lden 2'))
+    await waitFor(() => expect(screen.getByTestId('noise-map').textContent).toMatch('Lday 2'))
     expect(fetchMock).toHaveBeenCalledWith('/api/hotels/ota-1/noise-map', expect.anything())
   })
 
@@ -80,11 +92,27 @@ describe('HotelNoise', () => {
     expect(screen.queryByText(/экранир/)).toBeNull()
   })
 
-  it('switches the map to the night', async () => {
+  it('shows the day estimate on the map by default and switches it to the night', async () => {
     render(<HotelNoise hotel={hotel} noise={loud} />)
+    expect(screen.getByRole('button', { name: 'Днём' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.queryByRole('button', { name: 'За сутки' })).toBeNull()
+    expect(screen.getByText('Днём, дБ (оценка по Lden и Lnight)')).toBeTruthy()
     await userEvent.click(screen.getByRole('button', { name: 'Ночью' }))
     expect(screen.getByRole('button', { name: 'Ночью' }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByTestId('noise-map').textContent).toMatch('Lnight')
+    expect(screen.getByText('Lnight, дБ (ночью)')).toBeTruthy()
+  })
+
+  it('greys out in the legend the day pieces whose bands fit no day, only when there are some', async () => {
+    fetchMock.mockResolvedValue(
+      Response.json({
+        map: { type: 'FeatureCollection', features: [shape('quiet', 'Lday', null), shape('roads', 'Lday', null)] },
+      }),
+    )
+    render(<HotelNoise hotel={hotel} noise={loud} />)
+    expect(await screen.findByText(/^Серым — полосы Lden и Lnight не сходятся/)).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: 'Ночью' }))
+    expect(screen.queryByText(/^Серым/)).toBeNull()
   })
 
   it('marks the estimated building, and says «нет данных EEA», not «тихо», outside the maps', () => {
