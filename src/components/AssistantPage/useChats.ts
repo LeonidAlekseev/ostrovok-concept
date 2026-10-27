@@ -5,7 +5,6 @@ import {
   askAssistant,
   HOTEL_UNAVAILABLE,
   briefWithStay,
-  describeBrief,
   makePlan,
   mergeBrief,
   MODELS_DOWN,
@@ -87,7 +86,7 @@ export function compose(
   exclude?: ReadonlySet<string>,
   /**
    * The chat's brief before the answer: what the answer saved is shown in a card of its own («Сохранил в память
-   * сессии»), so the text does not repeat «Записал: …».
+   * сессии»), so the text does not repeat it.
    */
   before?: Brief,
 ): { brief: Brief; question: Question | null; text: string; data: ChatMessage['data'] } {
@@ -133,10 +132,9 @@ export function compose(
   }
   const question = nextQuestion(brief, today, destinations)
   const saved = before !== undefined && savedParams(before, brief, destinations).length > 0
-  const understood = saved ? '' : describeBrief(brief, destinations)
   if (question) {
-    // The model's remark fills in only when nothing is understood yet, so answers keep "Записал: …".
-    const lead = saved ? '' : understood ? `Записал: ${understood}.` : remark
+    // What was understood is in the memory card; the model's remark leads only when nothing new was saved.
+    const lead = saved ? '' : remark
     const text = lead ? `${lead} ${question.text}` : question.text
     return { brief, question, text: seen ? `${seen} ${text}` : text, data: {} }
   }
@@ -145,9 +143,14 @@ export function compose(
   const plan = makePlan(brief, today, destinations, newHotels, matches, features, exclude, strict)
   // Nothing within the conditions: Эвал offers to change the parameters the search went by.
   if (strict && plan.options.length === 0)
-    return { brief, question, text: [seen, NOT_FOUND].filter(Boolean).join(' '), data: { notFound: brief } }
+    return {
+      brief,
+      question,
+      text: [seen, NOT_FOUND].filter(Boolean).join(' '),
+      data: { notFound: brief },
+    }
   const note = missingNote(missing, planCities(brief, today, destinations))
-  const text = [seen, understood && `Записал: ${understood}.`, note].filter(Boolean).join(' ')
+  const text = [seen, note].filter(Boolean).join(' ')
   return { brief, question, text, data: { plan } }
 }
 
@@ -370,7 +373,10 @@ export function useChats(
       const controller = new AbortController()
       inflight.current.set(chatId, controller)
 
-      const history = dialogOf({ ...chat, messages: chat.messages.filter((m) => m.createdAt < pending.createdAt) })
+      const history = dialogOf({
+        ...chat,
+        messages: chat.messages.filter((m) => m.createdAt < pending.createdAt),
+      })
       const input = history.at(-1)?.text ?? ''
       // The question about photos is not a part of the brief.
       const question = chat.question?.id === 'photo' ? null : (chat.question?.id ?? null)
@@ -417,7 +423,12 @@ export function useChats(
         if (controller.signal.aborted) return
         const ask = () =>
           askAssistant(
-            { messages: history, brief: chat.brief, ...(sent && { photos: sent }), ...(rerun && { rerun }) },
+            {
+              messages: history,
+              brief: chat.brief,
+              ...(sent && { photos: sent }),
+              ...(rerun && { rerun }),
+            },
             rerun ? null : question,
             destinations,
             controller.signal,
@@ -511,7 +522,14 @@ export function useChats(
       ]
         .map((m) => (m.id === pendingId ? { ...m, status: 'done' as const, text, data } : m))
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-      return { ...chat, brief: next, question, messages, unread: activeRef.current !== chatId, updatedAt: now }
+      return {
+        ...chat,
+        brief: next,
+        question,
+        messages,
+        unread: activeRef.current !== chatId,
+        updatedAt: now,
+      }
     })
   }
 
