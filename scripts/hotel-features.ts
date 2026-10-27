@@ -4,8 +4,9 @@
 // `hotel_room_views`, and the noise map around each hotel computed ahead into `hotel_noise_maps` (the day pieces, the
 // quiet and the Lnight contours: too slow to compute on every request, see 20261027210000_hotel_noise_maps.sql).
 // And the store of claims (src/lib/claimRows.ts, scripts/lib/claims-store.ts): EEA's bands at each hotel and the day
-// estimate from them, the loud OSM places within 200 m, the guests' reviews and their words about noise and quiet,
-// each with its evidence and calculation. Copies no raw data: only the derived values and the reference to the source. Run it after every reload of the
+// estimate from them, the loud OSM places within 200 m, the pharmacies, shops, hospitals, stops, beaches and parks
+// within 1 km (Ostrovok's places first), the nearest building of EUBUCCO, the guests' reviews and their words about
+// noise and quiet, each with its evidence, calculation and the confidence of src/lib/confidence.ts. Copies no raw data: only the derived values and the reference to the source. Run it after every reload of the
 // geodata (scripts/load-valencia-geo.py), or the noise maps stay those of the old contours.
 //   npm run db:features [-- --dry-run]   (Node runs the TypeScript itself; the keys come from .env.local)
 // `--dry-run` reads and counts, and writes nothing.
@@ -18,9 +19,20 @@ import { writeClaims } from './lib/claims-store.ts'
 
 const { diffRows, featureRow, viewRows } = await import('../src/lib/featureRows.ts')
 const { NOISE_MAP_RADIUS_M, NOISY_CATEGORIES, NOISY_PER_CATEGORY, NOISY_RADIUS_M } = await import('../src/lib/noise.ts')
-const { mergeStores, nearbyStore, noiseStore, reviewStore } = await import('../src/lib/claimRows.ts')
+const {
+  NEARBY_CATEGORIES,
+  NEARBY_PER_CATEGORY,
+  NEARBY_RADIUS_M,
+  buildingStore,
+  mergeStores,
+  nearbyStore,
+  noiseStore,
+  placesStore,
+  reviewStore,
+} = await import('../src/lib/claimRows.ts')
 type Store = import('../src/lib/claimRows.ts').Store
 type Dataset = import('../src/lib/claimRows.ts').Dataset
+type OstrovokPlace = import('../src/lib/claimRows.ts').OstrovokPlace
 type FeatureRow = import('../src/lib/featureRows.ts').FeatureRow
 type ViewRow = import('../src/lib/featureRows.ts').ViewRow
 type HotelGeo = import('../src/lib/featureRows.ts').HotelGeo
@@ -31,10 +43,14 @@ const dryRun = options['dry-run']
 
 const PAGE = 1000
 const BATCH = 200
-/** `hotel_geo` calls at a time. */
-const PARALLEL = 8
-/** Noise maps computed at a time: each intersects the EEA polygons for a second or so. */
-const MAP_PARALLEL = 4
+/** Hotels at a time, three calls each (`hotel_geo` and two `osm_places_near`): eight outlast the 8 s statement timeout. */
+const PARALLEL = 4
+/**
+ * Noise maps computed at a time: one. Each intersects the EEA polygons for a second or so (2.1 s at most alone, 220
+ * points ~3.5 min); four at once share the database's few cores and outlast the 8 s statement timeout of the API's
+ * role (`authenticator`), which the script keeps.
+ */
+const MAP_PARALLEL = 1
 
 const supabase = serviceClient()
 
@@ -85,14 +101,39 @@ const datasets = await readAll<Dataset>('geo_datasets', 'id, name, version, url,
   'id',
 ])
 
-// The building and the noise of each hotel, and the claims of its noise and of the loud places around it.
+// The Ostrovok places of the hotels' pages, with the time of their rows.
+const ostrovokPlaces = await readAll<Omit<OstrovokPlace, 'updated_at'> & { hotel_id: string }>(
+  'ota_hotel_places' as Table,
+  'hotel_id, master_id, region_id, type, subtype, name, name_en, distance_m, lat, lon',
+  ['master_id', 'region_id'],
+  (q) => q.lte('distance_m', NEARBY_RADIUS_M),
+)
+const poiTimes = new Map(
+  (
+    await readAll<{ master_id: number; region_id: number; updated_at: string }>(
+      'ota_hotel_pois',
+      'master_id, region_id, updated_at',
+      ['master_id', 'region_id'],
+      (q) => q.lte('distance_m', NEARBY_RADIUS_M),
+    )
+  ).map((row) => [`${row.master_id}:${row.region_id}`, row.updated_at]),
+)
+const placesOf = new Map<string, OstrovokPlace[]>()
+for (const { hotel_id, ...place } of ostrovokPlaces)
+  placesOf.set(hotel_id, [
+    ...(placesOf.get(hotel_id) ?? []),
+    { ...place, updated_at: poiTimes.get(`${place.master_id}:${place.region_id}`) ?? null },
+  ])
+
+// The building and the noise of each hotel, and the claims of its noise, its building and the places around it.
 const features: FeatureRow[] = []
 const stores: Store[] = []
 const near = { radiusM: NOISY_RADIUS_M, perCategory: NOISY_PER_CATEGORY }
+const around = { radiusM: NEARBY_RADIUS_M, perCategory: NEARBY_PER_CATEGORY }
 for (let i = 0; i < hotels.length; i += PARALLEL) {
   const rows = await Promise.all(
     hotels.slice(i, i + PARALLEL).map(async (hotel) => {
-      const [geo, places] = await Promise.all([
+      const [geo, places, everyday] = await Promise.all([
         supabase.rpc('hotel_geo', { lat: hotel.lat, lon: hotel.lon }),
         supabase.rpc('osm_places_near', {
           lat: hotel.lat,
@@ -101,18 +142,34 @@ for (let i = 0; i < hotels.length; i += PARALLEL) {
           wanted: [...NOISY_CATEGORIES],
           per_category: near.perCategory,
         }),
+        supabase.rpc('osm_places_near', {
+          lat: hotel.lat,
+          lon: hotel.lon,
+          radius_m: around.radiusM,
+          wanted: [...NEARBY_CATEGORIES],
+          per_category: around.perCategory,
+        }),
       ])
       if (geo.error) throw new Error(`hotel_geo: ${geo.error.message}`)
       if (places.error) throw new Error(`osm_places_near: ${places.error.message}`)
+      if (everyday.error) throw new Error(`osm_places_near: ${everyday.error.message}`)
       const data = (geo.data ?? {}) as HotelGeo & { noise?: unknown }
-      stores.push(
-        noiseStore(hotel, Array.isArray(data.noise) ? data.noise : [], datasets),
-        nearbyStore(hotel, places.data, near),
-      )
-      return featureRow(hotel.id, data)
+      // The places of everyday need after the loud ones: a tram stop of both keeps the edge of `placesStore`.
+      return {
+        row: featureRow(hotel.id, data),
+        stores: [
+          noiseStore(hotel, Array.isArray(data.noise) ? data.noise : [], datasets),
+          buildingStore(hotel, data.building, datasets),
+          nearbyStore(hotel, places.data, near),
+          placesStore(hotel, everyday.data, placesOf.get(hotel.id) ?? [], around),
+        ],
+      }
     }),
   )
-  features.push(...rows.filter((row) => row !== null))
+  for (const { row, stores: own } of rows) {
+    stores.push(...own)
+    if (row) features.push(row)
+  }
 }
 
 // The reviews of the hotels' pages.
@@ -178,6 +235,7 @@ await writeClaims(supabase, store, dryRun)
 console.log(
   `claims: hotels with EEA bands ${hotelsWith((p) => /^noise\.l(den|night)\./.test(p))}, with a day estimate ` +
     `${hotelsWith((p) => p.startsWith('noise.lday.'))}, with loud places nearby ${hotelsWith((p) => p === 'noise.nearby.distance')}, ` +
+    `with places within ${NEARBY_RADIUS_M} m ${hotelsWith((p) => p === 'nearby.distance')}, with a building ${hotelsWith((p) => p === 'building.nearest.distance')}, ` +
     `with reviews ${new Set(store.documents.map((d) => d.hotel_id)).size} (${store.documents.length}), with mentions of noise ` +
     `${hotelsWith((p) => p === 'noise.review.mention')} (${new Set(store.claims.filter((c) => c.property === 'noise.review.mention').map((c) => c.source_key.split(':')[0])).size} reviews)`,
 )

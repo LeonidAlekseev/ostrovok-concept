@@ -1,11 +1,13 @@
 // Writes the store of claims (src/lib/claimRows.ts) for `npm run db:features`: the natural keys of the rows become
 // the ids of the database, only the new and changed rows are written and the stale ones deleted, so a second run over
-// the same data writes nothing. Touches only what the script makes: the entities of the hotels and the OSM places,
-// the evidence of EEA, OpenStreetMap and Островок, the calculations and claims of `noise.*`, the edges `near` and the
-// documents of the reviews; what another writer adds is left alone.
+// the same data writes nothing. Touches only what the script makes: the entities of the hotels, the OSM and Ostrovok
+// places and the buildings, the evidence of EEA, EUBUCCO, OpenStreetMap and Островок, the calculations and claims of
+// `OWN_PROPERTIES`, the edges `near` and `nearest_building` and the documents of the reviews; what another writer adds
+// is left alone.
 import type { serviceClient } from './node.ts'
 
-const { EEA, OSM, OSTROVOK, claimKey, entityKey, evidenceKey, sameRow } = await import('../../src/lib/claimRows.ts')
+const { EEA, EUBUCCO, OSM, OSTROVOK, claimKey, entityKey, evidenceKey, sameRow } =
+  await import('../../src/lib/claimRows.ts')
 type Store = import('../../src/lib/claimRows.ts').Store
 
 type Client = ReturnType<typeof serviceClient>
@@ -13,6 +15,10 @@ type Row = Record<string, unknown>
 
 const PAGE = 1000
 const BATCH = 200
+
+/** The first part of the properties and of the calculations' keys the script writes. */
+const OWN_PROPERTIES = ['noise', 'nearby', 'building']
+const own = (dotted: unknown) => OWN_PROPERTIES.includes(String(dotted).split('.')[0])
 
 /** Every row of the table the filter keeps, by pages in the order of `orderBy`. */
 async function readAll(
@@ -151,7 +157,9 @@ export async function writeClaims(supabase: Client, store: Store, dryRun: boolea
   const entities = await run({
     table: 'entities',
     keys: ['kind', 'ref'],
-    current: await readAll(supabase, 'entities', ENTITY_COLUMNS, ['id'], (q) => q.in('kind', ['hotel', 'osm_place'])),
+    current: await readAll(supabase, 'entities', ENTITY_COLUMNS, ['id'], (q) =>
+      q.in('kind', ['hotel', 'osm_place', 'building', 'ota_poi']),
+    ),
     next: store.entities.map((e) => ({ kind: e.kind, ref: e.ref, hotel_id: e.hotel_id, name: e.name })),
     stamp: ['updated_at'],
     removeBy: 'id',
@@ -162,7 +170,7 @@ export async function writeClaims(supabase: Client, store: Store, dryRun: boolea
     table: 'evidence',
     keys: ['provider', 'external_id'],
     current: await readAll(supabase, 'evidence', EVIDENCE_COLUMNS, ['id'], (q) =>
-      q.in('provider', [EEA, OSM, OSTROVOK]).in('type', ['dataset', 'osm', 'review']),
+      q.in('provider', [EEA, EUBUCCO, OSM, OSTROVOK]).in('type', ['dataset', 'osm', 'review', 'ota_page']),
     ),
     next: store.evidence.map((e) => ({ ...e })),
     stamp: ['updated_at'],
@@ -176,7 +184,7 @@ export async function writeClaims(supabase: Client, store: Store, dryRun: boolea
   const calculations = await run({
     table: 'calculations',
     keys: ['key'],
-    current: await readAll(supabase, 'calculations', CALCULATION_COLUMNS, ['id'], (q) => q.like('key', 'noise.%')),
+    current: (await readAll(supabase, 'calculations', CALCULATION_COLUMNS, ['id'])).filter((row) => own(row.key)),
     next: store.calculations.map((c) => ({ ...c })),
     stamp: ['updated_at', 'computed_at'],
     removeBy: 'id',
@@ -194,7 +202,7 @@ export async function writeClaims(supabase: Client, store: Store, dryRun: boolea
   const claims = await run({
     table: 'claims',
     keys: ['entity_id', 'property', 'source_key'],
-    current: await readAll(supabase, 'claims', CLAIM_COLUMNS, ['id'], (q) => q.like('property', 'noise.%')),
+    current: (await readAll(supabase, 'claims', CLAIM_COLUMNS, ['id'])).filter((row) => own(row.property)),
     next: claimRows,
     stamp: ['updated_at'],
     removeBy: 'id',
@@ -225,14 +233,16 @@ export async function writeClaims(supabase: Client, store: Store, dryRun: boolea
   await run({
     table: 'relations',
     keys: ['subject_id', 'predicate', 'object_id'],
-    current: await readAll(supabase, 'relations', RELATION_COLUMNS, ['id'], (q) => q.eq('predicate', 'near')),
+    current: await readAll(supabase, 'relations', RELATION_COLUMNS, ['id'], (q) =>
+      q.in('predicate', ['near', 'nearest_building']),
+    ),
     next: store.relations.map((r) => ({
       subject_id: entityId(r.subject),
       predicate: r.predicate,
       object_id: entityId(r.object),
       claim_id: r.claim ? claimId(r.claim) : null,
       evidence_id: r.evidence ? evidenceId(r.evidence) : null,
-      confidence: null,
+      confidence: r.confidence,
     })),
     stamp: ['updated_at'],
     removeBy: 'id',

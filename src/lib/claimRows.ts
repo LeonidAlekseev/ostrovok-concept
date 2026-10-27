@@ -1,14 +1,18 @@
+import { confidenceFor, type ConfidenceKind } from './confidence'
 import { NOISY_CATEGORIES, dayEstimate } from './noise'
 import type { NoiseBand } from './features'
+import { mergePlaces, type OsmLike, type OstrovokLike } from './geo/samePlace'
+import { placeKind } from './ota/page'
 
 /**
  * The rows of the store of claims (supabase/migrations/20261027220000_claims_evidence_store.sql) that
  * `npm run db:features` writes for the real hotels: pure, so the tests check what goes to the database. The rows point
  * at each other by their natural keys (`entityKey`, `evidenceKey`, `claimKey`, the calculation's `key`); the script
  * turns the keys into the ids of the database. Only what the sources give: EEA's bands at the hotel's point, the day
- * estimate from them, the loud OSM places within `NOISY_RADIUS_M`, the guests' reviews and their words about noise and
- * quiet. A hotel outside the EEA contours has no band (not «тихо»), a review without such words no claim (not «тихо»
- * either); no confidence is given, none has a basis.
+ * estimate from them, the loud OSM places within `NOISY_RADIUS_M`, the places of everyday need within `NEARBY_RADIUS_M`
+ * (Ostrovok's first), the nearest building of EUBUCCO, the guests' reviews and their words about noise and quiet. A
+ * hotel outside the EEA contours has no band (not «тихо»), a review without such words no claim (not «тихо» either), a
+ * category with no place nearby no claim (not «нет»). Each claim has the confidence of src/lib/confidence.ts.
  */
 
 export type EpistemicStatus = 'observed' | 'reported' | 'derived' | 'inferred'
@@ -16,14 +20,14 @@ type Json = string | number | boolean | null | Json[] | { [key: string]: Json }
 type JsonObject = { [key: string]: Json }
 
 export interface EntityRow {
-  kind: 'hotel' | 'osm_place'
+  kind: 'hotel' | 'osm_place' | 'building' | 'ota_poi'
   ref: string
   hotel_id: string | null
   name: string | null
 }
 
 export interface EvidenceRow {
-  type: 'dataset' | 'osm' | 'review'
+  type: 'dataset' | 'osm' | 'review' | 'ota_page'
   title: string
   provider: string
   external_id: string
@@ -60,7 +64,9 @@ export interface ClaimRow {
   value_text: string | null
   unit: string | null
   epistemic_status: EpistemicStatus
-  confidence: null
+  /** The policy's (src/lib/confidence.ts): never null for a claim of the script. */
+  confidence: number
+  /** With `confidence`: the policy's version and rule. */
   method: JsonObject
   /** The `key` of its calculation, for a derived claim. */
   calculation: string | null
@@ -71,11 +77,14 @@ export interface ClaimRow {
 
 export interface RelationRow {
   subject: string
-  predicate: 'near'
+  /** `near`: a place around the hotel; `nearest_building`: the building nearest to its point (`BUILDING_RADIUS_M`). */
+  predicate: 'near' | 'nearest_building'
   object: string
   /** `claimKey` of the claim of the edge's value (the distance). */
   claim: string | null
   evidence: string | null
+  /** Its claim's. */
+  confidence: number
 }
 
 export interface ChunkRow {
@@ -114,6 +123,13 @@ export const claimKey = (row: Pick<ClaimRow, 'entity' | 'property' | 'source_key
 export const EEA = 'EEA'
 export const OSM = 'OpenStreetMap'
 export const OSTROVOK = 'Островок'
+export const EUBUCCO = 'EUBUCCO'
+
+/** The claim's confidence by the policy, and its method with the policy's version and rule. */
+const rated = (kind: ConfidenceKind, method: JsonObject) => {
+  const { confidence, method: policy } = confidenceFor(kind)
+  return { confidence, method: { ...method, confidence: policy } }
+}
 
 /** A real hotel of the catalogue. */
 export interface ClaimHotel {
@@ -221,8 +237,7 @@ export function noiseStore(hotel: ClaimHotel, noise: readonly unknown[], dataset
       value_text: null,
       unit: 'dB',
       epistemic_status: 'reported',
-      confidence: null,
-      method: { layer: band.source, indicator: band.indicator, category: band.category },
+      ...rated('eea_band', { layer: band.source, indicator: band.indicator, category: band.category }),
       calculation: null,
       observed_at: null,
       limitations:
@@ -276,8 +291,7 @@ export function noiseStore(hotel: ClaimHotel, noise: readonly unknown[], dataset
       value_text: null,
       unit: 'dB',
       epistemic_status: 'derived',
-      confidence: null,
-      method: { layer, from: ['Lden', 'Lnight'] },
+      ...rated('day_estimate', { layer, from: ['Lden', 'Lnight'] }),
       calculation: key,
       observed_at: null,
       limitations: ['Оценка по допущению «вечер = день», не измерение'],
@@ -296,19 +310,31 @@ export function noiseStore(hotel: ClaimHotel, noise: readonly unknown[], dataset
 
 const NOISY = new Set<string>(NOISY_CATEGORIES)
 
-/** A place of an `osm_places_near` answer, the parts read here. */
-const nearPlace = (value: unknown) => {
+/** A place of an `osm_places_near` answer of a `wanted` category, the parts read here. */
+const nearPlace = (value: unknown, wanted: ReadonlySet<string> = NOISY) => {
   if (!value || typeof value !== 'object') return null
   const row = value as Record<string, unknown>
   const type = row.osm_type === 'node' || row.osm_type === 'way' || row.osm_type === 'relation' ? row.osm_type : null
   const id = finite(row.osm_id)
   const category = text(row.category)
   const distance = finite(row.distance_m)
-  if (!type || id === null || !Number.isInteger(id) || !category || !NOISY.has(category) || distance === null)
+  if (!type || id === null || !Number.isInteger(id) || !category || !wanted.has(category) || distance === null)
     return null
   return {
     ref: `${type}/${id}`,
+    type,
+    id,
     category,
+    lat: finite(row.lat),
+    lon: finite(row.lon),
+    tags:
+      row.tags && typeof row.tags === 'object' && !Array.isArray(row.tags)
+        ? Object.fromEntries(
+            Object.entries(row.tags as Record<string, unknown>).filter(
+              (e): e is [string, string] => typeof e[1] === 'string',
+            ),
+          )
+        : {},
     categories: Array.isArray(row.categories) ? row.categories.filter((c): c is string => typeof c === 'string') : [],
     name: text(row.name),
     distance,
@@ -317,6 +343,29 @@ const nearPlace = (value: unknown) => {
     origin: text(row.origin),
   }
 }
+
+const osmEntity = (place: { ref: string; name: string | null }): EntityRow => ({
+  kind: 'osm_place',
+  ref: place.ref,
+  hotel_id: null,
+  name: place.name,
+})
+
+const osmEvidence = (place: NonNullable<ReturnType<typeof nearPlace>>): EvidenceRow => ({
+  type: 'osm',
+  title: place.name ?? place.ref,
+  provider: OSM,
+  external_id: place.ref,
+  url: `https://www.openstreetmap.org/${place.ref}`,
+  retrieved_at: place.fetchedAt,
+  excerpt: null,
+  metadata: {
+    categories: place.categories,
+    ...(place.attribution && { attribution: place.attribution }),
+    ...(place.origin && { origin: place.origin }),
+  },
+  dataset_id: null,
+})
 
 export const NEAR_METHOD = 'osm_places_near: расстояние по прямой от точки отеля до формы объекта OSM'
 export const NEAR_VERSION = 'osm_places_near-1'
@@ -334,7 +383,7 @@ export function nearbyStore(
 ): Store {
   const places = (
     answer && typeof answer === 'object' && Array.isArray((answer as { places?: unknown }).places)
-      ? ((answer as { places: unknown[] }).places.map(nearPlace).filter(Boolean) as NonNullable<
+      ? ((answer as { places: unknown[] }).places.map((p) => nearPlace(p)).filter(Boolean) as NonNullable<
           ReturnType<typeof nearPlace>
         >[])
       : []
@@ -362,22 +411,8 @@ export function nearbyStore(
     byCategory.set(place.category, (byCategory.get(place.category) ?? new Set()).add(place.ref))
     if (seen.has(place.ref)) continue
     seen.add(place.ref)
-    const entity: EntityRow = { kind: 'osm_place', ref: place.ref, hotel_id: null, name: place.name }
-    const source: EvidenceRow = {
-      type: 'osm',
-      title: place.name ?? place.ref,
-      provider: OSM,
-      external_id: place.ref,
-      url: `https://www.openstreetmap.org/${place.ref}`,
-      retrieved_at: place.fetchedAt,
-      excerpt: null,
-      metadata: {
-        categories: place.categories,
-        ...(place.attribution && { attribution: place.attribution }),
-        ...(place.origin && { origin: place.origin }),
-      },
-      dataset_id: null,
-    }
+    const entity = osmEntity(place)
+    const source = osmEvidence(place)
     const claim: ClaimRow = {
       entity: hotelKey,
       property: 'noise.nearby.distance',
@@ -388,8 +423,7 @@ export function nearbyStore(
       value_text: null,
       unit: 'm',
       epistemic_status: 'derived',
-      confidence: null,
-      method: { categories: place.categories.filter((c) => NOISY.has(c)) },
+      ...rated('osm_distance', { categories: place.categories.filter((c) => NOISY.has(c)) }),
       calculation: key,
       observed_at: null,
       limitations: [],
@@ -404,6 +438,7 @@ export function nearbyStore(
       object: entityKey(entity),
       claim: claimKey(claim),
       evidence: evidenceKey(source),
+      confidence: claim.confidence,
     })
   }
   for (const category of NOISY_CATEGORIES) {
@@ -420,12 +455,328 @@ export function nearbyStore(
       value_text: null,
       unit: 'count',
       epistemic_status: 'derived',
-      confidence: null,
-      method: { category, radius_m: radiusM },
+      ...rated('osm_count', { category, radius_m: radiusM }),
       calculation: key,
       observed_at: null,
       limitations: full ? ['Ответ ограничен: мест может быть больше'] : [],
       evidence: [...refs].map((ref) => ({ evidence: `${OSM}:${ref}`, role: 'input' as const })),
+    })
+  }
+  return store
+}
+
+/** The categories of src/lib/geo/categories.ts a guest needs near the hotel: a pharmacy, a shop, a doctor, a stop. */
+export const NEARBY_CATEGORIES = [
+  'pharmacy',
+  'supermarket',
+  'hospital',
+  'bus_stop',
+  'tram',
+  'metro',
+  'train_station',
+  'beach',
+  'park',
+] as const
+/** Within a walk of a quarter of an hour. */
+export const NEARBY_RADIUS_M = 1000
+/** The nearest of each category, as the geo tools ask `osm_places_near` (its default). */
+export const NEARBY_PER_CATEGORY = 5
+
+export const PLACES_METHOD =
+  'osm_places_near: расстояние по прямой от точки отеля до формы объекта OSM; место Островка — его расстояние со страницы'
+export const PLACES_VERSION = 'nearby-1'
+
+/** A place of the hotel's Ostrovok page (`ota_hotel_places`) with the time of its row (`ota_hotel_pois.updated_at`). */
+export interface OstrovokPlace {
+  master_id: number
+  region_id: number
+  type: string
+  subtype: string
+  name: string | null
+  name_en: string | null
+  distance_m: number
+  lat: number
+  lon: number
+  updated_at: string | null
+}
+
+/** The Ostrovok kinds of the places of `NEARBY_CATEGORIES` (src/lib/geo/samePlace.ts groups them with OSM's). */
+const NEARBY_KINDS = new Set(['Больница', 'Парк', 'Пляж', 'Станция'])
+
+/**
+ * The places of `NEARBY_CATEGORIES` around the hotel: the nearest `perCategory` of each in the cache of OSM within
+ * `radiusM` (`osm_places_near`), each an entity with its OSM evidence and the edge hotel —near→ place, its distance a
+ * `derived` claim `nearby.distance` of the hotel's calculation; and the hotel's Ostrovok places of these kinds within
+ * `radiusM`, with the distance of the page (`reported`, the page as evidence). A place of both (src/lib/geo/samePlace.ts)
+ * is the Ostrovok one: the OSM place folded into it gives no edge. A category with no place gives no claim: the cache
+ * holds what was loaded, and OSM may lack a place.
+ */
+export function placesStore(
+  hotel: ClaimHotel,
+  answer: unknown,
+  ostrovok: readonly OstrovokPlace[],
+  { radiusM, perCategory }: { radiusM: number; perCategory: number },
+): Store {
+  const wanted = new Set<string>(NEARBY_CATEGORIES)
+  const raw =
+    answer && typeof answer === 'object' && Array.isArray((answer as { places?: unknown }).places)
+      ? (answer as { places: unknown[] }).places
+      : []
+  const found = raw
+    .map((p) => nearPlace(p, wanted))
+    .filter((p): p is NonNullable<ReturnType<typeof nearPlace>> => p !== null)
+  const covered = (answer as { covered?: unknown } | null)?.covered
+  const own = ostrovok
+    .filter((p) => p.distance_m <= radiusM && NEARBY_KINDS.has(placeKind(p.type, p.subtype)) && (p.name || p.name_en))
+    .sort((a, b) => a.distance_m - b.distance_m || a.region_id - b.region_id)
+  const osm = found.filter((p) => p.lat !== null && p.lon !== null)
+  const merged = mergePlaces(
+    own.map((p): OstrovokLike & { place: OstrovokPlace } => ({
+      name: (p.name || p.name_en)!,
+      ...(p.name_en && p.name_en !== p.name && { nameEn: p.name_en }),
+      kind: placeKind(p.type, p.subtype),
+      lat: p.lat,
+      lon: p.lon,
+      place: p,
+    })),
+    osm.map((p): OsmLike & { place: (typeof osm)[number] } => ({
+      name: p.name,
+      category: p.category,
+      tags: p.tags,
+      osmType: p.type,
+      osmId: p.id,
+      lat: p.lat!,
+      lon: p.lon!,
+      place: p,
+    })),
+  )
+  const folded = new Set(merged.ostrovok.flatMap((m) => m.osm.map((o) => o.place.ref)))
+  const places = found
+    .filter((p) => !folded.has(p.ref))
+    .sort((a, b) => a.distance - b.distance || a.ref.localeCompare(b.ref))
+  const empty: Store = { entities: [], evidence: [], calculations: [], claims: [], relations: [], documents: [] }
+  if (places.length === 0 && merged.ostrovok.length === 0) return empty
+  const hotelKey = entityKey(hotelEntity(hotel))
+  const key = `nearby.places:${hotel.id}`
+  const store: Store = { ...empty, entities: [hotelEntity(hotel)] }
+  if (places.length > 0)
+    store.calculations.push({
+      key,
+      method: PLACES_METHOD,
+      version: PLACES_VERSION,
+      inputs: {
+        hotel_id: hotel.id,
+        lat: hotel.lat,
+        lon: hotel.lon,
+        covered: Array.isArray(covered) ? covered.filter((c): c is string => typeof c === 'string') : [],
+      },
+      parameters: { radius_m: radiusM, per_category: perCategory, categories: [...NEARBY_CATEGORIES] },
+      limitations: [
+        'Кэш OSM ограничен тем, что загружено: места нет в кэше — не значит, что его нет на месте',
+        'Расстояние по прямой до формы объекта, не путь пешком',
+        `Не более ${perCategory} ближайших мест каждой категории`,
+        'Место OSM, которое есть и на странице Островка, записано как место Островка',
+      ],
+    })
+  const seen = new Set<string>()
+  for (const place of places) {
+    if (seen.has(place.ref)) continue
+    seen.add(place.ref)
+    const entity = osmEntity(place)
+    const source = osmEvidence(place)
+    const claim: ClaimRow = {
+      entity: hotelKey,
+      property: 'nearby.distance',
+      source_key: place.ref,
+      value_numeric: place.distance,
+      value_min: null,
+      value_max: null,
+      value_text: null,
+      unit: 'm',
+      epistemic_status: 'derived',
+      ...rated('osm_distance', { categories: place.categories.filter((c) => wanted.has(c)) }),
+      calculation: key,
+      observed_at: null,
+      limitations: [],
+      evidence: [{ evidence: evidenceKey(source), role: 'input' }],
+    }
+    store.entities.push(entity)
+    store.evidence.push(source)
+    store.claims.push(claim)
+    store.relations.push({
+      subject: hotelKey,
+      predicate: 'near',
+      object: entityKey(entity),
+      claim: claimKey(claim),
+      evidence: evidenceKey(source),
+      confidence: claim.confidence,
+    })
+  }
+  for (const { place: named, twins, osm: same } of merged.ostrovok) {
+    const { place } = named
+    const name = named.name
+    const entity: EntityRow = { kind: 'ota_poi', ref: String(place.region_id), hotel_id: null, name }
+    const source: EvidenceRow = {
+      type: 'ota_page',
+      title: `Страница отеля на Островке: «${name}»`,
+      provider: OSTROVOK,
+      external_id: `poi:${place.master_id}:${place.region_id}`,
+      url: null,
+      retrieved_at: time(place.updated_at),
+      excerpt: `${name} — ${place.distance_m} м`,
+      metadata: { master_id: place.master_id, region_id: place.region_id, type: place.type, subtype: place.subtype },
+      dataset_id: null,
+    }
+    const claim: ClaimRow = {
+      entity: hotelKey,
+      property: 'nearby.distance',
+      source_key: `ota_poi/${place.region_id}`,
+      value_numeric: place.distance_m,
+      value_min: null,
+      value_max: null,
+      value_text: null,
+      unit: 'm',
+      epistemic_status: 'reported',
+      ...rated('ostrovok_place_distance', {
+        kind: named.kind,
+        ...(twins.length > 0 && { aliases: twins.map((t) => t.name) }),
+        // The categories of the OSM places that are it: a station of Ostrovok is a metro or a tram stop of OSM.
+        ...(same.length > 0 && {
+          osm: same.map((o) => o.place.ref),
+          categories: NEARBY_CATEGORIES.filter((c) => same.some((o) => o.place.categories.includes(c))),
+        }),
+      }),
+      calculation: null,
+      observed_at: null,
+      limitations: ['Расстояние со страницы Островка: как он его меряет, страница не говорит'],
+      evidence: [{ evidence: evidenceKey(source), role: 'source' }],
+    }
+    store.entities.push(entity)
+    store.evidence.push(source)
+    store.claims.push(claim)
+    store.relations.push({
+      subject: hotelKey,
+      predicate: 'near',
+      object: entityKey(entity),
+      claim: claimKey(claim),
+      evidence: evidenceKey(source),
+      confidence: claim.confidence,
+    })
+  }
+  return store
+}
+
+/** The building of `hotel_geo` is the nearest within this many metres of the hotel's point, or none. */
+export const BUILDING_RADIUS_M = 50
+export const BUILDING_METHOD = `hotel_geo: ближайшее к точке отеля здание EUBUCCO в пределах ${BUILDING_RADIUS_M} м`
+export const BUILDING_VERSION = 'hotel_geo-1'
+
+/** A height or floors of EUBUCCO, to 0.1. */
+const tenth = (value: unknown) => {
+  const n = finite(value)
+  return n !== null && n > 0 ? Math.round(n * 10) / 10 : null
+}
+
+/**
+ * The building of EUBUCCO nearest to the hotel's point (`hotel_geo().building`, within `BUILDING_RADIUS_M`): the edge
+ * hotel —nearest_building→ building, its distance a `derived` claim of the hotel `building.nearest.distance`, and the
+ * height and the floors of that building as the hotel's claims `building.height` and `building.floors` (`reported`,
+ * the dataset as evidence, the building's id as the source key, EUBUCCO's source and bounds in the method). Not
+ * «the hotel's building»: the point of Ostrovok may stand on the next one. Nothing without a building or its dataset.
+ */
+export function buildingStore(hotel: ClaimHotel, building: unknown, datasets: readonly Dataset[]): Store {
+  const empty: Store = { entities: [], evidence: [], calculations: [], claims: [], relations: [], documents: [] }
+  if (!building || typeof building !== 'object') return empty
+  const row = building as Record<string, unknown>
+  const id = text(row.id)
+  const distance = finite(row.distance_m)
+  const dataset = datasets.find((d) => d.id === text(row.dataset))
+  if (!id || distance === null || distance < 0 || !dataset) return empty
+  const hotelKey = entityKey(hotelEntity(hotel))
+  const entity: EntityRow = { kind: 'building', ref: id, hotel_id: null, name: null }
+  const source = datasetEvidence(dataset, EUBUCCO)
+  const key = `building.nearest:${hotel.id}`
+  const nearest = 'Ближайшее к точке отеля здание, не обязательно здание отеля'
+  const distanceClaim: ClaimRow = {
+    entity: hotelKey,
+    property: 'building.nearest.distance',
+    source_key: id,
+    value_numeric: Math.round(distance * 10) / 10,
+    value_min: null,
+    value_max: null,
+    value_text: null,
+    unit: 'm',
+    epistemic_status: 'derived',
+    ...rated('building_distance', {}),
+    calculation: key,
+    observed_at: null,
+    limitations: ['Расстояние по прямой до контура здания; 0 — точка внутри него'],
+    evidence: [{ evidence: evidenceKey(source), role: 'input' }],
+  }
+  const store: Store = {
+    ...empty,
+    entities: [hotelEntity(hotel), entity],
+    evidence: [source],
+    calculations: [
+      {
+        key,
+        method: BUILDING_METHOD,
+        version: BUILDING_VERSION,
+        inputs: { hotel_id: hotel.id, lat: hotel.lat, lon: hotel.lon },
+        parameters: { max_distance_m: BUILDING_RADIUS_M },
+        limitations: [nearest, 'Точка отеля — координаты Островка, не вход в здание'],
+      },
+    ],
+    claims: [distanceClaim],
+    relations: [
+      {
+        subject: hotelKey,
+        predicate: 'nearest_building',
+        object: entityKey(entity),
+        claim: claimKey(distanceClaim),
+        evidence: evidenceKey(source),
+        confidence: distanceClaim.confidence,
+      },
+    ],
+  }
+  const measures = [
+    ['height', tenth(row.height), 'm', row.height_source, row.height_confidence_lower, row.height_confidence_upper],
+    [
+      'floors',
+      tenth(row.floors),
+      'floors',
+      row.floors_source,
+      row.floors_confidence_lower,
+      row.floors_confidence_upper,
+    ],
+  ] as const
+  for (const [what, value, unit, rawSource, lower, upper] of measures) {
+    if (value === null) continue
+    const from = text(rawSource)
+    store.claims.push({
+      entity: hotelKey,
+      property: `building.${what}`,
+      source_key: id,
+      value_numeric: value,
+      value_min: null,
+      value_max: null,
+      value_text: null,
+      unit,
+      epistemic_status: 'reported',
+      ...rated('eubucco_building', {
+        source: from,
+        lower: finite(lower),
+        upper: finite(upper),
+      }),
+      calculation: null,
+      observed_at: null,
+      limitations: [
+        nearest,
+        ...(from === 'estimated'
+          ? [`${what === 'height' ? 'Высота оценена' : 'Этажность оценена'} моделью EUBUCCO, не измерена`]
+          : []),
+      ],
+      evidence: [{ evidence: evidenceKey(source), role: 'source' }],
     })
   }
   return store
@@ -553,8 +904,7 @@ export function reviewStore(hotel: ClaimHotel, page: ReviewPage): Store {
           value_text: mentionExcerpt(sentence),
           unit: null,
           epistemic_status: 'reported',
-          confidence: null,
-          method: { part, pattern: NOISE_MENTION.source },
+          ...rated('review_mention', { part, pattern: NOISE_MENTION.source }),
           calculation: null,
           observed_at: date,
           limitations: [
