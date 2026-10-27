@@ -183,3 +183,26 @@ write('assistant-knowledge', {
     }),
   },
 })
+
+// A chat about the bookings: the browser's booking at the hotel without the personal fields, moved to other dates.
+const tripsRequest = {
+  messages: [{ role: 'user', text: 'Перенеси бронь на 20–23 ноября' }],
+  brief: { trips: true, bookingId: 'OS-7K2Q9Z' },
+  bookings: [
+    {
+      id: 'OS-7K2Q9Z',
+      createdAt: '2026-10-27T18:00:00.000Z',
+      status: 'confirmed',
+      hotelId: HOTEL,
+      roomId: 'room-3202',
+      rateId: 'rate-1',
+      checkIn: '2026-11-10',
+      checkOut: '2026-11-12',
+      guests: { adults: 2, children: 0, rooms: 1 },
+      payment: 'now',
+      total: 19200,
+      cancellation: { kind: 'free', daysBefore: 4 },
+    },
+  ],
+}
+write('assistant-trips', { request: tripsRequest, response: await call('/api/assistant', tripsRequest) })

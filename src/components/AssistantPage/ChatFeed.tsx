@@ -25,7 +25,7 @@ import type { ChatMessage } from '../../lib/assistantChats'
 import { formatDateRange, type IsoDate } from '../../lib/dates'
 import { formatPrice, guestsLabel } from '../../lib/format'
 import { HotelTile } from '../HotelTile/HotelTile'
-import { MemoryCard, SessionParamsCard, ToolCard, ToolRunCard, WorkingRow } from './ChatCards'
+import { DateChangeCard, MemoryCard, SessionParamsCard, ToolCard, ToolRunCard, WorkingRow } from './ChatCards'
 import { MessagePhotos, type PhotoUrl } from './ChatPhotos'
 import { MapMessage } from './MapMessage'
 
@@ -65,6 +65,8 @@ interface FeedProps {
   busy?: boolean
   destinations?: readonly Destination[]
   today?: IsoDate
+  /** «Подтвердить» of a proposed change of a booking's dates; absent in a shared chat. */
+  onConfirmChange?: (messageId: string) => void
 }
 
 /**
@@ -83,6 +85,7 @@ export function Feed({
   busy,
   destinations = [],
   today,
+  onConfirmChange,
 }: FeedProps) {
   const lastPlanId = messages.findLast((m) => m.role === 'assistant' && m.data.plan?.options.length)?.id
   const lastNotFoundId = messages.findLast((m) => m.role === 'assistant' && m.data.notFound)?.id
@@ -112,6 +115,7 @@ export function Feed({
                   photoUrl={photoUrl}
                   onChoose={onChoose}
                   onRetry={onRetry && (() => onRetry(message.id))}
+                  onConfirmChange={onConfirmChange && (() => onConfirmChange(message.id))}
                   actions={message.id === lastPlanId && message.data.plan ? planActions?.(message.data.plan) : null}
                   params={
                     message.data.notFound && {
@@ -146,6 +150,7 @@ interface MessageProps {
   actions?: ReactNode
   /** The card of the parameters of «ничего не нашёл». */
   params?: Omit<ComponentProps<typeof SessionParamsCard>, 'brief'> | false | undefined
+  onConfirmChange?: () => void
 }
 
 function MessageTime({ iso, align }: { iso: string; align?: 'end' }) {
@@ -168,7 +173,7 @@ function MessageTime({ iso, align }: { iso: string; align?: 'end' }) {
 const workingText = (step: NonNullable<ChatMessage['data']['step']>) =>
   step.agent === 'search' ? 'Ищу подходящие варианты…' : `${step.title}…`
 
-function MessageItem({ message, photoUrl, onChoose, onRetry, actions, params }: MessageProps) {
+function MessageItem({ message, photoUrl, onChoose, onRetry, actions, params, onConfirmChange }: MessageProps) {
   const { role, status, text, data, createdAt } = message
   if (role === 'user')
     return (
@@ -255,6 +260,7 @@ function MessageItem({ message, photoUrl, onChoose, onRetry, actions, params }: 
           </Bubble>
         )}
         {data.map && <MapMessage map={data.map} />}
+        {data.change && <DateChangeCard change={data.change} onConfirm={onConfirmChange} />}
         {data.plan && <PlanView plan={data.plan} onChoose={onChoose} />}
         {status === 'failed' && onRetry ? (
           <MessageFooter className="px-0">

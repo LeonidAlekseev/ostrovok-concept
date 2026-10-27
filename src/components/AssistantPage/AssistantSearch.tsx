@@ -42,8 +42,21 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
   const destinations = useDestinations()
   const today = useToday()
   const pathId = useChatPath()
-  const { chats, active, ready, signedIn, send, retry, rename, remove, setBrief, research, photoUrl, photoError } =
-    useChats(destinations, newHotels, pathId)
+  const {
+    chats,
+    active,
+    ready,
+    signedIn,
+    send,
+    retry,
+    confirmChange,
+    rename,
+    remove,
+    setBrief,
+    research,
+    photoUrl,
+    photoError,
+  } = useChats(destinations, newHotels, pathId)
   const [text, setText] = useState('')
   const attach = useAttachPhotos()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -225,6 +238,7 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
             photoUrl={photoUrl}
             onChoose={onChoose}
             onRetry={(messageId) => retry(active.id, messageId)}
+            onConfirmChange={(messageId) => confirmChange(active.id, messageId)}
             planActions={planActions}
             onResearch={(brief) => research(active.id, brief)}
             busy={thinking || !ready}

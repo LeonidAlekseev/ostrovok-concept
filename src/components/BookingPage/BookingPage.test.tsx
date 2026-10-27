@@ -172,7 +172,7 @@ describe('BookingPage submit', () => {
 
     await waitFor(() => expect(nav.replace).toHaveBeenCalledTimes(1), { timeout: 3000 })
     const [booking] = bookingsStore.get()
-    expect(nav.replace).toHaveBeenCalledWith(`/booking/confirmation?id=${booking.id}`)
+    expect(nav.replace).toHaveBeenCalledWith(`/trips?new=${booking.id}`)
     expect(booking).toMatchObject({
       status: 'confirmed',
       cardLast4: '4242',
