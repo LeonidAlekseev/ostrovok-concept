@@ -33,7 +33,7 @@ describe.runIf(process.env.LIVE_DB === '1' && isSupabaseConfigured)('runNoiseToo
       confidence: 0.6,
     })
     const nearest = result.claims.find((c) => c.label.startsWith('Ближайшее место: кафе'))
-    expect(nearest).toMatchObject({ label: 'Ближайшее место: кафе «Cerveceria Tamesis»', value: '50 м' })
+    expect(nearest).toMatchObject({ label: 'Ближайшее место: кафе «Cerveceria Tamesis»', value: '50 м', confidence: 1 })
   })
 
   it('quotes the reviews about the noise of ota-7857547 as the sources say them', async () => {

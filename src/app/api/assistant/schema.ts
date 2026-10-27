@@ -18,6 +18,7 @@ import { hotelSummarySchema } from '../hotels/schema'
 import geoExample from '@/lib/openapi/examples/assistant-geo.json'
 import noiseExample from '@/lib/openapi/examples/assistant-noise.json'
 import wishExample from '@/lib/openapi/examples/assistant-wish.json'
+import knowledgeExample from '@/lib/openapi/examples/assistant-knowledge.json'
 
 /** `POST /api/assistant`: the traveller's newest message to Эвал and its answer. */
 
@@ -181,6 +182,10 @@ export const assistantResponseSchema = component(
         .meta({ description: 'Что вышло с фото запроса' }),
       modelsDown: z.literal(true).optional().meta({ description: 'Ни одна модель не ответила, ответили правила' }),
       map: chatMapSchema.optional(),
+      findings: z.string().optional().meta({
+        description:
+          'Ответ инструментов хранилища при подборе: отели с характеристиками, местами рядом и отзывами, по которым они подобраны (только данные запусков `steps[].run`)',
+      }),
     })
     .meta({ description: 'Ответ Эвала' }),
 )
@@ -198,7 +203,7 @@ export const assistantOperations: ApiOperation[] = [
       'Новое сообщение путешественника:',
       '- с `brief.hotelId` — вопрос об отеле: ответ из данных отеля, о местах рядом и маршрутах — с картой `map`, о виде из окон — по линиям взгляда, о шуме — по инструменту «Анализ шума» (шаг с `run`);',
       '- с `photos` — найти похожие отели или учесть фото в запросе;',
-      '- иначе — пожелание: бриф дополняется, а когда он полный — отели `matches` поиска по смыслу.',
+      '- иначе — пожелание: бриф дополняется, а когда он полный — отели `matches` поиска по смыслу; пожелание о шуме, местах рядом или отзывах подбирается инструментами хранилища (шаги с `run`, ответ `findings`).',
       '',
       `Отвечает за 15 с (с фото — за 28 с). Не больше ${RATE_LIMIT} запросов в минуту с одного адреса. Модели и их ключи — только на сервере.`,
     ].join('\n'),
@@ -209,6 +214,7 @@ export const assistantOperations: ApiOperation[] = [
         geo: { summary: 'Об отеле: места рядом и маршрут', value: geoExample.request },
         noise: { summary: 'Об отеле: шум', value: noiseExample.request },
         wish: { summary: 'Пожелание с полным брифом', value: wishExample.request },
+        knowledge: { summary: 'Подбор: аптека рядом и тихо ночью', value: knowledgeExample.request },
       },
     },
     responses: {
@@ -225,6 +231,12 @@ export const assistantOperations: ApiOperation[] = [
             summary: 'Шум у ota-9096882',
             description: 'Шаг «Анализ шума» с запуском `run`: источники EEA и OpenStreetMap, характеристики, расчёты',
             value: noiseExample.response,
+          },
+          knowledge: {
+            summary: 'Аптека рядом и тихо ночью в Валенсии',
+            description:
+              'Шаги «Отели по характеристикам», «Места рядом» с запусками `run` (характеристики по отелям в `groups`) и ответ `findings`; первые 3 отеля `matches`',
+            value: knowledgeExample.response,
           },
           wish: {
             summary: 'Тихий отель у моря в Валенсии',

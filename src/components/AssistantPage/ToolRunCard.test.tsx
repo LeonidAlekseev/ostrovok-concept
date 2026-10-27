@@ -5,7 +5,7 @@ import { CHATS_KEY, newChat, type Chat, type ChatMessage } from '../../lib/assis
 import { newHotels } from '../../lib/catalogGenerator'
 import { errorResult, type ToolResult, type ToolRun } from '../../lib/toolResult'
 import { catalogFetch } from '../../test/catalog'
-import { RUN_ID, sampleResult } from '../../test/toolResult'
+import { RUN_ID, groupedResult, sampleResult } from '../../test/toolResult'
 import { AssistantSearch } from './AssistantSearch'
 import { ToolRunCard } from './ChatCards'
 import { SharedChat } from './SharedChat'
@@ -38,6 +38,32 @@ describe('the block of a tool’s run', () => {
     expect(screen.getByRole('button', { name: 'Источники и данные: Анализ шума' }).getAttribute('aria-expanded')).toBe(
       'false',
     )
+  })
+
+  it('shows the characteristics by hotel, the long list opening with a button', async () => {
+    const choice = { agent: 'features', title: 'Отели по характеристикам', params: 'ночью тише 50 дБ' }
+    const result: ToolResult = {
+      ...groupedResult,
+      claims: groupedResult.claims.map((c, i) => (i === 0 ? { ...c, confidence: 0.9 } : c)),
+    }
+    const { container } = render(<ToolRunCard step={choice} run={runOf(result)} />)
+    const user = await open('Источники и данные: Отели по характеристикам')
+    expect(screen.getByText('По отелям')).toBeTruthy()
+    const quiet = container.querySelector('[data-group="ota-1"]') as HTMLElement
+    expect(within(quiet).getByText('Hotel Quiet')).toBeTruthy()
+    expect(within(quiet).getByText('Ночь: подходит')).toBeTruthy()
+    expect(within(quiet).getByText('55–59 дБ')).toBeTruthy()
+    expect(within(quiet).getByText('сообщено источником · уверенность 90 % · источник: EEA')).toBeTruthy()
+    // The claims of the groups are not repeated in the common list.
+    expect(screen.queryByText('Полученные характеристики')).toBeNull()
+    // Three hotels first; the rest and the hotels without data open with the button.
+    expect(screen.queryByText('Hotel Fourth')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Показать все (5)' }))
+    expect(screen.getByText('Hotel Fourth')).toBeTruthy()
+    expect(screen.getByText('Данных по этим характеристикам в хранилище нет: Hotel Unknown')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Свернуть' }))
+    expect(screen.queryByText('Hotel Fourth')).toBeNull()
+    expect(container.textContent).not.toMatch(/hotels_by_features|claim_ids|\{"/)
   })
 
   it('opens «Источники и данные»: the characteristics with their origin, the calculation, the sources', async () => {

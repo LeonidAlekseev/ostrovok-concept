@@ -223,7 +223,7 @@ function inputValue(key: string, value: unknown): string {
  * A calculation of the store for the block: its method without the name of the function it ran, the number of its
  * version, its inputs and parameters, its limitations as the assumptions.
  */
-function calculationOf(calculation: ClaimCalculation): ToolCalculation {
+export function calculationOf(calculation: ClaimCalculation): ToolCalculation {
   const lines = { ...calculation.inputs, ...calculation.parameters }
   return {
     id: calculation.id,
@@ -237,7 +237,12 @@ function calculationOf(calculation: ClaimCalculation): ToolCalculation {
 }
 
 /** The source of the store for the block; a link that is not http(s) is dropped. */
-const evidenceOf = (e: ClaimEvidence, entity: string, claimId: string | null, excerpt = e.excerpt): ToolEvidence => ({
+export const evidenceOf = (
+  e: ClaimEvidence,
+  entity: string,
+  claimId: string | null,
+  excerpt = e.excerpt,
+): ToolEvidence => ({
   id: e.id,
   source_type:
     (['dataset', 'osm', 'review', 'ota_page', 'calculation'] as const).find((t) => t === e.type) ?? 'dataset',

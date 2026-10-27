@@ -168,7 +168,8 @@ export function compose(
       data: { notFound: brief },
     }
   const note = missingNote(missing, planCities(brief, today, destinations))
-  const text = [seen, note].filter(Boolean).join(' ')
+  // The answer of the tools of the store, with the hotels and the data they were chosen by, leads the plan.
+  const text = [seen, response.findings, note].filter(Boolean).join(' ')
   return { brief, question, text, data: { plan } }
 }
 
