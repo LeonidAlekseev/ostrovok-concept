@@ -79,3 +79,15 @@ describe('compose: the text does not repeat what the memory card shows', () => {
     expect(same.text).not.toContain('Записал')
   })
 })
+
+// assistant-search, Requirement: Аргументированный ответ по данным инструментов
+describe('compose: the answer of the tools of the store leads the plan', () => {
+  it('shows the findings before the hotels of the plan', () => {
+    const brief = { destinationId: 'valencia', when: 'any' as const, party: 'couple' as const, quiet: true as const }
+    const findings =
+      'Подобрал по данным (ночью тише 50 дБ):\n1. Hotel Quiet: ночью — ниже 40 дБ (EEA, уверенность 90 %).'
+    const { text, data } = compose({ source: 'model', brief, findings }, destinations, newHotels, undefined, brief)
+    expect(text).toBe(findings)
+    expect(data.plan).toBeTruthy()
+  })
+})

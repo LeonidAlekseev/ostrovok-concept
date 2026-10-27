@@ -814,6 +814,11 @@ export interface AssistantResponse {
   modelsDown?: true
   /** A chat about a hotel: the map of the places near it the geo steps found. */
   map?: ChatMap
+  /**
+   * The answer of the tools of the store (src/lib/ai/knowledgeTurn.ts): the chosen hotels with the characteristics,
+   * the places near and the reviews they were chosen by, from the runs' data only. Shown before the plan.
+   */
+  findings?: string
 }
 
 /** What Эвал says when no hotel meets the conditions it keeps (the sea within a distance): the parameters follow. */
@@ -823,6 +828,8 @@ export const NOT_FOUND = 'Пока не нашёл точных совпаден
 export const HOTEL_UNAVAILABLE = 'Сейчас не могу ответить. Попробуйте позже.'
 
 export const MAX_MESSAGE_LENGTH = 500
+/** The answer of the tools of the store at most, characters: six hotels with their facts. */
+export const MAX_FINDINGS = 4000
 export const MAX_HISTORY = 20
 /**
  * The client's own limit: the route gives the text models 9 s (the rules after that) and answers within 15 s with
@@ -924,6 +931,7 @@ export async function askAssistant(
         ...(parsePhoto(data.photo) && { photo: parsePhoto(data.photo) }),
         ...(data.modelsDown === true && { modelsDown: true as const }),
         ...(parseChatMap(data.map) && { map: parseChatMap(data.map) }),
+        ...(typeof data.findings === 'string' && data.findings && { findings: data.findings.slice(0, MAX_FINDINGS) }),
       }
     }
     limited = response.status === 429

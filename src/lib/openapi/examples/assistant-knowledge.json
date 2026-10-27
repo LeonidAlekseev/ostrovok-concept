@@ -1,0 +1,1235 @@
+{
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "text": "Найди отель в Валенсии, чтобы рядом была аптека и было тихо ночью"
+      },
+      {
+        "role": "assistant",
+        "text": "Когда планируете поехать?"
+      },
+      {
+        "role": "user",
+        "text": "Не важно"
+      },
+      {
+        "role": "assistant",
+        "text": "С кем едете?"
+      },
+      {
+        "role": "user",
+        "text": "Вдвоём"
+      }
+    ],
+    "brief": {
+      "destinationId": "valencia",
+      "quiet": true,
+      "when": "any",
+      "party": "couple"
+    }
+  },
+  "response": {
+    "brief": {
+      "destinationId": "valencia",
+      "when": "any",
+      "party": "couple",
+      "quiet": true
+    },
+    "reply": "Отлично, для двоих ищу тихий отель в Валенсии с рядом аптеки. Когда планируете поездку?",
+    "source": "model",
+    "matches": [
+      {
+        "id": "ota-13385109",
+        "destinationId": "valencia",
+        "name": "BYPILLOW Sinfonía",
+        "stayType": "hotel",
+        "stars": 2,
+        "rating": 0,
+        "reviewCount": 0,
+        "priceFrom": 20000,
+        "wifiMbps": null,
+        "workspace": false,
+        "isNew": false
+      },
+      {
+        "id": "ota-9783413",
+        "destinationId": "valencia",
+        "name": "Reina 107 Beach Boutique",
+        "stayType": "hotel",
+        "stars": 2,
+        "rating": 0,
+        "reviewCount": 0,
+        "priceFrom": 11500,
+        "wifiMbps": null,
+        "workspace": false,
+        "isNew": false
+      },
+      {
+        "id": "ota-9559092",
+        "destinationId": "valencia",
+        "name": "Reina 107 Beach Boutique",
+        "stayType": "hotel",
+        "stars": 0,
+        "rating": 0,
+        "reviewCount": 0,
+        "priceFrom": 11100,
+        "wifiMbps": null,
+        "workspace": false,
+        "isNew": false
+      }
+    ],
+    "features": {
+      "ota-13385109": {
+        "floors": 3,
+        "heightM": 19.6,
+        "lden": {
+          "min": 45,
+          "max": 49
+        },
+        "lnight": {
+          "max": 39
+        },
+        "views": [
+          {
+            "roomName": "Двухместный номер Standard с видом на город",
+            "view": "city"
+          },
+          {
+            "roomName": "Двухместный номер Standard с видом на внутренний двор",
+            "view": "courtyard"
+          }
+        ],
+        "seaM": 3175
+      },
+      "ota-9783413": {
+        "floors": 3,
+        "heightM": 12.4,
+        "lden": {
+          "max": 39
+        },
+        "lnight": {
+          "max": 39
+        },
+        "views": [],
+        "seaM": 631
+      },
+      "ota-9559092": {
+        "floors": 3,
+        "heightM": 12.4,
+        "lden": {
+          "max": 39
+        },
+        "lnight": {
+          "max": 39
+        },
+        "views": [],
+        "seaM": 631
+      }
+    },
+    "findings": "Подобрал по данным (ночью тише 50 дБ, аптека в 500 м):\n1. BYPILLOW Sinfonía: ночью (Lnight), все источники шума EEA — ниже 40 дБ (EEA, уверенность 90 %); днём (07:00–19:00), оценка: все источники шума EEA — ниже 40 дБ (EEA, уверенность 80 %); аптека «Farmacia San Petrillo» — 20 м (OpenStreetMap, уверенность 100 %); отзывов о теме «шум и тишина» не нашлось.\n2. Reina 107 Beach Boutique: ночью (Lnight), все источники шума EEA — ниже 40 дБ (EEA, уверенность 90 %); днём (07:00–19:00), оценка: все источники шума EEA — ниже 40 дБ (EEA, уверенность 80 %); аптека — 40 м (OpenStreetMap, уверенность 100 %); отзывов о теме «шум и тишина» не нашлось.\n3. Reina 107 Beach Boutique: ночью (Lnight), все источники шума EEA — ниже 40 дБ (EEA, уверенность 90 %); днём (07:00–19:00), оценка: все источники шума EEA — ниже 40 дБ (EEA, уверенность 80 %); аптека — 40 м (OpenStreetMap, уверенность 100 %); отзывов о теме «шум и тишина» не нашлось.\n4. Hostal Tartessos: ночью (Lnight), все источники шума EEA — ниже 40 дБ (EEA, уверенность 90 %); днём (07:00–19:00), оценка: все источники шума EEA — ниже 40 дБ (EEA, уверенность 80 %); аптека «Farmacia Ajuntament» — 40 м (OpenStreetMap, уверенность 100 %); отзыв гостя: шум и тишина — «В номере было тихо.» (Островок, уверенность 75 %).\n5. Dau Studios: ночью (Lnight), все источники шума EEA — ниже 40 дБ (EEA, уверенность 90 %); днём (07:00–19:00), оценка: все источники шума EEA — ниже 40 дБ (EEA, уверенность 80 %); аптека — 40 м (OpenStreetMap, уверенность 100 %); отзывов о теме «шум и тишина» не нашлось.\n6. Hotel Ilunion Aqua 4: ночью (Lnight), все источники шума EEA — ниже 40 дБ (EEA, уверенность 90 %); днём (07:00–19:00), оценка: все источники шума EEA — ниже 40 дБ (EEA, уверенность 80 %); аптека «Farmacia Aqua» — 60 м (OpenStreetMap, уверенность 100 %); отзывов о теме «шум и тишина» не нашлось.\nНет данных: аптека в 500 м — у 2 отелей. Такие отели я не считаю ни подходящими, ни неподходящими.\nОтзывы — слова гостей, а уровни шума — карта EEA снаружи здания, не звукоизоляция номера.\nВыбирайте вариант с максимально близким расположением аптеки для удобства.",
+    "steps": [
+      {
+        "agent": "search",
+        "title": "Подбираю отели по вашему описанию",
+        "params": "Валенсия",
+        "status": "done",
+        "result": "нашёл 6 отелей"
+      },
+      {
+        "agent": "features",
+        "title": "Отели по характеристикам",
+        "params": "ночью тише 50 дБ",
+        "status": "done",
+        "result": "Ночью тише 50 дБ: подходят 93 из 205 отелей",
+        "run": {
+          "id": "4f342f87-9af9-4716-b276-600baa716328",
+          "result": {
+            "status": "success",
+            "summary": "Ночью тише 50 дБ: подходят 93 из 205 отелей",
+            "data": {
+              "match": 93,
+              "miss": 112,
+              "nodata": 0,
+              "chosen": ["ota-13385109", "ota-9783413", "ota-9559092", "ota-7833017", "ota-10491322", "ota-8585501"]
+            },
+            "evidence": [
+              {
+                "id": "ee159ffb-c245-47de-acbc-0d7a329216d0",
+                "source_type": "dataset",
+                "source_name": "EEA",
+                "source_id": "eea-noise-end2022-v01_r00",
+                "source_url": "https://sdi.eea.europa.eu/datastore/public?path=/eea_v_3035_1_k_noise-contours-end2022_p_2026_v01_r00",
+                "title": "EEA noise contours, Environmental Noise Directive, round 2022 v01_r00",
+                "excerpt": null,
+                "retrieved_at": "2026-10-26T18:06:03.471+00:00",
+                "entity_id": null,
+                "claim_id": null
+              }
+            ],
+            "claims": [
+              {
+                "id": "f786429c-a565-45f4-8e84-5ef94ce242c1",
+                "label": "Ночью (Lnight), все источники шума EEA",
+                "value": "ниже 40 дБ",
+                "status": "reported",
+                "confidence": 0.9,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": null
+              },
+              {
+                "id": "c2cd2519-7f20-4961-a3be-3b140c0da78d",
+                "label": "Днём (07:00–19:00), оценка: все источники шума EEA",
+                "value": "ниже 40 дБ",
+                "status": "derived",
+                "confidence": 0.8,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": "1a6e31b4-26be-40cb-a4a4-9f15d4bdd1bf"
+              },
+              {
+                "id": "e5555730-1081-4000-941d-33501f700344",
+                "label": "Ночью (Lnight), все источники шума EEA",
+                "value": "ниже 40 дБ",
+                "status": "reported",
+                "confidence": 0.9,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": null
+              },
+              {
+                "id": "5116b05f-705e-457b-b13f-a489577ea9c1",
+                "label": "Днём (07:00–19:00), оценка: все источники шума EEA",
+                "value": "ниже 40 дБ",
+                "status": "derived",
+                "confidence": 0.8,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": "985dda68-2b8d-476c-93ad-d2740964adc5"
+              },
+              {
+                "id": "e1a9c1c6-878f-4f14-a5d3-85589bc280a9",
+                "label": "Ночью (Lnight), все источники шума EEA",
+                "value": "ниже 40 дБ",
+                "status": "reported",
+                "confidence": 0.9,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": null
+              },
+              {
+                "id": "9159abca-33b5-468e-9eef-810b1d907ed1",
+                "label": "Днём (07:00–19:00), оценка: все источники шума EEA",
+                "value": "ниже 40 дБ",
+                "status": "derived",
+                "confidence": 0.8,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": "06950df1-eeb3-4e8c-bdd1-5ba95d2d90c1"
+              },
+              {
+                "id": "bd55fbed-f10c-464b-b125-fa8c300639b2",
+                "label": "Ночью (Lnight), все источники шума EEA",
+                "value": "ниже 40 дБ",
+                "status": "reported",
+                "confidence": 0.9,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": null
+              },
+              {
+                "id": "1f897fca-3c1d-471d-afd4-d3a5c1a1775e",
+                "label": "Днём (07:00–19:00), оценка: все источники шума EEA",
+                "value": "ниже 40 дБ",
+                "status": "derived",
+                "confidence": 0.8,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": "fe01709e-eff5-4f2f-a44b-c74ff1e2a76e"
+              },
+              {
+                "id": "dd8fa893-e6c9-49da-b337-6842cc7433a6",
+                "label": "Ночью (Lnight), все источники шума EEA",
+                "value": "ниже 40 дБ",
+                "status": "reported",
+                "confidence": 0.9,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": null
+              },
+              {
+                "id": "907a861d-53e2-4b14-9c25-fee14874d8f9",
+                "label": "Днём (07:00–19:00), оценка: все источники шума EEA",
+                "value": "ниже 40 дБ",
+                "status": "derived",
+                "confidence": 0.8,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": "6853d8ba-6ae1-44d0-bd6c-42efe4cc2ae6"
+              },
+              {
+                "id": "c29770dc-438a-4ea3-adfd-da73d623696f",
+                "label": "Ночью (Lnight), все источники шума EEA",
+                "value": "ниже 40 дБ",
+                "status": "reported",
+                "confidence": 0.9,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": null
+              },
+              {
+                "id": "3ab25e88-a82b-4dc6-9fa8-62adcf637595",
+                "label": "Днём (07:00–19:00), оценка: все источники шума EEA",
+                "value": "ниже 40 дБ",
+                "status": "derived",
+                "confidence": 0.8,
+                "evidence_ids": ["ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": "33993014-47d4-45c0-8b65-fbdb50ef87ce"
+              }
+            ],
+            "calculations": [
+              {
+                "name": "Директива ЕС 2002/49/EC, приложение I: Lday из Lden и Lnight",
+                "version": "1",
+                "inputs": [
+                  {
+                    "label": "Lden (сутки)",
+                    "value": "ниже 40 дБ"
+                  },
+                  {
+                    "label": "Источник шума",
+                    "value": "Промышленность"
+                  },
+                  {
+                    "label": "Lnight (ночь)",
+                    "value": "ниже 40 дБ"
+                  },
+                  {
+                    "label": "Отель",
+                    "value": "ota-13385109"
+                  },
+                  {
+                    "label": "Часов дня",
+                    "value": "12"
+                  },
+                  {
+                    "label": "Часов ночи",
+                    "value": "8"
+                  },
+                  {
+                    "label": "Часов вечера",
+                    "value": "4"
+                  },
+                  {
+                    "label": "Поправка ночи, дБ",
+                    "value": "10"
+                  },
+                  {
+                    "label": "Вечер так же громок, как день",
+                    "value": "да"
+                  },
+                  {
+                    "label": "Поправка вечера, дБ",
+                    "value": "5"
+                  },
+                  {
+                    "label": "День не тише ночи",
+                    "value": "да"
+                  }
+                ],
+                "assumptions": [
+                  "Допущение: вечер так же громок, как день",
+                  "Допущение: день не тише ночи",
+                  "Оценка из полос 5 дБ модельной карты, не измерение"
+                ],
+                "id": "1a6e31b4-26be-40cb-a4a4-9f15d4bdd1bf"
+              },
+              {
+                "name": "Директива ЕС 2002/49/EC, приложение I: Lday из Lden и Lnight",
+                "version": "1",
+                "inputs": [
+                  {
+                    "label": "Lden (сутки)",
+                    "value": "ниже 40 дБ"
+                  },
+                  {
+                    "label": "Источник шума",
+                    "value": "Промышленность"
+                  },
+                  {
+                    "label": "Lnight (ночь)",
+                    "value": "ниже 40 дБ"
+                  },
+                  {
+                    "label": "Отель",
+                    "value": "ota-9783413"
+                  },
+                  {
+                    "label": "Часов дня",
+                    "value": "12"
+                  },
+                  {
+                    "label": "Часов ночи",
+                    "value": "8"
+                  },
+                  {
+                    "label": "Часов вечера",
+                    "value": "4"
+                  },
+                  {
+                    "label": "Поправка ночи, дБ",
+                    "value": "10"
+                  },
+                  {
+                    "label": "Вечер так же громок, как день",
+                    "value": "да"
+                  },
+                  {
+                    "label": "Поправка вечера, дБ",
+                    "value": "5"
+                  },
+                  {
+                    "label": "День не тише ночи",
+                    "value": "да"
+                  }
+                ],
+                "assumptions": [
+                  "Допущение: вечер так же громок, как день",
+                  "Допущение: день не тише ночи",
+                  "Оценка из полос 5 дБ модельной карты, не измерение"
+                ],
+                "id": "985dda68-2b8d-476c-93ad-d2740964adc5"
+              },
+              {
+                "name": "Директива ЕС 2002/49/EC, приложение I: Lday из Lden и Lnight",
+                "version": "1",
+                "inputs": [
+                  {
+                    "label": "Lden (сутки)",
+                    "value": "ниже 40 дБ"
+                  },
+                  {
+                    "label": "Источник шума",
+                    "value": "Промышленность"
+                  },
+                  {
+                    "label": "Lnight (ночь)",
+                    "value": "ниже 40 дБ"
+                  },
+                  {
+                    "label": "Отель",
+                    "value": "ota-9559092"
+                  },
+                  {
+                    "label": "Часов дня",
+                    "value": "12"
+                  },
+                  {
+                    "label": "Часов ночи",
+                    "value": "8"
+                  },
+                  {
+                    "label": "Часов вечера",
+                    "value": "4"
+                  },
+                  {
+                    "label": "Поправка ночи, дБ",
+                    "value": "10"
+                  },
+                  {
+                    "label": "Вечер так же громок, как день",
+                    "value": "да"
+                  },
+                  {
+                    "label": "Поправка вечера, дБ",
+                    "value": "5"
+                  },
+                  {
+                    "label": "День не тише ночи",
+                    "value": "да"
+                  }
+                ],
+                "assumptions": [
+                  "Допущение: вечер так же громок, как день",
+                  "Допущение: день не тише ночи",
+                  "Оценка из полос 5 дБ модельной карты, не измерение"
+                ],
+                "id": "06950df1-eeb3-4e8c-bdd1-5ba95d2d90c1"
+              },
+              {
+                "name": "Директива ЕС 2002/49/EC, приложение I: Lday из Lden и Lnight",
+                "version": "1",
+                "inputs": [
+                  {
+                    "label": "Lden (сутки)",
+                    "value": "ниже 40 дБ"
+                  },
+                  {
+                    "label": "Источник шума",
+                    "value": "Промышленность"
+                  },
+                  {
+                    "label": "Lnight (ночь)",
+                    "value": "ниже 40 дБ"
+                  },
+                  {
+                    "label": "Отель",
+                    "value": "ota-7833017"
+                  },
+                  {
+                    "label": "Часов дня",
+                    "value": "12"
+                  },
+                  {
+                    "label": "Часов ночи",
+                    "value": "8"
+                  },
+                  {
+                    "label": "Часов вечера",
+                    "value": "4"
+                  },
+                  {
+                    "label": "Поправка ночи, дБ",
+                    "value": "10"
+                  },
+                  {
+                    "label": "Вечер так же громок, как день",
+                    "value": "да"
+                  },
+                  {
+                    "label": "Поправка вечера, дБ",
+                    "value": "5"
+                  },
+                  {
+                    "label": "День не тише ночи",
+                    "value": "да"
+                  }
+                ],
+                "assumptions": [
+                  "Допущение: вечер так же громок, как день",
+                  "Допущение: день не тише ночи",
+                  "Оценка из полос 5 дБ модельной карты, не измерение"
+                ],
+                "id": "fe01709e-eff5-4f2f-a44b-c74ff1e2a76e"
+              },
+              {
+                "name": "Директива ЕС 2002/49/EC, приложение I: Lday из Lden и Lnight",
+                "version": "1",
+                "inputs": [
+                  {
+                    "label": "Lden (сутки)",
+                    "value": "ниже 40 дБ"
+                  },
+                  {
+                    "label": "Источник шума",
+                    "value": "Промышленность"
+                  },
+                  {
+                    "label": "Lnight (ночь)",
+                    "value": "ниже 40 дБ"
+                  },
+                  {
+                    "label": "Отель",
+                    "value": "ota-10491322"
+                  },
+                  {
+                    "label": "Часов дня",
+                    "value": "12"
+                  },
+                  {
+                    "label": "Часов ночи",
+                    "value": "8"
+                  },
+                  {
+                    "label": "Часов вечера",
+                    "value": "4"
+                  },
+                  {
+                    "label": "Поправка ночи, дБ",
+                    "value": "10"
+                  },
+                  {
+                    "label": "Вечер так же громок, как день",
+                    "value": "да"
+                  },
+                  {
+                    "label": "Поправка вечера, дБ",
+                    "value": "5"
+                  },
+                  {
+                    "label": "День не тише ночи",
+                    "value": "да"
+                  }
+                ],
+                "assumptions": [
+                  "Допущение: вечер так же громок, как день",
+                  "Допущение: день не тише ночи",
+                  "Оценка из полос 5 дБ модельной карты, не измерение"
+                ],
+                "id": "6853d8ba-6ae1-44d0-bd6c-42efe4cc2ae6"
+              },
+              {
+                "name": "Директива ЕС 2002/49/EC, приложение I: Lday из Lden и Lnight",
+                "version": "1",
+                "inputs": [
+                  {
+                    "label": "Lden (сутки)",
+                    "value": "ниже 40 дБ"
+                  },
+                  {
+                    "label": "Источник шума",
+                    "value": "Промышленность"
+                  },
+                  {
+                    "label": "Lnight (ночь)",
+                    "value": "ниже 40 дБ"
+                  },
+                  {
+                    "label": "Отель",
+                    "value": "ota-8585501"
+                  },
+                  {
+                    "label": "Часов дня",
+                    "value": "12"
+                  },
+                  {
+                    "label": "Часов ночи",
+                    "value": "8"
+                  },
+                  {
+                    "label": "Часов вечера",
+                    "value": "4"
+                  },
+                  {
+                    "label": "Поправка ночи, дБ",
+                    "value": "10"
+                  },
+                  {
+                    "label": "Вечер так же громок, как день",
+                    "value": "да"
+                  },
+                  {
+                    "label": "Поправка вечера, дБ",
+                    "value": "5"
+                  },
+                  {
+                    "label": "День не тише ночи",
+                    "value": "да"
+                  }
+                ],
+                "assumptions": [
+                  "Допущение: вечер так же громок, как день",
+                  "Допущение: день не тише ночи",
+                  "Оценка из полос 5 дБ модельной карты, не измерение"
+                ],
+                "id": "33993014-47d4-45c0-8b65-fbdb50ef87ce"
+              }
+            ],
+            "method": {
+              "name": "Отбор отелей по характеристикам хранилища: полосы шума EEA ночью, оценка дня, высота здания EUBUCCO",
+              "version": "1",
+              "inputs": [
+                {
+                  "label": "Условия",
+                  "value": "ночью тише 50 дБ"
+                },
+                {
+                  "label": "Отелей проверено",
+                  "value": "205"
+                }
+              ],
+              "assumptions": [
+                "Ночью отель тише порога, если самая громкая полоса EEA по всем источникам шума заканчивается ниже порога",
+                "Днём — по самой громкой оценке дня из Lden и Lnight",
+                "Отели без характеристики — «нет данных», они не отбираются и не отбрасываются"
+              ]
+            },
+            "limitations": [
+              "Нет данных — не значит «тихо» или «шумно»: такой отель не считается ни подходящим, ни неподходящим",
+              "Уровни EEA — модельная карта снаружи здания полосами по 5 дБ; звукоизоляция окон и номеров не оценивается",
+              "Высота — у ближайшего к точке отеля здания EUBUCCO, не обязательно здания отеля"
+            ],
+            "error": null,
+            "groups": [
+              {
+                "id": "ota-13385109",
+                "title": "BYPILLOW Sinfonía",
+                "note": "Ночь: подходит",
+                "claim_ids": ["f786429c-a565-45f4-8e84-5ef94ce242c1", "c2cd2519-7f20-4961-a3be-3b140c0da78d"]
+              },
+              {
+                "id": "ota-9783413",
+                "title": "Reina 107 Beach Boutique",
+                "note": "Ночь: подходит",
+                "claim_ids": ["e5555730-1081-4000-941d-33501f700344", "5116b05f-705e-457b-b13f-a489577ea9c1"]
+              },
+              {
+                "id": "ota-9559092",
+                "title": "Reina 107 Beach Boutique",
+                "note": "Ночь: подходит",
+                "claim_ids": ["e1a9c1c6-878f-4f14-a5d3-85589bc280a9", "9159abca-33b5-468e-9eef-810b1d907ed1"]
+              },
+              {
+                "id": "ota-7833017",
+                "title": "Hostal Tartessos",
+                "note": "Ночь: подходит",
+                "claim_ids": ["bd55fbed-f10c-464b-b125-fa8c300639b2", "1f897fca-3c1d-471d-afd4-d3a5c1a1775e"]
+              },
+              {
+                "id": "ota-10491322",
+                "title": "Dau Studios",
+                "note": "Ночь: подходит",
+                "claim_ids": ["dd8fa893-e6c9-49da-b337-6842cc7433a6", "907a861d-53e2-4b14-9c25-fee14874d8f9"]
+              },
+              {
+                "id": "ota-8585501",
+                "title": "Hotel Ilunion Aqua 4",
+                "note": "Ночь: подходит",
+                "claim_ids": ["c29770dc-438a-4ea3-adfd-da73d623696f", "3ab25e88-a82b-4dc6-9fa8-62adcf637595"]
+              }
+            ]
+          }
+        }
+      },
+      {
+        "agent": "geo",
+        "title": "Места рядом",
+        "params": "аптека в 500 м",
+        "status": "done",
+        "result": "Аптека в 500 м: есть у 191 из 205 отелей; в данных нет у 2",
+        "run": {
+          "id": "5fe65ad7-f4bb-42ee-a339-90778260a763",
+          "result": {
+            "status": "success",
+            "summary": "Аптека в 500 м: есть у 191 из 205 отелей; в данных нет у 2",
+            "data": {
+              "category": "pharmacy",
+              "radiusM": 500,
+              "match": 191,
+              "miss": 12,
+              "nodata": 2,
+              "chosen": ["ota-13385109", "ota-9783413", "ota-9559092", "ota-7833017", "ota-10491322", "ota-8585501"]
+            },
+            "evidence": [
+              {
+                "id": "5cddebe3-9c9f-410f-8abd-1f27989c9063",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/6003222161",
+                "source_url": "https://www.openstreetmap.org/node/6003222161",
+                "title": "Farmacia San Petrillo",
+                "excerpt": null,
+                "retrieved_at": "2026-10-26T19:30:00.378+00:00",
+                "entity_id": "ota-13385109",
+                "claim_id": "651d2598-24b1-4f78-88ba-dbaa5f89f5da"
+              },
+              {
+                "id": "13039a29-93fb-40a3-a076-7b1b14560534",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/5012877450",
+                "source_url": "https://www.openstreetmap.org/node/5012877450",
+                "title": "node/5012877450",
+                "excerpt": null,
+                "retrieved_at": "2026-10-26T19:30:00.378+00:00",
+                "entity_id": null,
+                "claim_id": null
+              },
+              {
+                "id": "c4907eab-63af-45bb-bf27-9bb46070e2cb",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/5044810927",
+                "source_url": "https://www.openstreetmap.org/node/5044810927",
+                "title": "Farmacia Ajuntament",
+                "excerpt": null,
+                "retrieved_at": "2026-10-26T19:30:00.378+00:00",
+                "entity_id": "ota-7833017",
+                "claim_id": "2602b9d0-eac3-458e-bf97-34e915fc67a4"
+              },
+              {
+                "id": "dc23f426-104c-4b5a-9fb7-6e9fa802d29c",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "way/1282494250",
+                "source_url": "https://www.openstreetmap.org/way/1282494250",
+                "title": "Farmacia Aqua",
+                "excerpt": null,
+                "retrieved_at": "2026-10-26T19:30:00.378+00:00",
+                "entity_id": "ota-8585501",
+                "claim_id": "8970a0e1-9645-4f86-bdf7-d47e07e75a79"
+              }
+            ],
+            "claims": [
+              {
+                "id": "651d2598-24b1-4f78-88ba-dbaa5f89f5da",
+                "label": "Аптека «Farmacia San Petrillo»",
+                "value": "20 м",
+                "status": "derived",
+                "confidence": 1,
+                "evidence_ids": ["5cddebe3-9c9f-410f-8abd-1f27989c9063"],
+                "calculation_id": "b41a4ec8-9c6b-498a-ab70-a218a3778641"
+              },
+              {
+                "id": "ddaf5ea1-e2fd-480a-8e43-b0db5a66d651",
+                "label": "Аптека",
+                "value": "40 м",
+                "status": "derived",
+                "confidence": 1,
+                "evidence_ids": ["13039a29-93fb-40a3-a076-7b1b14560534"],
+                "calculation_id": "f9e79a6b-b8ee-47c8-a97f-750ce7377639"
+              },
+              {
+                "id": "fd2721e5-7dda-4468-9969-42538d5a6d1c",
+                "label": "Аптека",
+                "value": "40 м",
+                "status": "derived",
+                "confidence": 1,
+                "evidence_ids": ["13039a29-93fb-40a3-a076-7b1b14560534"],
+                "calculation_id": "825e4959-3177-41da-b229-ebd8635b4b28"
+              },
+              {
+                "id": "2602b9d0-eac3-458e-bf97-34e915fc67a4",
+                "label": "Аптека «Farmacia Ajuntament»",
+                "value": "40 м",
+                "status": "derived",
+                "confidence": 1,
+                "evidence_ids": ["c4907eab-63af-45bb-bf27-9bb46070e2cb"],
+                "calculation_id": "992f8185-4fd9-426b-a112-160c75ae6562"
+              },
+              {
+                "id": "21845363-5915-473d-8442-ec511bb8ea30",
+                "label": "Аптека",
+                "value": "40 м",
+                "status": "derived",
+                "confidence": 1,
+                "evidence_ids": ["13039a29-93fb-40a3-a076-7b1b14560534"],
+                "calculation_id": "cd42a2b8-c42a-419f-a249-45857be3651a"
+              },
+              {
+                "id": "8970a0e1-9645-4f86-bdf7-d47e07e75a79",
+                "label": "Аптека «Farmacia Aqua»",
+                "value": "60 м",
+                "status": "derived",
+                "confidence": 1,
+                "evidence_ids": ["dc23f426-104c-4b5a-9fb7-6e9fa802d29c"],
+                "calculation_id": "e6e8569d-d68d-4719-a9f4-7a624e1659e7"
+              }
+            ],
+            "calculations": [
+              {
+                "name": "Расстояние по прямой от точки отеля до формы объекта OSM; место Островка — его расстояние со страницы",
+                "version": "1",
+                "inputs": [
+                  {
+                    "label": "Широта точки отеля",
+                    "value": "39.485214"
+                  },
+                  {
+                    "label": "Долгота точки отеля",
+                    "value": "-0.360384"
+                  },
+                  {
+                    "label": "covered",
+                    "value": "beach, bus_stop, hospital, metro, park, pharmacy, supermarket, ж/д станция, остановка трамвая"
+                  },
+                  {
+                    "label": "Отель",
+                    "value": "ota-13385109"
+                  },
+                  {
+                    "label": "Радиус, м",
+                    "value": "1000"
+                  },
+                  {
+                    "label": "Категории мест",
+                    "value": "pharmacy, supermarket, hospital, bus_stop, остановка трамвая, metro, ж/д станция, beach, park"
+                  },
+                  {
+                    "label": "Мест каждой категории не больше",
+                    "value": "5"
+                  }
+                ],
+                "assumptions": [
+                  "Кэш OSM ограничен тем, что загружено: места нет в кэше — не значит, что его нет на месте",
+                  "Расстояние по прямой до формы объекта, не путь пешком",
+                  "Не более 5 ближайших мест каждой категории",
+                  "Место OSM, которое есть и на странице Островка, записано как место Островка"
+                ],
+                "id": "b41a4ec8-9c6b-498a-ab70-a218a3778641"
+              },
+              {
+                "name": "Расстояние по прямой от точки отеля до формы объекта OSM; место Островка — его расстояние со страницы",
+                "version": "1",
+                "inputs": [
+                  {
+                    "label": "Широта точки отеля",
+                    "value": "39.46849"
+                  },
+                  {
+                    "label": "Долгота точки отеля",
+                    "value": "-0.3289"
+                  },
+                  {
+                    "label": "covered",
+                    "value": "beach, bus_stop, hospital, metro, park, pharmacy, supermarket, ж/д станция, остановка трамвая"
+                  },
+                  {
+                    "label": "Отель",
+                    "value": "ota-9783413"
+                  },
+                  {
+                    "label": "Радиус, м",
+                    "value": "1000"
+                  },
+                  {
+                    "label": "Категории мест",
+                    "value": "pharmacy, supermarket, hospital, bus_stop, остановка трамвая, metro, ж/д станция, beach, park"
+                  },
+                  {
+                    "label": "Мест каждой категории не больше",
+                    "value": "5"
+                  }
+                ],
+                "assumptions": [
+                  "Кэш OSM ограничен тем, что загружено: места нет в кэше — не значит, что его нет на месте",
+                  "Расстояние по прямой до формы объекта, не путь пешком",
+                  "Не более 5 ближайших мест каждой категории",
+                  "Место OSM, которое есть и на странице Островка, записано как место Островка"
+                ],
+                "id": "f9e79a6b-b8ee-47c8-a97f-750ce7377639"
+              },
+              {
+                "name": "Расстояние по прямой от точки отеля до формы объекта OSM; место Островка — его расстояние со страницы",
+                "version": "1",
+                "inputs": [
+                  {
+                    "label": "Широта точки отеля",
+                    "value": "39.46849"
+                  },
+                  {
+                    "label": "Долгота точки отеля",
+                    "value": "-0.328903"
+                  },
+                  {
+                    "label": "covered",
+                    "value": "beach, bus_stop, hospital, metro, park, pharmacy, supermarket, ж/д станция, остановка трамвая"
+                  },
+                  {
+                    "label": "Отель",
+                    "value": "ota-9559092"
+                  },
+                  {
+                    "label": "Радиус, м",
+                    "value": "1000"
+                  },
+                  {
+                    "label": "Категории мест",
+                    "value": "pharmacy, supermarket, hospital, bus_stop, остановка трамвая, metro, ж/д станция, beach, park"
+                  },
+                  {
+                    "label": "Мест каждой категории не больше",
+                    "value": "5"
+                  }
+                ],
+                "assumptions": [
+                  "Кэш OSM ограничен тем, что загружено: места нет в кэше — не значит, что его нет на месте",
+                  "Расстояние по прямой до формы объекта, не путь пешком",
+                  "Не более 5 ближайших мест каждой категории",
+                  "Место OSM, которое есть и на странице Островка, записано как место Островка"
+                ],
+                "id": "825e4959-3177-41da-b229-ebd8635b4b28"
+              },
+              {
+                "name": "Расстояние по прямой от точки отеля до формы объекта OSM; место Островка — его расстояние со страницы",
+                "version": "1",
+                "inputs": [
+                  {
+                    "label": "Широта точки отеля",
+                    "value": "39.470516"
+                  },
+                  {
+                    "label": "Долгота точки отеля",
+                    "value": "-0.377303"
+                  },
+                  {
+                    "label": "covered",
+                    "value": "beach, bus_stop, hospital, metro, park, pharmacy, supermarket, ж/д станция, остановка трамвая"
+                  },
+                  {
+                    "label": "Отель",
+                    "value": "ota-7833017"
+                  },
+                  {
+                    "label": "Радиус, м",
+                    "value": "1000"
+                  },
+                  {
+                    "label": "Категории мест",
+                    "value": "pharmacy, supermarket, hospital, bus_stop, остановка трамвая, metro, ж/д станция, beach, park"
+                  },
+                  {
+                    "label": "Мест каждой категории не больше",
+                    "value": "5"
+                  }
+                ],
+                "assumptions": [
+                  "Кэш OSM ограничен тем, что загружено: места нет в кэше — не значит, что его нет на месте",
+                  "Расстояние по прямой до формы объекта, не путь пешком",
+                  "Не более 5 ближайших мест каждой категории",
+                  "Место OSM, которое есть и на странице Островка, записано как место Островка"
+                ],
+                "id": "992f8185-4fd9-426b-a112-160c75ae6562"
+              },
+              {
+                "name": "Расстояние по прямой от точки отеля до формы объекта OSM; место Островка — его расстояние со страницы",
+                "version": "1",
+                "inputs": [
+                  {
+                    "label": "Широта точки отеля",
+                    "value": "39.46793"
+                  },
+                  {
+                    "label": "Долгота точки отеля",
+                    "value": "-0.328901"
+                  },
+                  {
+                    "label": "covered",
+                    "value": "beach, bus_stop, hospital, metro, park, pharmacy, supermarket, ж/д станция, остановка трамвая"
+                  },
+                  {
+                    "label": "Отель",
+                    "value": "ota-10491322"
+                  },
+                  {
+                    "label": "Радиус, м",
+                    "value": "1000"
+                  },
+                  {
+                    "label": "Категории мест",
+                    "value": "pharmacy, supermarket, hospital, bus_stop, остановка трамвая, metro, ж/д станция, beach, park"
+                  },
+                  {
+                    "label": "Мест каждой категории не больше",
+                    "value": "5"
+                  }
+                ],
+                "assumptions": [
+                  "Кэш OSM ограничен тем, что загружено: места нет в кэше — не значит, что его нет на месте",
+                  "Расстояние по прямой до формы объекта, не путь пешком",
+                  "Не более 5 ближайших мест каждой категории",
+                  "Место OSM, которое есть и на странице Островка, записано как место Островка"
+                ],
+                "id": "cd42a2b8-c42a-419f-a249-45857be3651a"
+              },
+              {
+                "name": "Расстояние по прямой от точки отеля до формы объекта OSM; место Островка — его расстояние со страницы",
+                "version": "1",
+                "inputs": [
+                  {
+                    "label": "Широта точки отеля",
+                    "value": "39.455982"
+                  },
+                  {
+                    "label": "Долгота точки отеля",
+                    "value": "-0.345828"
+                  },
+                  {
+                    "label": "covered",
+                    "value": "beach, bus_stop, hospital, metro, park, pharmacy, supermarket, ж/д станция, остановка трамвая"
+                  },
+                  {
+                    "label": "Отель",
+                    "value": "ota-8585501"
+                  },
+                  {
+                    "label": "Радиус, м",
+                    "value": "1000"
+                  },
+                  {
+                    "label": "Категории мест",
+                    "value": "pharmacy, supermarket, hospital, bus_stop, остановка трамвая, metro, ж/д станция, beach, park"
+                  },
+                  {
+                    "label": "Мест каждой категории не больше",
+                    "value": "5"
+                  }
+                ],
+                "assumptions": [
+                  "Кэш OSM ограничен тем, что загружено: места нет в кэше — не значит, что его нет на месте",
+                  "Расстояние по прямой до формы объекта, не путь пешком",
+                  "Не более 5 ближайших мест каждой категории",
+                  "Место OSM, которое есть и на странице Островка, записано как место Островка"
+                ],
+                "id": "e6e8569d-d68d-4719-a9f4-7a624e1659e7"
+              }
+            ],
+            "method": {
+              "name": "Ближайшее место категории по связям «рядом» хранилища: места OpenStreetMap и страницы Островка",
+              "version": "1",
+              "inputs": [
+                {
+                  "label": "Место",
+                  "value": "аптека"
+                },
+                {
+                  "label": "Радиус",
+                  "value": "500 м"
+                },
+                {
+                  "label": "Отелей проверено",
+                  "value": "205"
+                }
+              ],
+              "assumptions": [
+                "Связи «рядом» записаны для мест в 1000 м от точки отеля",
+                "Место, которое есть и в OpenStreetMap, и на странице Островка, — одно, с расстоянием Островка"
+              ]
+            },
+            "limitations": [
+              "Связи нет — значит, в данных нет такого места в 1 км, а не что его нет на месте: OpenStreetMap и страница Островка не полны",
+              "Расстояние по прямой от точки отеля, не путь пешком"
+            ],
+            "error": null,
+            "groups": [
+              {
+                "id": "ota-13385109",
+                "title": "BYPILLOW Sinfonía",
+                "note": "Ближайшая — в 20 м: в пределах 500 м",
+                "claim_ids": ["651d2598-24b1-4f78-88ba-dbaa5f89f5da"]
+              },
+              {
+                "id": "ota-9783413",
+                "title": "Reina 107 Beach Boutique",
+                "note": "Ближайшая — в 40 м: в пределах 500 м",
+                "claim_ids": ["ddaf5ea1-e2fd-480a-8e43-b0db5a66d651"]
+              },
+              {
+                "id": "ota-9559092",
+                "title": "Reina 107 Beach Boutique",
+                "note": "Ближайшая — в 40 м: в пределах 500 м",
+                "claim_ids": ["fd2721e5-7dda-4468-9969-42538d5a6d1c"]
+              },
+              {
+                "id": "ota-7833017",
+                "title": "Hostal Tartessos",
+                "note": "Ближайшая — в 40 м: в пределах 500 м",
+                "claim_ids": ["2602b9d0-eac3-458e-bf97-34e915fc67a4"]
+              },
+              {
+                "id": "ota-10491322",
+                "title": "Dau Studios",
+                "note": "Ближайшая — в 40 м: в пределах 500 м",
+                "claim_ids": ["21845363-5915-473d-8442-ec511bb8ea30"]
+              },
+              {
+                "id": "ota-8585501",
+                "title": "Hotel Ilunion Aqua 4",
+                "note": "Ближайшая — в 60 м: в пределах 500 м",
+                "claim_ids": ["8970a0e1-9645-4f86-bdf7-d47e07e75a79"]
+              },
+              {
+                "id": "nodata",
+                "title": "Нет данных: 2 отеля",
+                "note": "Данных о месте «аптека» в 1000 м в хранилище нет: Parador de El Saler, CA Emma",
+                "claim_ids": []
+              }
+            ]
+          }
+        }
+      },
+      {
+        "agent": "search",
+        "title": "Отзывы",
+        "params": "тема: шум и тишина",
+        "status": "done",
+        "result": "Шум и тишина: 1 фрагмент отзывов у 6 отелей",
+        "run": {
+          "id": "66ed4528-b729-4a80-b7a8-06931c5871c3",
+          "result": {
+            "status": "success",
+            "summary": "Шум и тишина: 1 фрагмент отзывов у 6 отелей",
+            "data": {
+              "topic": "noise",
+              "found": 1
+            },
+            "evidence": [
+              {
+                "id": "ea23738f-5ade-4bc4-97eb-4ab46244a04b",
+                "source_type": "review",
+                "source_name": "Островок",
+                "source_id": "6490793",
+                "source_url": null,
+                "title": "Отзыв гостя от 2014-06-21",
+                "excerpt": "В номере было тихо.",
+                "retrieved_at": "2026-10-26T19:43:48.681+00:00",
+                "entity_id": "ota-7833017",
+                "claim_id": "def713f2-a8f1-4021-af17-122f5085db25"
+              }
+            ],
+            "claims": [
+              {
+                "id": "def713f2-a8f1-4021-af17-122f5085db25",
+                "label": "Отзыв гостя: шум и тишина",
+                "value": "«В номере было тихо.»",
+                "status": "reported",
+                "confidence": 0.75,
+                "evidence_ids": ["ea23738f-5ade-4bc4-97eb-4ab46244a04b"],
+                "calculation_id": null
+              }
+            ],
+            "calculations": [],
+            "method": {
+              "name": "Поиск по тексту отзывов гостей со страниц Островка",
+              "version": "1",
+              "inputs": [
+                {
+                  "label": "Тема",
+                  "value": "шум и тишина"
+                },
+                {
+                  "label": "Слова",
+                  "value": "шум, шумно, шумный, тихо, тихий, тишина, громко, слышно, звукоизоляция"
+                }
+              ],
+              "assumptions": ["Не больше 2 фрагментов на отель, из разных отзывов"]
+            },
+            "limitations": [
+              "Отзывы — слова отдельных гостей, а не измерение",
+              "Поиск по словам: отзыв о теме другими словами не найдётся"
+            ],
+            "error": null,
+            "groups": [
+              {
+                "id": "ota-13385109",
+                "title": "BYPILLOW Sinfonía",
+                "note": "Отзывов о теме «шум и тишина» не нашлось",
+                "claim_ids": []
+              },
+              {
+                "id": "ota-9783413",
+                "title": "Reina 107 Beach Boutique",
+                "note": "Отзывов о теме «шум и тишина» не нашлось",
+                "claim_ids": []
+              },
+              {
+                "id": "ota-9559092",
+                "title": "Reina 107 Beach Boutique",
+                "note": "Отзывов о теме «шум и тишина» не нашлось",
+                "claim_ids": []
+              },
+              {
+                "id": "ota-7833017",
+                "title": "Hostal Tartessos",
+                "note": null,
+                "claim_ids": ["def713f2-a8f1-4021-af17-122f5085db25"]
+              },
+              {
+                "id": "ota-10491322",
+                "title": "Dau Studios",
+                "note": "Отзывов о теме «шум и тишина» не нашлось",
+                "claim_ids": []
+              },
+              {
+                "id": "ota-8585501",
+                "title": "Hotel Ilunion Aqua 4",
+                "note": "Отзывов о теме «шум и тишина» не нашлось",
+                "claim_ids": []
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

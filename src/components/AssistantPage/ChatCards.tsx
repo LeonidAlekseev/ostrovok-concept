@@ -27,7 +27,14 @@ import { Trace, TraceIcon, TraceLine, TraceTitle } from '@/components/ui/trace'
 import type { Destination } from '@/data/destinations'
 import { GUEST_LIMITS, VIBE_LABEL, briefWithStay, stayDates, type Brief, type VibeId } from '../../lib/assistant'
 import type { AgentStep } from '../../lib/assistantChats'
-import { EPISTEMIC_LABEL, isSafeUrl, type ToolEvidence, type ToolResult, type ToolRun } from '../../lib/toolResult'
+import {
+  EPISTEMIC_LABEL,
+  isSafeUrl,
+  type ToolClaim,
+  type ToolEvidence,
+  type ToolResult,
+  type ToolRun,
+} from '../../lib/toolResult'
 import type { IsoDate } from '../../lib/dates'
 import { VIEW_LABEL, type ViewKind } from '../../lib/features'
 import { formatMeters } from '../../lib/format'
@@ -169,31 +176,79 @@ function SourceItem({ source }: { source: ToolEvidence }) {
   )
 }
 
+/** A characteristic of a run: its value, how it is known, the confidence when it has a basis, its sources. */
+function ClaimItem({ claim, names }: { claim: ToolClaim; names: ReadonlyMap<string, string> }) {
+  const sources = [...new Set(claim.evidence_ids.flatMap((id) => names.get(id) ?? []))]
+  const origin = [
+    EPISTEMIC_LABEL[claim.status],
+    claim.confidence !== null && `уверенность ${Math.round(claim.confidence * 100)} %`,
+    sources.length > 0 && `источник: ${sources.join(', ')}`,
+  ].filter(Boolean)
+  return (
+    <li className="text-sm/[1.35]">
+      <span className="text-foreground">
+        {claim.label}: <span className="font-semibold">{claim.value}</span>
+      </span>
+      <span className={`block ${greyMutedText}`}>{origin.join(' · ')}</span>
+    </li>
+  )
+}
+
+/** The hotels of a run shown before «Показать все». */
+const GROUPS_SHOWN = 3
+
+/** The characteristics by hotel: each with its verdict; a long list opens with a button. */
+function RunGroups({ result, names }: { result: ToolResult; names: ReadonlyMap<string, string> }) {
+  const [all, setAll] = useState(false)
+  const groups = result.groups ?? []
+  const claims = new Map(result.claims.map((c) => [c.id, c]))
+  const shown = all ? groups : groups.slice(0, GROUPS_SHOWN)
+  return (
+    <RunSection title="По отелям">
+      <ul className="flex flex-col gap-2">
+        {shown.map((group) => (
+          <li key={group.id} className="flex flex-col gap-1 rounded-xl bg-card px-3 py-2" data-group={group.id}>
+            <span className="text-sm/[1.35] font-semibold text-foreground">{group.title}</span>
+            {group.note && <span className={`text-sm/[1.35] ${greyMutedText}`}>{group.note}</span>}
+            {group.claim_ids.length > 0 && (
+              <ul className="flex flex-col gap-1.5">
+                {group.claim_ids.flatMap((id) => {
+                  const claim = claims.get(id)
+                  return claim ? [<ClaimItem key={id} claim={claim} names={names} />] : []
+                })}
+              </ul>
+            )}
+          </li>
+        ))}
+      </ul>
+      {groups.length > GROUPS_SHOWN && (
+        <button
+          type="button"
+          onClick={() => setAll((v) => !v)}
+          className="w-fit rounded-md py-1 text-sm font-semibold text-primary focus-visible:outline-3 focus-visible:outline-ring"
+        >
+          {all ? 'Свернуть' : `Показать все (${groups.length})`}
+        </button>
+      )}
+    </RunSection>
+  )
+}
+
 /** «Источники и данные» of a run: the characteristics with their origin, the calculations, the sources, the limits. */
 function RunDetails({ result }: { result: ToolResult }) {
   const names = new Map(result.evidence.map((e) => [e.id, e.source_name]))
+  const grouped = new Set((result.groups ?? []).flatMap((g) => g.claim_ids))
+  const loose = result.claims.filter((c) => !grouped.has(c.id))
   return (
     <div className="flex flex-col gap-3 pt-2">
       {result.error && <p className="text-sm/[1.35] text-destructive">{result.error.message}</p>}
-      {result.claims.length > 0 && (
+      {(result.groups?.length ?? 0) > 0 && <RunGroups result={result} names={names} />}
+      {loose.length > 0 && (
         <RunSection title="Полученные характеристики">
           <ul className="flex flex-col gap-1.5">
-            {result.claims.map((claim) => {
-              const sources = [...new Set(claim.evidence_ids.flatMap((id) => names.get(id) ?? []))]
-              const origin = [
-                EPISTEMIC_LABEL[claim.status],
-                claim.confidence !== null && `уверенность ${Math.round(claim.confidence * 100)} %`,
-                sources.length > 0 && `источник: ${sources.join(', ')}`,
-              ].filter(Boolean)
-              return (
-                <li key={claim.id} className="text-sm/[1.35]">
-                  <span className="text-foreground">
-                    {claim.label}: <span className="font-semibold">{claim.value}</span>
-                  </span>
-                  <span className={`block ${greyMutedText}`}>{origin.join(' · ')}</span>
-                </li>
-              )
-            })}
+            {loose.map((claim) => (
+              <ClaimItem key={claim.id} claim={claim} names={names} />
+            ))}
           </ul>
         </RunSection>
       )}

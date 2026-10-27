@@ -167,7 +167,7 @@
         "tags": ["Таблицы"],
         "summary": "claims",
         "description": "Строки `claims` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
-        "x-used-in": ["src/lib/db/claims.ts"],
+        "x-used-in": ["src/lib/db/claims.ts", "src/lib/db/knowledge.ts"],
         "parameters": [
           {
             "name": "select",

@@ -16,7 +16,7 @@ import {
   type ChatMessage,
 } from './assistantChats'
 import { DIALOG_KEY } from './assistantDialog'
-import { RUN_ID, sampleResult } from '@/test/toolResult'
+import { RUN_ID, groupedResult, sampleResult } from '@/test/toolResult'
 
 afterEach(() => {
   window.localStorage.clear()
@@ -249,6 +249,12 @@ describe('the runs of the steps in the saved chats', () => {
     const chat = chatWith({ step: { ...step, run } }) as Chat
     saveGuestChats([chat])
     expect(loadGuestChats()[0].messages[0].data.step).toEqual({ ...step, run })
+  })
+
+  it('keeps the characteristics by hotel of a tool of the choice after a reload', () => {
+    const run = { id: RUN_ID, result: groupedResult }
+    saveGuestChats([chatWith({ step: { ...step, run } }) as Chat])
+    expect(loadGuestChats()[0].messages[0].data.step?.run?.result.groups).toEqual(groupedResult.groups)
   })
 
   it('shows an older step without a run as before, and drops a run off the contract only', () => {

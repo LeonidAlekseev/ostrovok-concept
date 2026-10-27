@@ -156,3 +156,30 @@ write('assistant-wish', {
     }),
   },
 })
+
+// The choice by the store's tools: the runs' characteristics by hotel, the first three hotels of the plan.
+const knowledgeRequest = {
+  messages: [
+    { role: 'user', text: 'Найди отель в Валенсии, чтобы рядом была аптека и было тихо ночью' },
+    { role: 'assistant', text: 'Когда планируете поехать?' },
+    { role: 'user', text: 'Не важно' },
+    { role: 'assistant', text: 'С кем едете?' },
+    { role: 'user', text: 'Вдвоём' },
+  ],
+  brief: { destinationId: 'valencia', quiet: true, when: 'any', party: 'couple' },
+}
+const knowledge = await call('/api/assistant', knowledgeRequest)
+const chosen = first(knowledge.matches as Json[] | undefined, 3)
+const chosenFeatures = knowledge.features as Record<string, unknown> | undefined
+write('assistant-knowledge', {
+  request: knowledgeRequest,
+  response: {
+    ...knowledge,
+    ...(chosen.length > 0 && { matches: chosen }),
+    ...(chosenFeatures && {
+      features: Object.fromEntries(
+        chosen.flatMap((m) => (chosenFeatures[m.id as string] ? [[m.id, chosenFeatures[m.id as string]]] : [])),
+      ),
+    }),
+  },
+})
