@@ -107,6 +107,168 @@ export type Database = {
           },
         ]
       }
+      calculations: {
+        Row: {
+          computed_at: string
+          id: string
+          inputs: NonNullable<Json>
+          key: string
+          limitations: string[]
+          method: string
+          parameters: NonNullable<Json>
+          updated_at: string
+          version: string
+        }
+        ComputedFields: never
+        Insert: {
+          computed_at?: string
+          id?: string
+          inputs?: NonNullable<Json>
+          key: string
+          limitations?: string[]
+          method: string
+          parameters?: NonNullable<Json>
+          updated_at?: string
+          version: string
+        }
+        Update: {
+          computed_at?: string
+          id?: string
+          inputs?: NonNullable<Json>
+          key?: string
+          limitations?: string[]
+          method?: string
+          parameters?: NonNullable<Json>
+          updated_at?: string
+          version?: string
+        }
+        Relationships: []
+      }
+      claim_evidence: {
+        Row: {
+          claim_id: string
+          created_at: string
+          evidence_id: string
+          role: string | null
+        }
+        ComputedFields: never
+        Insert: {
+          claim_id: string
+          created_at?: string
+          evidence_id: string
+          role?: string | null
+        }
+        Update: {
+          claim_id?: string
+          created_at?: string
+          evidence_id?: string
+          role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'claim_evidence_claim_id_fkey'
+            columns: ['claim_id']
+            isOneToOne: false
+            referencedRelation: 'claims'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'claim_evidence_evidence_id_fkey'
+            columns: ['evidence_id']
+            isOneToOne: false
+            referencedRelation: 'evidence'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      claims: {
+        Row: {
+          calculation_id: string | null
+          confidence: number | null
+          created_at: string
+          entity_id: string
+          epistemic_status: string
+          id: string
+          limitations: string[]
+          method: NonNullable<Json>
+          observed_at: string | null
+          property: string
+          source_key: string
+          unit: string | null
+          updated_at: string
+          valid_from: string | null
+          valid_to: string | null
+          value_boolean: boolean | null
+          value_json: Json | null
+          value_max: number | null
+          value_min: number | null
+          value_numeric: number | null
+          value_text: string | null
+        }
+        ComputedFields: never
+        Insert: {
+          calculation_id?: string | null
+          confidence?: number | null
+          created_at?: string
+          entity_id: string
+          epistemic_status: string
+          id?: string
+          limitations?: string[]
+          method?: NonNullable<Json>
+          observed_at?: string | null
+          property: string
+          source_key?: string
+          unit?: string | null
+          updated_at?: string
+          valid_from?: string | null
+          valid_to?: string | null
+          value_boolean?: boolean | null
+          value_json?: Json | null
+          value_max?: number | null
+          value_min?: number | null
+          value_numeric?: number | null
+          value_text?: string | null
+        }
+        Update: {
+          calculation_id?: string | null
+          confidence?: number | null
+          created_at?: string
+          entity_id?: string
+          epistemic_status?: string
+          id?: string
+          limitations?: string[]
+          method?: NonNullable<Json>
+          observed_at?: string | null
+          property?: string
+          source_key?: string
+          unit?: string | null
+          updated_at?: string
+          valid_from?: string | null
+          valid_to?: string | null
+          value_boolean?: boolean | null
+          value_json?: Json | null
+          value_max?: number | null
+          value_min?: number | null
+          value_numeric?: number | null
+          value_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'claims_calculation_id_fkey'
+            columns: ['calculation_id']
+            isOneToOne: false
+            referencedRelation: 'calculations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'claims_entity_id_fkey'
+            columns: ['entity_id']
+            isOneToOne: false
+            referencedRelation: 'entities'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       destinations: {
         Row: {
           data: NonNullable<Json>
@@ -128,6 +290,113 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      document_chunks: {
+        Row: {
+          created_at: string
+          document_id: string
+          embedding: unknown
+          fts: unknown
+          id: string
+          metadata: NonNullable<Json>
+          ord: number
+          text: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          document_id: string
+          embedding?: unknown
+          fts?: never
+          id?: string
+          metadata?: NonNullable<Json>
+          ord: number
+          text: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string
+          embedding?: unknown
+          fts?: never
+          id?: string
+          metadata?: NonNullable<Json>
+          ord?: number
+          text?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'document_chunks_document_id_fkey'
+            columns: ['document_id']
+            isOneToOne: false
+            referencedRelation: 'documents'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          created_at: string
+          entity_id: string | null
+          evidence_id: string
+          hotel_id: string | null
+          id: string
+          kind: string
+          language: string | null
+          metadata: NonNullable<Json>
+          text: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          entity_id?: string | null
+          evidence_id: string
+          hotel_id?: string | null
+          id?: string
+          kind: string
+          language?: string | null
+          metadata?: NonNullable<Json>
+          text: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string | null
+          evidence_id?: string
+          hotel_id?: string | null
+          id?: string
+          kind?: string
+          language?: string | null
+          metadata?: NonNullable<Json>
+          text?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'documents_entity_id_fkey'
+            columns: ['entity_id']
+            isOneToOne: false
+            referencedRelation: 'entities'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'documents_evidence_id_fkey'
+            columns: ['evidence_id']
+            isOneToOne: true
+            referencedRelation: 'evidence'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'documents_hotel_id_fkey'
+            columns: ['hotel_id']
+            isOneToOne: false
+            referencedRelation: 'hotels'
+            referencedColumns: ['id']
+          },
+        ]
       }
       embeddings: {
         Row: {
@@ -167,6 +436,99 @@ export type Database = {
             columns: ['destination_id']
             isOneToOne: false
             referencedRelation: 'destinations'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      entities: {
+        Row: {
+          created_at: string
+          hotel_id: string | null
+          id: string
+          kind: string
+          name: string | null
+          ref: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          hotel_id?: string | null
+          id?: string
+          kind: string
+          name?: string | null
+          ref: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          hotel_id?: string | null
+          id?: string
+          kind?: string
+          name?: string | null
+          ref?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'entities_hotel_id_fkey'
+            columns: ['hotel_id']
+            isOneToOne: false
+            referencedRelation: 'hotels'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      evidence: {
+        Row: {
+          created_at: string
+          dataset_id: string | null
+          excerpt: string | null
+          external_id: string | null
+          id: string
+          metadata: NonNullable<Json>
+          provider: string
+          retrieved_at: string | null
+          title: string
+          type: string
+          updated_at: string
+          url: string | null
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          dataset_id?: string | null
+          excerpt?: string | null
+          external_id?: string | null
+          id?: string
+          metadata?: NonNullable<Json>
+          provider: string
+          retrieved_at?: string | null
+          title: string
+          type: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          created_at?: string
+          dataset_id?: string | null
+          excerpt?: string | null
+          external_id?: string | null
+          id?: string
+          metadata?: NonNullable<Json>
+          provider?: string
+          retrieved_at?: string | null
+          title?: string
+          type?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'evidence_dataset_id_fkey'
+            columns: ['dataset_id']
+            isOneToOne: false
+            referencedRelation: 'geo_datasets'
             referencedColumns: ['id']
           },
         ]
@@ -951,6 +1313,166 @@ export type Database = {
         }
         Relationships: []
       }
+      relations: {
+        Row: {
+          claim_id: string | null
+          confidence: number | null
+          created_at: string
+          evidence_id: string | null
+          id: string
+          object_id: string
+          predicate: string
+          subject_id: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          claim_id?: string | null
+          confidence?: number | null
+          created_at?: string
+          evidence_id?: string | null
+          id?: string
+          object_id: string
+          predicate: string
+          subject_id: string
+          updated_at?: string
+        }
+        Update: {
+          claim_id?: string | null
+          confidence?: number | null
+          created_at?: string
+          evidence_id?: string | null
+          id?: string
+          object_id?: string
+          predicate?: string
+          subject_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'relations_claim_id_fkey'
+            columns: ['claim_id']
+            isOneToOne: false
+            referencedRelation: 'claims'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'relations_evidence_id_fkey'
+            columns: ['evidence_id']
+            isOneToOne: false
+            referencedRelation: 'evidence'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'relations_object_id_fkey'
+            columns: ['object_id']
+            isOneToOne: false
+            referencedRelation: 'entities'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'relations_subject_id_fkey'
+            columns: ['subject_id']
+            isOneToOne: false
+            referencedRelation: 'entities'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      tool_run_evidence: {
+        Row: {
+          evidence_id: string
+          tool_run_id: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          evidence_id: string
+          tool_run_id: string
+          user_id?: string
+        }
+        Update: {
+          evidence_id?: string
+          tool_run_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'tool_run_evidence_evidence_id_fkey'
+            columns: ['evidence_id']
+            isOneToOne: false
+            referencedRelation: 'evidence'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'tool_run_evidence_tool_run_id_user_id_fkey'
+            columns: ['tool_run_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'tool_runs'
+            referencedColumns: ['id', 'user_id']
+          },
+        ]
+      }
+      tool_runs: {
+        Row: {
+          chat_id: string
+          completed_at: string | null
+          error: Json | null
+          id: string
+          input_summary: string
+          message_id: string | null
+          result_data: Json | null
+          result_summary: string
+          resume: Json | null
+          started_at: string
+          status: string
+          tool_name: string
+          updated_at: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          chat_id: string
+          completed_at?: string | null
+          error?: Json | null
+          id?: string
+          input_summary?: string
+          message_id?: string | null
+          result_data?: Json | null
+          result_summary?: string
+          resume?: Json | null
+          started_at?: string
+          status?: string
+          tool_name: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          chat_id?: string
+          completed_at?: string | null
+          error?: Json | null
+          id?: string
+          input_summary?: string
+          message_id?: string | null
+          result_data?: Json | null
+          result_summary?: string
+          resume?: Json | null
+          started_at?: string
+          status?: string
+          tool_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'tool_runs_chat_id_user_id_fkey'
+            columns: ['chat_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'assistant_chats'
+            referencedColumns: ['id', 'user_id']
+          },
+        ]
+      }
     }
     Views: {
       hotel_room_views_named: {
@@ -1010,6 +1532,19 @@ export type Database = {
           id: string
           snapshot: Json
           title: string
+        }[]
+      }
+      hotel_chunks_search: {
+        Args: { hotel_id: string; max_rows?: number; query: string }
+        Returns: {
+          chunk_id: string
+          document_id: string
+          evidence_id: string
+          kind: string
+          metadata: Json
+          ord: number
+          rank: number
+          text: string
         }[]
       }
       hotel_geo: { Args: { lat: number; lon: number }; Returns: Json }

@@ -125,7 +125,12 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
   нагрузкой занимали до 5,8 с при лимите anon 3 с, готовая читается за ~0,05 с. **После каждой перезагрузки
   геоданных** (`load-valencia-geo.py`) запускайте `db:features`, иначе карты останутся по старым контурам; отель без
   готовой карты получает карту, посчитанную на лету. Сырые данные не копирует, повторный запуск ничего не меняет в
-  `hotel_features` и `hotel_room_views`; `--dry-run` только считает. Затем — `npm run db:embed`.
+  `hotel_features` и `hotel_room_views`; `--dry-run` только считает. Тот же запуск заполняет хранилище утверждений
+  (`entities`, `claims`, `evidence`, `calculations`, `relations`, `documents`/`document_chunks`; схема — миграция
+  `20261027220000_claims_evidence_store.sql`, строки — `src/lib/claimRows.ts`, запись — `scripts/lib/claims-store.ts`):
+  полосы EEA у отеля (`reported`), оценка Lday (`derived` с расчётом), шумные места OSM в 200 м (связи `near` и
+  расстояния), отзывы как документы с полнотекстовым поиском (`hotel_chunks_search`) и их слова о шуме и тишине; пишет
+  только новое и изменённое, повторный запуск ничего не дублирует. Чтение — `src/lib/db/claims.ts`. Затем — `npm run db:embed`.
 - `npm run db:city-places -- --city <город> --pbf-url <выгрузка Geofabrik>` — `scripts/load-city-places.ts`: места
   OpenStreetMap города для гео-инструментов Эвала (`src/lib/geo`), вся загрузка одним шагом — см. «Загрузка мест
   другого города». Шаг записи отдельно — `npm run db:osm-places -- --bbox <s,w,n,e> [--centre <lat,lon>] [--file
@@ -158,7 +163,7 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 | `load-city-places.ts` (`db:city-places`)                                              | места OSM города одним шагом: выгрузка Geofabrik → `osm-pbf-to-overpass.py` → `load-osm-places.ts` |
 | `load-osm-places.ts` (`db:osm-places`)                                                | шаг записи мест OSM в `osm_places` и `osm_place_areas`                                             |
 | `osm-pbf-to-overpass.py`                                                              | выгрузка `.osm.pbf` → ответ Overpass, когда Overpass недоступен                                    |
-| `hotel-features.ts` (`db:features`)                                                   | свойства отелей, вид номеров, готовые карты шума                                                   |
+| `hotel-features.ts` (`db:features`)                                                   | свойства отелей, вид номеров, готовые карты шума, хранилище утверждений                            |
 | `embed.ts` (`db:embed`)                                                               | векторы поиска по смыслу                                                                           |
 | `semantic-eval.ts`                                                                    | качество поиска по смыслу на живой базе                                                            |
 | `clean-shared-photos.ts` (`db:clean:shared-photos`)                                   | фото снимков без снимка                                                                            |

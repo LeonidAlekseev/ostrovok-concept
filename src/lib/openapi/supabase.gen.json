@@ -161,6 +161,50 @@
         }
       }
     },
+    "/claims": {
+      "get": {
+        "operationId": "select_claims",
+        "tags": ["Таблицы"],
+        "summary": "claims",
+        "description": "Строки `claims` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/db/claims.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/claims"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/destinations": {
       "get": {
         "operationId": "select_destinations",
@@ -560,6 +604,79 @@
                       }
                     },
                     "required": ["created_at", "id", "snapshot", "title"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/hotel_chunks_search": {
+      "post": {
+        "operationId": "rpc_hotel_chunks_search",
+        "tags": ["Функции"],
+        "summary": "hotel_chunks_search",
+        "description": "Функция `hotel_chunks_search` базы через PostgREST.",
+        "x-used-in": ["src/lib/db/claims.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "hotel_id": {
+                    "type": "string"
+                  },
+                  "max_rows": {
+                    "type": "number"
+                  },
+                  "query": {
+                    "type": "string"
+                  }
+                },
+                "required": ["hotel_id", "query"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "chunk_id": {
+                        "type": "string"
+                      },
+                      "document_id": {
+                        "type": "string"
+                      },
+                      "evidence_id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "metadata": {
+                        "description": "JSON"
+                      },
+                      "ord": {
+                        "type": "number"
+                      },
+                      "rank": {
+                        "type": "number"
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["chunk_id", "document_id", "evidence_id", "kind", "metadata", "ord", "rank", "text"]
                   }
                 }
               }
@@ -1250,6 +1367,108 @@
           }
         },
         "required": ["chat_id", "created_at", "data", "id", "role", "status", "text", "updated_at", "user_id"]
+      },
+      "claims": {
+        "type": "object",
+        "properties": {
+          "calculation_id": {
+            "type": ["string", "null"]
+          },
+          "confidence": {
+            "type": ["number", "null"]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "entity_id": {
+            "type": "string"
+          },
+          "epistemic_status": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "limitations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "method": {
+            "type": ["object", "array", "string", "number", "boolean"],
+            "description": "JSON"
+          },
+          "observed_at": {
+            "type": ["string", "null"]
+          },
+          "property": {
+            "type": "string"
+          },
+          "source_key": {
+            "type": "string"
+          },
+          "unit": {
+            "type": ["string", "null"]
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "valid_from": {
+            "type": ["string", "null"]
+          },
+          "valid_to": {
+            "type": ["string", "null"]
+          },
+          "value_boolean": {
+            "type": ["boolean", "null"]
+          },
+          "value_json": {
+            "anyOf": [
+              {
+                "description": "JSON"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "value_max": {
+            "type": ["number", "null"]
+          },
+          "value_min": {
+            "type": ["number", "null"]
+          },
+          "value_numeric": {
+            "type": ["number", "null"]
+          },
+          "value_text": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": [
+          "calculation_id",
+          "confidence",
+          "created_at",
+          "entity_id",
+          "epistemic_status",
+          "id",
+          "limitations",
+          "method",
+          "observed_at",
+          "property",
+          "source_key",
+          "unit",
+          "updated_at",
+          "valid_from",
+          "valid_to",
+          "value_boolean",
+          "value_json",
+          "value_max",
+          "value_min",
+          "value_numeric",
+          "value_text"
+        ]
       },
       "destinations": {
         "type": "object",
