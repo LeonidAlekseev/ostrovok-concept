@@ -3,22 +3,8 @@
 //   npm run db:seed -- --revalidate https://<site>   then drops the site's cached catalogue (POST /api/revalidate)
 // Upserts by id, so a second run leaves the same rows. Needs NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
 // DEMO_USER_EMAIL and DEMO_USER_PASSWORD; prints counts, never the keys.
-import { registerHooks } from 'node:module'
 import { parseArgs } from 'node:util'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '../src/lib/db/database.types.ts'
-
-// The app's modules import each other without extensions, as the bundler allows; Node needs `.ts`.
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    try {
-      return nextResolve(specifier, context)
-    } catch (error) {
-      if (specifier.startsWith('.') && !/\.[cm]?[jt]s$/.test(specifier)) return nextResolve(`${specifier}.ts`, context)
-      throw error
-    }
-  },
-})
+import { required, serviceClient, type Table } from './lib/node.ts'
 
 const { destinations } = await import('../src/data/destinations.ts')
 const { buildCatalog } = await import('../src/lib/catalogGenerator.ts')
@@ -26,19 +12,9 @@ const { buildCatalog } = await import('../src/lib/catalogGenerator.ts')
 const { values: options } = parseArgs({ options: { revalidate: { type: 'string' } } })
 
 const BATCH = 100
-/** A table of the schema, for the helpers that take its name. */
-type Table = keyof Database['public']['Tables']
 const DEMO_NAME = 'Демо-путешественник'
 
-function required(name: string): string {
-  const value = process.env[name]
-  if (!value) throw new Error(`${name} is not set: run npm run secrets:reveal`)
-  return value
-}
-
-const supabase = createClient<Database>(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
-  auth: { persistSession: false, autoRefreshToken: false },
-})
+const supabase = serviceClient()
 
 async function upsert(table: Table, rows: Record<string, unknown>[]) {
   for (let i = 0; i < rows.length; i += BATCH) {

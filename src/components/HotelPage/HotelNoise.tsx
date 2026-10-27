@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import dynamic from 'next/dynamic'
 import { Building2, Car, Factory, Moon, Plane, Sun, Sunset, TrainFront, type LucideIcon } from 'lucide-react'
 import { cn } from 'cn'
+import { MapUnavailable } from '@/components/MapUnavailable/MapUnavailable'
 import type { Hotel } from '@/lib/catalog'
 import type { NoiseMap as NoiseMapData } from '@/lib/db/noise'
 import { bandLabel, type NoiseBand } from '@/lib/features'
@@ -36,10 +37,10 @@ import {
   type NoiseMapIndicator,
   type NoisyPlace,
 } from '@/lib/noise'
-import { HotelMapUnavailable } from './HotelMapUnavailable'
+import { useHotelJson } from './useHotelJson'
 
 // MapLibre is loaded only in the browser.
-const NoiseMap = dynamic(() => import('./NoiseMap').catch(() => ({ default: () => <HotelMapUnavailable /> })), {
+const NoiseMap = dynamic(() => import('./NoiseMap').catch(() => ({ default: () => <MapUnavailable /> })), {
   ssr: false,
   loading: () => <div className="size-full animate-pulse bg-muted" aria-hidden />,
 })
@@ -66,20 +67,6 @@ const MAP_TITLE: Record<NoiseMapIndicator, string> = {
 
 /** The places of OSM shown in the list. */
 const PLACES_SHOWN = 6
-
-/** The noise contours of the hotel (`GET /api/hotels/<id>/noise-map`): `null` until they come and on a failure. */
-function useNoiseMap(hotelId: string) {
-  const [map, setMap] = useState<NoiseMapData | null>(null)
-  useEffect(() => {
-    const controller = new AbortController()
-    fetch(`/api/hotels/${encodeURIComponent(hotelId)}/noise-map`, { signal: controller.signal })
-      .then((response) => (response.ok ? (response.json() as Promise<{ map: NoiseMapData | null }>) : null))
-      .then((body) => setMap(body?.map ?? null))
-      .catch(() => {})
-    return () => controller.abort()
-  }, [hotelId])
-  return map
-}
 
 /** A day piece on the map whose two bands fit no day level. */
 const isUnknown = (f: NoiseMapData['features'][number]) =>
@@ -144,7 +131,8 @@ function Legend({
 }
 
 function NoiseMapCard({ hotel, noise }: { hotel: Hotel; noise: HotelNoiseData }) {
-  const contours = useNoiseMap(hotel.id)
+  // The noise contours around the hotel for the map.
+  const { value: contours } = useHotelJson<NoiseMapData>(hotel.id, 'noise-map', 'map')
   const [indicator, setIndicator] = useState<NoiseMapIndicator>('Lday')
   const [failed, setFailed] = useState(false)
   return (
@@ -181,7 +169,7 @@ function NoiseMapCard({ hotel, noise }: { hotel: Hotel; noise: HotelNoiseData })
       )}
       <div className="h-[clamp(18rem,55vw,28rem)] overflow-hidden rounded-2xl bg-muted">
         {failed ? (
-          <HotelMapUnavailable />
+          <MapUnavailable />
         ) : (
           <NoiseMap
             center={{ lat: hotel.lat, lon: hotel.lon }}

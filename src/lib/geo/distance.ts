@@ -47,12 +47,6 @@ export interface Bbox {
  */
 export const VALENCIA_BBOX: Bbox = { south: 39.27, west: -0.53, north: 39.58, east: -0.27 }
 
-export const inBbox = ({ lat, lon }: LatLon, box: Bbox) =>
-  lat >= box.south && lat <= box.north && lon >= box.west && lon <= box.east
-
-export const isLatLon = ({ lat, lon }: LatLon) =>
-  Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180
-
 /** The straight line between two points as GeoJSON. */
 export const straightLine = (from: LatLon, to: LatLon): LineString => ({
   type: 'LineString',

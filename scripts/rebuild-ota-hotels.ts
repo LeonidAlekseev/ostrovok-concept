@@ -8,21 +8,8 @@
 // `position` of every row, touches no synthetic hotel and no other table. Needs NEXT_PUBLIC_SUPABASE_URL and
 // SUPABASE_SERVICE_ROLE_KEY; prints counts, never the keys. Afterwards: `npm run db:embed`.
 import { isDeepStrictEqual, parseArgs } from 'node:util'
-import { registerHooks } from 'node:module'
-import { createClient } from '@supabase/supabase-js'
 import type { Database } from '../src/lib/db/database.types.ts'
-
-// The app's modules import each other without extensions, as the bundler allows; Node needs `.ts`.
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    try {
-      return nextResolve(specifier, context)
-    } catch (error) {
-      if (specifier.startsWith('.') && !/\.[cm]?[jt]s$/.test(specifier)) return nextResolve(`${specifier}.ts`, context)
-      throw error
-    }
-  },
-})
+import { serviceClient, type Table } from './lib/node.ts'
 
 const { REAL_HOTEL_ID_PREFIX } = await import('../src/lib/catalog.ts')
 const { otaHotel, searchStay } = await import('../src/lib/ota/hotel.ts')
@@ -32,21 +19,11 @@ const { pageFields, pageFieldsRowSchema, PAGE_FIELDS_COLUMNS } = await import('.
 const DESTINATION_ID = 'valencia'
 // Rows of jsonb a request: small enough for the database's short statement timeout.
 const BATCH = 50
-/** A table of the schema, for the helpers that take its name. */
-type Table = keyof Database['public']['Tables']
 
 const { values } = parseArgs({ options: { 'dry-run': { type: 'boolean', default: false } } })
 const dryRun = values['dry-run']
 
-function required(name: string): string {
-  const value = process.env[name]
-  if (!value) throw new Error(`${name} is not set: run npm run secrets:reveal`)
-  return value
-}
-
-const supabase = createClient<Database>(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
-  auth: { persistSession: false, autoRefreshToken: false },
-})
+const supabase = serviceClient()
 
 /** Every row of a table, a page at a time, in the order of `key`. */
 async function readAll<Row>(table: Table, columns: string, key: string): Promise<Row[]> {

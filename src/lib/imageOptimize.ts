@@ -46,7 +46,8 @@ const toBlob = (canvas: HTMLCanvasElement, type: string, quality: number) =>
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('The photo was not encoded'))), type, quality),
   )
 
-const dataUrl = (blob: Blob) =>
+/** The blob as a `data:` URL, the form the chat keeps its photos in. */
+export const blobToDataUrl = (blob: Blob) =>
   new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(reader.result as string)
@@ -71,7 +72,7 @@ async function encode(bitmap: ImageBitmap, side: number) {
   const type = blob.type === 'image/webp' ? 'image/webp' : 'image/jpeg'
   if (type !== blob.type) blob = await toBlob(canvas, type, QUALITY)
   if (blob.size > MAX_ENCODED_BYTES) blob = await toBlob(canvas, type, COARSE_QUALITY)
-  return { url: await dataUrl(blob), width, height }
+  return { url: await blobToDataUrl(blob), width, height }
 }
 
 /** The photo and its preview; throws when the file is not a picture the browser can open. */

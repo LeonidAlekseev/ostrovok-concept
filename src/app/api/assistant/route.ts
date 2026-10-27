@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { apiError } from '@/lib/api'
 import { firstAnswer } from '@/lib/ai/chain'
 import { geoTurn } from '@/lib/ai/geoTurn'
 import { viewTurn } from '@/lib/ai/viewTurn'
@@ -401,14 +402,14 @@ async function photoTurn(photos: readonly string[], ip: string, context: WishCon
  */
 export async function POST(request: Request) {
   const ip = clientIp(request)
-  if (!(await allowRequest(ip))) return Response.json({ error: 'Too many requests' }, { status: 429 })
+  if (!(await allowRequest(ip))) return apiError(429, 'Too many requests')
   const parsedBody = requestSchema.safeParse(await request.json().catch(() => null))
-  if (!parsedBody.success) return Response.json({ error: 'Invalid request' }, { status: 400 })
+  if (!parsedBody.success) return apiError(400, 'Invalid request')
 
   const { messages, photos = [], rerun } = parsedBody.data
   const deadline = Date.now() + (photos.length > 0 ? PHOTO_BUDGET_MS : ANSWER_BUDGET_MS)
   const destinations = await loadDestinations().catch(() => null)
-  if (!destinations) return Response.json({ error: 'Catalog unavailable' }, { status: 503 })
+  if (!destinations) return apiError(503, 'Catalog unavailable')
   const brief = normalizeBrief(parsedBody.data.brief, destinations)
   const today = todayIso()
   // A chat about a hotel answers about it; an id the catalogue does not know is a chat like any other.

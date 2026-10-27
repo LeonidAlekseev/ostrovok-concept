@@ -8,7 +8,6 @@ import {
   BALANCE,
   fillVibe,
   poleImage,
-  readVibe,
   VIBE_AXES,
   VIBE_HOTELS,
   vibeArchetype,
@@ -156,15 +155,6 @@ describe('vibeHotels', () => {
   it('takes the best rated hotels when nothing is chosen', () => {
     const ratings = vibeHotels(all(0), catalogue, destinations).map((h) => h.rating)
     expect(ratings).toEqual([...ratings].sort((a, b) => b - a))
-  })
-})
-
-describe('readVibe', () => {
-  it('returns the archetype, seven shares and six hotels', () => {
-    const vibe = readVibe(all(-1), catalogue, destinations)
-    expect(vibe.shares).toHaveLength(7)
-    expect(vibe.hotels).toHaveLength(6)
-    expect(vibe.archetype.name).toBeTruthy()
   })
 })
 

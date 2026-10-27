@@ -20,7 +20,7 @@ import {
   type HotelFeatures,
 } from './features'
 import { formatMeters } from './format'
-import { REMOVED, paramLine, parseParams, savedParams, sessionParams, stayLabel } from './sessionParams'
+import { REMOVED, paramLine, parseParams, savedParams, sessionParams, stayLabel } from './sessionMemory'
 
 const valencia = destinations.filter((d) => d.id === 'valencia')
 const today = '2026-10-27'

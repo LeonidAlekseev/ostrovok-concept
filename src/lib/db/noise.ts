@@ -1,8 +1,5 @@
 import 'server-only'
-import { createClient } from '@supabase/supabase-js'
-import { unstable_cache } from 'next/cache'
 import { z } from 'zod'
-import type { Database } from '@/lib/db/database.types'
 import type { NoiseBand } from '@/lib/features'
 import {
   NOISY_CATEGORIES,
@@ -18,21 +15,16 @@ import {
   type NoisyCategory,
   type SourceNoise,
 } from '@/lib/noise'
-import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/config'
-import { CATALOG_LIFETIME, CATALOG_TAG } from './catalog'
+import { anonClient, catalogCached, readOrNull, warnShort, type AnonClient, type HotelPoint } from './anon'
 
 /**
  * «Шум и окружение» of a real hotel for its page and for Эвал (`HotelNoise`): the EEA bands at its point by layer
  * (`hotel_geo`) and the loud places of the OSM cache around it (`osm_places_near`), and the noise around it for the
  * map: the day estimate of the pieces of `hotel_noise_day`, the Lnight contours of `hotel_geo_features` and the quiet of
- * `hotel_noise_quiet`. Read with the anon key and cached with the catalogue; a synthetic hotel, a
- * database without the functions or a failure read as `null`, and the page and Эвал say they do not know.
+ * `hotel_noise_quiet`, computed ahead into `hotel_noise_maps` (`hotel_noise_map`) and computed now only for a point
+ * without one. Read with the anon key and cached with the catalogue; a synthetic hotel, a database without the
+ * functions or a failure read as `null`, and the page and Эвал say they do not know.
  */
-
-const database = () =>
-  createClient<Database>(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } })
-
-const isRealHotel = (id: string) => isSupabaseConfigured && /^ota-\d{1,15}$/.test(id)
 
 /** A row of `hotel_geo().noise`. */
 const geoBand = z.object({
@@ -103,9 +95,10 @@ export function placesOf(answer: unknown): Pick<HotelNoise, 'places' | 'placesCo
   return { places, placesCovered: parsed.data.covered.filter((c): c is NoisyCategory => NOISY.has(c)) }
 }
 
-const readNoise = unstable_cache(
+const readNoise = catalogCached(
+  ['hotel-noise'],
   async (_hotelId: string, lat: number, lon: number): Promise<HotelNoise> => {
-    const db = database()
+    const db = anonClient()
     const [geo, near] = await Promise.all([
       db.rpc('hotel_geo', { lat, lon }),
       db.rpc('osm_places_near', {
@@ -120,24 +113,11 @@ const readNoise = unstable_cache(
     // Without the places the bands still stand: the page says it has no data of OSM.
     return { sources: sourcesOf(hotelGeo.parse(geo.data).noise), ...placesOf(near.error ? null : near.data) }
   },
-  [CATALOG_TAG, 'hotel-noise'],
-  { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME },
 )
 
-const warn = (what: string, error: unknown) =>
-  // The kind and the provider's short message only.
-  console.warn(`${what} (${String((error as { message?: unknown })?.message ?? error).slice(0, 200)})`)
-
 /** The noise of the real hotel, or `null` when it cannot be read. */
-export async function loadHotelNoise(hotel: { id: string; lat: number; lon: number }): Promise<HotelNoise | null> {
-  if (!isRealHotel(hotel.id)) return null
-  try {
-    return await readNoise(hotel.id, hotel.lat, hotel.lon)
-  } catch (error) {
-    warn(`hotel noise: none for ${hotel.id}`, error)
-    return null
-  }
-}
+export const loadHotelNoise = (hotel: HotelPoint): Promise<HotelNoise | null> =>
+  readOrNull(hotel.id, 'hotel noise', () => readNoise(hotel.id, hotel.lat, hotel.lon))
 
 /**
  * A shape of the map, cut to the circle: a band of a layer's Lnight; a piece of a layer with one Lden and one Lnight
@@ -255,38 +235,47 @@ export function noiseMapOf(
   }
 }
 
-const readNoiseMap = unstable_cache(
+const features = z.object({ features: z.array(z.unknown()) })
+/** A map of `hotel_noise_map`: the three parts as their functions give them. */
+const storedMap = z.object({ contours: z.array(z.unknown()), quiet: z.array(z.unknown()), day: z.array(z.unknown()) })
+
+/** The map computed from the contours on this request: three intersections of the EEA polygons, a second or more. */
+async function computeNoiseMap(db: AnonClient, lat: number, lon: number): Promise<NoiseMap> {
+  const args = { lat, lon, radius_m: NOISE_MAP_RADIUS_M }
+  const [contours, quiet, day] = await Promise.all([
+    db.rpc('hotel_geo_features', args),
+    db.rpc('hotel_noise_quiet', args),
+    db.rpc('hotel_noise_day', args),
+  ])
+  // The day is the map's default: a map without it is not cached, the next request asks again.
+  if (contours.error) throw contours.error
+  if (day.error) throw day.error
+  // Without the quiet the louder shapes still stand: the map leaves the quiet uncoloured.
+  if (quiet.error) warnShort('noise map: no quiet', quiet.error)
+  return noiseMapOf(
+    features.parse(contours.data).features,
+    quiet.error ? [] : (features.safeParse(quiet.data).data?.features ?? []),
+    features.parse(day.data).features,
+  )
+}
+
+/**
+ * The map of `hotel_noise_maps`, computed ahead by `npm run db:features` (a few ms instead of seconds under load), or
+ * the one computed now when the point has none yet (a new hotel, one that moved) or the database has no such function.
+ * Both give the same shapes: the stored contours are the Lnight bands `nightOf` keeps anyway.
+ */
+const readNoiseMap = catalogCached(
+  ['hotel-noise-map', 'day'],
   async (_hotelId: string, lat: number, lon: number): Promise<NoiseMap> => {
-    const db = database()
-    const args = { lat, lon, radius_m: NOISE_MAP_RADIUS_M }
-    const [contours, quiet, day] = await Promise.all([
-      db.rpc('hotel_geo_features', args),
-      db.rpc('hotel_noise_quiet', args),
-      db.rpc('hotel_noise_day', args),
-    ])
-    // The day is the map's default: a map without it is not cached, the next request asks again.
-    if (contours.error) throw contours.error
-    if (day.error) throw day.error
-    const features = z.object({ features: z.array(z.unknown()) })
-    // Without the quiet the louder shapes still stand: the map leaves the quiet uncoloured.
-    if (quiet.error) warn('noise map: no quiet', quiet.error)
-    return noiseMapOf(
-      features.parse(contours.data).features,
-      quiet.error ? [] : (features.safeParse(quiet.data).data?.features ?? []),
-      features.parse(day.data).features,
-    )
+    const db = anonClient()
+    const { data, error } = await db.rpc('hotel_noise_map', { lat, lon, radius_m: NOISE_MAP_RADIUS_M })
+    const stored = error ? null : storedMap.safeParse(data).data
+    if (stored) return noiseMapOf(stored.contours, stored.quiet, stored.day)
+    if (error) warnShort('noise map: none stored, computing', error)
+    return computeNoiseMap(db, lat, lon)
   },
-  [CATALOG_TAG, 'hotel-noise-map', 'day'],
-  { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME },
 )
 
 /** The noise contours around the real hotel, or `null` when they cannot be read. */
-export async function loadNoiseMap(hotel: { id: string; lat: number; lon: number }): Promise<NoiseMap | null> {
-  if (!isRealHotel(hotel.id)) return null
-  try {
-    return await readNoiseMap(hotel.id, hotel.lat, hotel.lon)
-  } catch (error) {
-    warn(`noise map: none for ${hotel.id}`, error)
-    return null
-  }
-}
+export const loadNoiseMap = (hotel: HotelPoint): Promise<NoiseMap | null> =>
+  readOrNull(hotel.id, 'noise map', () => readNoiseMap(hotel.id, hotel.lat, hotel.lon))

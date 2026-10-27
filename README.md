@@ -75,7 +75,10 @@ RLS): `loadDestinations`, `loadHotelSummaries`, `loadNewHotels`, `loadHotel`, `l
 (`src/app/error.tsx`, `global-error.tsx`), API — 503. Клиент получает только нужное: направления — из корневого
 layout (`CatalogProvider`, `useDestinations`), главная — новые отели и подборки пропсами, «Поиск вайба» и «Звёзды
 подскажут» считают на сервере (server actions), остальное — `GET /api/hotels?ids=a,b` (избранное, поездки, бронь) или
-`?destinations=x,y` (результаты): до 60 `id`, полные отели, `Cache-Control: s-maxage=300`. Карта «Показать на карте»
+`?destinations=x,y` (результаты): до 60 `id`, полные отели, `Cache-Control: s-maxage=300`. Общее у маршрутов
+`src/app/api` — `src/lib/api.ts`: заголовок кэша CDN, ошибка `{ error }` с коротким английским текстом (браузер
+смотрит только на статус) и отель маршрута `[hotelId]`, показанный в этом окружении. Общее у читателей `src/lib/db` —
+`src/lib/db/anon.ts`: anon-клиент без сессии, проверка настоящего отеля, кэш каталога и «прочитать или `null`». Карта «Показать на карте»
 открывается на кварталах вокруг отеля и грузит отели видимой области с запасом — `?bbox=west,south,east,north`
 (`src/lib/mapBox.ts`: сторона до 0,1°, сетка 0,005°, до 200 отелей), уже загруженные остаются. Отель,
 добавленный в базу после сборки, открывается без пересборки: `/hotels/<id>` рендерится при первом запросе и
@@ -110,11 +113,18 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
   команда заменяет свою таблицу в одной транзакции; затем `npm run db:features`. Чтение: `hotel_geo(lat, lon)` —
   здание и шум в точке, `hotel_geo_features(lat, lon, radius_m)` — GeoJSON зданий (для `fill-extrusion`) и зон шума
   в круге, радиус 300 м по умолчанию, не больше 500 м; `hotel_noise_quiet(lat, lon, radius_m)` — тихая зона того же
-  круга: где слои EEA размечены и ни один не достигает 40 дБ.
+  круга: где слои EEA размечены и ни один не достигает 40 дБ; `hotel_noise_day(lat, lon, radius_m)` — куски, где
+  полоса Lden встречает полосу Lnight того же слоя (для оценки дня); `hotel_noise_map(lat, lon, radius_m)` — те же
+  три части карты, посчитанные заранее (`hotel_noise_maps`, см. `db:features`), или `null`.
 - `npm run db:features [-- --dry-run]` — `scripts/hotel-features.ts`: свойства настоящих отелей для Эвала — здание и
   шум по `hotel_geo` в `hotel_features` с их происхождением (наборы данных, источник и границы высоты и этажности),
-  вид из номеров по названиям групп номеров `ota_hotels` в `hotel_room_views`.
-  Сырые данные не копирует, повторный запуск ничего не меняет; `--dry-run` только считает. Затем — `npm run db:embed`.
+  вид из номеров по названиям групп номеров `ota_hotels` в `hotel_room_views`, и карты шума вокруг каждого отеля в
+  `hotel_noise_maps` (`hotel_noise_map_refresh` по 4 точки параллельно, ~3 мин на 220 точек; карты точек без отеля
+  удаляет `hotel_noise_maps_prune`). Карту на лету считать дорого: пересечения полигонов EEA в круге 300 м под
+  нагрузкой занимали до 5,8 с при лимите anon 3 с, готовая читается за ~0,05 с. **После каждой перезагрузки
+  геоданных** (`load-valencia-geo.py`) запускайте `db:features`, иначе карты останутся по старым контурам; отель без
+  готовой карты получает карту, посчитанную на лету. Сырые данные не копирует, повторный запуск ничего не меняет в
+  `hotel_features` и `hotel_room_views`; `--dry-run` только считает. Затем — `npm run db:embed`.
 - `npm run db:city-places -- --city <город> --pbf-url <выгрузка Geofabrik>` — `scripts/load-city-places.ts`: места
   OpenStreetMap города для гео-инструментов Эвала (`src/lib/geo`), вся загрузка одним шагом — см. «Загрузка мест
   другого города». Шаг записи отдельно — `npm run db:osm-places -- --bbox <s,w,n,e> [--centre <lat,lon>] [--file
@@ -131,6 +141,30 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 - `npm run db:clean:shared-photos [-- --delete]` — `scripts/clean-shared-photos.ts`: фото снимков «Поделиться» в
   публичном bucket без снимка (удалён вместе с аккаунтом или вручную); без `--delete` только показывает папки и число
   файлов. Папки моложе часа не трогает. Нужен `SUPABASE_SERVICE_ROLE_KEY`.
+
+**Скрипты `scripts/`.** Исходные файлы данных вне репозитория, поэтому скрипты загрузки — единственный способ
+восстановить базу; не удаляйте их. TypeScript-скрипты исполняет Node и начинают с `scripts/lib/node.ts`: он
+разрешает импорты модулей приложения без расширения, даёт `required()` (переменная `.env.local` или ошибка с её
+именем) и `serviceClient()` (клиент с сервисным ключом).
+
+| Скрипт                                                                                | Назначение                                                                                         |
+| ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `seed.ts` (`db:seed`)                                                                 | каталог генератора и демо-аккаунт                                                                  |
+| `seed-valencia.ts` (`db:seed:valencia`)                                               | выдача Островка по Валенсии: `ota_hotels`, `ota_searches`, отели каталога                          |
+| `load-ota-pages.ts` (`db:load:ota-pages`)                                             | страницы отелей Островка: `ota_hotel_pages`, `ota_pois`, `ota_hotel_pois`, `ota_rate_spec_tags`    |
+| `rebuild-ota-hotels.ts` (`db:rebuild:ota`)                                            | строки каталога настоящих отелей из `ota_hotels` и страниц                                         |
+| `load-valencia-geo.py`                                                                | здания EUBUCCO, шум EEA и покрытие `geo_coverage`                                                  |
+| `load-city-places.ts` (`db:city-places`)                                              | места OSM города одним шагом: выгрузка Geofabrik → `osm-pbf-to-overpass.py` → `load-osm-places.ts` |
+| `load-osm-places.ts` (`db:osm-places`)                                                | шаг записи мест OSM в `osm_places` и `osm_place_areas`                                             |
+| `osm-pbf-to-overpass.py`                                                              | выгрузка `.osm.pbf` → ответ Overpass, когда Overpass недоступен                                    |
+| `hotel-features.ts` (`db:features`)                                                   | свойства отелей, вид номеров, готовые карты шума                                                   |
+| `embed.ts` (`db:embed`)                                                               | векторы поиска по смыслу                                                                           |
+| `semantic-eval.ts`                                                                    | качество поиска по смыслу на живой базе                                                            |
+| `clean-shared-photos.ts` (`db:clean:shared-photos`)                                   | фото снимков без снимка                                                                            |
+| `db-push.mjs`, `db-types.mjs` (`db:push`, `db:types`)                                 | миграции и типы `Database`                                                                         |
+| `secrets.mjs` (`secrets:*`)                                                           | ключи `.env.local.secret`                                                                          |
+| `screenshots.mjs`                                                                     | визуальная проверка страниц                                                                        |
+| `build-images.py`, `build-star-assets.mjs`, `build-draw-images.mjs`, `build-globe.py` | изображения и глобус из исходников вне репозитория (см. «Изображения»)                             |
 
 ### Загрузка мест другого города
 
@@ -394,7 +428,8 @@ Escape, фокус возвращается на фото), название с 
 (`src/lib/rates.ts`).
 
 «Шум и окружение» (`HotelNoise`, вкладка «Шум») — у настоящего отеля Валенсии: плоская карта MapLibre с контурами
-шума EEA END 2022 вокруг отеля (`GET /api/hotels/<id>/noise-map`, `hotel_geo_features` и `hotel_noise_quiet` на 300 м;
+шума EEA END 2022 вокруг отеля (`GET /api/hotels/<id>/noise-map`: готовая карта `hotel_noise_map` на 300 м, без неё —
+`hotel_geo_features`, `hotel_noise_quiet` и `hotel_noise_day`;
 Lden или Lnight, ниже 40 дБ — зелёным) и шумными местами OpenStreetMap (точка открывает название, тип и расстояние;
 экранирование зданиями не считается), полосы Lden и Lnight в точке отеля (`hotel_geo`) по
 источникам, дневной уровень по формуле директивы 2002/49/EC (допущения: вечер равен дню, день не тише ночи), график
@@ -517,7 +552,9 @@ Supabase; `src/proxy.ts` обновляет её на запросах с это
 Готовые файлы лежат в `public/images` (источники и лицензии — `public/images/CREDITS.md`):
 
 ```bash
-uv run --with pillow python scripts/build-images.py <папка-с-исходниками>
+uv run --with pillow python scripts/build-images.py <папка-с-исходниками>   # фото «Поиска вайба», небо «Звёзд»
+node scripts/build-star-assets.mjs <папка с orb.png, modal-bg.jpeg, button.jpeg>   # шар, окно и кнопка «Звёзд»
+node scripts/build-draw-images.mjs <папка с section-bg.png, canvas-drawing.png, result-image.png>   # «Нарисуй»
 ```
 
 Геометрия глобуса собирается из Natural Earth 1:50m (`ne_50m_land.geojson`,

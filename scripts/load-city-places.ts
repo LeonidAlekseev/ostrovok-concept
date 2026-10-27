@@ -16,7 +16,6 @@ import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createReadStream, createWriteStream, rmSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, stat, statfs } from 'node:fs/promises'
-import { registerHooks } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
@@ -24,17 +23,7 @@ import { pipeline } from 'node:stream/promises'
 import type { ReadableStream as WebReadableStream } from 'node:stream/web'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    try {
-      return nextResolve(specifier, context)
-    } catch (error) {
-      if (specifier.startsWith('.') && !/\.[cm]?[jt]s$/.test(specifier)) return nextResolve(`${specifier}.ts`, context)
-      throw error
-    }
-  },
-})
+import './lib/node.ts'
 
 const { citySlug, formatBbox, growBbox, isPbfUrl, parseBbox, parseLatLon, parseNominatimCity, requiredFreeBytes } =
   await import('../src/lib/geo/cityLoad.ts')

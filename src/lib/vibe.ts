@@ -289,13 +289,3 @@ export interface Vibe {
   shares: AxisShare[]
   hotels: Hotel[]
 }
-
-export const readVibe = (
-  answers: readonly Answer[],
-  hotels: readonly Hotel[],
-  destinations: readonly Destination[],
-): Vibe => ({
-  archetype: vibeArchetype(answers),
-  shares: axisShares(answers),
-  hotels: vibeHotels(answers, hotels, destinations),
-})

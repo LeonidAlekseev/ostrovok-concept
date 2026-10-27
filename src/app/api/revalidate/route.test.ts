@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { POST } from './route'
 
 vi.mock('next/cache', () => ({ revalidateTag: vi.fn(), unstable_cache: <T>(read: T) => read }))
-vi.mock('@/lib/db/catalog', () => import('@/test/catalog'))
 vi.mock('@/lib/secrets', () => ({
   getSecret: async (name: string) => (name === 'SUPABASE_SERVICE_ROLE_KEY' ? 'service' : undefined),
 }))

@@ -4,7 +4,7 @@ import type { Chat } from './assistantChats'
 import { nightsBetween, toIso, type IsoDate } from './dates'
 import { countRu, guestsLabel } from './format'
 import { selectionHref, type Guests } from './search'
-import { stayLabel } from './sessionParams'
+import { stayLabel } from './sessionMemory'
 
 /**
  * The list of chats on `/assistant`: the groups by the day of the last change, the icon of the trip, the start of

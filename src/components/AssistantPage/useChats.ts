@@ -52,7 +52,7 @@ import {
   uploadPhotos,
 } from '@/lib/assistantChatsRemote'
 import type { PhotoUrl } from './ChatPhotos'
-import { savedParams } from '@/lib/sessionParams'
+import { savedParams } from '@/lib/sessionMemory'
 import type { HotelSummary } from '@/lib/catalog'
 import { todayIso } from '@/lib/dates'
 import { isHotelGeoQuestion, isHotelViewQuestion } from '@/lib/noise'

@@ -9,7 +9,7 @@ import {
 } from './assistant'
 import { clearDialog, isBrief, isPlan, isQuestion, loadDialog } from './assistantDialog'
 import { parseChatMap, type ChatMap } from './geo/chatMap'
-import { parseParams, type SessionParam } from './sessionParams'
+import { parseParams, type SessionParam } from './sessionMemory'
 
 /**
  * The chats with Эвал. A message has a role, a status and structured data, so the feed holds the steps of Эвал's

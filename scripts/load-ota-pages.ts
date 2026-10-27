@@ -10,22 +10,8 @@
 // Afterwards: npm run db:rebuild:ota (the description, the times, the Wi‑Fi of the hotels), then npm run db:embed.
 import { readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
-import { registerHooks } from 'node:module'
 import { parseArgs } from 'node:util'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '../src/lib/db/database.types.ts'
-
-// The app's modules import each other without extensions, as the bundler allows; Node needs `.ts`.
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    try {
-      return nextResolve(specifier, context)
-    } catch (error) {
-      if (specifier.startsWith('.') && !/\.[cm]?[jt]s$/.test(specifier)) return nextResolve(`${specifier}.ts`, context)
-      throw error
-    }
-  },
-})
+import { serviceClient, type Table } from './lib/node.ts'
 
 const { nextDataPageProps, trimPage } = await import('../src/lib/ota/page.ts')
 type TrimmedPage = import('../src/lib/ota/page.ts').TrimmedPage
@@ -34,8 +20,6 @@ const MAX_FILE_BYTES = 4 * 1024 * 1024
 // Rows of jsonb a request: small enough for the database's short statement timeout.
 const BATCH = 20
 const ROW_BATCH = 500
-/** A table of the schema, for the helpers that take its name. */
-type Table = keyof Database['public']['Tables']
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
@@ -45,15 +29,7 @@ if (positionals.length !== 1) throw new Error('usage: npm run db:load:ota-pages 
 const dir = positionals[0]
 const dryRun = values['dry-run']
 
-function required(name: string): string {
-  const value = process.env[name]
-  if (!value) throw new Error(`${name} is not set: run npm run secrets:reveal`)
-  return value
-}
-
-const supabase = createClient<Database>(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
-  auth: { persistSession: false, autoRefreshToken: false },
-})
+const supabase = serviceClient()
 
 const names = (await readdir(dir)).filter((name) => name.endsWith('.json')).sort()
 const pages: TrimmedPage[] = []
