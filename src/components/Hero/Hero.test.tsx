@@ -48,6 +48,24 @@ describe('Hero in the server render', () => {
     expect(plainPage.textContent).not.toContain('Новый отель')
   })
 
+  // hero-globe, Requirement: Карточка отеля на глобусе — Фото отеля
+  it('shows the hotel’s first photo in the card, and a placeholder without one', () => {
+    const photo = { id: 'photo-1', caption: 'Фасад', tone: 1, url: 'https://cdn.ostrovok.ru/t/{size}/content/a.jpeg' }
+    const render = (photoOf: typeof photo | null) => {
+      const el = document.createElement('div')
+      el.innerHTML = renderToStaticMarkup(
+        <Hero cities={cities} hotels={[{ ...firstOfPrague, photo: photoOf }]} featured={prague} />,
+      )
+      return el.querySelector('a[href^="/hotels/"]')!.closest('[class*="max-w-"]')!
+    }
+    expect(render(photo).querySelector('img')!.getAttribute('src')).toBe(
+      'https://cdn.ostrovok.ru/t/640x400/content/a.jpeg',
+    )
+    const empty = render(null)
+    expect(empty.querySelector('img')).toBeNull()
+    expect(empty.querySelector('svg.lucide-building2, svg.lucide-building-2')).not.toBeNull()
+  })
+
   // hero-globe, Requirement: Ширина карточки отеля — Длинное название
   it('keeps the hotel card to its old maximum width and cuts a long name with an ellipsis', () => {
     const link = page.querySelector('a[href^="/hotels/"]')!

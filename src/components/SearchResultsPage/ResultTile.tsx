@@ -8,13 +8,15 @@ interface Props {
   stay: Stay
   active: boolean
   onActivate: (id: string | null) => void
+  /** A link of the card is followed to the hotel page. */
+  onOpen?: (id: string) => void
 }
 
 /**
  * A hotel in the results: links to the hotel page with the same dates and guests; the price and the
  * free cancellation are those of the rate found for the stay.
  */
-export function ResultTile({ item, stay, active, onActivate }: Props) {
+export function ResultTile({ item, stay, active, onActivate, onOpen }: Props) {
   const { hotel, rate, price } = item
   return (
     <HotelTile
@@ -27,6 +29,8 @@ export function ResultTile({ item, stay, active, onActivate }: Props) {
       onMouseLeave={() => onActivate(null)}
       onFocus={() => onActivate(hotel.id)}
       onBlur={() => onActivate(null)}
+      // The name and the photos are links to the hotel; the favourite and the arrows of the photos are not.
+      onClickCapture={(e) => (e.target as Element).closest('a[href]') && onOpen?.(hotel.id)}
       className={cn('ring-2 ring-transparent transition-[box-shadow]', active && 'ring-primary')}
     />
   )

@@ -2,8 +2,7 @@
 
 import { Suspense, type ReactNode } from 'react'
 import type { Hotel } from '@/lib/catalog'
-import type { Stay } from '@/lib/search'
-import { useLocalStay, useStay } from '../StayBar/useStay'
+import { useStay } from '../StayBar/useStay'
 import { RoomList } from './RoomList'
 import { StayDates } from './StayDates'
 import { noDates, StayContext, useHotelStay } from './stayContext'
@@ -12,27 +11,11 @@ function AddressStay({ hotel, children }: { hotel: Hotel; children: ReactNode })
   return <StayContext value={useStay(hotel)}>{children}</StayContext>
 }
 
-/** The stay the caller holds (the hotel dialog); nothing is written to the address. */
-export interface LocalStay {
-  value: Stay
-  onChange: (next: Stay) => void
-}
-
-function LocalStays({ hotel, local, children }: { hotel: Hotel; local: LocalStay; children: ReactNode }) {
-  return <StayContext value={useLocalStay(hotel, local.value, local.onChange)}>{children}</StayContext>
-}
-
 /**
  * Gives the blocks inside it the dates and guests. They depend on the address, so the prerendered
- * page shows the no-dates state. With `local` they come from the caller instead.
+ * page shows the no-dates state.
  */
-export function HotelStay({ hotel, local, children }: { hotel: Hotel; local?: LocalStay; children: ReactNode }) {
-  if (local)
-    return (
-      <LocalStays hotel={hotel} local={local}>
-        {children}
-      </LocalStays>
-    )
+export function HotelStay({ hotel, children }: { hotel: Hotel; children: ReactNode }) {
   return (
     <Suspense fallback={<StayContext value={noDates}>{children}</StayContext>}>
       <AddressStay hotel={hotel}>{children}</AddressStay>

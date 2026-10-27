@@ -27,7 +27,7 @@ export function ShareButton({ hotel, className }: { hotel: Hotel; className?: st
 
   const share = async () => {
     const params = stay ? setStayParams(new URLSearchParams(), stay) : setGuestParams(new URLSearchParams(), guests)
-    // Built from the hotel, not the address: inside the hotel dialog the address is the search's.
+    // Built from the hotel, not the address: the address may carry the page's other parameters.
     const url = `${window.location.origin}/hotels/${hotel.id}?${params}`
     if (typeof navigator.share === 'function') {
       // The user closing the sheet rejects the promise; there is nothing to report.
