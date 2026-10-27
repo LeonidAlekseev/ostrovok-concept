@@ -4,6 +4,7 @@ import { unstable_cache } from 'next/cache'
 import { z } from 'zod'
 import type { Database } from '@/lib/db/database.types'
 import { haversineMeters } from '@/lib/geo/distance'
+import { mergePlaces } from '@/lib/geo/samePlace'
 import type { HotelBuilding, NearbyPlace } from '@/lib/hotelDetails'
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/config'
 import {
@@ -119,7 +120,10 @@ async function measure(db: Db, hotel: Point, eyeM: number, points: readonly Poin
 
 const nearPlace = z.object({
   category: z.string(),
+  osm_type: z.string().optional(),
+  osm_id: z.number().optional(),
   name: z.string().nullable(),
+  tags: z.record(z.string(), z.string()).optional().catch(undefined),
   lat: z.number(),
   lon: z.number(),
   near_lat: z.number(),
@@ -144,11 +148,55 @@ export const ostrovokLandmarks = (places: readonly NearbyPlace[]) =>
   places
     .filter((p) => !p.transport && p.kind !== 'Станция' && p.kind !== 'Аэропорт' && p.distanceM <= LANDMARK_RADIUS_M)
     .slice(0, 10)
-    .map((p) => ({ name: p.name, category: p.kind.toLocaleLowerCase('ru'), lat: p.lat, lon: p.lon }))
+    .map((p) => ({
+      name: p.name,
+      ...(p.nameEn && { nameEn: p.nameEn }),
+      ...(p.aliases && { aliases: p.aliases }),
+      kind: p.kind,
+      lat: p.lat,
+      lon: p.lon,
+    }))
 
 type Landmark = ReturnType<typeof ostrovokLandmarks>[number]
 
 const sameName = (a: string, b: string) => a.trim().toLocaleLowerCase('ru') === b.trim().toLocaleLowerCase('ru')
+
+/**
+ * The landmarks of the view: the Ostrovok places and the attractions of OSM, a place of both once with its Ostrovok
+ * name (`mergePlaces`); an attraction OSM maps twice (a node and a building) once.
+ */
+export function viewLandmarks(
+  ostrovok: readonly Landmark[],
+  osm: readonly z.infer<typeof nearPlace>[],
+): Omit<ViewTarget, 'line' | 'distanceM' | 'bearing'>[] {
+  const named = osm
+    .filter((p) => p.name && osm.findIndex((q) => q.name && sameName(q.name, p.name!)) === osm.indexOf(p))
+    .map((p) => ({
+      name: p.name,
+      category: p.category,
+      lat: p.lat,
+      lon: p.lon,
+      ...(p.tags && { tags: p.tags }),
+      ...(p.osm_type && p.osm_id !== undefined && { osmType: p.osm_type, osmId: p.osm_id }),
+    }))
+  const merged = mergePlaces(ostrovok, named)
+  return [
+    ...merged.ostrovok.map(({ place }) => ({
+      kind: 'ostrovok' as const,
+      name: place.name,
+      category: place.kind.toLocaleLowerCase('ru'),
+      lat: place.lat,
+      lon: place.lon,
+    })),
+    ...merged.osm.map((p) => ({
+      kind: 'attraction' as const,
+      name: p.name!,
+      category: 'достопримечательность',
+      lat: p.lat,
+      lon: p.lon,
+    })),
+  ]
+}
 
 type Measured = Omit<HotelView, 'observer' | 'floors' | 'windowSides'>
 
@@ -170,21 +218,8 @@ const readView = unstable_cache(
       hotel,
       coast.places.map((p) => ({ lat: p.near_lat, lon: p.near_lon, distanceM: p.distance_m })),
     ).map((p) => ({ kind: 'sea', name: 'Берег моря', category: 'море', ...p }))
-    const osm = nearOf(attractions.error ? null : attractions.data, 'attraction').places.filter(
-      (p, i, all) => p.name && all.findIndex((q) => q.name && sameName(q.name, p.name!)) === i,
-    )
-    const landmarks: Omit<ViewTarget, 'line'>[] = [
-      ...ostrovok.map((p) => ({ kind: 'ostrovok' as const, ...p })),
-      ...osm
-        .filter((p) => !ostrovok.some((o) => sameName(o.name, p.name!)))
-        .map((p) => ({
-          kind: 'attraction' as const,
-          name: p.name!,
-          category: 'достопримечательность',
-          lat: p.lat,
-          lon: p.lon,
-        })),
-    ].map((p) => ({
+    const osm = nearOf(attractions.error ? null : attractions.data, 'attraction').places
+    const landmarks: Omit<ViewTarget, 'line'>[] = viewLandmarks(ostrovok, osm).map((p) => ({
       ...p,
       distanceM: Math.round(haversineMeters(hotel, p)),
       bearing: bearingDeg(hotel, p),
@@ -200,7 +235,7 @@ const readView = unstable_cache(
       landmarks: measured.filter((t) => t.kind !== 'sea').sort((a, b) => a.distanceM - b.distanceM),
     }
   },
-  [CATALOG_TAG, 'hotel-view-v2'],
+  [CATALOG_TAG, 'hotel-view-v3'],
   { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME },
 )
 

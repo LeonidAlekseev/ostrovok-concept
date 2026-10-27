@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { NearbyPlace } from '@/lib/hotelDetails'
-import { linesOf, nearOf, ostrovokLandmarks, viewMapOf } from './view'
+import { linesOf, nearOf, ostrovokLandmarks, viewLandmarks, viewMapOf } from './view'
 
 // hotel-page, Requirement: Вид из отеля настоящего отеля
 describe('linesOf', () => {
@@ -101,7 +101,45 @@ describe('ostrovokLandmarks', () => {
         place({ name: 'Валенсия', kind: 'Аэропорт', distanceM: 8000 }),
         place({ name: 'Далеко', distanceM: 3500 }),
       ]),
-    ).toEqual([{ name: 'Ла-Лонха', category: 'музей', lat: 39.47, lon: -0.37 }])
+    ).toEqual([{ name: 'Ла-Лонха', kind: 'Музей', lat: 39.47, lon: -0.37 }])
+  })
+})
+
+// assistant-geo, Requirement: Одно место Островка и OpenStreetMap
+describe('viewLandmarks', () => {
+  const osm = (name: string, lat: number, lon: number, tags?: Record<string, string>) => ({
+    category: 'attraction',
+    name,
+    lat,
+    lon,
+    near_lat: lat,
+    near_lon: lon,
+    distance_m: 0,
+    ...(tags && { tags }),
+  })
+
+  it('names the Silk Exchange once, as Ostrovok does, and keeps the attractions Ostrovok has not', () => {
+    const landmarks = viewLandmarks(
+      [
+        { name: 'Ла-Лонья', nameEn: 'La Lonja', kind: 'Достопримечательность', lat: 39.4741249, lon: -0.378566 },
+        {
+          name: 'Лонха-де-ла-Седа',
+          nameEn: 'La Lonja de la Seda de Valencia',
+          kind: 'Достопримечательность',
+          lat: 39.4745026,
+          lon: -0.378185,
+        },
+      ],
+      [
+        osm('Llotja de la Seda', 39.4744082, -0.3784312, { 'name:es': 'Lonja de la Seda' }),
+        osm('Llotja de la Seda', 39.4744, -0.3784),
+        osm('La casa dels gats', 39.4789, -0.3797),
+      ],
+    )
+    expect(landmarks.map((l) => [l.kind, l.name, l.category])).toEqual([
+      ['ostrovok', 'Ла-Лонья', 'достопримечательность'],
+      ['attraction', 'La casa dels gats', 'достопримечательность'],
+    ])
   })
 })
 

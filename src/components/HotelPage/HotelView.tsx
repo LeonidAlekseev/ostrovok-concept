@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import dynamic from 'next/dynamic'
-import { Building2, Landmark, Sunset, Waves } from 'lucide-react'
+import { Building2, ChevronDown, Landmark, Sunset, Waves } from 'lucide-react'
 import { cn } from 'cn'
 import type { Hotel } from '@/lib/catalog'
 import type { ViewMap as ViewMapData } from '@/lib/db/view'
@@ -44,6 +44,8 @@ const ViewMap = dynamic(() => import('./ViewMap').catch(() => ({ default: () => 
 })
 
 const card = 'flex flex-col gap-3 rounded-2xl bg-card p-5 shadow-(--shadow-card)'
+/** The landmarks shown before «Показать все»: a hotel in the centre has up to 20. */
+export const LANDMARKS_SHOWN = 8
 
 const VERDICT_CLASS: Record<Verdict, string> = {
   visible: 'bg-success-soft text-success-foreground',
@@ -152,6 +154,7 @@ export function HotelView({ hotel, building }: { hotel: Hotel; building: HotelBu
   const [picked, setPicked] = useState<string | null>(null)
   const date = picked ?? today
   const [side, setSide] = useState<SideId | null>(null)
+  const [allLandmarks, setAllLandmarks] = useState(false)
 
   const shownSide = side ?? (view ? openestSide(view.rays) : 'w')
   const sunset = date ? sunsetOf(date, hotel.lat, hotel.lon) : null
@@ -403,8 +406,8 @@ export function HotelView({ hotel, building }: { hotel: Hotel; building: HotelBu
           <h3 id="view-landmarks-title" className="text-lg font-bold">
             Ориентиры до 3 км
           </h3>
-          <ul className="grid gap-3 md:grid-cols-2">
-            {landmarks.map(({ target, verdict }, i) => (
+          <ul id="view-landmarks-list" className="grid gap-3 md:grid-cols-2">
+            {(allLandmarks ? landmarks : landmarks.slice(0, LANDMARKS_SHOWN)).map(({ target, verdict }, i) => (
               <Row
                 key={`${target.kind}-${target.name}-${i}`}
                 icon={Landmark}
@@ -414,6 +417,18 @@ export function HotelView({ hotel, building }: { hotel: Hotel; building: HotelBu
               />
             ))}
           </ul>
+          {landmarks.length > LANDMARKS_SHOWN && (
+            <button
+              type="button"
+              aria-expanded={allLandmarks}
+              aria-controls="view-landmarks-list"
+              className="flex items-center gap-1 self-start font-semibold text-primary"
+              onClick={() => setAllLandmarks((open) => !open)}
+            >
+              {allLandmarks ? 'Свернуть' : `Показать все (${landmarks.length})`}
+              <ChevronDown className={cn('size-4 transition-transform', allLandmarks && 'rotate-180')} aria-hidden />
+            </button>
+          )}
           <p className="text-xs text-muted-foreground">
             Места Островка и достопримечательности OpenStreetMap (tourism=attraction). Станции и аэропорты не проверяем.
           </p>

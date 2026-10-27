@@ -22,6 +22,13 @@ export const TEXT_CHAIN: readonly ChainModel[] = [
 ]
 
 /**
+ * The model of `TEXT_CHAIN` asked first for Эвал's remark over the facts of a geo answer (src/lib/ai/geoRemark.ts):
+ * in the live check its sentences kept to the facts and answered in 0.3–0.5 s, those of `lightning` drifted to
+ * made-up advice; the rest of the chain follows.
+ */
+export const REMARK_MODEL_ID = 'nvidia/nemotron-3.5-bolt-e4b'
+
+/**
  * The photos of the chat: what is on them, for the search of similar hotels and for the wish. The first answers in
  * 1–12 s and now and then 500; `minimax-m3.1-flash` in 3–12 s and takes what the window has left.
  */

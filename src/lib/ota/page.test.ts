@@ -375,6 +375,36 @@ describe('otaHotelDetails', () => {
     ])
   })
 
+  it('names a place Ostrovok has twice once, by its nearer name', () => {
+    const lonja = [
+      { region_id: 6160500, name: 'Ла-Лонья', name_en: 'La Lonja', distance_m: 400, lat: 39.4741249, lon: -0.378566 },
+      {
+        region_id: 966082472,
+        name: 'Лонха-де-ла-Седа',
+        name_en: 'La Lonja de la Seda de Valencia',
+        distance_m: 420,
+        lat: 39.4745026,
+        lon: -0.378185,
+      },
+    ].map((place) =>
+      placeRowSchema.parse({
+        ...place,
+        hotel_id: 'ota-13666997',
+        type: 'POI',
+        subtype: 'HISTORICAL_POI',
+        is_transport_hub: false,
+        bearing_deg: 90,
+      }),
+    )
+    expect(
+      otaHotelDetails(storedRow(), [...places, ...lonja]).nearby.map((p) => [p.name, p.nameEn, p.aliases]),
+    ).toEqual([
+      ['Станция', undefined, undefined],
+      ['Ла-Лонья', 'La Lonja', ['Лонха-де-ла-Седа', 'La Lonja de la Seda de Valencia']],
+      ['Зоопарк', undefined, undefined],
+    ])
+  })
+
   it('quotes the sentences about the view word for word, once each, not «внешний вид»', () => {
     expect(details.viewQuotes.map((q) => [q.text, q.source, q.author])).toEqual([
       ['Номер с видом', 'tripadvisor', 'Анна'],

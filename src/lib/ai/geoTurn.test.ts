@@ -9,7 +9,9 @@ import { ATTRIBUTION, type Place, type PlaceStore } from '../geo/places'
 import { ok } from '../geo/result'
 import type { NearbyPlace } from '../hotelDetails'
 import type { ModelLink } from './chain'
-import { geoTurn, rulesPlan, tidyPlan, walks } from './geoTurn'
+import { PLAN_MS, REMARK_MS, geoTurn, remarkModels, rulesPlan, tidyPlan, walks } from './geoTurn'
+import { REMARK_MODEL_ID } from './model'
+import { MODEL_TIMEOUT_MS } from './understand'
 
 const hotel = { name: 'Hotel Turia', lat: 39.451, lon: -0.3582 }
 const at = (lat: number, lon: number) => ({ lat, lon })
@@ -209,7 +211,7 @@ describe('the sea', () => {
   })
 })
 
-// assistant-geo, Requirement: Гео-шаги в ходе Эвала (места Островка первыми)
+// assistant-geo, Requirement: Гео-шаги в ходе Эвала
 describe('the Ostrovok places', () => {
   const airportOstrovok: NearbyPlace = {
     id: 6077,
@@ -222,7 +224,7 @@ describe('the Ostrovok places', () => {
     transport: true,
   }
 
-  it('come first; OpenStreetMap does not repeat their kind', async () => {
+  it('come first; OpenStreetMap does not repeat their places', async () => {
     const outcome = (await geoTurn(hotel, ask('Как далеко аэропорт?'), options({ ostrovok: [airportOstrovok] })))!
     expect(outcome.steps[0]).toMatchObject({ title: 'Смотрю места рядом по данным Островка', result: 'аэропорт — 1' })
     expect(outcome.summary).toMatch(/^По данным Островка:\n• Аэропорт: ближе всего — «Валенсия» \(аэропорт\), 10,9 км/)
@@ -240,6 +242,137 @@ describe('the Ostrovok places', () => {
       'Смотрю места рядом по данным Островка',
       'Строю маршрут на машине до «Валенсия»',
     ])
+  })
+})
+
+// assistant-geo, Requirement: Одно место Островка и OpenStreetMap
+describe('a place of Ostrovok and OpenStreetMap', () => {
+  const nearLonja = { name: 'Hotel Lonja', lat: 39.4737, lon: -0.377 }
+  const lonja: NearbyPlace = {
+    id: 6160500,
+    name: 'Ла-Лонья',
+    nameEn: 'La Lonja',
+    // The Ostrovok place «Лонха-де-ла-Седа», 53 m away, folded into it (`nearbyOf`).
+    aliases: ['Лонха-де-ла-Седа', 'La Lonja de la Seda de Valencia'],
+    kind: 'Достопримечательность',
+    distanceM: 150,
+    bearingDeg: 280,
+    lat: 39.4741249,
+    lon: -0.378566,
+    transport: false,
+  }
+  const llotja: Row = {
+    id: 23377876,
+    name: 'Llotja de la Seda',
+    categories: ['attraction'],
+    ...at(39.4744082, -0.3784312),
+  }
+  const towers: Row = { id: 7, name: 'Torres de Quart', categories: ['attraction'], ...at(39.4757, -0.3838) }
+
+  it('is named once, by Ostrovok, in the answer and on the map; OSM adds the places Ostrovok has not', async () => {
+    const outcome = (await geoTurn(
+      nearLonja,
+      ask('Какие достопримечательности рядом?'),
+      options({ deps: deps(store([llotja, towers])), ostrovok: [lonja] }),
+    ))!
+    expect(outcome.summary).toMatch(
+      /^По данным Островка и OpenStreetMap:\n• Достопримечательность: ближе всего — «Ла-Лонья» \(достопримечательность\), 150 м от отеля; пешком/,
+    )
+    expect(outcome.summary).toContain('Ещё: «Torres de Quart» — 630 м.')
+    expect(outcome.summary).not.toContain('Llotja')
+    expect(outcome.map?.points.map((p) => p.label)).toEqual(['Hotel Lonja', 'Ла-Лонья', 'Torres de Quart'])
+  })
+
+  it('leaves a nearer hospital of OSM before the one Ostrovok lists', async () => {
+    const university: NearbyPlace = {
+      id: 1,
+      name: 'University Hospital',
+      kind: 'Больница',
+      distanceM: 2900,
+      bearingDeg: 0,
+      lat: 39.4771,
+      lon: -0.3582,
+      transport: false,
+    }
+    const outcome = (await geoTurn(hotel, ask('Где ближайшая больница?'), options({ ostrovok: [university] })))!
+    expect(outcome.summary).toContain(
+      '• Больница: ближе всего — «Hospital La Fe», 1,7 км от отеля по прямой; пешком 4,9 км, около 1 ч 5 мин. Ещё: «University Hospital» — 2,9 км.',
+    )
+  })
+})
+
+// assistant-geo, Requirement: Вывод Эвала поверх фактов
+describe('the remark over the facts', () => {
+  /** A model that chooses the rules' calls and then says `remark`. */
+  const remarking = (remark: string) =>
+    new MockLanguageModelV4({
+      doGenerate: async (call) =>
+        call.tools?.length
+          ? {
+              content: [
+                {
+                  type: 'tool-call' as const,
+                  toolCallId: 'call-0',
+                  toolName: 'nearbyPlaces',
+                  input: JSON.stringify({ categories: ['pharmacy'], radiusM: 1000 }),
+                },
+              ],
+              finishReason: { unified: 'tool-calls' as const, raw: undefined },
+              usage,
+              warnings: [],
+            }
+          : {
+              content: [{ type: 'text' as const, text: remark }],
+              finishReason: { unified: 'stop' as const, raw: undefined },
+              usage,
+              warnings: [],
+            },
+    })
+
+  it('is added after the facts when it passes the checks', async () => {
+    const outcome = (await geoTurn(
+      hotel,
+      ask('Есть ли рядом аптека?'),
+      options({ models: chain(remarking('Аптека совсем рядом — за лекарствами можно сходить пешком.')) }),
+    ))!
+    expect(outcome.remark).toBe('Аптека совсем рядом — за лекарствами можно сходить пешком.')
+    expect(outcome.summary.split('\n').slice(-2)).toEqual([
+      'Аптека совсем рядом — за лекарствами можно сходить пешком.',
+      'Места и маршруты — на карте ниже.',
+    ])
+  })
+
+  // assistant-geo, Requirement: Проверка фразы
+  it('is dropped when it gives a number of its own, and the facts answer alone', async () => {
+    const outcome = (await geoTurn(
+      hotel,
+      ask('Есть ли рядом аптека?'),
+      options({ models: chain(remarking('До аптеки минуты три пешком.')) }),
+    ))!
+    expect(outcome).toMatchObject({ remarkDropped: true })
+    expect(outcome.remark).toBeUndefined()
+    expect(outcome.summary).not.toContain('минуты три')
+  })
+
+  it('is not asked of the models that could not choose the calls', async () => {
+    const failing = vi.fn(async () => {
+      throw new Error('boom')
+    })
+    await geoTurn(
+      hotel,
+      ask('Есть ли рядом аптека?'),
+      options({ models: chain(new MockLanguageModelV4({ doGenerate: failing })) }),
+    )
+    expect(failing).toHaveBeenCalledTimes(1)
+  })
+
+  it('is asked of the model of the remarks first', () => {
+    const links = ['lightning', REMARK_MODEL_ID, 'flash'].map((id) => ({ id, model: calling(), timeoutMs: 1000 }))
+    expect(remarkModels(links).map((m) => m.id)).toEqual([REMARK_MODEL_ID, 'lightning', 'flash'])
+  })
+
+  it('keeps the model time of a turn within the text models’ 9 s', () => {
+    expect(PLAN_MS + REMARK_MS).toBeLessThanOrEqual(MODEL_TIMEOUT_MS)
   })
 })
 
