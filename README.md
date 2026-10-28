@@ -135,6 +135,8 @@ GoTrue и Storage для входа и фото. Поэтому данные н�
 - [docs/architecture.md](docs/architecture.md) — стили, глобус, состояние в браузере, изображения
 - [docs/pages.md](docs/pages.md) — страницы и интерфейс
 - [docs/search-and-ai.md](docs/search-and-ai.md) — режимы поиска, поиск по смыслу, модели
+- [docs/retrieval.md](docs/retrieval.md) — граф знаний (KAG), фрагменты и гибридный поиск (RAG), поиск по смыслу и по фото
+- [docs/geo-methods.md](docs/geo-methods.md) — положение солнца, линия взгляда, уровни шума
 - [docs/data-and-scripts.md](docs/data-and-scripts.md) — Supabase, каталог, скрипты загрузки данных
 - [docs/api.md](docs/api.md) — документация API
 - [docs/secrets.md](docs/secrets.md) — ключи и секреты (age)
