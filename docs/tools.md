@@ -65,7 +65,7 @@ const run = await recordRun(owner, 'my_tool', 'краткий вход без д
 
 Подбор по хранилищу — `src/lib/ai/knowledgeTools.ts` (инструменты) и `src/lib/ai/knowledgeTurn.ts` (ход):
 
-- «Отели по характеристикам» (`hotels_by_features`), «Места рядом» (`nearby_places`, по связям `near`), «Отзывы» (`hotel_reviews`, `hotel_chunks_search`).
+- «Отели по характеристикам» (`hotels_by_features`), «Места рядом» (`nearby_places`, по связям `near`), «Отзывы» (`hotel_reviews`, `searchHotelReviews`: гибридный поиск `hotel_chunks_hybrid` по словам темы и по смыслу её названия, цитируются только фрагменты, где тема названа словами; без ключа модели — только по словам).
 - Отбор — чистые функции по индексам всех отелей (`src/lib/db/knowledge.ts`); запуск показывает выбранные отели с claims целиком. Так блоки показывают ровно отели ответа.
 - Вызовы выбирает модель (`modelKnowledge`: `generateText` с `tools` без `execute`); правила (`rulesKnowledge`) решают, нужен ли подбор, и дополняют план модели тем, что пользователь назвал, а модель пропустила. Запуски идут параллельно через `recordRun`, каждый с таймаутом.
 - Ответ (`findings`) пишут правила из claims запусков; модель добавляет одну фразу, которую пропускает `checkedRemark`. Цитаты отзывов модели не передаются (`factsForModel`).

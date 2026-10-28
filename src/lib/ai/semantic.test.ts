@@ -2,7 +2,7 @@ import { embed, rerank } from 'ai'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setProduction } from '@/test/env'
 import { getSecret } from '../secrets'
-import { semanticSearch } from './semantic'
+import { queryVectorOrNull, semanticSearch } from './semantic'
 
 const rpc = vi.fn()
 const hidden = vi.hoisted(() => ({ ids: new Set<string>() }))
@@ -203,6 +203,19 @@ describe('semanticSearch', () => {
 })
 
 // hotel-catalog, Requirement: Синтетические отели только вне production
+// hotel-knowledge, Requirement: Гибридный поиск по отзывам
+describe('queryVectorOrNull', () => {
+  it('is the query’s vector, or null without the key, on a failure and too late', async () => {
+    expect(await queryVectorOrNull(words())).toEqual([0.1, 0.2])
+    vi.mocked(getSecret).mockResolvedValueOnce(undefined)
+    expect(await queryVectorOrNull(words())).toBeNull()
+    vi.mocked(embed).mockRejectedValueOnce(new Error('HTTP 429'))
+    expect(await queryVectorOrNull(words())).toBeNull()
+    vi.mocked(embed).mockReturnValueOnce(new Promise(() => {}))
+    expect(await queryVectorOrNull(words(), 10)).toBeNull()
+  })
+})
+
 describe('semanticSearch in production', () => {
   it('finds only the real hotels', async () => {
     setProduction(true)
