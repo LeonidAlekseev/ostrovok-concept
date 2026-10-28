@@ -21,7 +21,7 @@
         "status": "derived",
         "confidence": 0.4,
         "method": {
-          "name": "noise-estimate-v1",
+          "name": "noise-estimate-v2",
           "confidence": {
             "rule": "noise_estimate_day",
             "policy": "confidence-1"
@@ -34,7 +34,7 @@
         "calculation": {
           "id": "796f2471-03b6-4477-a6de-5aea74df4fc4",
           "method": "Оценка шума у фасада: самые громкие (улица) и самые тихие (двор) полосы карт шума EEA у контура здания, энергетическая сумма слоёв и шумных мест OpenStreetMap как точечных источников",
-          "version": "noise-estimate-v1",
+          "version": "noise-estimate-v2",
           "inputs": {
             "zone": {
               "kind": "building",
@@ -46,92 +46,92 @@
                 "name": "Cerveceria Tamesis",
                 "category": "cafe",
                 "levels_db": {
-                  "day": 46.4,
-                  "evening": 48.4
+                  "day": 48.1,
+                  "evening": 50.1
                 },
-                "distance_m": 47.6
+                "distance_m": 39.3
               },
               {
                 "name": "Pasión turca",
                 "category": "restaurant",
                 "levels_db": {
-                  "day": 45.6,
-                  "evening": 47.6
+                  "day": 47,
+                  "evening": 49
                 },
-                "distance_m": 52.7
+                "distance_m": 44.6
               },
               {
                 "name": "Cervecería Taxi-Driver",
                 "category": "cafe",
                 "levels_db": {
-                  "day": 42.5,
-                  "evening": 44.5
+                  "day": 43.4,
+                  "evening": 45.4
                 },
-                "distance_m": 75.2
+                "distance_m": 67.7
               },
               {
                 "name": "cerveceria tames",
                 "category": "bar",
                 "levels_db": {
-                  "day": 39.4,
-                  "night": 43.4,
-                  "evening": 46.4
+                  "day": 40.1,
+                  "night": 44.1,
+                  "evening": 47.1
                 },
-                "distance_m": 85.5
+                "distance_m": 78.3
               },
               {
                 "name": "Restaurante chino Tian an men",
                 "category": "restaurant",
                 "levels_db": {
-                  "day": 39.2,
-                  "evening": 41.2
+                  "day": 39.7,
+                  "evening": 41.7
                 },
-                "distance_m": 110.2
+                "distance_m": 103.5
               },
               {
                 "name": "Asados Boro",
                 "category": "restaurant",
                 "levels_db": {
-                  "day": 37.2,
-                  "evening": 39.2
+                  "day": 37.6,
+                  "evening": 39.6
                 },
-                "distance_m": 138.2
+                "distance_m": 131.9
               },
               {
                 "name": "Cerveceria Casa Juan",
                 "category": "restaurant",
                 "levels_db": {
-                  "day": 36.7,
-                  "evening": 38.7
+                  "day": 37.2,
+                  "evening": 39.2
                 },
-                "distance_m": 146.3
-              },
-              {
-                "name": "Bar Boca2",
-                "category": "cafe",
-                "levels_db": {
-                  "day": 36.4,
-                  "evening": 38.4
-                },
-                "distance_m": 150.8
+                "distance_m": 138.5
               },
               {
                 "name": "Restaurante Flor de Valencia 22",
                 "category": "restaurant",
                 "levels_db": {
-                  "day": 36.3,
-                  "evening": 38.3
+                  "day": 36.8,
+                  "evening": 38.8
                 },
-                "distance_m": 153.6
+                "distance_m": 143.9
+              },
+              {
+                "name": "Bar Boca2",
+                "category": "cafe",
+                "levels_db": {
+                  "day": 36.8,
+                  "evening": 38.8
+                },
+                "distance_m": 144.7
               },
               {
                 "name": "Capuccino",
                 "category": "cafe",
                 "levels_db": {
-                  "day": 36.2,
-                  "evening": 38.2
+                  "day": 36.5,
+                  "evening": 38.5
                 },
-                "distance_m": 154.7
+                "distance_m": 149.8
               }
             ],
             "hotel_id": "ota-9741622",
@@ -236,13 +236,13 @@
           },
           "limitations": [
             "Модель, а не измерение: полосы стратегической карты шума EEA (END, раунд 2022) и типовые уровни заведений",
-            "Экранирование зданиями не учитывается: шум заведения доходит до фасада и двора без препятствий",
+            "Здание отеля полностью экранирует двор от заведений (к окнам во двор они не прибавляются); другие здания между заведением и фасадом не учитываются",
             "Уровни снаружи у стены: окна, стены и звукоизоляция номеров не учитываются",
             "Уровни заведений — типовые для вида (терраса, открытая дверь), а не измерение конкретного места; часы работы не проверяются",
-            "Расстояние до заведения — от точки отеля по прямой; заведения, которых нет в OpenStreetMap, не учтены",
+            "Расстояние до заведения — по прямой от фасада (контур здания отеля по EUBUCCO; от точки отеля, если здания нет); заведения, которых нет в OpenStreetMap, не учтены",
             "Дневной и вечерний уровни из Lden и Lnight при допущениях «вечер = день» и «день не тише ночи»"
           ],
-          "computedAt": "2026-10-27T20:28:35.548+00:00"
+          "computedAt": "2026-10-28T13:23:23.379+00:00"
         },
         "evidence": [
           {
@@ -278,13 +278,13 @@
         "value": {
           "kind": "range",
           "min": 70.1,
-          "max": 75
+          "max": 75.1
         },
         "unit": "dB",
         "status": "derived",
         "confidence": 0.5,
         "method": {
-          "name": "noise-estimate-v1",
+          "name": "noise-estimate-v2",
           "confidence": {
             "rule": "noise_estimate",
             "policy": "confidence-1"
@@ -297,7 +297,7 @@
         "calculation": {
           "id": "796f2471-03b6-4477-a6de-5aea74df4fc4",
           "method": "Оценка шума у фасада: самые громкие (улица) и самые тихие (двор) полосы карт шума EEA у контура здания, энергетическая сумма слоёв и шумных мест OpenStreetMap как точечных источников",
-          "version": "noise-estimate-v1",
+          "version": "noise-estimate-v2",
           "inputs": {
             "zone": {
               "kind": "building",
@@ -309,92 +309,92 @@
                 "name": "Cerveceria Tamesis",
                 "category": "cafe",
                 "levels_db": {
-                  "day": 46.4,
-                  "evening": 48.4
+                  "day": 48.1,
+                  "evening": 50.1
                 },
-                "distance_m": 47.6
+                "distance_m": 39.3
               },
               {
                 "name": "Pasión turca",
                 "category": "restaurant",
                 "levels_db": {
-                  "day": 45.6,
-                  "evening": 47.6
+                  "day": 47,
+                  "evening": 49
                 },
-                "distance_m": 52.7
+                "distance_m": 44.6
               },
               {
                 "name": "Cervecería Taxi-Driver",
                 "category": "cafe",
                 "levels_db": {
-                  "day": 42.5,
-                  "evening": 44.5
+                  "day": 43.4,
+                  "evening": 45.4
                 },
-                "distance_m": 75.2
+                "distance_m": 67.7
               },
               {
                 "name": "cerveceria tames",
                 "category": "bar",
                 "levels_db": {
-                  "day": 39.4,
-                  "night": 43.4,
-                  "evening": 46.4
+                  "day": 40.1,
+                  "night": 44.1,
+                  "evening": 47.1
                 },
-                "distance_m": 85.5
+                "distance_m": 78.3
               },
               {
                 "name": "Restaurante chino Tian an men",
                 "category": "restaurant",
                 "levels_db": {
-                  "day": 39.2,
-                  "evening": 41.2
+                  "day": 39.7,
+                  "evening": 41.7
                 },
-                "distance_m": 110.2
+                "distance_m": 103.5
               },
               {
                 "name": "Asados Boro",
                 "category": "restaurant",
                 "levels_db": {
-                  "day": 37.2,
-                  "evening": 39.2
+                  "day": 37.6,
+                  "evening": 39.6
                 },
-                "distance_m": 138.2
+                "distance_m": 131.9
               },
               {
                 "name": "Cerveceria Casa Juan",
                 "category": "restaurant",
                 "levels_db": {
-                  "day": 36.7,
-                  "evening": 38.7
+                  "day": 37.2,
+                  "evening": 39.2
                 },
-                "distance_m": 146.3
-              },
-              {
-                "name": "Bar Boca2",
-                "category": "cafe",
-                "levels_db": {
-                  "day": 36.4,
-                  "evening": 38.4
-                },
-                "distance_m": 150.8
+                "distance_m": 138.5
               },
               {
                 "name": "Restaurante Flor de Valencia 22",
                 "category": "restaurant",
                 "levels_db": {
-                  "day": 36.3,
-                  "evening": 38.3
+                  "day": 36.8,
+                  "evening": 38.8
                 },
-                "distance_m": 153.6
+                "distance_m": 143.9
+              },
+              {
+                "name": "Bar Boca2",
+                "category": "cafe",
+                "levels_db": {
+                  "day": 36.8,
+                  "evening": 38.8
+                },
+                "distance_m": 144.7
               },
               {
                 "name": "Capuccino",
                 "category": "cafe",
                 "levels_db": {
-                  "day": 36.2,
-                  "evening": 38.2
+                  "day": 36.5,
+                  "evening": 38.5
                 },
-                "distance_m": 154.7
+                "distance_m": 149.8
               }
             ],
             "hotel_id": "ota-9741622",
@@ -499,13 +499,13 @@
           },
           "limitations": [
             "Модель, а не измерение: полосы стратегической карты шума EEA (END, раунд 2022) и типовые уровни заведений",
-            "Экранирование зданиями не учитывается: шум заведения доходит до фасада и двора без препятствий",
+            "Здание отеля полностью экранирует двор от заведений (к окнам во двор они не прибавляются); другие здания между заведением и фасадом не учитываются",
             "Уровни снаружи у стены: окна, стены и звукоизоляция номеров не учитываются",
             "Уровни заведений — типовые для вида (терраса, открытая дверь), а не измерение конкретного места; часы работы не проверяются",
-            "Расстояние до заведения — от точки отеля по прямой; заведения, которых нет в OpenStreetMap, не учтены",
+            "Расстояние до заведения — по прямой от фасада (контур здания отеля по EUBUCCO; от точки отеля, если здания нет); заведения, которых нет в OpenStreetMap, не учтены",
             "Дневной и вечерний уровни из Lden и Lnight при допущениях «вечер = день» и «день не тише ночи»"
           ],
-          "computedAt": "2026-10-27T20:28:35.548+00:00"
+          "computedAt": "2026-10-28T13:23:23.379+00:00"
         },
         "evidence": [
           {
@@ -540,14 +540,14 @@
         "sourceKey": "",
         "value": {
           "kind": "range",
-          "min": 65.3,
+          "min": 65.4,
           "max": 73.2
         },
         "unit": "dB",
         "status": "derived",
         "confidence": 0.4,
         "method": {
-          "name": "noise-estimate-v1",
+          "name": "noise-estimate-v2",
           "confidence": {
             "rule": "noise_estimate_day",
             "policy": "confidence-1"
@@ -560,7 +560,7 @@
         "calculation": {
           "id": "796f2471-03b6-4477-a6de-5aea74df4fc4",
           "method": "Оценка шума у фасада: самые громкие (улица) и самые тихие (двор) полосы карт шума EEA у контура здания, энергетическая сумма слоёв и шумных мест OpenStreetMap как точечных источников",
-          "version": "noise-estimate-v1",
+          "version": "noise-estimate-v2",
           "inputs": {
             "zone": {
               "kind": "building",
@@ -572,92 +572,92 @@
                 "name": "Cerveceria Tamesis",
                 "category": "cafe",
                 "levels_db": {
-                  "day": 46.4,
-                  "evening": 48.4
+                  "day": 48.1,
+                  "evening": 50.1
                 },
-                "distance_m": 47.6
+                "distance_m": 39.3
               },
               {
                 "name": "Pasión turca",
                 "category": "restaurant",
                 "levels_db": {
-                  "day": 45.6,
-                  "evening": 47.6
+                  "day": 47,
+                  "evening": 49
                 },
-                "distance_m": 52.7
+                "distance_m": 44.6
               },
               {
                 "name": "Cervecería Taxi-Driver",
                 "category": "cafe",
                 "levels_db": {
-                  "day": 42.5,
-                  "evening": 44.5
+                  "day": 43.4,
+                  "evening": 45.4
                 },
-                "distance_m": 75.2
+                "distance_m": 67.7
               },
               {
                 "name": "cerveceria tames",
                 "category": "bar",
                 "levels_db": {
-                  "day": 39.4,
-                  "night": 43.4,
-                  "evening": 46.4
+                  "day": 40.1,
+                  "night": 44.1,
+                  "evening": 47.1
                 },
-                "distance_m": 85.5
+                "distance_m": 78.3
               },
               {
                 "name": "Restaurante chino Tian an men",
                 "category": "restaurant",
                 "levels_db": {
-                  "day": 39.2,
-                  "evening": 41.2
+                  "day": 39.7,
+                  "evening": 41.7
                 },
-                "distance_m": 110.2
+                "distance_m": 103.5
               },
               {
                 "name": "Asados Boro",
                 "category": "restaurant",
                 "levels_db": {
-                  "day": 37.2,
-                  "evening": 39.2
+                  "day": 37.6,
+                  "evening": 39.6
                 },
-                "distance_m": 138.2
+                "distance_m": 131.9
               },
               {
                 "name": "Cerveceria Casa Juan",
                 "category": "restaurant",
                 "levels_db": {
-                  "day": 36.7,
-                  "evening": 38.7
+                  "day": 37.2,
+                  "evening": 39.2
                 },
-                "distance_m": 146.3
-              },
-              {
-                "name": "Bar Boca2",
-                "category": "cafe",
-                "levels_db": {
-                  "day": 36.4,
-                  "evening": 38.4
-                },
-                "distance_m": 150.8
+                "distance_m": 138.5
               },
               {
                 "name": "Restaurante Flor de Valencia 22",
                 "category": "restaurant",
                 "levels_db": {
-                  "day": 36.3,
-                  "evening": 38.3
+                  "day": 36.8,
+                  "evening": 38.8
                 },
-                "distance_m": 153.6
+                "distance_m": 143.9
+              },
+              {
+                "name": "Bar Boca2",
+                "category": "cafe",
+                "levels_db": {
+                  "day": 36.8,
+                  "evening": 38.8
+                },
+                "distance_m": 144.7
               },
               {
                 "name": "Capuccino",
                 "category": "cafe",
                 "levels_db": {
-                  "day": 36.2,
-                  "evening": 38.2
+                  "day": 36.5,
+                  "evening": 38.5
                 },
-                "distance_m": 154.7
+                "distance_m": 149.8
               }
             ],
             "hotel_id": "ota-9741622",
@@ -762,13 +762,13 @@
           },
           "limitations": [
             "Модель, а не измерение: полосы стратегической карты шума EEA (END, раунд 2022) и типовые уровни заведений",
-            "Экранирование зданиями не учитывается: шум заведения доходит до фасада и двора без препятствий",
+            "Здание отеля полностью экранирует двор от заведений (к окнам во двор они не прибавляются); другие здания между заведением и фасадом не учитываются",
             "Уровни снаружи у стены: окна, стены и звукоизоляция номеров не учитываются",
             "Уровни заведений — типовые для вида (терраса, открытая дверь), а не измерение конкретного места; часы работы не проверяются",
-            "Расстояние до заведения — от точки отеля по прямой; заведения, которых нет в OpenStreetMap, не учтены",
+            "Расстояние до заведения — по прямой от фасада (контур здания отеля по EUBUCCO; от точки отеля, если здания нет); заведения, которых нет в OpenStreetMap, не учтены",
             "Дневной и вечерний уровни из Lden и Lnight при допущениях «вечер = день» и «день не тише ночи»"
           ],
-          "computedAt": "2026-10-27T20:28:35.548+00:00"
+          "computedAt": "2026-10-28T13:23:23.379+00:00"
         },
         "evidence": [
           {
@@ -810,7 +810,7 @@
         "status": "derived",
         "confidence": 0.5,
         "method": {
-          "name": "noise-estimate-v1",
+          "name": "noise-estimate-v2",
           "confidence": {
             "rule": "noise_estimate",
             "policy": "confidence-1"
@@ -823,7 +823,7 @@
         "calculation": {
           "id": "796f2471-03b6-4477-a6de-5aea74df4fc4",
           "method": "Оценка шума у фасада: самые громкие (улица) и самые тихие (двор) полосы карт шума EEA у контура здания, энергетическая сумма слоёв и шумных мест OpenStreetMap как точечных источников",
-          "version": "noise-estimate-v1",
+          "version": "noise-estimate-v2",
           "inputs": {
             "zone": {
               "kind": "building",
@@ -835,92 +835,92 @@
                 "name": "Cerveceria Tamesis",
                 "category": "cafe",
                 "levels_db": {
-                  "day": 46.4,
-                  "evening": 48.4
+                  "day": 48.1,
+                  "evening": 50.1
                 },
-                "distance_m": 47.6
+                "distance_m": 39.3
               },
               {
                 "name": "Pasión turca",
                 "category": "restaurant",
                 "levels_db": {
-                  "day": 45.6,
-                  "evening": 47.6
+                  "day": 47,
+                  "evening": 49
                 },
-                "distance_m": 52.7
+                "distance_m": 44.6
               },
               {
                 "name": "Cervecería Taxi-Driver",
                 "category": "cafe",
                 "levels_db": {
-                  "day": 42.5,
-                  "evening": 44.5
+                  "day": 43.4,
+                  "evening": 45.4
                 },
-                "distance_m": 75.2
+                "distance_m": 67.7
               },
               {
                 "name": "cerveceria tames",
                 "category": "bar",
                 "levels_db": {
-                  "day": 39.4,
-                  "night": 43.4,
-                  "evening": 46.4
+                  "day": 40.1,
+                  "night": 44.1,
+                  "evening": 47.1
                 },
-                "distance_m": 85.5
+                "distance_m": 78.3
               },
               {
                 "name": "Restaurante chino Tian an men",
                 "category": "restaurant",
                 "levels_db": {
-                  "day": 39.2,
-                  "evening": 41.2
+                  "day": 39.7,
+                  "evening": 41.7
                 },
-                "distance_m": 110.2
+                "distance_m": 103.5
               },
               {
                 "name": "Asados Boro",
                 "category": "restaurant",
                 "levels_db": {
-                  "day": 37.2,
-                  "evening": 39.2
+                  "day": 37.6,
+                  "evening": 39.6
                 },
-                "distance_m": 138.2
+                "distance_m": 131.9
               },
               {
                 "name": "Cerveceria Casa Juan",
                 "category": "restaurant",
                 "levels_db": {
-                  "day": 36.7,
-                  "evening": 38.7
+                  "day": 37.2,
+                  "evening": 39.2
                 },
-                "distance_m": 146.3
-              },
-              {
-                "name": "Bar Boca2",
-                "category": "cafe",
-                "levels_db": {
-                  "day": 36.4,
-                  "evening": 38.4
-                },
-                "distance_m": 150.8
+                "distance_m": 138.5
               },
               {
                 "name": "Restaurante Flor de Valencia 22",
                 "category": "restaurant",
                 "levels_db": {
-                  "day": 36.3,
-                  "evening": 38.3
+                  "day": 36.8,
+                  "evening": 38.8
                 },
-                "distance_m": 153.6
+                "distance_m": 143.9
+              },
+              {
+                "name": "Bar Boca2",
+                "category": "cafe",
+                "levels_db": {
+                  "day": 36.8,
+                  "evening": 38.8
+                },
+                "distance_m": 144.7
               },
               {
                 "name": "Capuccino",
                 "category": "cafe",
                 "levels_db": {
-                  "day": 36.2,
-                  "evening": 38.2
+                  "day": 36.5,
+                  "evening": 38.5
                 },
-                "distance_m": 154.7
+                "distance_m": 149.8
               }
             ],
             "hotel_id": "ota-9741622",
@@ -1025,13 +1025,13 @@
           },
           "limitations": [
             "Модель, а не измерение: полосы стратегической карты шума EEA (END, раунд 2022) и типовые уровни заведений",
-            "Экранирование зданиями не учитывается: шум заведения доходит до фасада и двора без препятствий",
+            "Здание отеля полностью экранирует двор от заведений (к окнам во двор они не прибавляются); другие здания между заведением и фасадом не учитываются",
             "Уровни снаружи у стены: окна, стены и звукоизоляция номеров не учитываются",
             "Уровни заведений — типовые для вида (терраса, открытая дверь), а не измерение конкретного места; часы работы не проверяются",
-            "Расстояние до заведения — от точки отеля по прямой; заведения, которых нет в OpenStreetMap, не учтены",
+            "Расстояние до заведения — по прямой от фасада (контур здания отеля по EUBUCCO; от точки отеля, если здания нет); заведения, которых нет в OpenStreetMap, не учтены",
             "Дневной и вечерний уровни из Lden и Lnight при допущениях «вечер = день» и «день не тише ночи»"
           ],
-          "computedAt": "2026-10-27T20:28:35.548+00:00"
+          "computedAt": "2026-10-28T13:23:23.379+00:00"
         },
         "evidence": [
           {

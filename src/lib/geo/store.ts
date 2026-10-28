@@ -27,14 +27,17 @@ type Client = SupabaseClient<Database>
 
 let clients: Promise<{ read: Client | null; write: Client | null }> | undefined
 
-function supabase() {
+async function supabase() {
   clients ??= (async () => {
     if (!isSupabaseConfigured) return { read: null, write: null }
     const write = await serviceClient()
     const options = { auth: { persistSession: false, autoRefreshToken: false } }
     return { read: write ?? createClient<Database>(supabaseUrl, supabaseAnonKey, options), write }
   })()
-  return clients
+  const answer = await clients
+  // A key that did not come in time leaves no write client for good: the next call asks again.
+  if (!answer.write && isSupabaseConfigured) clients = undefined
+  return answer
 }
 
 const osmType = z.enum(['node', 'way', 'relation'])

@@ -100,6 +100,11 @@ describe('ruleAnswer', () => {
     expect(answer).not.toContain('Выберите даты')
   })
 
+  it('answers every topic of a mixed question, not the first one only', () => {
+    const { answer } = ruleAnswer('Можно с питомцами и есть ли парковка?', hotel)
+    expect(answer).toMatch(/^Да, можно с питомцами[^]*\n\nДа: парковка/)
+  })
+
   it('answers the parking and the pets from the amenities', () => {
     expect(ruleAnswer('Есть ли парковка?', hotel).answer).toMatch(/^Да: парковка/)
     expect(ruleAnswer('Можно с питомцами?', hotel).answer).toMatch(/^Да, можно с питомцами \(за отдельную плату\)/)
