@@ -11,6 +11,7 @@ import type { HotelFeatures } from '@/lib/features'
 import { nextQuestion } from '@/lib/assistant'
 import { getHotel } from '@/lib/catalogGenerator'
 import { runNoiseTool } from '@/lib/ai/noiseTool'
+import { loadHotelNoise } from '@/lib/db/noise'
 import { runOwner } from '@/lib/db/toolRuns'
 import { loadLevelIndex, loadNearIndex } from '@/lib/db/knowledge'
 import { errorResult, toolResultSchema } from '@/lib/toolResult'
@@ -32,6 +33,10 @@ vi.mock('@/lib/ai/geoTurn', () => ({ geoTurn: vi.fn() }))
 vi.mock('@/lib/ai/noiseTool', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/ai/noiseTool')>()
   return { ...actual, runNoiseTool: vi.fn(actual.runNoiseTool) }
+})
+vi.mock('@/lib/db/noise', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/db/noise')>()
+  return { ...actual, loadHotelNoise: vi.fn(actual.loadHotelNoise) }
 })
 vi.mock('@/lib/db/toolRuns', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/db/toolRuns')>()
@@ -720,6 +725,29 @@ describe('POST /api/assistant: a question about a hotel', () => {
     ])
     // The answer goes by the tool's characteristics.
     expect(body.reply).toContain('Ночью (Lnight): дороги города: 55–59 дБ')
+  })
+
+  // assistant-geo, Requirement: Виджеты карт в ответе Эвала
+  it('sends the noise map of the page beside a noise answer, with the data the answer was told from', async () => {
+    setModel(undefined)
+    const noise = {
+      sources: [{ source: 'roadsInAgglomeration', lden: { min: 60, max: 64 }, lnight: { min: 50, max: 54 } }],
+      yard: [],
+      zone: { kind: 'circle' as const, radiusM: 25 },
+      places: [{ category: 'bar' as const, name: 'Bar Uno', distanceM: 40, lat: 50.087, lon: 14.42 }],
+      placesCovered: ['bar' as const],
+    }
+    vi.mocked(loadHotelNoise).mockResolvedValueOnce(noise)
+    const body = await (await aboutHotel('Тут шумно ночью?')).json()
+    expect(body.widget).toEqual({
+      kind: 'noise',
+      hotel: { id: hotelId, name: expect.any(String), lat: expect.any(Number), lon: expect.any(Number) },
+      noise,
+    })
+    // Not a noise question, no widget; no noise data, no widget — the text says «нет данных».
+    vi.mocked(loadHotelNoise).mockResolvedValueOnce(noise)
+    expect((await (await aboutHotel('Есть ли парковка?')).json()).widget).toBeUndefined()
+    expect((await (await aboutHotel('Шумно ли тут?')).json()).widget).toBeUndefined()
   })
 
   it('gives a hotel with no data a run with no sources, said so (Scenario: Источников нет)', async () => {

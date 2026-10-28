@@ -26,6 +26,7 @@ import { formatDateRange, type IsoDate } from '../../lib/dates'
 import { formatPrice, guestsLabel } from '../../lib/format'
 import { HotelTile } from '../HotelTile/HotelTile'
 import { DemoBadge } from '../DemoBadge'
+import { ChatWidget } from './ChatWidget'
 import { DateChangeCard, MemoryCard, SessionParamsCard, ToolCard, ToolRunCard, WorkingRow } from './ChatCards'
 import { MessagePhotos, type PhotoUrl } from './ChatPhotos'
 import { MapMessage } from './MapMessage'
@@ -266,6 +267,7 @@ function MessageItem({ message, photoUrl, onChoose, onRetry, actions, params, on
           </Bubble>
         )}
         {data.map && <MapMessage map={data.map} />}
+        {data.widget && <ChatWidget widget={data.widget} />}
         {data.change && <DateChangeCard change={data.change} onConfirm={onConfirmChange} />}
         {data.plan && <PlanView plan={data.plan} onChoose={onChoose} />}
         {status === 'failed' && onRetry ? (
