@@ -3,7 +3,6 @@ import { loadHotelRelations } from './knowledge'
 
 const db = vi.hoisted(() => ({
   relations: { data: [] as unknown, error: null as { message: string } | null },
-  near: { data: null as unknown, error: null as { message: string } | null },
   calls: [] as unknown[][],
 }))
 vi.mock('@/lib/supabase/config', () => ({
@@ -27,10 +26,6 @@ vi.mock('@supabase/supabase-js', () => ({
         },
       )
       return query
-    },
-    rpc: async (name: string, args: unknown) => {
-      db.calls.push(['rpc', name, args])
-      return db.near
     },
   }),
 }))
@@ -57,11 +52,12 @@ const distance = (value: number, ref: string) => ({
   calculation: null,
   claim_evidence: [],
 })
+const points: Record<string, { lat: number; lon: number }> = { 'node/2': { lat: 39.383, lon: -0.333 } }
 const edge = (ref: string, meters: number, categories: string[], kind = 'osm_place') => ({
   id: `edge-${ref}`,
   predicate: 'near',
   confidence: 1,
-  object: { kind, ref, name: ref === 'node/2' ? 'Farmacia' : null },
+  object: { kind, ref, name: ref === 'node/2' ? 'Farmacia' : null, metadata: points[ref] ?? {} },
   claim: distance(meters, ref),
   evidence: {
     id: `ev-${ref}`,
@@ -81,7 +77,6 @@ const hotel = { id: 'ota-1', lat: 39.38, lon: -0.33 }
 
 beforeEach(() => {
   db.calls = []
-  db.near = { data: null, error: null }
   vi.spyOn(console, 'warn').mockImplementation(() => {})
 })
 
@@ -92,15 +87,6 @@ describe('loadHotelRelations', () => {
       data: [edge('node/1', 300, ['bar']), edge('node/2', 66.2, ['pharmacy']), { id: 'broken' }],
       error: null,
     }
-    db.near = {
-      error: null,
-      data: {
-        places: [
-          { osm_type: 'node', osm_id: 2, lat: 39.383, lon: -0.333, categories: ['pharmacy', 'shop'] },
-          { osm_type: 'node', osm_id: 1, lat: 39.4, lon: -0.3, categories: ['bar'] },
-        ],
-      },
-    }
   })
 
   it('reads the edges of the hotel nearest first, with the place, the distance claim and the source', async () => {
@@ -109,13 +95,12 @@ describe('loadHotelRelations', () => {
     expect(relations![0]).toMatchObject({
       predicate: 'near',
       confidence: 1,
-      object: { kind: 'osm_place', name: 'Farmacia', lat: 39.383, lon: -0.333, categories: ['pharmacy', 'shop'] },
+      object: { kind: 'osm_place', name: 'Farmacia', lat: 39.383, lon: -0.333, categories: ['pharmacy'] },
       claim: { value: { kind: 'number', value: 66.2 }, confidence: 1 },
       evidence: { provider: 'OpenStreetMap', externalId: 'node/2' },
     })
     expect(db.calls).toContainEqual(['eq', 'subject.ref', 'ota-1'])
-    const rpc = db.calls.find((call) => call[0] === 'rpc')!
-    expect(rpc[2]).toMatchObject({ lat: 39.38, lon: -0.33, wanted: ['bar', 'pharmacy'], radius_m: 301 })
+    expect(db.calls.some((call) => call[0] === 'rpc')).toBe(false)
   })
 
   it('filters by the place category and by the predicate', async () => {
@@ -124,7 +109,7 @@ describe('loadHotelRelations', () => {
     expect(db.calls).toContainEqual(['eq', 'predicate', 'near'])
   })
 
-  it('leaves a point null for a place the cache no longer shows, and for a building', async () => {
+  it('leaves a point null for a place stored without one, and for a building', async () => {
     db.relations = {
       data: [edge('node/9', 10, ['pharmacy']), edge('b-1', 3, [], 'building')],
       error: null,
@@ -136,8 +121,6 @@ describe('loadHotelRelations', () => {
 
   it('is null for a synthetic hotel and a failure, and [] when there are none', async () => {
     expect(await loadHotelRelations({ ...hotel, id: 'h-1' })).toBeNull()
-    db.near = { data: null, error: { message: 'boom' } }
-    expect(await loadHotelRelations(hotel)).toBeNull()
     db.relations = { data: [], error: null }
     expect(await loadHotelRelations(hotel)).toEqual([])
     db.relations = { data: null, error: { message: 'no relations' } }

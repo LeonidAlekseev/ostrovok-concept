@@ -31,6 +31,7 @@ function RoomRow({ hotel, room, stay, guests, onPickDates }: Props & { room: Roo
       <div className="flex flex-col gap-1">
         <h3 className="text-lg font-bold">{room.name}</h3>
         <p className="text-sm text-muted-foreground">{roomFacts(room)}</p>
+        {room.amenities && <p className="text-sm text-muted-foreground">{room.amenities.slice(0, 6).join(' · ')}</p>}
         {reason && <p className="text-sm text-destructive">{reason}</p>}
       </div>
       <div className="flex flex-col items-start gap-2 sm:items-end sm:text-right">

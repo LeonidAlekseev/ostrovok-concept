@@ -206,6 +206,8 @@ export interface Room {
   /** Guests one room sleeps. */
   capacity: number
   photos: Photo[]
+  /** What the room has, as the hotel lists it (Russian labels); absent when the hotel lists none. */
+  amenities?: string[]
   /** Cheapest first. */
   rates: Rate[]
 }

@@ -30,6 +30,18 @@ export interface OtaPageFields {
   checkIn: string | null
   checkOut: string | null
   workspace: boolean
+  /** The page's room groups by `rg_hash`. */
+  rooms: Record<string, PageRoom>
+}
+
+/** A room group of the hotel's Ostrovok page: what the page says of the room, nothing more. */
+export interface PageRoom {
+  /** m², `null` when the page gives none. */
+  area: number | null
+  /** CDN templates of the room's photos. */
+  photos: string[]
+  /** Russian labels of the room's amenities. */
+  amenities: string[]
 }
 
 /** The search's stay: its check-in (an instant) and its length, which the prices of the search are for. */
@@ -101,23 +113,29 @@ function cancellationOf(rate: OtaRate, stay: OtaStay): Cancellation {
   return { kind: 'free', daysBefore: Math.max(1, Math.ceil((Date.parse(stay.checkIn) - Date.parse(before)) / DAY_MS)) }
 }
 
-const roomPhotos = (name: string): Photo[] => [{ id: 'room-1', caption: name, tone: 0 }]
+/** The room's real photos when the page has them, else the one placeholder. */
+const roomPhotos = (name: string, urls: readonly string[] = []): Photo[] =>
+  urls.length
+    ? urls.map((url, i) => ({ id: `room-${i + 1}`, caption: `${name}, фото ${i + 1}`, tone: 0, url }))
+    : [{ id: 'room-1', caption: name, tone: 0 }]
 
 /** The rooms of the rates, each with its rates cheapest first, the cheapest room first. */
-function roomsOf(raw: OtaHotel, stay: OtaStay): Room[] {
+function roomsOf(raw: OtaHotel, stay: OtaStay, pageRooms: Record<string, PageRoom>): Room[] {
   const rooms = new Map<string, Room>()
   raw.rates.forEach((rate, index) => {
     const room = rate.rooms[0]
     const group = raw.static_vm.room_groups.find((g) => g.rg_hash === room.rg_hash)
     const name = room.room_data_trans?.ru.main_name ?? group?.name_struct.main_name ?? room.room_name
     const id = `room-${room.rg_hash}`
+    const page = pageRooms[room.rg_hash]
     const entry = rooms.get(id) ?? {
       id,
       name,
-      area: room.size ? Math.round(room.size) : null,
+      area: room.size ? Math.round(room.size) : (page?.area ?? null),
       beds: room.room_data_trans?.ru.bedding_type ?? group?.name_struct.bedding_type ?? '',
       capacity: rate.occupancy,
-      photos: roomPhotos(name),
+      photos: roomPhotos(name, page?.photos),
+      ...(page?.amenities.length && { amenities: page.amenities }),
       rates: [],
     }
     entry.rates.push({
@@ -135,16 +153,18 @@ function roomsOf(raw: OtaHotel, stay: OtaStay): Room[] {
 }
 
 /** A hotel the search found no rate for: its first room at the price of the map pin, without a refund. */
-function pinRoom(raw: OtaHotel, priceFrom: number): Room {
+function pinRoom(raw: OtaHotel, priceFrom: number, pageRooms: Record<string, PageRoom>): Room {
   const group = raw.static_vm.room_groups[0]
+  const page = group && pageRooms[group.rg_hash]
   const name = group?.name_struct.main_name ?? 'Номер'
   return {
     id: 'room-1',
     name,
-    area: null,
+    area: page?.area ?? null,
     beds: group?.name_struct.bedding_type ?? '',
     capacity: 2,
-    photos: roomPhotos(name),
+    photos: roomPhotos(name, page?.photos),
+    ...(page?.amenities.length && { amenities: page.amenities }),
     rates: [
       {
         id: 'rate-1',
@@ -172,7 +192,7 @@ export function otaHotel(
   const vm = raw.static_vm
   const id = otaHotelId(raw.master_id)
   const stayType = STAY_TYPE_OF_KIND[vm.kind] ?? 'hotel'
-  const rooms = raw.rates.length ? roomsOf(raw, stay) : null
+  const rooms = raw.rates.length ? roomsOf(raw, stay, page?.rooms ?? {}) : null
   const priceFrom = rooms ? rooms[0].rates[0].pricePerNight : pin && roundUp100(pin.price / stay.nights)
   if (!priceFrom) throw new Error(`ota: ${raw.ota_hotel_id} has neither a rate nor a map pin`)
   const rating = vm.rating_total ?? 0
@@ -209,7 +229,7 @@ export function otaHotel(
         url: image.tmpl,
       })),
     }),
-    rooms: rooms ?? [pinRoom(raw, priceFrom)],
+    rooms: rooms ?? [pinRoom(raw, priceFrom, page?.rooms ?? {})],
   })
   // Ostrovok's rating and review count are real; the reviews, the scores of the sections and the guests' photos
   // are not in the search, and the generator's would be made up: the page's are the hotel's details.

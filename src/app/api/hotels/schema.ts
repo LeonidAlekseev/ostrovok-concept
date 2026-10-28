@@ -90,6 +90,10 @@ const roomSchema = component(
     beds: z.string().meta({ description: 'Пусто, когда неизвестно' }),
     capacity: z.number().int().min(1).meta({ description: 'Гостей в одном номере' }),
     photos: z.array(photoSchema),
+    amenities: z
+      .array(z.string())
+      .optional()
+      .meta({ description: 'Что в номере, по данным отеля; нет — отель не указал' }),
     rates: z.array(rateSchema).meta({ description: 'Сначала дешёвые' }),
   }),
 )

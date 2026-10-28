@@ -17,7 +17,7 @@ const PAGE = 1000
 const BATCH = 200
 
 /** The first part of the properties and of the calculations' keys the script writes. */
-const OWN_PROPERTIES = ['noise', 'nearby', 'building']
+const OWN_PROPERTIES = ['noise', 'nearby', 'building', 'hotel', 'room']
 const own = (dotted: unknown) => OWN_PROPERTIES.includes(String(dotted).split('.')[0])
 
 /** Every row of the table the filter keeps, by pages in the order of `orderBy`. */
@@ -132,7 +132,7 @@ const idOf = (ids: Map<string, string>, key: string, what: string) => {
   return id
 }
 
-const ENTITY_COLUMNS = 'id, kind, ref, hotel_id, name'
+const ENTITY_COLUMNS = 'id, kind, ref, hotel_id, name, metadata'
 const EVIDENCE_COLUMNS = 'id, type, title, provider, external_id, url, retrieved_at, excerpt, metadata, dataset_id'
 const CALCULATION_COLUMNS = 'id, key, method, version, inputs, parameters, limitations'
 const CLAIM_COLUMNS =
@@ -158,9 +158,15 @@ export async function writeClaims(supabase: Client, store: Store, dryRun: boolea
     table: 'entities',
     keys: ['kind', 'ref'],
     current: await readAll(supabase, 'entities', ENTITY_COLUMNS, ['id'], (q) =>
-      q.in('kind', ['hotel', 'osm_place', 'building', 'ota_poi']),
+      q.in('kind', ['hotel', 'osm_place', 'building', 'ota_poi', 'room']),
     ),
-    next: store.entities.map((e) => ({ kind: e.kind, ref: e.ref, hotel_id: e.hotel_id, name: e.name })),
+    next: store.entities.map((e) => ({
+      kind: e.kind,
+      ref: e.ref,
+      hotel_id: e.hotel_id,
+      name: e.name,
+      metadata: e.metadata ?? {},
+    })),
     stamp: ['updated_at'],
     removeBy: 'id',
   })
