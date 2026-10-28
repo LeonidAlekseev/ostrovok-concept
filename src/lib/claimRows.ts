@@ -20,6 +20,7 @@ import {
   type SourceNoise,
 } from './noise'
 import type { NoiseBand } from './features'
+import { viewRows, type RoomGroup } from './featureRows'
 import { mergePlaces, type OsmLike, type OstrovokLike } from './geo/samePlace'
 import { placeKind } from './ota/page'
 
@@ -39,10 +40,12 @@ type Json = string | number | boolean | null | Json[] | { [key: string]: Json }
 type JsonObject = { [key: string]: Json }
 
 export interface EntityRow {
-  kind: 'hotel' | 'osm_place' | 'building' | 'ota_poi'
+  kind: 'hotel' | 'room' | 'osm_place' | 'building' | 'ota_poi'
   ref: string
   hotel_id: string | null
   name: string | null
+  /** Where a place is: `{ lat, lon }` of an `osm_place` or `ota_poi`; absent for the rest (stored as `{}`). */
+  metadata?: JsonObject
 }
 
 export interface EvidenceRow {
@@ -363,11 +366,12 @@ const nearPlace = (value: unknown, wanted: ReadonlySet<string> = NOISY) => {
   }
 }
 
-const osmEntity = (place: { ref: string; name: string | null }): EntityRow => ({
+const osmEntity = (place: { ref: string; name: string | null; lat: number | null; lon: number | null }): EntityRow => ({
   kind: 'osm_place',
   ref: place.ref,
   hotel_id: null,
   name: place.name,
+  ...(place.lat !== null && place.lon !== null && { metadata: { lat: place.lat, lon: place.lon } }),
 })
 
 const osmEvidence = (place: NonNullable<ReturnType<typeof nearPlace>>): EvidenceRow => ({
@@ -739,6 +743,8 @@ export interface OstrovokPlace {
   name: string | null
   name_en: string | null
   distance_m: number
+  /** The straight line from the hotel's point to the place's point (`ota_hotel_places.straight_m`), m. */
+  straight_m?: number | null
   lat: number
   lon: number
   updated_at: string | null
@@ -859,7 +865,13 @@ export function placesStore(
   for (const { place: named, twins, osm: same } of merged.ostrovok) {
     const { place } = named
     const name = named.name
-    const entity: EntityRow = { kind: 'ota_poi', ref: String(place.region_id), hotel_id: null, name }
+    const entity: EntityRow = {
+      kind: 'ota_poi',
+      ref: String(place.region_id),
+      hotel_id: null,
+      name,
+      metadata: { lat: place.lat, lon: place.lon },
+    }
     const source: EvidenceRow = {
       type: 'ota_page',
       title: `Страница отеля на Островке: «${name}»`,
@@ -883,6 +895,9 @@ export function placesStore(
       epistemic_status: 'reported',
       ...rated('ostrovok_place_distance', {
         kind: named.kind,
+        // Ostrovok's distance is the claim's value; our straight line to the place's point is kept beside it, as the
+        // two differ (a beach's point is its middle, and Ostrovok's distance is the shorter, up to 1 km).
+        ...(typeof place.straight_m === 'number' && { straight_m: place.straight_m }),
         ...(twins.length > 0 && { aliases: twins.map((t) => t.name) }),
         // The categories of the OSM places that are it: a station of Ostrovok is a metro or a tram stop of OSM.
         ...(same.length > 0 && {
@@ -892,7 +907,10 @@ export function placesStore(
       }),
       calculation: null,
       observed_at: null,
-      limitations: ['Расстояние со страницы Островка: как он его меряет, страница не говорит'],
+      limitations: [
+        'Расстояние со страницы Островка: как он его меряет, страница не говорит',
+        'Прямая до точки места в method.straight_m может быть длиннее: точка пляжа — его середина',
+      ],
       evidence: [{ evidence: evidenceKey(source), role: 'source' }],
     }
     store.entities.push(entity)
@@ -1175,6 +1193,124 @@ export function mergeStores(stores: readonly Store[]): Store {
     relations: once(all('relations'), (row) => `${row.subject}|${row.predicate}|${row.object}`),
     documents: once(all('documents'), (row) => row.evidence),
   }
+}
+
+/** What the hotel's Ostrovok page says of it, the parts read here (`ota_hotel_pages.hotel->facts`, the time of the row). */
+export interface FactsPage {
+  master_id: number
+  updated_at: string
+  facts: unknown
+}
+
+/** The facts of the page that become claims: the property, its unit and the key in `facts`. Zero is «unknown». */
+const FACTS = [
+  { property: 'hotel.year_built', key: 'yearBuilt', unit: 'year', label: 'год постройки' },
+  { property: 'hotel.year_renovated', key: 'yearRenovated', unit: 'year', label: 'год ремонта' },
+  { property: 'hotel.rooms_count', key: 'roomsNumber', unit: null, label: 'число номеров' },
+  // Not the building's floors: the floors the hotel's rooms take (the building's are EUBUCCO's, `building.*`).
+  { property: 'hotel.room_floors', key: 'floorsNumber', unit: null, label: 'этажи, которые занимают номера' },
+] as const
+
+/**
+ * The facts of the hotel's page — the year built and renovated, the number of rooms, the floors its rooms take — each a
+ * `reported` claim of the hotel with the page as evidence. A fact the page leaves at zero or lacks gives no claim: the
+ * page's zero is «unknown», not a value.
+ */
+export function factsStore(hotel: ClaimHotel, page: FactsPage): Store {
+  const store: Store = { entities: [], evidence: [], calculations: [], claims: [], relations: [], documents: [] }
+  const facts = page.facts && typeof page.facts === 'object' ? (page.facts as Record<string, unknown>) : {}
+  const hotelKey = entityKey(hotelEntity(hotel))
+  const source: EvidenceRow = {
+    type: 'ota_page',
+    title: `Страница отеля на Островке: «${hotel.name ?? hotel.id}»`,
+    provider: OSTROVOK,
+    external_id: `facts:${page.master_id}`,
+    url: null,
+    retrieved_at: time(page.updated_at),
+    excerpt: null,
+    metadata: { master_id: page.master_id },
+    dataset_id: null,
+  }
+  for (const { property, key, unit, label } of FACTS) {
+    const value = finite(facts[key])
+    if (value === null || value <= 0) continue
+    store.claims.push({
+      entity: hotelKey,
+      property,
+      source_key: key,
+      value_numeric: value,
+      value_min: null,
+      value_max: null,
+      value_text: null,
+      unit,
+      epistemic_status: 'reported',
+      ...rated('ostrovok_fact', { key }),
+      calculation: null,
+      observed_at: null,
+      limitations: [`Данные страницы Островка (${label}): их сообщает отель, Островок не проверяет`],
+      evidence: [{ evidence: evidenceKey(source), role: 'source' }],
+    })
+  }
+  if (store.claims.length > 0) {
+    store.entities.push(hotelEntity(hotel))
+    store.evidence.push(source)
+  }
+  return store
+}
+
+/**
+ * The views the names of the hotel's room types tell of (src/lib/featureRows.ts `viewRows`): the room is an entity,
+ * `room.view` its claim `reported` with the name as the evidence's excerpt. A name without a view gives nothing: not
+ * «без вида». Other variants of the same room may be named otherwise, so the claim is about the named variant.
+ */
+export function roomViewStore(hotel: ClaimHotel, groups: readonly RoomGroup[], updatedAt: string | null): Store {
+  const store: Store = { entities: [], evidence: [], calculations: [], claims: [], relations: [], documents: [] }
+  const seen = new Set<string>()
+  for (const row of viewRows(Number(hotel.id.replace('ota-', '')), groups)) {
+    const group = groups.find((g) => g.rg_hash === row.rg_hash)
+    const name = text(group?.name_struct?.main_name)
+    if (!name) continue
+    const room: EntityRow = {
+      kind: 'room',
+      ref: `${hotel.id}/${row.rg_hash}`,
+      hotel_id: hotel.id,
+      name,
+    }
+    const source: EvidenceRow = {
+      type: 'ota_page',
+      title: `Название номера на Островке: «${name}»`,
+      provider: OSTROVOK,
+      external_id: `room:${row.master_id}:${row.rg_hash}`,
+      url: null,
+      retrieved_at: time(updatedAt),
+      excerpt: name,
+      metadata: { master_id: row.master_id, rg_hash: row.rg_hash },
+      dataset_id: null,
+    }
+    if (!seen.has(entityKey(room))) {
+      seen.add(entityKey(room))
+      store.entities.push(room)
+      store.evidence.push(source)
+    }
+    store.claims.push({
+      entity: entityKey(room),
+      property: 'room.view',
+      source_key: row.view,
+      value_numeric: null,
+      value_min: null,
+      value_max: null,
+      value_text: row.view,
+      unit: null,
+      epistemic_status: 'reported',
+      ...rated('room_name_view', { name }),
+      calculation: null,
+      observed_at: null,
+      limitations: ['Вид взят из названия типа номера; в другом варианте того же номера его в названии может не быть'],
+      evidence: [{ evidence: evidenceKey(source), role: 'source' }],
+    })
+  }
+  if (store.entities.length > 0) store.entities.unshift(hotelEntity(hotel))
+  return store
 }
 
 /** JSON with its keys sorted: jsonb comes back in its own order. */

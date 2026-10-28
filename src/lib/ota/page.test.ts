@@ -4,6 +4,8 @@ import {
   nextDataPageProps,
   otaHotelDetails,
   pageFields,
+  pageRooms,
+  poiName,
   pageFieldsRowSchema,
   pageRowSchema,
   placeRowSchema,
@@ -474,7 +476,37 @@ describe('pageFields', () => {
       checkIn: '15:00',
       checkOut: '11:00',
       workspace: true,
+      rooms: {},
     })
     expect(pageFields({ ...row, roomGroups: [{ roomAmenityData: ['safe'] }] }).workspace).toBe(false)
+  })
+
+  it('reads the room groups: the area, the photos and the amenities the page lists, nothing else', () => {
+    const rooms = pageRooms([
+      {
+        rgHash: '3502302',
+        size: 15.4,
+        images: [{ tmpl: 'https://cdn.ostrovok.ru/t/{size}/b.jpg' }, { tmpl: 'no size' }],
+        roomAmenityData: ['air-conditioning', 'unknown-key', 'safe', 'safe'],
+      },
+      { rgHash: '0', size: 0, images: [], roomAmenityData: [] },
+      { nameStruct: {} },
+    ])
+    expect(rooms['3502302']).toEqual({
+      area: 15,
+      photos: ['https://cdn.ostrovok.ru/t/{size}/b.jpg'],
+      amenities: ['Кондиционер', 'Сейф'],
+    })
+    expect(rooms['0']).toEqual({ area: null, photos: [], amenities: [] })
+    expect(Object.keys(rooms)).toHaveLength(2)
+    expect(pageRooms(null)).toEqual({})
+  })
+})
+
+describe('poiName', () => {
+  it("names an airport by its own English name, not its city's, and leaves the other places", () => {
+    expect(poiName({ type: 'AIRPORT', name: 'Валенсия', nameEn: 'Valencia Airport' })).toBe('Valencia Airport')
+    expect(poiName({ type: 'AIRPORT', name: 'Валенсия', nameEn: '' })).toBe('Валенсия')
+    expect(poiName({ type: 'POI', name: 'Зоопарк', nameEn: 'Zoo' })).toBe('Зоопарк')
   })
 })

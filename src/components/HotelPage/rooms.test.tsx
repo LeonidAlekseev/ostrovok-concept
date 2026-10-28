@@ -37,6 +37,22 @@ describe('RoomList', () => {
   })
 })
 
+describe('the amenities of a real room', () => {
+  const withAmenities = { ...hotel, rooms: [{ ...room, amenities: ['Сейф', 'Кондиционер'] }, ...hotel.rooms.slice(1)] }
+
+  it('lists them under the facts of the room, and nothing for a room that has none', () => {
+    render(<RoomList hotel={withAmenities} stay={null} guests={guests} onPickDates={noop} />)
+    expect(screen.getAllByText('Сейф · Кондиционер')).toHaveLength(1)
+  })
+
+  it('lists them on the rates of the room', () => {
+    render(
+      <RoomRates hotel={withAmenities} room={withAmenities.rooms[0]} stay={null} guests={guests} onPickDates={noop} />,
+    )
+    expect(screen.getByText('Сейф · Кондиционер')).toBeTruthy()
+  })
+})
+
 // rate-selection
 describe('RoomRates', () => {
   it('links "Забронировать" to an offer that parses back', () => {

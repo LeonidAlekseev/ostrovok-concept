@@ -14,18 +14,12 @@ import { claimsOf, evidenceOf, type ClaimEvidence, type HotelClaim } from './cla
  *
  * The graph of a real hotel for the public read routes (`GET /api/hotels/{hotelId}/relations`): its edges
  * (`relations`: `near` a place, `nearest_building` a building) with the claim that is the edge's value (the distance)
- * and the edge's source, read with the anon key as `claims.ts` does. The store keeps no coordinates of a place, so they
- * and its categories come from the OSM cache (`osm_places_near`) the edge was computed from.
+ * and the edge's source, read with the anon key as `claims.ts` does. A place's point is its entity's `metadata`
+ * (`npm run db:features` writes it), its categories the edge's evidence's.
  */
 
 /** Edges at most read from the store for a hotel: it has a few dozen. */
 export const RELATIONS_LIMIT = 500
-
-export interface PlaceSpot {
-  lat: number
-  lon: number
-  categories: string[]
-}
 
 export interface HotelRelation {
   id: string
@@ -35,7 +29,7 @@ export interface HotelRelation {
     kind: string
     ref: string
     name: string | null
-    /** `null` for a building, or a place the OSM cache no longer shows. */
+    /** `null` for a building, or a place stored without its point. */
     lat: number | null
     lon: number | null
     categories: string[]
@@ -49,7 +43,12 @@ const relationRow = z.object({
   id: z.string(),
   predicate: z.string(),
   confidence: z.number().min(0).max(1).nullable(),
-  object: z.object({ kind: z.string(), ref: z.string(), name: z.string().nullable() }),
+  object: z.object({
+    kind: z.string(),
+    ref: z.string(),
+    name: z.string().nullable(),
+    metadata: z.object({ lat: z.number(), lon: z.number() }).partial().catch({}),
+  }),
   claim: z.unknown(),
   evidence: z.unknown(),
 })
@@ -62,7 +61,7 @@ const CLAIM_COLUMNS =
 const EVIDENCE_COLUMNS = 'id, type, title, provider, external_id, url, retrieved_at, excerpt, dataset_id, metadata'
 
 const RELATION_SELECT =
-  `id, predicate, confidence, object:entities!relations_object_id_fkey(kind, ref, name), ` +
+  `id, predicate, confidence, object:entities!relations_object_id_fkey(kind, ref, name, metadata), ` +
   `claim:claims(${CLAIM_COLUMNS}), evidence(${EVIDENCE_COLUMNS}), subject:entities!relations_subject_id_fkey!inner(kind, ref)`
 
 const metadataCategories = (value: unknown): string[] => {
@@ -70,81 +69,44 @@ const metadataCategories = (value: unknown): string[] => {
   return Array.isArray(categories) ? categories.filter((c): c is string => typeof c === 'string') : []
 }
 
-const spotRow = z.object({
-  osm_type: z.string(),
-  osm_id: z.number(),
-  lat: z.number(),
-  lon: z.number(),
-  categories: z.array(z.string()),
-})
+const readRelations = catalogCached(['hotel-relations', 'v2'], async (hotelId: string, predicate: string) => {
+  const client = anonClient()
+  const query = client
+    .from('relations')
+    .select(RELATION_SELECT)
+    .eq('subject.kind', 'hotel')
+    .eq('subject.ref', hotelId)
+    .limit(RELATIONS_LIMIT)
+  const { data, error } = await (predicate ? query.eq('predicate', predicate) : query)
+  if (error) throw error
 
-const readRelations = catalogCached(
-  ['hotel-relations', 'v1'],
-  async (hotelId: string, lat: number, lon: number, predicate: string) => {
-    const client = anonClient()
-    const query = client
-      .from('relations')
-      .select(RELATION_SELECT)
-      .eq('subject.kind', 'hotel')
-      .eq('subject.ref', hotelId)
-      .limit(RELATIONS_LIMIT)
-    const { data, error } = await (predicate ? query.eq('predicate', predicate) : query)
-    if (error) throw error
+  const rows = (data ?? []).flatMap((value) => {
+    const parsed = relationRow.safeParse(value)
+    return parsed.success ? [parsed.data] : []
+  })
+  const sources = rows.map(({ evidence }) => ({
+    evidence: evidenceOf(evidence ? [evidence] : [])[0] ?? null,
+    categories: metadataCategories((evidence as { metadata?: unknown } | null)?.metadata),
+  }))
+  const claims = rows.map(({ claim }) => claimsOf(claim ? [claim] : [])[0] ?? null)
 
-    const rows = (data ?? []).flatMap((value) => {
-      const parsed = relationRow.safeParse(value)
-      return parsed.success ? [parsed.data] : []
-    })
-    const sources = rows.map(({ evidence }) => ({
-      evidence: evidenceOf(evidence ? [evidence] : [])[0] ?? null,
-      categories: metadataCategories((evidence as { metadata?: unknown } | null)?.metadata),
-    }))
-    const claims = rows.map(({ claim }) => claimsOf(claim ? [claim] : [])[0] ?? null)
-
-    // The places' points and categories: the cache the edges were computed from, around the hotel.
-    const spots = new Map<string, PlaceSpot>()
-    const wanted = [...new Set(sources.flatMap(({ categories }) => categories))]
-    const places = rows.filter(({ object }) => object.kind === 'osm_place')
-    if (wanted.length > 0 && places.length > 0) {
-      const radius = Math.max(1, ...claims.map((c) => (c?.value.kind === 'number' ? c.value.value : 0))) + 1
-      const { data: near, error: nearError } = await client.rpc('osm_places_near', {
-        lat,
-        lon,
-        radius_m: radius,
-        wanted,
-        per_category: 20,
-      })
-      if (nearError) throw nearError
-      const list = (near as { places?: unknown } | null)?.places
-      for (const item of Array.isArray(list) ? list : []) {
-        const spot = spotRow.safeParse(item)
-        if (spot.success)
-          spots.set(`${spot.data.osm_type}/${spot.data.osm_id}`, {
-            lat: spot.data.lat,
-            lon: spot.data.lon,
-            categories: spot.data.categories,
-          })
-      }
+  return rows.map(({ id, predicate: name, confidence, object }, i): HotelRelation => {
+    const { metadata, ...entity } = object
+    return {
+      id,
+      predicate: name,
+      confidence,
+      object: {
+        ...entity,
+        lat: metadata.lat ?? null,
+        lon: metadata.lon ?? null,
+        categories: sources[i].categories,
+      },
+      claim: claims[i],
+      evidence: sources[i].evidence,
     }
-
-    return rows.map(({ id, predicate: name, confidence, object }, i): HotelRelation => {
-      const spot = spots.get(object.ref)
-      return {
-        id,
-        predicate: name,
-        confidence,
-        object: {
-          ...object,
-          lat: spot?.lat ?? null,
-          lon: spot?.lon ?? null,
-          categories: spot?.categories ?? sources[i].categories,
-        },
-        claim: claims[i],
-        evidence: sources[i].evidence,
-      }
-    })
-  },
-)
+  })
+})
 
 const distanceOf = (relation: HotelRelation) =>
   relation.claim?.value.kind === 'number' ? relation.claim.value.value : Number.POSITIVE_INFINITY
@@ -157,9 +119,7 @@ export async function loadHotelRelations(
   hotel: HotelPoint,
   { predicate = '', category = '' }: { predicate?: string; category?: string } = {},
 ): Promise<HotelRelation[] | null> {
-  const all = await readOrNull(hotel.id, 'hotel relations', () =>
-    readRelations(hotel.id, hotel.lat, hotel.lon, predicate),
-  )
+  const all = await readOrNull(hotel.id, 'hotel relations', () => readRelations(hotel.id, predicate))
   if (!all) return all
   return all
     .filter((r) => !category || r.object.categories.includes(category))

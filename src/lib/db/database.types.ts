@@ -452,6 +452,7 @@ export type Database = {
           hotel_id: string | null
           id: string
           kind: string
+          metadata: Json
           name: string | null
           ref: string
           updated_at: string
@@ -462,6 +463,7 @@ export type Database = {
           hotel_id?: string | null
           id?: string
           kind: string
+          metadata?: Json
           name?: string | null
           ref: string
           updated_at?: string
@@ -471,6 +473,7 @@ export type Database = {
           hotel_id?: string | null
           id?: string
           kind?: string
+          metadata?: Json
           name?: string | null
           ref?: string
           updated_at?: string

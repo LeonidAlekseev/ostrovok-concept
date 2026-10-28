@@ -65,11 +65,11 @@ export function confidenceOf({ inputs, assumptions }: ConfidenceRule): number {
 
 /** The rule of each kind of claim. */
 export const CONFIDENCE_RULES = {
-  /** A fact of the hotel's page (none in the store yet). */
+  /** A fact of the hotel's page: the year built, the rooms, the floors the rooms take. */
   ostrovok_fact: { inputs: ['ostrovok'], assumptions: [] },
   /** A place of Ostrovok near the hotel and its distance, as the page gives it. */
   ostrovok_place_distance: { inputs: ['ostrovok'], assumptions: [] },
-  /** A view from a room by the name of its group (none in the store yet). */
+  /** A view from a room by the name of its group. */
   room_name_view: { inputs: ['ostrovok'], assumptions: [] },
   /** Where an OSM place is (`observed`; none in the store yet). */
   osm_place: { inputs: ['osm'], assumptions: [] },
