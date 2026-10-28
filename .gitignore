@@ -33,14 +33,11 @@ next-env.d.ts
 # Скриншоты визуальных проверок: хранятся вне репозитория
 openspec/**/screenshots/
 
-# Ключи API: открытые .env* и закрытые ключи не коммитим, в git только .env.local.secret (git-secret)
-.env*
+# Ключи API: открытый .env и закрытые ключи не коммитим, в git только .env.example и зашифрованные *.age
+.env
+.env.*
 !.env.example
-!.env.local.secret
-.gitsecret/keys/random_seed
-.gitsecret/keys/pubring.kbx~
-!*.secret
-*.asc
+*.key
 
 # Supabase CLI cache
 supabase/.temp/

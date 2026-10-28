@@ -17,7 +17,7 @@ export const GIGACHAT_BASE_URL = 'https://api.giga.chat/v1'
 /** The name of the biggest model of the API: `GET /v1/models` has no "Ultra 3.5". */
 export const GIGACHAT_MODEL = 'GigaChat-3-Ultra'
 const OAUTH_URL = 'https://ngw.devices.sberbank.ru:9443/api/v2/oauth'
-const CA_FILE = 'config/certs/russian_trusted_root_ca.pem'
+const CA_FILE = 'certs/russian_trusted_root_ca.pem'
 
 /** The token is renewed this long before it ends, so a request never leaves with a token about to die. */
 const TOKEN_MARGIN_MS = 60_000

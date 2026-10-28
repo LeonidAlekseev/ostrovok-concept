@@ -1,679 +1,125 @@
-# ostrovok-concept
+# Островок! Эвал (трек: AI-агрегатор онлайн-бронирования жилья)
 
-Островок! - концепт агрегатора в сфере онлайн-бронирования жилья
+Концепт агрегатора Островка: каталог настоящих отелей Валенсии с картой, поиском по смыслу и фото и ИИ-помощником Эвалом.
+Эвал подбирает отели по пожеланию, отвечает на вопросы об отеле по данным (шум, этаж, окружение, отзывы), а когда данных нет — спрашивает отельера.
 
-Главная страница сервиса бронирования отелей (Next.js 16 App Router + React 19 + TypeScript).
+- Видео: TODO: ссылка на видео
+- Сервис (Vercel, production): https://ostrovok-concept.vercel.app
 
-## Запуск
+## Быстрый старт
 
-```bash
-npm install
-npm run dev        # http://localhost:3000
-npm run build      # production-сборка (страница пререндерится статически)
-npm run start      # запуск собранной версии
-npm run lint
-npm run typecheck
-npm test
-npm run format:check
-```
-
-Для `npm run dev` и `npm run build` нужны `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-(сборка читает каталог из базы и без них останавливается). Остальные имена — в `.env.example`; значения достаёт
-`npm run secrets:reveal` (создаёт `.env.local`, см. «Ключи API»). Для ИИ-ответов нужен `NVIDIA_API_KEY` (и `GIGACHAT_AUTH_KEY` для первой текстовой модели), без них
-помощник отвечает по правилам. Тесты и lint ключей не требуют.
-
-CI (GitHub Actions, `.github/workflows/ci.yml`) на каждый PR и push в `dev` и `main` запускает
-`npm ci`, `npm run lint`, `npm run typecheck`, `npm test` и `npm run format:check` в job `checks`
-(проверка `CI / checks`). Сборку в CI не запускают: её выполняет Vercel.
-
-## Деплой на Vercel
-
-Vercel определяет проект как Next.js без дополнительной настройки:
-импортируйте репозиторий (Framework Preset — Next.js, команды по умолчанию)
-или выполните `npx vercel --prod` из корня. Нужен Node.js ≥ 20.9.
-В настройках проекта Vercel нужна одна переменная — `GIT_SECRET_PRIVATE_KEY` (см. «Ключи API»).
-
-Вне production (`npm run dev` и preview-деплои Vercel, по `VERCEL_ENV`) в левом нижнем углу
-показываются технические параметры глобуса: fps, время кадра, разрешение рендера,
-объём геометрии. Проверить production-сборку с ними локально: `VERCEL_ENV=preview npm run build`.
-
-## Ключи API
-
-Ключи API (Supabase, NVIDIA) хранятся в репозитории зашифрованными через
-[git-secret](https://github.com/sobolevn/git-secret): в git лежит только `.env.local.secret`, открытые `.env*`
-(кроме `.env.example` с именами переменных) и закрытые ключи в `.gitignore`. Файл зашифрован для ключа GPG проекта
-`secrets@opognali.local` (без пароля) и ключей людей, добавленных через `git secret tell`.
-
-- **Раскрыть** — `npm run secrets:reveal` создаёт `.env.local`: с переменной `GIT_SECRET_PRIVATE_KEY` (закрытый ключ
-  в armored-виде, `\n` можно экранировать) расшифровывает пакетом `openpgp`, без неё — через `git secret reveal -f`
-  (нужны git-secret и закрытый ключ в `gpg`). Без ключа и git-secret ничего не делает.
-- **Добавить или сменить ключ** — правка `.env.local`, затем `npm run secrets:hide` (`git secret hide`) и коммит
-  `.env.local.secret`. Новое имя переменной — ещё и в `.env.example`.
-- **Добавить человека** — импорт его открытого ключа (`gpg --import`), `git secret tell <email>`, затем
-  `npm run secrets:hide` и коммит `.gitsecret/` и `.env.local.secret`. Убрать — `git secret removeperson <email>`,
-  `npm run secrets:hide` и смена самих ключей API: старые копии файла остаются в истории git.
-- **Сборка** — `prebuild` (`node scripts/secrets.mjs build`) при наличии `GIT_SECRET_PRIVATE_KEY` пишет
-  `.env.production.local`, из которого `next build` встраивает `NEXT_PUBLIC_*`; `.env.local` при этом не трогается.
-  Без ключа (CI) шаг пропускается, сборка и тесты проходят.
-- **Сервер** — `getSecret(name)` из `src/lib/secrets.ts` (`server-only`) берёт `process.env[name]`, иначе один раз на
-  холодный старт расшифровывает `.env.local.secret` (файл попадает в функции Vercel через `outputFileTracingIncludes`
-  в `next.config.ts`). Нет ключа — `undefined`, код работает в режиме без ключей. Клиент серверные ключи не получает.
-- **Сменить ключ проекта** — новый ключ GPG, `git secret removeperson secrets@opognali.local`, `git secret tell` нового,
-  `npm run secrets:hide`, новый закрытый ключ — в `GIT_SECRET_PRIVATE_KEY` на Vercel.
-
-## Supabase
-
-Постоянные данные — в Supabase: аккаунты (`profiles`) и каталог (`destinations`, `hotels`: ключевые колонки, порядок
-`position` и весь объект в `data jsonb`). Схема с RLS — `supabase/migrations/`: каталог читают все, пишет только
-сервисный ключ, профиль читает и меняет владелец.
-
-**Каталог в Supabase.** Интерфейс читает его на сервере через `src/lib/db/catalog.ts` (`server-only`, anon-ключ под
-RLS): `loadDestinations`, `loadHotelSummaries`, `loadNewHotels`, `loadHotel`, `loadHotels(ids)`,
-`loadCityHotels(destinationIds)`, `loadAllHotels`. Чтения кешируются `unstable_cache` с тегом `catalog` на час
-(`CATALOG_LIFETIME`; полные отели — по городу на запись кеша); страницы с ними перестраиваются в фоне так же часто.
-Ошибка базы — `CatalogUnavailableError`: страница показывает «Не удалось загрузить страницу» с «Повторить»
-(`src/app/error.tsx`, `global-error.tsx`), API — 503. Клиент получает только нужное: направления — из корневого
-layout (`CatalogProvider`, `useDestinations`), главная — новые отели и подборки пропсами, «Поиск вайба» и «Звёзды
-подскажут» считают на сервере (server actions), остальное — `GET /api/hotels?ids=a,b` (избранное, поездки, бронь) или
-`?destinations=x,y` (результаты): до 60 `id`, полные отели, `Cache-Control: s-maxage=300`. Общее у маршрутов
-`src/app/api` — `src/lib/api.ts`: заголовок кэша CDN, ошибка `{ error }` с коротким английским текстом (браузер
-смотрит только на статус) и отель маршрута `[hotelId]`, показанный в этом окружении. Общее у читателей `src/lib/db` —
-`src/lib/db/anon.ts`: anon-клиент без сессии, проверка настоящего отеля, кэш каталога и «прочитать или `null`». Карта «Показать на карте»
-открывается на кварталах вокруг отеля и грузит отели видимой области с запасом — `?bbox=west,south,east,north`
-(`src/lib/mapBox.ts`: сторона до 0,1°, сетка 0,005°, до 200 отелей), уже загруженные остаются. Отель,
-добавленный в базу после сборки, открывается без пересборки: `/hotels/<id>` рендерится при первом запросе и
-кешируется. Генератор `src/lib/catalogGenerator.ts` — источник `db:seed` и фикстура тестов (`src/test/catalog.ts`),
-в бандлы сайта не попадает. **После изменения данных** — `npm run db:seed`, затем ревалидация:
-`npm run db:seed -- --revalidate https://<сайт>` (или `POST /api/revalidate` с `Authorization: Bearer
-<SUPABASE_SERVICE_ROLE_KEY>`), иначе сайт обновится сам в течение часа. Сборка читает базу: без ключей она
-останавливается с «нет NEXT_PUBLIC_SUPABASE_URL…: npm run secrets:reveal».
-
-- `npm run db:types` — `scripts/db-types.mjs`: `supabase gen types typescript` по базе (`SUPABASE_DB_URL` из `.env.local`, схема
-  только читается) в `src/lib/db/database.types.ts`, затем Prettier. Клиенты Supabase типизированы `Database`. **Перегенерируйте
-  после каждой миграции** (`db:push`) и коммитьте файл вместе с ней. Следом скрипт обновляет раздел Supabase документации API
-  (`npm run docs:supabase`, см. «Документация API»).
-- `npm run db:push` — применяет миграции (`supabase db push --db-url "$SUPABASE_DB_URL"`, строка из `.env.local`).
-  Прямой адрес `db.<ref>.supabase.co` доступен только по IPv6; без IPv6 подставьте строку пулера
-  (Dashboard → Connect → Transaction pooler, порт 6543) в `SUPABASE_DB_URL` окружения.
-- `npm run db:seed` — `scripts/seed.ts` (Node исполняет TypeScript сам): строит каталог генератором
-  `src/lib/catalogGenerator.ts` (с порядком `position`), делает upsert пачками по 100 и печатает число строк; повторный запуск оставляет те же строки.
-  Создаёт демо-аккаунт «Демо-путешественник» из `DEMO_USER_EMAIL`/`DEMO_USER_PASSWORD`, если его нет.
-- `npm run db:seed:hotelier-demo` — `scripts/hotelier-demo.ts`: демо-переписки с отельером (`src/lib/hotelierDemo.ts`, после `npm run db:seed` и `npm run db:hotelier`).
-  - 6 настоящих отелей Валенсии, 8 сценариев: известно, неизвестно → запрос Эвала, противоречие, вид, гарантия этажа, личный ответ.
-  - Вопросы демо-путешественника, ответы демо-отельера, утверждения `hotelier.*` с источниками и векторами, чаты Эвала с блоком «Запрос отельеру».
-  - Всё помечено `is_demo` и показывается с бейджем «демо».
-  - Id — UUID v5 от ключей сценария: повторный запуск ничего не добавляет и чужие строки не трогает.
-- `npm run db:hotelier-knowledge` — `scripts/hotelier-knowledge.ts`: повторяет то, что сервер делает в `after()` после
-  ответа отельера (характеристики `hotelier.*`, документ поиска с векторами, ждущие запуски Эвала), для ответов, чьи
-  сведения не сохранились (`knowledge_status` `queued`/`failed`) или ещё не обрабатывались; повторный запуск не плодит строк.
-- `npm run db:hotelier` — `scripts/hotelier-account.ts`: аккаунт «Демо отельер» из `DEMO_HOTELIER_EMAIL`/
-  `DEMO_HOTELIER_PASSWORD` и его профиль `hotelier_profiles` с `all_hotels` (отельер всех отелей); повторный запуск
-  оставляет тот же аккаунт и профиль.
-  `SUPABASE_SERVICE_ROLE_KEY` читают только этот скрипт и сервер, никогда клиент.
-- `npm run db:seed:valencia -- <search.json>` — `scripts/seed-valencia.ts`: выдача Островка по Валенсии. Сырые отели
-  кладёт в `ota_hotels` (ключ `master_id`, уникальный `ota_hotel_id`), остальное о поиске — в `ota_searches`, а отели
-  каталога `ota-<master_id>` (маппер `src/lib/ota/hotel.ts`) — в `hotels` после сгенерированных. JSON в репозиторий
-  не кладём. Печатает число строк; после загрузки — `npm run db:embed`.
-- `uv run scripts/load-valencia-geo.py buildings [<ES52.parquet>]`, затем `… noise <ES.gpkg>` — геоданные города
-  Валенсия (PostGIS, схема `extensions`): здания EUBUCCO v0.2 региона ES52 (город `city_id` ES46250) в `geo_buildings`
-  — без пути DuckDB читает их с S3 EUBUCCO (`s3://eubucco/v0.2/buildings/parquet/nuts_id=ES52/ES52.parquet`, анонимно),
-  только строки города; контуры шума EEA END 2022 (`ES.gpkg` из хранилища EEA,
-  `eea_v_3035_1_k_noise-contours-end2022_p_2026_v01_r00`, ~1,6 ГБ) по охвату зданий плюс 300 м в `geo_noise`. Файлы
-  держим вне git. Каждая строка ссылается на набор в `geo_datasets` (название, версия, обработка) и хранит поля
-  источника и уверенности набора под их именами: у зданий `*_source`, `*_source_id(s)`, `*_confidence*` (границы
-  оценки высоты и этажности), у шума поставку Reportnet, исправление геометрии EEA и ширину полосы `band_db`. Каждая
-  команда заменяет свою таблицу в одной транзакции; затем `npm run db:features`. Чтение: `hotel_geo(lat, lon)` —
-  здание и шум в точке, `hotel_noise_facade(lat, lon)` — полосы EEA у фасада (самая громкая и самая тихая полоса
-  каждого слоя у контура здания + 5 м или в круге 25 м без здания), `hotel_geo_features(lat, lon, radius_m)` — GeoJSON зданий (для `fill-extrusion`) и зон шума
-  в круге, радиус 300 м по умолчанию, не больше 500 м; `hotel_noise_quiet(lat, lon, radius_m)` — тихая зона того же
-  круга: где слои EEA размечены и ни один не достигает 40 дБ; `hotel_noise_day(lat, lon, radius_m)` — куски, где
-  полоса Lden встречает полосу Lnight того же слоя (для оценки дня); `hotel_noise_map(lat, lon, radius_m)` — те же
-  три части карты, посчитанные заранее (`hotel_noise_maps`, см. `db:features`), или `null`.
-- `npm run db:features [-- --dry-run]` — `scripts/hotel-features.ts`: свойства настоящих отелей для Эвала — здание по
-  `hotel_geo` и шум у фасада по `hotel_noise_facade` с оценкой `noise-estimate-v2` в `hotel_features` с их происхождением (наборы данных, источник и границы высоты и этажности),
-  вид из номеров по названиям групп номеров `ota_hotels` в `hotel_room_views`, и карты шума вокруг каждого отеля в
-  `hotel_noise_maps` (`hotel_noise_map_refresh` по одной точке: одна — до 2,1 с, четыре разом превышали лимит 8 с
-  роли API; ~5 мин на 220 точек; карты точек без отеля удаляет `hotel_noise_maps_prune`). Карту на лету считать дорого: пересечения полигонов EEA в круге 300 м под
-  нагрузкой занимали до 5,8 с при лимите anon 3 с, готовая читается за ~0,05 с. **После каждой перезагрузки
-  геоданных** (`load-valencia-geo.py`) запускайте `db:features`, иначе карты останутся по старым контурам; отель без
-  готовой карты получает карту, посчитанную на лету. Сырые данные не копирует, повторный запуск ничего не меняет в
-  `hotel_features` и `hotel_room_views`; `--dry-run` только считает. Тот же запуск заполняет хранилище утверждений
-  (`entities`, `claims`, `evidence`, `calculations`, `relations`, `documents`/`document_chunks`; схема — миграция
-  `20261027220000_claims_evidence_store.sql`, строки — `src/lib/claimRows.ts`, запись — `scripts/lib/claims-store.ts`):
-  полосы EEA у отеля (`reported`), оценка Lday (`derived` с расчётом), шумные места OSM в 200 м (связи `near` и
-  расстояния), аптеки, супермаркеты, больницы, остановки, пляжи и парки в 1 км (по 5 ближайших каждой категории из
-  кэша `osm_places`; место Островка тех же видов вместо совпавшего места OSM), ближайшее здание EUBUCCO в 50 м (связь
-  `nearest_building`, высота и этажность), отзывы как документы с гибридным поиском (`hotel_chunks_hybrid`: слова и смысл) и их
-  слова о шуме и тишине. У каждого утверждения — уверенность по политике `src/lib/confidence.ts` (версия в
-  `method.confidence`). Пишет только новое и изменённое, повторный запуск ничего не дублирует. Чтение — `src/lib/db/claims.ts`. Затем — `npm run db:embed` и `npm run db:embed:chunks`.
-- `npm run db:embed:chunks` — `scripts/embed-chunks.ts`: векторы фрагментов документов отелей (`document_chunks`:
-  отзывы и сведения отельера) для гибридного поиска `hotel_chunks_hybrid`. Идемпотентен: `content_hash` (модель,
-  размерность, текст) пишется только вместе с вектором, в модель уходят фрагменты без вектора и с изменённым текстом;
-  пачки по 32, не больше 40 запросов в минуту, при 429 и 5xx — повтор с паузой. Фрагмент без вектора ищется по словам.
-- `npm run db:embed:photos` — `scripts/embed-photos.ts`: векторы фото отелей Валенсии (`hotel_photo_embeddings`,
-  `nvidia/llama-nemotron-embed-vl-1b-v2`, 2048 чисел) для «Найти похожие отели» по фото в чате Эвала. Идемпотентен:
-  `content_hash` (модель, размерность, путь фото на CDN), в модель уходят только новые фото; фото без `url`, не
-  WebP/JPEG и отвергнутые моделью (422) пропускаются, фото, которых нет в каталоге, удаляются. Пачки по 4, не больше 40
-  запросов в минуту (около 2000 фото — 12–15 мин); `--dry-run` только считает.
-  Запускать после `db:features`; нужен `NVIDIA_API_KEY`. Печатает: всего, посчитано, без изменений, ошибок.
-- `npm run db:city-places -- --city <город> --pbf-url <выгрузка Geofabrik>` — `scripts/load-city-places.ts`: места
-  OpenStreetMap города для гео-инструментов Эвала (`src/lib/geo`), вся загрузка одним шагом — см. «Загрузка мест
-  другого города». Шаг записи отдельно — `npm run db:osm-places -- --bbox <s,w,n,e> [--centre <lat,lon>] [--file
-<answer.json>] [--dry-run]` (`scripts/load-osm-places.ts`; без `--file` спрашивает overpass-api.de).
-- `npm run db:embed` — `scripts/embed.ts`: векторы для поиска по смыслу (см. «Поиск по смыслу») по каталогу из базы —
-  все отели. В модель уходят только новые и изменённые отели (`content_hash`),
-  векторы удалённых объектов стираются; пачки по 32, при 429 и 5xx — повтор с паузой 2, 4, 8… с. Печатает: всего, посчитано,
-  без изменений, ошибок, удалено. Запускать после `db:seed`; нужен `NVIDIA_API_KEY`, не больше 40 запросов в минуту (лимит ключа), при 429 — ожидание
-  (`Retry-After` или 2, 4, 8… с) и повтор.
-  Модель входит в `content_hash`: после смены модели (`EMBEDDING_MODEL`) первый `npm run db:embed` пересчитывает
-  векторы всех отелей (миграция не нужна; число отелей ÷ 32 запросов, не больше 40 в минуту), повторный — ничего не шлёт
-  в модель. Пока переиндексация не прошла, поиск по смыслу сравнивает вектор запроса со старыми векторами другой
-  модели — запускать её сразу после выкладки.
-- `npm run db:clean:shared-photos [-- --delete]` — `scripts/clean-shared-photos.ts`: фото снимков «Поделиться» в
-  публичном bucket без снимка (удалён вместе с аккаунтом или вручную); без `--delete` только показывает папки и число
-  файлов. Папки моложе часа не трогает. Нужен `SUPABASE_SERVICE_ROLE_KEY`.
-
-**Скрипты `scripts/`.** Исходные файлы данных вне репозитория, поэтому скрипты загрузки — единственный способ
-восстановить базу; не удаляйте их. TypeScript-скрипты исполняет Node и начинают с `scripts/lib/node.ts`: он
-разрешает импорты модулей приложения без расширения, даёт `required()` (переменная `.env.local` или ошибка с её
-именем) и `serviceClient()` (клиент с сервисным ключом).
-
-| Скрипт                                                                                | Назначение                                                                                         |
-| ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `seed.ts` (`db:seed`)                                                                 | каталог генератора и демо-аккаунт                                                                  |
-| `seed-valencia.ts` (`db:seed:valencia`)                                               | выдача Островка по Валенсии: `ota_hotels`, `ota_searches`, отели каталога                          |
-| `load-ota-pages.ts` (`db:load:ota-pages`)                                             | страницы отелей Островка: `ota_hotel_pages`, `ota_pois`, `ota_hotel_pois`, `ota_rate_spec_tags`    |
-| `rebuild-ota-hotels.ts` (`db:rebuild:ota`)                                            | строки каталога настоящих отелей из `ota_hotels` и страниц                                         |
-| `load-valencia-geo.py`                                                                | здания EUBUCCO, шум EEA и покрытие `geo_coverage`                                                  |
-| `load-city-places.ts` (`db:city-places`)                                              | места OSM города одним шагом: выгрузка Geofabrik → `osm-pbf-to-overpass.py` → `load-osm-places.ts` |
-| `load-osm-places.ts` (`db:osm-places`)                                                | шаг записи мест OSM в `osm_places` и `osm_place_areas`                                             |
-| `osm-pbf-to-overpass.py`                                                              | выгрузка `.osm.pbf` → ответ Overpass, когда Overpass недоступен                                    |
-| `hotel-features.ts` (`db:features`)                                                   | свойства отелей, вид номеров, готовые карты шума, хранилище утверждений                            |
-| `embed.ts` (`db:embed`)                                                               | векторы поиска по смыслу                                                                           |
-| `embed-chunks.ts` (`db:embed:chunks`)                                                 | векторы фрагментов отзывов и сведений отельера                                                     |
-| `embed-photos.ts` (`db:embed:photos`)                                                 | векторы фото отелей Валенсии для поиска похожих по фото                                            |
-| `semantic-eval.ts`                                                                    | качество поиска по смыслу на живой базе                                                            |
-| `clean-shared-photos.ts` (`db:clean:shared-photos`)                                   | фото снимков без снимка                                                                            |
-| `db-push.mjs`, `db-types.mjs` (`db:push`, `db:types`)                                 | миграции и типы `Database`                                                                         |
-| `secrets.mjs` (`secrets:*`)                                                           | ключи `.env.local.secret`                                                                          |
-| `screenshots.mjs`                                                                     | визуальная проверка страниц                                                                        |
-| `openapi-supabase.ts` (`docs:supabase`)                                               | раздел Supabase документации API из `database.types.ts`                                            |
-| `openapi-examples.ts` (`docs:examples`)                                               | реальные примеры ответов документации API с запущенного сайта                                      |
-| `build-images.py`, `build-star-assets.mjs`, `build-draw-images.mjs`, `build-globe.py` | изображения и глобус из исходников вне репозитория (см. «Изображения»)                             |
-
-### Загрузка мест другого города
-
-Места для гео-инструментов Эвала (медицина, бары и клубы, еда, супермаркеты, транспорт, пляжи и берег, парки,
-достопримечательности, центр) хранятся в `osm_places`, а загруженный прямоугольник — в `osm_place_areas`: внутри него
-сервер отвечает из базы, вне — спрашивает Overpass онлайн и дописывает найденное. Город загружается одной командой:
+Нужен только Docker (Docker Desktop на Windows и macOS). Установка Node.js не нужна.
 
 ```bash
-npm run db:city-places -- --city València \
-  --pbf-url https://download.geofabrik.de/europe/spain/valencia-latest.osm.pbf \
-  --bbox 39.27,-0.53,39.58,-0.27 --dry-run
+git clone https://github.com/LeonidAlekseev/ostrovok-concept.git
+cd ostrovok-concept
+cp .env.example .env     # вписать значения переменных или только AGE_SECRET_KEY (см. ниже)
+docker compose up --build
 ```
 
-- `--city` — название для Nominatim и для имён временных файлов.
-- `--pbf-url` — выгрузка региона с [Geofabrik](https://download.geofabrik.de/) (`.osm.pbf`, `https`), в которой лежит
-  город; `.md5` рядом с ней проверяется.
-- Парки и пляжи, нарисованные как relation, `scripts/osm-pbf-to-overpass.py` отдаёт с границей (`polygons`, их собирает pyosmium), загрузчик хранит её `MULTIPOLYGON`: расстояние считается до края парка, а не до его центра.
-- `--bbox south,west,north,east` — прямоугольник загрузки: город, его отели с запасом, побережье, аэропорт. Без него —
-  рамка города из Nominatim, расширенная на `--margin-km` (по умолчанию 3 км); аэропорт за городом в неё может не попасть.
-- `--centre lat,lon` — центр города: категория `centre` остаётся только у ближайшего к нему узла `place=city|town`.
-  Без него — точка города из Nominatim.
-- `--tmp <dir>` — где держать временный каталог (по умолчанию системный `/tmp`); он удаляется в конце, даже после ошибки.
-- `--overpass` — сначала загрузить прямо из overpass-api.de (одна попытка на группу категорий), при отказе — из выгрузки.
-- `--dry-run` — скачать, разобрать и посчитать места по категориям, ничего не записывая.
-
-Шаги: прямоугольник и центр → проверка свободного места (выгрузка × 4 + 500 МБ: выгрузка, индекс координат,
-запас) → скачивание и md5 → `uv run scripts/osm-pbf-to-overpass.py` (обрезка по прямоугольнику и категориям) →
-`scripts/load-osm-places.ts` (upsert в `osm_places`, прямоугольник `preload` — один раз, подсчёт по категориям в базе)
-→ удаление временных файлов. Повторный запуск обновляет те же строки и не добавляет вторую область. Нужны `uv`,
-`NEXT_PUBLIC_SUPABASE_URL` и `SUPABASE_SERVICE_ROLE_KEY` (кроме `--dry-run`); ключи не печатаются. Пример:
-Валенсия 2026-10-26 — выгрузка 134 МБ, 5 минут на разбор, 8962 места. Геокодирование Эвала сейчас ограничено
-Валенсией (`VALENCIA_BBOX` в `src/lib/geo/distance.ts`): для другого города его тоже нужно расширить.
-
-## Производительность глобуса
-
-Глобус — точечный wireframe на Canvas 2D, без WebGL и текстур: ~7 700 точек суши, контуры
-побережий и сетка широт и долгот по всей сфере (`public/data/globe.json`, 53 KB в gzip). Кадр —
-поворот единичных векторов без тригонометрии на точку и три заливки точек плюс два штриха линий.
-Рисуется в полном разрешении экрана (`devicePixelRatio`), без понижения на слабых устройствах.
-Глобус крутится перетаскиванием в обе стороны: по горизонтали — с инерцией, по вертикали меняется
-наклон оси, и вращение продолжается с ним. Вокруг Земли медленно летают белые самолётики и ещё
-медленнее — воздушные шары, по случайным большим кругам; скрывшись за горизонтом, каждый берёт
-новый случайный курс (`globeFlyers.ts`). Из-за них
-глобус перерисовывается каждый кадр, кроме режима «уменьшить движение», на экранах 120 Гц кадры
-идут с частотой 60 fps.
-
-## Режимы поиска
-
-Панель поиска переключается между двумя режимами; рядом — два необычных поиска:
-
-- **Ассистент** — свободный запрос («хочу на море в октябре, бюджет до 70 000 ₽»). Ассистент
-  разбирает его, по одному задаёт недостающие вопросы (настроение, когда, с кем), сам выбирает
-  атмосферу поездки и предлагает три варианта; выбранный открывает страницу результатов `/search`
-  с его городом, датами и гостями (`src/lib/assistant.ts`). Сообщение читает языковая модель через `POST /api/assistant`
-  (Vercel AI SDK, `src/lib/ai/`; см. «Модели»).
-  Без `NVIDIA_API_KEY`, при ошибке, лимите (20 запросов в минуту с IP) или через 9 с — прежние правила по ключевым
-  словам, без сообщения об ошибке. Сообщение — до 500 символов, история — до 20 сообщений. Когда все вопросы заданы,
-  отели плана подбирает поиск по смыслу по всем словам путешественника в городах плана («тихий хостел с быстрым
-  Wi‑Fi в Праге» — хостелы Праги); ответ с ним — до 15 с, клиент ждёт 16.
-- **Вручную** — стандартная форма: направление, даты, гости; «Найти отель» открывает `/search`.
-- **Звёзды подскажут** — имя и знак зодиака, затем детерминированное предсказание по западной
-  астрологии: знак, Солнце и Луна в день заезда, фаза Луны и города каталога
-  (`src/lib/horoscope.ts`). Результат — отель и город; из предсказания можно собрать видео для
-  друзей и отправить его или скачать (`src/lib/shareMedia.ts`).
-- **Поиск вайба** — семь пар противоположностей («Море / Город», «Уютный вечер / Шумная вечеринка»…),
-  у каждой можно ответить «Не могу выбрать». По ответам считается архетип путешественника и
-  подбираются отели, по одному на город (`src/lib/vibe.ts`): сначала поиск по смыслу по выбранным полюсам, остальное —
-  расчёт по осям (он же — запасной путь); результат — картинка, которой можно поделиться.
-
-### Поиск по смыслу
-
-`src/lib/ai/semantic.ts` (только сервер): `semanticSearch(текст, { destinationIds, k, timeoutMs })` — вектор запроса
-`nvidia/nemotron-3.5-embed-1b` (`input_type: query`), ближайшие объекты в Supabase pgvector
-(`match_embeddings`, косинус, индекс HNSW), затем реранжирование `nvidia/nemotron-3.5-rerank-8b` (адаптер
-`RerankingModelV4` в `src/lib/ai/rerank.ts`). Модель отдаёт 2048 чисел (HNSW индексирует не больше 4000), они хранятся как `halfvec(2048)`;
-если вектор длиннее, берутся первые 2048 и нормируются заново. Без ключа, без векторов, при ошибке или через 8 с — `failed` с причиной (`no-key`, `timeout`, `aborted`, `model`,
-`database`), и вызывающий код берёт прежние правила; упал только реранкер — порядок векторов. Поиск по смыслу в плане
-(`searchStep`, `src/lib/ai/turn.ts`) повторяется один раз при `timeout`, `model` или `database`, если до срока ответа
-(15 с) хватает времени; если и повтор не удался, ответ помечается `modelsDown`. Векторы недавних запросов кешируются в памяти процесса.
-Таблица `embeddings` закрыта: читают её только функции `security definer`, пишет сервисный ключ.
-Качество — `node --env-file=.env.local scripts/semantic-eval.ts` (15 запросов, попадания в top-5 до и после
-реранжирования; вне CI).
-
-### Модели
-
-Эмбеддинги, реранк, фото и запасные текстовые модели — через API NVIDIA (build.nvidia.com) с одним ключом `NVIDIA_API_KEY`
-(см. «Ключи API»); лимит ключа — 40 запросов в минуту, дневного лимита нет. Общий запрос и ошибки — `src/lib/ai/nvidia.ts`.
-Первая текстовая модель — GigaChat Ultra (Сбер, ключ `GIGACHAT_AUTH_KEY`).
-
-- **Текстовые задачи** (помощник, `src/lib/ai/model.ts`, `understand.ts`) — цепочка `gigachat/GigaChat-3-Ultra` (4,5 с)
-  → `nvidia/nemotron-3.5-lightning-30b-a3b` → `nvidia/nemotron-3.5-bolt-e4b` → `minimaxai/minimax-m3.1-flash`: следующая модель
-  отвечает, если предыдущая не уложилась в свой срок, вернула 429, 5xx или ответ не по схеме. Без `GIGACHAT_AUTH_KEY`
-  цепочка начинается с `lightning`. Модели NVIDIA — через OpenAI-совместимый `https://integrate.api.nvidia.com/v1`
-  (`@ai-sdk/openai-compatible`). Рассуждения выключены (`reasoning: 'none'` → `reasoning_effort: none`): иначе модель тратит
-  на них время и токены ответа.
-- **GigaChat** (`src/lib/ai/gigachat.ts`) — `https://api.giga.chat/v1`, модель `GigaChat-3-Ultra` (имя из `GET /v1/models`;
-  «Ultra 3.5» в списке нет). Ключ авторизации `GIGACHAT_AUTH_KEY` (Basic, значение из личного кабинета Studio) меняется на токен
-  `POST https://ngw.devices.sberbank.ru:9443/api/v2/oauth` (`scope=GIGACHAT_API_PERS`, `RqUID` на каждый запрос); токен живёт
-  30 мин, кешируется в процессе и обновляется за минуту до конца и после 401. Сертификаты Сбера подписаны НУЦ Минцифры:
-  корневой `config/certs/russian_trusted_root_ca.pem` (публичный, с gu-st.ru) подключается только к запросам GigaChat через
-  свой `undici` Agent, `NODE_EXTRA_CA_CERTS` не нужен, проверка TLS нигде не отключается. Модель не знает `tools`,
-  `response_format: json_schema` и `reasoning_effort` (422): адаптер `fetch` превращает инструменты и схему `Output.object` в
-  `functions`/`function_call` и обратно, `reasoning_effort` убирает. Ответ не по схеме, 429 и 5xx отдают запрос следующей
-  модели. Цена и лимиты зависят от тарифа ключа в личном кабинете GigaChat; здесь они не проверялись.
-- **Эмбеддинги** — `nvidia/nemotron-3.5-embed-1b` (`/v1/embeddings`, `input_type` query/passage, `truncate: END`).
-  Свой адаптер в `src/lib/ai/embedding.ts`: провайдер AI SDK не передаёт `input_type`.
-- **Реранк** — `nvidia/nemotron-3.5-rerank-8b`
-  (`https://ai.api.nvidia.com/v1/retrieval/nvidia/nemotron-3.5-rerank-8b/reranking`), оценка — логит модели.
-- **Фото** (`src/lib/ai/vision.ts`) — цепочка `nvidia/nemotron-3.5-super-vl-120b-a12b` →
-  `minimaxai/minimax-m3.1-flash`.
-
-Скрипты (`db:embed`, `semantic-eval`) выдерживают 40 запросов в минуту и при 429 ждут (`Retry-After` или 2, 4,
-8… с) и повторяют; приложение при ошибке, лимите или таймауте уходит в запасной путь по правилам.
-
-## Стили
-
-Tailwind CSS v4 (через `@tailwindcss/postcss`, `postcss.config.mjs`) и shadcn/ui, своих CSS-модулей нет.
-Примитивы интерфейса — компоненты shadcn/ui на Base UI в `src/components/ui/` (настройки CLI —
-`components.json`, добавить компонент: `npx shadcn@latest add <имя>`); там же лежат свои
-примитивы вроде `SmartImage`. Все компоненты — раскладка страницы (`HomePage`), шапка, hero с
-глобусом, карточки направлений, баннер, панель поиска, форма и поля, ассистент, окна «Звёзды подскажут» и вайба и страница результатов с маркерами карты —
-написаны утилитами Tailwind. Значения, которые меняются по элементам или кадрам (координаты пинов
-`--x`/`--y`, размеры сцены `--globe-*`), — CSS-переменные в `style` или в произвольных свойствах
-(`[--globe-x:88%]`), их читают утилиты: `translate-x-[calc(var(--x)_*_var(--unit)_-_50%)]`.
-
-Анимации компонентов объявлены в `@theme` в `src/app/globals.css`: переменная
-`--animate-<имя>` и `@keyframes <имя>` внутри `@theme`, запуск — классом `animate-<имя>`
-(`animate-slot-shine`, `animate-typing-dot`, `before:animate-hub-pulse`). Задержка, своя у
-каждого элемента, — `animation-delay` в `style`. Появление элементов — утилиты `tw-animate-css`
-(`animate-in`, `fade-in`, `zoom-in-*`, `slide-in-from-*`).
-
-`translate`, `scale`, `rotate`, `box-shadow`: стандартные утилиты Tailwind (`-translate-x-1/2`,
-`hover:-translate-y-[3px]`, `scale-105`, `rotate-10`, `shadow-[…]`, `shadow-(--shadow-card)`,
-`inset-shadow-[…]`); произвольное свойство (`[transform:…]`) — только когда утилиты нет. Если
-`@keyframes` двигают элемент, они меняют то же свойство, что задаёт утилита (`translate`, `scale`),
-а не `transform`. Тень, которую анимация `box-shadow` должна плавно продолжить, ставится тем
-слоем Tailwind, на месте которого она в `@keyframes` (`inset-shadow-*` для внутренней обводки).
-Наведение — всегда `hover:` (Tailwind применяет его только на устройствах с наведением, касание
-состояние не показывает); `[&:hover]` не использовать. `transition` — стандартными утилитами
-(`transition-[scale,box-shadow] duration-250 ease-[ease]`; у нескольких свойств — списки значений:
-`duration-[600ms,700ms]`), не `[transition:…]`. Значение, которое задаёт сдвиг или поворот по
-состоянию, — CSS-переменная в `style`, читает её утилита (`translate-y-(--shift)`), а не
-`transform` в `style`. Раскрытие аккордеона `ui/accordion` — анимации `animate-accordion-down`/`-up`
-из `@theme` (высоту даёт `--accordion-panel-height` Base UI), при `prefers-reduced-motion` их нет.
-Примитивы `src/components/ui/*` генерирует CLI shadcn, правило к ним не применяется.
-
-Все токены описаны в `src/app/globals.css` слоями:
-
-1. **Бренд** — `--brand-*`, сырые значения палитры. На них ссылается только `globals.css`.
-2. **Роли** — `--background`, `--foreground`, `--primary`, `--primary-hover`, `--secondary`,
-   `--muted`, `--muted-foreground`, `--border`, `--ring`, `--destructive`, `--brand` (лайм),
-   `--success` и другие. Их читают Tailwind-классы и произвольные значения: `var(--primary)`.
-   Прозрачные варианты строятся через `color-mix(in srgb, var(--роль) 12%, transparent)`.
-3. **Тени и декор** — `--shadow-soft`, `--shadow-card`, `--shadow-popover`, `--shadow-color` и
-   `--decor-*` для иллюстраций, стекла и окон поиска. Литералы цветов вне
-   `globals.css` не пишутся (кроме `themeColor` в `layout.tsx` и canvas глобуса).
-4. **Тема Tailwind** — `@theme` / `@theme inline` превращает роли в классы `bg-primary`,
-   `text-muted-foreground`, `border-border`. `@theme` без `static`: в сборку попадают только
-   токены, которые используют утилиты или `var()` в CSS.
-
-Примитивы в `src/components/ui/`:
-
-- **Button** (`button.tsx`): варианты `default` (синяя, при наведении `--primary-hover`),
-  `secondary` (мягкий синий), `ghost`, `outline`, `link`; размеры `sm`, `default`, `lg`, `icon`,
-  `icon-sm`; `shape="pill"` для круглых концов. У `default` + `lg` своя тень. Недоступная кнопка
-  приглушена (`opacity: .5`) и не реагирует на наведение.
-- **Badge** (`badge.tsx`): `secondary`, `destructive`, `success`.
-- **Input**, **Textarea**, **Label**, **Card**, **Field** (`FieldError` и др.) — шаблоны shadcn на
-  токенах бренда; `Card` без обводки.
-- **SmartImage** — своя картинка с заглушкой при ошибке загрузки.
-- **PhotoPlaceholder** — заглушка фото отеля или номера из каталога (градиент, иконка, подпись).
-
-Фокус у всех элементов — одно кольцо `:focus-visible` на `--ring` из `globals.css`.
-
-## Визуальная проверка
-
-`scripts/screenshots.mjs` снимает страницы в двух viewport (390×844 и 1280×800, полная высота) в
-headless Chromium (`playwright-core`, браузер из `~/.cache/ms-playwright`; при отсутствии —
-`npx playwright-core install chromium`) и сравнивает кадры с прошлым прогоном через `pixelmatch`
-(threshold 0.1). Изображения в репозиторий не попадают: по умолчанию вывод в
-`/tmp/ostrovok-screenshots/<label>/`.
-
-```bash
-npm run build && npx next start -p 3341 &
-node scripts/screenshots.mjs --label before --mask canvas / /search?destination=prague
-# … правки, пересборка …
-node scripts/screenshots.mjs --label after --against before --mask canvas / /search?destination=prague
-```
-
-Параметры: `--base` (по умолчанию `http://localhost:3341`), `--name` и `--out` (каталог вывода),
-`--label`, `--against` (с чем сравнивать), `--wait` (мс после загрузки, 1000), `--mask <selector>`
-(закрасить анимируемые элементы; глобус на `/` — `canvas`). Для расхождений рядом с кадром
-сохраняется `*.diff.png`; код выхода 1, если кадры различаются.
-
-`npx next start` порождает дочерний процесс `next-server`, который держит порт: чтобы остановить
-сервер, завершите PID именно `next-server` (например, `lsof -ti :3341`), а не только родительского
-`npx`.
-
-## Демо-режим
-
-Поиск работает без бэкенда: валидирует форму и открывает страницу результатов с параметрами запроса
-(`/search?destination=…&checkin=…&checkout=…&adults=…&rooms=…`, для сценария — `scenario=…`);
-отели и цены берутся из каталога в Supabase.
-Страницы прототипа (поиск, отель, оформление, вход, поездки) строятся на основе ниже.
-
-### Маршруты
-
-Шапка (`src/components/Header`) и подвал (`src/components/Footer`) рендерятся в
-`src/app/layout.tsx` на каждой странице; страница сама рендерит свой `main`. Сейчас есть `/`,
-`/search` (результаты поиска), `/hotels/<id>`, `/hotels/<id>/rooms`, `/booking`, `/login`, `/register`, `/trips`, `/trips/booking`, `/favorites`, `/help`, `/api/docs` (документация API), `/legal/terms`, `/legal/privacy`, `/legal/cookies`, `/auth/callback` (обработчик ссылки из письма) и страница 404 (`src/app/not-found.tsx`). Шапка и подвал ссылаются на разделы. Все страницы пререндерятся статически и перестраиваются в фоне раз в час (каталог, см. «Supabase»).
-
-### Каталог
-
-`src/lib/catalog.ts` — типы, подписи и помощники каталога; `src/lib/catalogGenerator.ts` — генератор
-демо-каталога, который `npm run db:seed` загружает в Supabase: у каждого направления не меньше 6 отелей — отобранные
-вручную из `src/data/hotels.ts` (их показывает глобус, `isNew`) плюс сгенерированные. Номера,
-тарифы (питание, отмена, оплата, цена за ночь), отзывы, адрес и координаты генерируются
-детерминированно (PRNG с seed по id отеля): каталог одинаков при каждом запуске. `hotels`/`newHotels` — краткие карточки, `getHotel(id)` строит полный отель при первом
-запросе. Минимальная цена направления (`priceFrom`) равна минимальному тарифу его отелей. Фото
-нет: `PhotoPlaceholder` рисует градиент из палитры, иконку и подпись.
-
-`src/lib/offer.ts` — выбранное предложение в адресе: `hotel`, `room`, `rate` и параметры
-дат и гостей поиска (`checkin`, `checkout`, `adults`, `children`, `rooms`). `parseOffer`
-возвращает предложение с ценой (за ночь × ночи × номера) или ошибку («Предложение не найдено»
-либо сообщение проверки дат и гостей).
-
-### Страница результатов
-
-`/search` (`src/app/search/page.tsx`, `src/components/SearchResultsPage`) пререндерится без
-запроса и читает его из адреса в браузере (`useSearchParams` внутри `Suspense`). Невалидный
-запрос показывает форму поиска с ошибками; валидный — демо-поиск (~700 мс, «Ищем варианты…»),
-сводку с кнопкой «Изменить поиск» и карточки отелей города или всех городов сценария. Карточка
-ведёт на `/hotels/<id>` с датами и гостями запроса. Фильтры и сортировка (`src/lib/results.ts`)
-хранятся в адресе и заменяют его без новой записи истории: `price_min`, `price_max` (цена за
-ночь), `stars` (через запятую), `rating` (6–9), `meal` (через запятую), `free_cancel=1`, `sort`
-(`price_asc`, `price_desc`, `rating`; по умолчанию — популярные, по числу отзывов). Отель
-показывается с самым дешёвым тарифом среди подходящих под фильтры питания и отмены; фильтр и
-сортировка по цене используют его.
-
-Карта — MapLibre GL (`maplibre-gl`) с векторными тайлами OpenFreeMap (стиль `liberty`, без
-ключа; атрибуция OpenStreetMap — из стиля). Модуль карты подключается динамическим импортом
-только на `/search` и только в браузере; путь к воркеру MapLibre задан явно
-(`setWorkerUrl`), потому что сборщик переносит его модуль. Маркеры — цены за ночь; наведение
-или фокус на карточке подсвечивает маркер, нажатие на маркер подсвечивает карточку и
-прокручивает к ней. От `lg` список и карта стоят рядом, на узких экранах — переключатель
-«Список / Карта» (карта загружается только при выборе). Если стиль не загрузился (нет сети) или
-нет WebGL, вместо карты — «Карта недоступна», список и фильтры работают. В тестах `maplibre-gl`
-подменяется моком.
-
-Turbopack превращает `new URL(x, import.meta.url)` в `maplibre-gl.mjs` в ассеты всех файлов
-`maplibre-gl/dist` (~5 МБ), поэтому `next.config.ts` пропускает этот файл через loader
-`config/maplibre-no-asset-glob.cjs`, заменяющий `import.meta.url`. При обновлении MapLibre запустите
-`npm test`: тест `src/lib/maplibreLoader.test.ts` падает, если в новой версии такого шаблона уже нет
-(loader не нужен — удалите его и правило в `next.config.ts`) или после замены остался `import.meta.url`
-(поправьте loader). Затем проверьте `npm run build` и карту на `/search`.
-
-### Страница отеля и выбор тарифа
-
-`/hotels/<id>` (`src/components/HotelPage`) — большое фото под прозрачной шапкой с рядом
-миниатюр (`Gallery`: свайп на `scroll-snap`, полноэкранный просмотр на диалоге shadcn, ←/→,
-Escape, фокус возвращается на фото), название с избранным, звёзды, адрес, блок оценки (плашка и
-полосы 8 разделов на одной цветовой шкале `scoreColor` из `src/lib/reviews.ts`), «Об отеле» со
-расстояниями в км (`travelDistances`) и 6 популярными удобствами, номера с минимальной ценой.
-«Показать на карте», «Читать отзывы (N)» и «Все удобства» — кнопки одного вида (`DialogButton`),
-каждая открывает окно: карту отелей города, отзывы по 5 с «Показать ещё», удобства по разделам
-(`AMENITIES` в `src/lib/catalog.ts`). `/hotels/<id>/rooms` (`src/components/RatesPage`) — все тарифы номеров:
-питание, условия отмены и оплаты, цена за срок и за ночь; номер, где гостей на номер больше
-вместимости, недоступен; «Забронировать» ведёт на `/booking?…` с параметрами предложения.
-Оба маршрута пререндерятся по `generateStaticParams` для каждого отеля базы, новый отель базы рендерится при первом
-запросе, неизвестный `id` — 404. Даты и гости (`checkin`, `checkout`, `adults`, `children`, `rooms`) читает `useStay`
-(`src/components/StayBar`) из адреса на клиенте; изменение заменяет адрес без новой записи
-истории. Без дат (или с неверными) цены показаны за ночь, а вместо «Выбрать» и «Забронировать» —
-«Выберите даты». Тариф, у которого дата бесплатной отмены уже прошла, показан невозвратным
-(`src/lib/rates.ts`).
-
-«Шум и окружение» (`HotelNoise`, вкладка «Шум») — у настоящего отеля Валенсии: плоская карта MapLibre с контурами
-шума EEA END 2022 вокруг отеля (`GET /api/hotels/<id>/noise-map`: готовая карта `hotel_noise_map` на 300 м, без неё —
-`hotel_geo_features`, `hotel_noise_quiet` и `hotel_noise_day`;
-Lden или Lnight, ниже 40 дБ — зелёным) и шумными местами OpenStreetMap (точка открывает название, тип и расстояние;
-экранирование зданиями, кроме здания отеля, не считается), оценка шума у фасада `noise-estimate-v2` (`noiseEstimate` в
-`src/lib/noise.ts`): фасад на улицу и окна во двор днём, вечером и ночью — полосы EEA у контура здания
-(`hotel_noise_facade`), Lday по директиве 2002/49/EC и бары, клубы, рестораны, кафе и фастфуд OSM до 200 м как точечные
-источники (L = Lref − 20·lg(d/10), d — от стены здания отеля) на улицу, но не во двор (здание его экранирует), сложенные по энергии; источники EEA у фасада, места OSM до 200 м
-(`osm_places_near_facade`) и «Как мы считаем» с источниками. Отель вне карт — «нет данных EEA», а не «тихо». Те же строки
-(`noiseLines`) получает Эвал в чате отеля, а утверждения `noise.estimate.*` — инструмент «Анализ шума».
-
-«Вид из отеля» (`HotelView`, вкладка «Вид») — у настоящего отеля Валенсии: с какого этажа видно море, закат и восход
-на дату, достопримечательности OSM и места Островка до 3 км — по линиям взгляда над зданиями EUBUCCO
-(`hotel_view_eyes`, миграции `20261027150000_hotel_view_eyes.sql` и `20261027170000_hotel_view_coverage.sql`: для
-каждой линии одним запросом — самая низкая высота глаза, с которой она проходит над всеми зданиями, с кривизной Земли и
-рефракцией, по высоте EUBUCCO и обеим границам её интервала). Данные о зданиях есть по всему муниципалитету València
-(`geo_coverage`, граница OpenStreetMap по IGN, `uv run scripts/load-valencia-geo.py coverage`): линия без зданий над
-морем или парком — «видно», «нет данных» — только если линия без помех уходит в соседний муниципалитет. Из какого окна
-смотрит номер, неизвестно, поэтому итог цели — «видно со всех этажей», «видно с N-го этажа», «возможно, видно с N-го
-этажа», «не видно ни с одного этажа» или «нет данных»; ползунок этажа (1…N: этажи здания EUBUCCO, а без точных данных
-о здании — этажи номеров Островка с этажом 3 м) показывает на карте и в списках итог с выбранного этажа: «видно»,
-«частично закрыто» (солнце на 2° видно, ниже — крыши), «закрыто» (здание выше линии взгляда даже по нижней границе
-высоты), «вероятно, закрыто» (по оценке), «возможно, закрыто» (только по верхней границе), «нет данных» — с причиной;
-все блоки и Эвал говорят это одними функциями `src/lib/view.ts`. Без здания и этажей номеров — «нет точных данных».
-Высота-оценка модели — «≈». «Положение окна» — этаж и сторона окон на компасе (данных о ней пока нет —
-`RoomWindowSide`); карта MapLibre ставит здания EUBUCCO в 3D по высоте в 250 м (`GET /api/hotels/<id>/view-map`, дальше
-— 3D-здания стиля), отель синим, закрывающие вид с выбранного этажа — оранжевым, и поворачивается к стороне; легенда —
-«Окно на 2-м этаже на юго-восток» и обозначения по группам; данные всех этажей — `GET /api/hotels/<id>/view`.
-Ту же проверку делает Эвал на «видно ли море / закат / рассвет / больницу из окна» (`src/lib/ai/viewTurn.ts`, места —
-через гео-инструменты). Ориентиров показано 8, остальные — по «Показать все (N)».
-
-Одно место Островка и OpenStreetMap («Ла-Лонья», «Лонха-де-ла-Седа» и «Llotja de la Seda») везде — в «Что рядом», в
-ориентирах вида, в гео-ответе Эвала и на карте чата — склеивается одной функцией `mergePlaces`
-(`src/lib/geo/samePlace.ts`): совместимые виды, общее слово названия до 150 м (парк и пляж до 600 м) или единственное
-место ближе 30 м; название и данные — Островка. Факты гео-ответа Эвала пишет код, модель добавляет одну фразу-вывод,
-которую код оставляет, только если в ней нет чисел, единиц и чужих названий (`src/lib/ai/geoRemark.ts`).
-
-### Оформление и подтверждение
-
-`/booking` (`src/components/BookingPage`) читает предложение из адреса (`parseOffer`) на клиенте внутри
-`Suspense`; неверное — «Предложение не найдено» со ссылкой «Найти отель». Сводка заказа и форма:
-основной гость каждого номера, email и телефон, пожелания (до 500 символов), оплата и согласие с
-условиями. Войдя в демо-сессию, пользователь видит имя и email из неё. Для тарифа «Оплата сейчас»
-форма карты (номер по Luhn, срок `MM/YY` не в прошлом, CVC, держатель; тестовая карта
-`4242 4242 4242 4242`), для «Оплаты в отеле» — только пометка. Над оплатой — пометка о демо. Ошибки
-показываются у полей, фокус переходит на первое невалидное. Валидная форма — «Обрабатываем…» ~1 с,
-затем бронирование `OS-XXXXXX` со статусом `confirmed` попадает в `bookingsStore` (только последние
-4 цифры карты) и адрес заменяется на `/trips?new=<номер>` (`router.replace`, «Назад» не возвращает к
-форме): «Мои поездки» показывают «Бронирование OS-XXXXXX подтверждено», а новая бронь стоит первой и
-подсвечена. Отдельной страницы подтверждения нет.
-
-Проверки формы — в `src/lib/booking.ts` (`validateTravelerDetails` — гости, контакты, пожелания;
-`validateCard`; `createBooking`). Поля — переиспользуемые компоненты `src/components/BookingFields`
-(`GuestsFields`, `ContactFields`, `RequestsField`, `CardFields` на `TextField`): они получают значения,
-`onChange` и ошибки по id поля, форму и состояние держит страница.
-
-### Вход и регистрация
-
-Вход — Supabase Auth по одноразовой ссылке (`signInWithOtp` из браузерного клиента
-`src/lib/supabase/client.ts`): «Вход» просит email, «Регистрация» — имя, email и согласие с условиями (имя уходит в
-`options.data` и триггером попадает в `profiles`). Паролей в формах нет. После отправки форма показывает «Проверьте
-почту»; ошибки проверки — у полей, ошибки отправки — над кнопкой. Ссылка из письма ведёт на `/auth/callback`
-(`src/app/auth/callback/route.ts`): обмен `code` на сессию (или `token_hash`) и переход на `next`, иначе `/login`
-с «Ссылка устарела…». В настройках Auth проекта Supabase адрес `<сайт>/auth/callback` должен быть в Redirect URLs.
-
-«Войти в демо-аккаунт» — серверное действие `signInDemo` (`src/app/auth/actions.ts`, `signInWithPassword` с
-`DEMO_USER_EMAIL` и `DEMO_USER_PASSWORD` через `getSecret`); аккаунт создаёт `npm run db:seed`. Сессия живёт в cookie
-Supabase; `src/proxy.ts` обновляет её на запросах с этой cookie. Интерфейс читает её через `sessionStore`
-(`src/lib/session.ts`, `onAuthStateChange`, имя — из `profiles`, затем из данных регистрации, затем часть email до
-`@`). «Выйти» (`signOut`, `scope: 'local'` — демо-аккаунт общий) завершает сессию только в этом браузере: избранное и
-бронирования остаются. Без `NEXT_PUBLIC_SUPABASE_*` вход сообщает «Вход временно недоступен».
-
-Рядом — «Демо отельер»: тот же `signInDemo` с `account: 'hotelier'` (`DEMO_HOTELIER_EMAIL`/`DEMO_HOTELIER_PASSWORD`,
-аккаунт — `npm run db:hotelier`) открывает панель отельера `/hotelier`.
-
-### Чат с отельером
-
-Карточка помощника на странице отеля — вкладки «Эвал | Отельер» (`HotelAssistant`): у каждой своя история и черновик.
-Во вкладке «Отельер» (`src/components/HotelierChat`) вошедший путешественник пишет отелю
-(`POST /api/hotels/<id>/hotelier/messages`), гостю предлагается войти. Отельер отвечает в панели `/hotelier`
-(`src/components/HotelierPanel`): список обращений своих отелей с фильтрами по статусу, инициатору и отелю, переписка,
-контекст запроса Эвала и характеристики, «Решено» / «Закрыть» / «Открыть снова»
-(`POST /api/hotelier/conversations/<id>/messages` и `…/status`). Путешественник для отельера — «Гость». Новые сообщения
-и статусы приходят через Supabase Realtime (`src/lib/hotelierChatRemote.ts`; канал подключается с токеном сессии, иначе
-политики отклоняют строки). Таблицы, RLS, право `is_hotelier_of` и лимит 20 сообщений автора в минуту — миграция
-`20261028130000_hotelier_chat.sql`; проверка RLS — `supabase/tests/hotelier_chat_rls.sql` (запуск — в шапке файла,
-всё откатывается).
-
-AI-посредник (миграция `20261028140000_hotelier_knowledge.sql`, проверка — `supabase/tests/hotelier_requests.sql`):
-
-- **«Запрос отельеру»** (`ask_hotelier`, `src/lib/ai/hotelierTool.ts`). Эвал вызывает его, когда в данных отеля нет ответа или путешественник просит уточнить у отеля. Инструмент создаёт запрос от имени путешественника (`create_hotelier_request`). Блок в чате ждёт (`pending`, в `tool_runs` — `waiting`), но ни один запрос не держится открытым.
-- **Ответ отельера** (`answer_hotelier_request`) завершает запуск и шаг сообщения и кладёт в чат Эвала сообщение «Отельер». Блок обновляется через Realtime и после перезагрузки читается из `tool_runs` (`useLiveRun`).
-- **Общие сведения.** Если отельер разрешил («в общих сведениях»), сервер после ответа (`after()`, `src/lib/db/hotelierKnowledge.ts`, service role только здесь) извлекает характеристики:
-  - утверждения `hotelier.*` со статусом `reported`, уверенностью 0,75 (`owner_answer`), моделью в `method` и пометкой `is_demo` у демо-отельера;
-  - документ `hotelier_answer` с векторами для поиска.
-
-  Более поздний ответ закрывает прежнее утверждение, «Отозвать сведения» — тоже.
-
-- **AI-помощник в чате с отельером** (`src/lib/ai/hotelierMediator.ts`, `after()`) отвечает с «Источниками» по данным отеля, сведениям отельера и гибридному поиску. Иначе передаёт вопрос отельеру.
-- **Поиск по документам отеля** (`hotel_chunks_hybrid`, `GET /api/hotels/<id>/documents/search`) сливает полнотекстовый поиск и векторы через RRF.
-
-Сведения отельера видны везде (`20261028150000_hotelier_demo.sql`, `is_demo` у сообщений и обращений):
-
-- **Карточка отеля** — блок «Сведения отельера» (`HotelierFacts`, `GET /api/hotels/<id>/hotelier/facts`, без кэша): дата, уверенность, «демо», расхождения.
-- **Выдача поиска** — «Сведения отельера: N · демо» (`GET /api/hotelier/hotels`).
-- **Ответы Эвала и AI-помощника** — всегда говорят, что демо-сведения демонстрационные и что ответы отельера расходятся (`hotelierNotes`).
-- **Чаты и блоки источников** — бейдж «демо».
-
-`/login` и `/register` — полные страницы (`AuthPage`). Переход на них из приложения (ссылка «Войти» в
-шапке) перехватывается: параллельный маршрут `@modal` с `(.)login` и `(.)register` показывает ту же форму диалогом
-(`AuthDialog`) поверх текущей страницы; кнопка, Escape и клик по подложке делают `router.back()`.
-Переключатель «Вход / Регистрация» — `router.replace`, диалог остаётся перехваченным. Параметр `next`
-задаёт страницу после входа (`resolveNext`): только путь с `/`, но не `//`, не с `\` и
-управляющими символами, иначе `/`. Без `next` диалог закрывается, полная страница ведёт на `/`.
-
-В шапке гость видит «Войти» (так же до гидрации), вошедший — кнопку с именем и меню «Мои поездки»,
-«Избранное», «Выйти» (`src/components/Header/UserMenu.tsx`).
-
-### Мои поездки и избранное
-
-`/trips` (`src/components/Trips`) требует демо-сессию: гость видит «Войдите, чтобы увидеть поездки» и
-ссылку `/login?next=…` на текущий путь (`TripsGate`). Бронирования не привязаны к пользователю:
-показываются все, что сделаны в этом браузере. Вкладки (`tripsIn` в `src/lib/trips.ts`):
-«Предстоящие» — подтверждённые с выездом не раньше сегодня (по заезду по возрастанию), «Завершённые» —
-подтверждённые с выездом в прошлом, «Отменённые»; последние две — по заезду по убыванию.
-
-`/trips/booking?id=<номер>` показывает заказ целиком и, для предстоящего, «Изменить данные» (гости,
-контакты, пожелания — поля и проверки оформления, «Изменения сохранены») и «Отменить бронирование».
-Диалог отмены показывает «Бесплатно» до последнего дня бесплатной отмены, затем «Удержание: N ₽» —
-стоимость первой ночи, для невозвратного тарифа вся сумма (`cancellationFee`); подтверждение
-сохраняет статус `cancelled`, дату и сумму удержания. Неизвестный номер — «Бронирование не найдено».
-
-На обеих страницах — плавающая кнопка «Спросить Эвала» (`TripsAssistant`): боковая панель с чатом о
-бронированиях (`brief.trips`, со страницы брони — `brief.bookingId`). Виджет — тот же `EvalChat`
-(`src/components/EvalChat`), что и карточка Эвала на странице отеля, в панели — с полной лентой
-(`Feed`): блоки инструментов «Бронирования» и «Пересчёт при смене дат» (`src/lib/ai/bookingTools.ts`,
-ход — `src/lib/ai/bookingTurn.ts`) с источниками и расчётами. Брони остаются в localStorage: каждый
-вопрос отправляет их в `/api/assistant` без имён, контактов, пожеланий и карты (`tripBooking`), сервер
-проверяет их zod-схемой и не хранит. Смену дат Эвал считает по цене тарифа, как при бронировании
-(`quoteDateChange`), и предлагает карточкой с новой ценой и условиями отмены; даты меняются только по
-«Подтвердить» (`applyDateChange`, бронь не должна измениться после расчёта).
-
-`/favorites` (`src/components/Favorites`) работает без входа: карточки сохранённых отелей со ссылкой
-на `/hotels/<id>` и кнопкой `FavoriteButton`; пусто — «В избранном пока пусто» и ссылка на `/`.
-
-### Поддержка и юридические страницы
-
-`/help` (`src/components/HelpPage`): вопросы из `src/data/faq.ts` (20 вопросов, 4 категории) в
-аккордеоне shadcn (`ui/accordion`). Поиск (`filterFaq` в `src/lib/faq.ts`) ищет по вопросу и
-ответу без учёта регистра и «ё/е»; без совпадений — «Ничего не нашлось» и ссылка на форму.
-`/help#<id вопроса>` раскрывает вопрос и прокручивает к нему. Форма обращения (имя, email,
-сообщение; номер бронирования необязателен) только проверяет поля и показывает «Обращение
-отправлено (демо)»: данные не отправляются и не сохраняются.
-
-### Документация API
-
-`/api/docs` (ссылка «API» в меню, во всех окружениях): интерактивная документация Scalar
-(`@scalar/api-reference-react`, грузится только на этой странице) двух документов OpenAPI 3.1 и карта MapLibre ответа
-гео-маршрута рядом с ответом «Try it» (`src/components/ApiDocs`). «Try it» шлёт запрос в то окружение, где открыта
-страница (сервер документа — `/`).
-
-- `GET /api/openapi.json` — маршруты `src/app/api`. Схемы zod запроса и ответа лежат рядом с каждым маршрутом
-  (`schema.ts`): маршрут разбирает ими запрос, его ответ — `satisfies` схемы, а схема сверяется с доменным типом
-  (`sameType<z.output<…>, Hotel>()` падает на `npm run typecheck`, если поле есть только в одном). Документ собирает
-  `src/lib/openapi/document.ts` через `z.toJSONSchema` (JSON Schema 2020-12); новый маршрут добавьте в `API_OPERATIONS` —
-  тест падает, если `route.ts` или его метод не описан. Примеры — реальные ответы по отелю ota-9096882 с сокращёнными
-  массивами: `npm run dev`, затем `npm run docs:examples [-- http://localhost:3000]`.
-- `GET /api/openapi/supabase.json` — таблицы, представления и функции Supabase, которые вызывает код `src` (`.from`,
-  `.rpc`), со схемами из `database.types.ts`; файл `src/lib/openapi/supabase.gen.json` пишет `npm run docs:supabase`
-  (без ключей: свой OpenAPI PostgREST отдаёт только ключу service role). Тест сверяет файл с типами и кодом.
-- Ключей в документах нет: `POST /api/revalidate` описан со схемой bearer без значения, у Supabase `apikey` вводится
-  вручную.
-
-`/legal/terms`, `/legal/privacy`, `/legal/cookies`: тексты-шаблоны лежат в `src/data/legal.ts`,
-разметку даёт общий `src/components/LegalPage` (дата обновления, демо-пометка, оглавление по
-`h2` с якорями). Страница cookie перечисляет cookie сессии Supabase и ключи `ostrovok:v1:*`. Все страницы статические.
-
-### Состояние в браузере
-
-`src/lib/storage.ts` хранит избранное и бронирования в `localStorage`
-(`ostrovok:v1:favorites`, `ostrovok:v1:bookings`), сессия — Supabase (`src/lib/session.ts`); хуки — в
-`src/hooks/useStore.ts` (`useSyncExternalStore`, без библиотек состояния). При пререндере и
-гидрации значения пустые, изменения видны в других вкладках, повреждённые данные читаются как
-пустые. Платёжные данные не сохраняются: у бронирования только последние 4 цифры карты.
-Кнопка `FavoriteButton` переключает отель в избранном.
-
-## Изображения
-
-Готовые файлы лежат в `public/images` (источники и лицензии — `public/images/CREDITS.md`):
-
-```bash
-uv run --with pillow python scripts/build-images.py <папка-с-исходниками>   # фото «Поиска вайба», небо «Звёзд»
-node scripts/build-star-assets.mjs <папка с orb.png, modal-bg.jpeg, button.jpeg>   # шар, окно и кнопка «Звёзд»
-node scripts/build-draw-images.mjs <папка с section-bg.png, canvas-drawing.png, result-image.png>   # «Нарисуй»
-```
-
-Геометрия глобуса собирается из Natural Earth 1:50m (`ne_50m_land.geojson`,
-`ne_50m_coastline.geojson`): точки, береговые линии и кольца суши для зелёной заливки:
-
-```bash
-uv run --with pillow --with numpy python scripts/build-globe.py <папка-с-geojson>
-```
+Через 5–10 минут (первая сборка) http://localhost:8080 работает; `make up` делает то же самое. Остановить:
+`Ctrl+C`, затем `docker compose down` (`make down`); логи — `make logs`.
+
+Ключи в `.env` даются двумя способами:
+
+1. Одна строка `AGE_SECRET_KEY=AGE-SECRET-KEY-1…` — закрытый ключ приложения. Остальные переменные приложение и сборка
+   расшифруют сами из `secrets.app.env.age`.
+2. Все переменные из `.env.example` со значениями. Организаторы берут их из `secrets.env.age`
+   (`age -d -i <свой ключ> secrets.env.age > .env`).
+
+Пошагово для Docker Desktop (Windows, macOS) — [docs/docker.md](docs/docker.md).
+
+## Зависимости и переменные окружения
+
+**Ресурсы.** Контейнер приложения (Next.js standalone, Node 24): около 1 CPU и 512 МБ RAM; образ ≈ TODO_IMAGE_SIZE. Сборка:
+2 CPU и 4 ГБ RAM, 3 ГБ диска, нужна сеть (каталог пререндерится из Supabase). Платформа `linux/amd64`.
+
+**Зависимости.** Docker с Compose v2. Внешние сервисы: облачный Supabase (Postgres, Auth, Storage), GigaChat и NVIDIA API. Версии пакетов — `package-lock.json`.
+
+**Переменные** (`.env`, подписи и источники — в `.env.example`):
+
+| Переменная                                      | По умолчанию      | Назначение                                                                           |
+| ----------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------ |
+| `AGE_SECRET_KEY`                                | пусто             | ключ приложения; если задан, недостающие переменные берутся из `secrets.app.env.age` |
+| `NEXT_PUBLIC_SUPABASE_URL`                      | пусто             | URL проекта Supabase (нужен при сборке)                                              |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`                 | пусто             | публичный ключ Supabase (нужен при сборке)                                           |
+| `SUPABASE_SERVICE_ROLE_KEY`                     | пусто             | серверный ключ Supabase, только на сервере                                           |
+| `SUPABASE_DB_URL`                               | пусто             | строка подключения к базе: нужна `make seed` и миграциям                             |
+| `NVIDIA_API_KEY`                                | пусто             | ключ NVIDIA API; без него Эвал отвечает по правилам, без модели                      |
+| `GIGACHAT_AUTH_KEY`                             | пусто             | Authorization key GigaChat (Сбер), developers.sber.ru → GigaChat API                 |
+| `DEMO_USER_EMAIL`, `DEMO_USER_PASSWORD`         | пусто             | демо-путешественник (вход кнопкой, `make seed` создаёт аккаунт)                      |
+| `DEMO_HOTELIER_EMAIL`, `DEMO_HOTELIER_PASSWORD` | пусто             | демо-отельер (то же)                                                                 |
+| `PORT`, `HOSTNAME`                              | `8080`, `0.0.0.0` | порт и адрес сервера в контейнере (заданы в `Dockerfile`)                            |
+
+Значения хранятся в репозитории только зашифрованными ([age](https://github.com/FiloSottile/age)): `secrets.env.age`
+(для организаторов) и `secrets.app.env.age` (для приложения). `.env` в `.gitignore`. Подробности — [docs/secrets.md](docs/secrets.md).
+
+### Почему база внешняя
+
+Compose поднимает только приложение, а базой служит облачный Supabase: в нём лежат готовые данные Валенсии (отели
+Островка, фото, отзывы, векторы поиска), здания EUBUCCO и контуры шума EEA в PostGIS, векторы в pgvector и сама
+авторизация Supabase (Auth, RLS, Storage). Локальный Postgres пришлось бы заполнять заново: геоданные — около 1,6 ГБ
+файлов вне репозитория и часы загрузки, векторы — пересчёт через NVIDIA API с лимитом 40 запросов в минуту, плюс поднять
+GoTrue и Storage для входа и фото. Поэтому данные не копируются, а ключи к облаку лежат в секретах.
+
+## Сидирование
+
+База уже заполнена. Заново загрузить и пересобрать данные (в **облачную** базу из `.env`) — `make seed`: внутри
+`docker compose run` выполняет `scripts/seed-all.sh`, то есть команды `package.json` по порядку:
+
+| Шаг | Команда                         | Что делает                                                   |
+| --- | ------------------------------- | ------------------------------------------------------------ |
+| 1   | `npm run db:push`               | применяет миграции `supabase/migrations/`                    |
+| 2   | `npm run db:seed`               | каталог-генератор и демо-путешественник                      |
+| 3   | `npm run db:hotelier`           | аккаунт и профиль демо-отельера                              |
+| 4   | `npm run db:seed:hotelier-demo` | демо-переписки с отельером (помечены «демо»)                 |
+| 5   | `npm run db:rebuild:ota`        | пересборка настоящих отелей каталога из данных Островка      |
+| 6   | `npm run db:features`           | здание, шум, окружение, вид из номера, хранилище утверждений |
+| 7   | `npm run db:embed`              | векторы поиска по смыслу (NVIDIA, до 40 запросов в минуту)   |
+| 8   | `npm run db:embed:chunks`       | векторы отзывов и сведений отельера                          |
+| 9   | `npm run db:embed:photos`       | векторы фото для «Найти похожие» (12–15 минут)               |
+
+Шаги идемпотентны. Отдельная команда: `docker compose run --rm tools npm run db:features -- --dry-run`. Загрузки из
+внешних файлов (`db:seed:valencia`, `db:load:ota-pages`, `load-valencia-geo.py`, `db:city-places`) в `make seed` не
+входят; описание всех скриптов — [docs/data-and-scripts.md](docs/data-and-scripts.md).
+
+## Маршруты и доступ
+
+| Маршрут                   | Что                                                 |
+| ------------------------- | --------------------------------------------------- |
+| `/`                       | главная: глобус, поиск, новые отели                 |
+| `/health`                 | `200 { "status": "ok" }`, для healthcheck           |
+| `/api/docs`               | документация API (OpenAPI, Scalar)                  |
+| `/assistant`              | чат с Эвалом                                        |
+| `/hotelier`               | кабинет отельера: вопросы путешественников и ответы |
+| `/search`, `/hotels/<id>` | результаты, страница отеля                          |
+
+**Тестовый доступ.** Пароли в README не публикуются. Откройте `/login`: кнопка «Войти в демо-аккаунт» входит демо-путешественником, «Демо отельер» — демо-отельером (кабинет `/hotelier`).
+Демо-данные помечены «демо».
+
+## LLM
+
+Текст отвечает **GigaChat Ultra** (`GigaChat-3-Ultra`, Сбер, ключ `GIGACHAT_AUTH_KEY`), остальное и запасные текстовые модели — **NVIDIA API** (build.nvidia.com, ключ `NVIDIA_API_KEY`, лимит 40 запросов в минуту).
+
+| Задача                                | Модель                                                                                                                                  |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Текст (помощник, понимание пожелания) | `gigachat/GigaChat-3-Ultra` → `nvidia/nemotron-3.5-lightning-30b-a3b` → `nvidia/nemotron-3.5-bolt-e4b` → `minimaxai/minimax-m3.1-flash` |
+| Фото в чате                           | `nvidia/nemotron-3.5-super-vl-120b-a12b` → `minimaxai/minimax-m3.1-flash`                                                               |
+| Эмбеддинги текста                     | `nvidia/nemotron-3.5-embed-1b`                                                                                                          |
+| Реранк                                | `nvidia/nemotron-3.5-rerank-8b`                                                                                                         |
+| Эмбеддинги фото                       | `nvidia/llama-nemotron-embed-vl-1b-v2`                                                                                                  |
+
+Цепочка `→`: следующая модель отвечает, если предыдущая не уложилась в срок или ошиблась. Без ключа или при сбое Эвал отвечает по правилам. Подробности — [docs/search-and-ai.md](docs/search-and-ai.md).
+
+## Документация
+
+- [docs/architecture.md](docs/architecture.md) — стили, глобус, состояние в браузере, изображения
+- [docs/pages.md](docs/pages.md) — страницы и интерфейс
+- [docs/search-and-ai.md](docs/search-and-ai.md) — режимы поиска, поиск по смыслу, модели
+- [docs/data-and-scripts.md](docs/data-and-scripts.md) — Supabase, каталог, скрипты загрузки данных
+- [docs/api.md](docs/api.md) — документация API
+- [docs/secrets.md](docs/secrets.md) — ключи и секреты (age)
+- [docs/docker.md](docs/docker.md) — Docker и Docker Desktop
+- [docs/vercel.md](docs/vercel.md) — деплой на Vercel
+- [docs/development.md](docs/development.md) — разработка, тесты, CI, визуальная проверка
+- [docs/tools.md](docs/tools.md) — инструменты Эвала

@@ -10,7 +10,7 @@
 // rooms), the views the names of the room types tell of, the guests' reviews and their words about
 // noise and quiet, each with its evidence, calculation and the confidence of src/lib/confidence.ts. Copies no raw data: only the derived values and the reference to the source. Run it after every reload of the
 // geodata (scripts/load-valencia-geo.py), or the noise maps stay those of the old contours.
-//   npm run db:features [-- --dry-run]   (Node runs the TypeScript itself; the keys come from .env.local)
+//   npm run db:features [-- --dry-run]   (Node runs the TypeScript itself; the keys come from .env)
 // `--dry-run` reads and counts, and writes nothing.
 // Idempotent: writes only the new and changed rows and deletes the stale ones, so a second run over the same data
 // changes nothing. Only the real hotels (`ota-<master_id>`) are read; nothing is made up for the others. Needs

@@ -1,29 +1,26 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { createMessage, encrypt, generateKey, readKey } from 'openpgp'
+import { generateIdentity, identityToRecipient } from 'age-encryption'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { SECRET_FILE, decryptEnv } from './secretsFile.mjs'
+import { SECRET_FILE, checkEnvFormat, decryptEnv, encryptEnv, findIdentity } from './secretsFile.mjs'
 
-const dotenv = `# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co
-NVIDIA_API_KEY="nvapi-test"
+const dotenv = `NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co
+NVIDIA_API_KEY=nvapi-test
 DEMO_USER_PASSWORD=
 `
 
-let privateKey: string
+let secretKey: string
 let encrypted: Uint8Array
 
 beforeAll(async () => {
-  const keys = await generateKey({ type: 'ecc', userIDs: [{ email: 'test@opognali.local' }], format: 'armored' })
-  privateKey = keys.privateKey
-  const encryptionKeys = await readKey({ armoredKey: keys.publicKey })
-  encrypted = await encrypt({ message: await createMessage({ text: dotenv }), encryptionKeys, format: 'binary' })
+  secretKey = await generateIdentity()
+  encrypted = await encryptEnv(await identityToRecipient(secretKey), dotenv)
 })
 
 describe('decryptEnv', () => {
-  it('decrypts and parses dotenv: comments, quotes, empty values', async () => {
-    const { text, env } = await decryptEnv(privateKey, encrypted)
+  it('decrypts and parses dotenv: empty values too', async () => {
+    const { text, env } = await decryptEnv(secretKey, encrypted)
     expect(text).toBe(dotenv)
     expect(env).toEqual({
       NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
@@ -32,14 +29,35 @@ describe('decryptEnv', () => {
     })
   })
 
-  it('accepts a key pasted on one line with escaped newlines', async () => {
-    const { env } = await decryptEnv(privateKey.replace(/\n/g, '\\n'), encrypted)
-    expect(env.NVIDIA_API_KEY).toBe('nvapi-test')
+  it('accepts the whole key file of age-keygen with its comments', async () => {
+    const keyFile = `# created: 2026-10-28T00:00:00Z\n# public key: age1xxx\n${secretKey}\n`
+    expect(findIdentity(keyFile)).toBe(secretKey)
+    expect((await decryptEnv(keyFile, encrypted)).env.NVIDIA_API_KEY).toBe('nvapi-test')
   })
 
-  it('rejects a foreign key', async () => {
-    const other = await generateKey({ type: 'ecc', userIDs: [{ email: 'other@opognali.local' }], format: 'armored' })
-    await expect(decryptEnv(other.privateKey, encrypted)).rejects.toThrow()
+  it('writes the binary age format, not armor', () => {
+    expect(new TextDecoder().decode(encrypted.slice(0, 22))).toBe('age-encryption.org/v1\n')
+  })
+
+  it('rejects a foreign key and text without a key', async () => {
+    await expect(decryptEnv(await generateIdentity(), encrypted)).rejects.toThrow()
+    await expect(decryptEnv('not a key', encrypted)).rejects.toThrow('AGE-SECRET-KEY-1')
+  })
+})
+
+describe('checkEnvFormat', () => {
+  it('counts KEY=value lines, empty values allowed', () => {
+    expect(checkEnvFormat(dotenv)).toBe(3)
+  })
+
+  it.each([
+    ['a BOM', '﻿KEY=value\n'],
+    ['CRLF', 'KEY=value\r\n'],
+    ['quotes', 'KEY="value"\n'],
+    ['spaces', 'KEY = value\n'],
+    ['a comment', '# note\nKEY=value\n'],
+  ])('rejects %s', (_, text) => {
+    expect(() => checkEnvFormat(text)).toThrow()
   })
 })
 
@@ -62,19 +80,19 @@ describe('getSecret', () => {
 
   const load = async () => (await import('./secrets')).getSecret
 
-  it('returns undefined without GIT_SECRET_PRIVATE_KEY', async () => {
-    vi.stubEnv('GIT_SECRET_PRIVATE_KEY', '')
+  it('returns undefined without AGE_SECRET_KEY', async () => {
+    vi.stubEnv('AGE_SECRET_KEY', '')
     expect(await (await load())('NVIDIA_API_KEY')).toBeUndefined()
   })
 
   it('prefers process.env', async () => {
-    vi.stubEnv('GIT_SECRET_PRIVATE_KEY', privateKey)
+    vi.stubEnv('AGE_SECRET_KEY', secretKey)
     vi.stubEnv('NVIDIA_API_KEY', 'from-env')
     expect(await (await load())('NVIDIA_API_KEY')).toBe('from-env')
   })
 
   it('decrypts the file once and caches it', async () => {
-    vi.stubEnv('GIT_SECRET_PRIVATE_KEY', privateKey)
+    vi.stubEnv('AGE_SECRET_KEY', secretKey)
     const getSecret = await load()
     expect(await getSecret('NVIDIA_API_KEY')).toBe('nvapi-test')
     await rm(path.join(dir, SECRET_FILE))
@@ -84,7 +102,7 @@ describe('getSecret', () => {
   })
 
   it('retries after a failed read', async () => {
-    vi.stubEnv('GIT_SECRET_PRIVATE_KEY', privateKey)
+    vi.stubEnv('AGE_SECRET_KEY', secretKey)
     await rm(path.join(dir, SECRET_FILE))
     const getSecret = await load()
     await expect(getSecret('NVIDIA_API_KEY')).rejects.toThrow()

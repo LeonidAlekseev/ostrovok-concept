@@ -12,4 +12,4 @@
 ## Impact
 
 - Ответы Эвала (разбор пожелания, вопросы об отеле, гео-план, посредник); схема API не меняется.
-- Зависимость `undici`, сертификат `config/certs/russian_trusted_root_ca.pem`, README.
+- Зависимость `undici`, сертификат `certs/russian_trusted_root_ca.pem`, README.

@@ -28,7 +28,7 @@ Sources (kept outside git):
 The footprints are only reprojected; `st_makevalid` fixes a geometry only where it is invalid, and the row says so
 (`made_valid`). The noise contours are simplified by 2 m (the bands are 5 dB wide) and subdivided into pieces of at
 most 256 vertices. Each command writes its dataset to public.geo_datasets and replaces its table in one transaction;
-afterwards `npm run db:features`. SUPABASE_DB_URL comes from the environment or .env.local and is never printed.
+afterwards `npm run db:features`. SUPABASE_DB_URL comes from the environment or .env and is never printed.
 """
 
 import json
@@ -92,8 +92,8 @@ BUILDING_TYPES = {
 
 def db_url():
     url = os.environ.get('SUPABASE_DB_URL')
-    if not url and os.path.exists('.env.local'):
-        for line in open('.env.local'):
+    if not url and os.path.exists('.env'):
+        for line in open('.env'):
             if line.startswith('SUPABASE_DB_URL='):
                 url = line.split('=', 1)[1].strip().strip('"').strip("'")
     if not url:
