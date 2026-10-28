@@ -27,5 +27,5 @@
 
 `src/lib/ota/{hotel,page}.ts`, `src/lib/catalog.ts`, `src/app/api/hotels/schema.ts`, `RoomList`, `RoomRates`,
 `src/lib/claimRows.ts`, `scripts/{hotel-features,load-ota-pages}.ts`, `scripts/lib/claims-store.ts`, `src/lib/db/knowledge.ts`,
-миграция `20261028160000_entities_metadata.sql`. После merge: применить миграцию, `db:load:ota-pages` (аэропорт),
+миграция `20261028170000_entities_metadata.sql`. После merge: применить миграцию, `db:load:ota-pages` (аэропорт),
 `db:rebuild:ota`, `db:features`, `db:embed`.
