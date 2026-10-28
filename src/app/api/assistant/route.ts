@@ -16,6 +16,7 @@ import {
   type KnowledgeDeps,
 } from '@/lib/ai/knowledgeTurn'
 import { runFeaturesTool, runNearTool, runReviewsTool, type Candidate } from '@/lib/ai/knowledgeTools'
+import { loadHotelierNoise } from '@/lib/db/claims'
 import { loadLevelIndex, loadNearIndex } from '@/lib/db/knowledge'
 import { MODEL_TIMEOUT_MS, understandWish } from '@/lib/ai/understand'
 import {
@@ -174,6 +175,7 @@ const KNOWLEDGE_TIME_MS = 4000
 /** The store's reads and the runs of the tools, as the route does them. */
 const KNOWLEDGE_DEPS: KnowledgeDeps = {
   levels: loadLevelIndex,
+  hotelierNoise: loadHotelierNoise,
   near: loadNearIndex,
   runFeatures: runFeaturesTool,
   runNear: runNearTool,

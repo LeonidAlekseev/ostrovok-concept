@@ -6,12 +6,14 @@ import {
   chooseHotels,
   featureVerdicts,
   featuresResult,
+  noiseWords,
   levelsOf,
   nearResult,
   nearVerdicts,
   reviewsResult,
   topicExcerpt,
   type Candidate,
+  type FeatureCriteria,
 } from './knowledgeTools'
 
 vi.mock('next/cache', () => ({ unstable_cache: (read: unknown) => read }))
@@ -164,6 +166,72 @@ describe('the choice of the hotels by the store', () => {
 })
 
 // hotel-knowledge, Requirement: Инструменты подбора по хранилищу
+// hotelier-facts-in-filters
+describe('the hotelier’s words on the noise in the choice', () => {
+  const told = (hotelId: string, text: string, claimId = `h-${hotelId}-${text}`) => ({
+    hotelId,
+    claimId,
+    text,
+    demo: true,
+  })
+  const quietWord = claim({
+    id: 'h-ota-3',
+    property: 'hotelier.room.noise',
+    value: { kind: 'text', value: 'ночью тихо' },
+    unit: null,
+    confidence: 0.75,
+    demo: true,
+    evidence: [],
+  })
+
+  it('reads «тихо» and «шумно» by the rules, a negation or both as nothing', () => {
+    expect(noiseWords('ночью тихо')).toBe('quiet')
+    expect(noiseWords('Бесшумный номер')).toBe('quiet')
+    expect(noiseWords('вечером бывает шумно')).toBe('loud')
+    expect(noiseWords('не тихо')).toBe('unknown')
+    expect(noiseWords('совсем не шумно')).toBe('unknown')
+    expect(noiseWords('днём шумно, ночью тихо')).toBe('unknown')
+    expect(noiseWords('окна во двор')).toBe('unknown')
+  })
+
+  it('closes «нет данных» of the night for a hotel the EEA has no level for, and no other verdict', () => {
+    const criteria: FeatureCriteria = { nightBelowDb: 50 }
+    const verdicts = (hotelier: ReturnType<typeof told>[], c = criteria) =>
+      featureVerdicts(levels, ['ota-1', 'ota-2', 'ota-3'], c, hotelier)
+    expect(verdicts([told('ota-3', 'ночью тихо')]).get('ota-3')!.verdict).toBe('match')
+    // The EEA's «громко» stays a miss, the EEA's level is not overridden by the words.
+    expect(verdicts([told('ota-2', 'ночью тихо')]).get('ota-2')!.verdict).toBe('miss')
+    // Diverging answers, «шумно» and a negation are «нет данных».
+    expect(verdicts([told('ota-3', 'ночью тихо'), told('ota-3', 'вечером шумно')]).get('ota-3')!.verdict).toBe('nodata')
+    expect(verdicts([told('ota-3', 'шумно')]).get('ota-3')!.verdict).toBe('nodata')
+    expect(verdicts([told('ota-3', 'не тихо')]).get('ota-3')!.verdict).toBe('nodata')
+    // «Тихо» is no number below 50 dB: a stricter threshold is not closed by it; the day is not either.
+    expect(verdicts([told('ota-3', 'тихо')], { nightBelowDb: 40 }).get('ota-3')!.verdict).toBe('nodata')
+    expect(verdicts([told('ota-3', 'тихо')], { dayBelowDb: 55 }).get('ota-3')!.verdict).toBe('nodata')
+  })
+
+  it('shows the answer as the hotelier’s, marked «демо», with its confidence', () => {
+    const result = featuresResult(
+      { criteria: { nightBelowDb: 50 }, candidates, chosen: ['ota-3'], hotelier: [told('ota-3', 'ночью тихо')] },
+      levels,
+      new Map([['ota-3', [quietWord]]]),
+    )
+    valid(result)
+    const [hotel] = result.groups!
+    expect(hotel.note).toBe('Ночь: подходит (со слов отельера, демо; по EEA данных нет)')
+    expect(result.claims).toMatchObject([
+      {
+        label: 'Шум в номере, со слов отельера',
+        value: 'ночью тихо',
+        status: 'reported',
+        confidence: 0.75,
+        demo: true,
+      },
+    ])
+    expect(result.data).toMatchObject({ match: 2 })
+  })
+})
+
 describe('the runs of the tools', () => {
   it('shows each chosen hotel with the claims it was chosen by, the hotels without data apart', () => {
     const result = featuresResult(
