@@ -26,8 +26,16 @@ cp .env.example .env     # вписать значения переменных 
 docker compose up --build
 ```
 
-Через 5–10 минут (первая сборка) http://localhost:8080 работает; `make up` делает то же самое. Остановить:
-`Ctrl+C`, затем `docker compose down` (`make down`); логи — `make logs`.
+Через 5–10 минут (первая сборка) http://localhost:8080 работает. Остановить: `Ctrl+C`, затем `docker compose down`.
+
+То же короче — через `make` (на Windows без `make` используйте команды из правой колонки):
+
+| Команда     | Что делает                                            | Без `make`                                                     |
+| ----------- | ----------------------------------------------------- | -------------------------------------------------------------- |
+| `make up`   | собрать образ и запустить приложение на `:8080`       | `docker compose up --build`                                    |
+| `make down` | остановить и удалить контейнеры                       | `docker compose down`                                          |
+| `make logs` | логи приложения в реальном времени                    | `docker compose logs -f app`                                   |
+| `make seed` | загрузить и пересобрать данные в облачной базе `.env` | `docker compose run --rm --build tools sh scripts/seed-all.sh` |
 
 Ключи в `.env` даются двумя способами:
 
