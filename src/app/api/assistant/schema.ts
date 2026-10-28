@@ -12,7 +12,7 @@ import { VIEW_LABEL, type HotelFeatures, type ViewKind } from '@/lib/features'
 import type { ChatMap } from '@/lib/geo/chatMap'
 import { chatWidgetSchema } from '@/lib/chatWidget'
 import { MAX_PHOTO_URL_LENGTH, PHOTO_DATA_URL } from '@/lib/ai/vision'
-import { RATE_LIMIT } from '@/lib/ai/rateLimit'
+import { HOTEL_RATE_LIMIT, RATE_LIMIT } from '@/lib/ai/rateLimit'
 import { toolRunSchema } from '@/lib/toolResult'
 import { MAX_BOOKINGS, type DateChange, type TripBooking } from '@/lib/trips'
 import { component, errorSchema, sameType, type ApiOperation } from '@/lib/openapi/operation'
@@ -282,7 +282,7 @@ export const assistantOperations: ApiOperation[] = [
       '- с `photos` — найти похожие отели или учесть фото в запросе;',
       '- иначе — пожелание: бриф дополняется, а когда он полный — отели `matches` поиска по смыслу; пожелание о шуме, местах рядом или отзывах подбирается инструментами хранилища (шаги с `run`, ответ `findings`).',
       '',
-      `Отвечает за 15 с (с фото — за 28 с). Не больше ${RATE_LIMIT} запросов в минуту с одного адреса. Модели и их ключи — только на сервере.`,
+      `Отвечает за 15 с (с фото — за 28 с). Не больше ${RATE_LIMIT} запросов в минуту с одного адреса, вопросы об отеле (brief.hotelId) — отдельно, ещё ${HOTEL_RATE_LIMIT}. Модели и их ключи — только на сервере.`,
     ].join('\n'),
     body: {
       description: 'Диалог и бриф',

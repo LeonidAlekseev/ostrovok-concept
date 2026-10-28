@@ -43,10 +43,17 @@ const MAX_QUOTES = 6
 
 export const NO_NEARBY_DATA = 'Сейчас не могу ответить: данных о местах рядом пока нет.'
 
-const ROOMS = /номер|комнат|апартамент|спальн|кроват|проживани|цен|стоим/i
-const PARKING = /парков|машин|автомоб|припарков/i
-const PETS = /питомц|собак|кошк|животн|с питом/i
-const NEARBY = /рядом|поблизости|недалеко|вокруг|окрестност|достопримечат|что посмотреть|куда сходить/i
+/** A word beginning with one of `stems`: «цена» is a price, «оценка» and «центр» are not. */
+const wordStart = (stems: string) => new RegExp(`(?<!\\p{L})(?:${stems})`, 'iu')
+
+const ROOMS = wordStart(
+  'номер|комнат|апартамент|спальн|кроват|проживани|цен(?:а|ы|у|е|ой|ам|ах)(?!\\p{L})|стоим|стоит|стоят',
+)
+const PARKING = wordStart('парков|припарков|автомобил|стоянк|(?:оставить|поставить) машин|машин\\S* на парков')
+const PETS = wordStart('питомц|собак|собач|кошк|кот(?:а|у|ом|ами)?(?!\\p{L})|животн')
+/** A question that also asks what the hotel's data answers: pets, parking, rooms and prices. */
+export const asksHotelFacts = (text: string) => PETS.test(text) || PARKING.test(text) || ROOMS.test(text)
+const NEARBY = wordStart('рядом|поблизости|недалеко|вокруг|окрестност|достопримечат|что посмотреть|куда сходить')
 
 /** The price line of a room on the chat's dates, or the cheapest night without them. */
 function roomPrice(room: Room, dates?: StayDates): string {
@@ -96,6 +103,8 @@ export function ruleAnswer(
   noise?: HotelNoise | null,
   /** The result of «Анализ шума» on a question about the noise: the answer goes by it. */
   noiseTool?: ToolResult,
+  /** `false`: the places nearby are answered elsewhere (the geo steps), only the hotel's own facts are. */
+  withNearby = true,
 ): HotelAnswer {
   const has = (...keys: (keyof typeof AMENITIES)[]) => keys.find((key) => hotel.amenities.includes(key))
   if (PETS.test(text)) {
@@ -135,11 +144,11 @@ export function ruleAnswer(
         : 'Сейчас не могу ответить: данных о шуме у этого отеля нет.',
     }
   }
-  if (NEARBY.test(text)) {
-    const places = details?.nearby.slice(0, NEARBY_SHOWN) ?? []
-    if (places.length === 0) return { answer: `${NO_NEARBY_DATA} Расстояния: ${distanceLine(hotel)}.` }
+  if (withNearby && NEARBY.test(text)) {
+    const nearby = details?.nearby.slice(0, NEARBY_SHOWN) ?? []
+    if (nearby.length === 0) return { answer: `${NO_NEARBY_DATA} Расстояния: ${distanceLine(hotel)}.` }
     return {
-      answer: `Рядом с отелем, по данным Островка:\n${places.map((place) => `• ${placeLine(place)}`).join('\n')}`,
+      answer: `Рядом с отелем, по данным Островка:\n${nearby.map((place) => `• ${placeLine(place)}`).join('\n')}`,
     }
   }
   if (ROOMS.test(text)) {

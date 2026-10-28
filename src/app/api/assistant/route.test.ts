@@ -372,6 +372,19 @@ describe('POST /api/assistant', () => {
     expect((await post(body, '192.0.2.1')).status).toBe(429)
     expect((await post(body, '192.0.2.2')).status).toBe(200)
   })
+
+  it('counts the questions about a hotel apart from the search (Scenario: Подбор исчерпал лимит)', async () => {
+    setModel(undefined)
+    const search = { messages: [{ role: 'user', text: 'море' }], brief: {} }
+    const hotel = {
+      messages: [{ role: 'user', text: 'есть парковка?' }],
+      brief: { hotelId: 'prague-old-town-lantern' },
+    }
+    for (let i = 0; i < 20; i++) expect((await post(search, '192.0.2.3')).status).toBe(200)
+    expect((await post(search, '192.0.2.3')).status).toBe(429)
+    for (let i = 0; i < 20; i++) expect((await post(hotel, '192.0.2.3')).status).toBe(200)
+    expect((await post(hotel, '192.0.2.3')).status).toBe(429)
+  })
 })
 
 describe('POST /api/assistant: the semantic search', () => {
@@ -686,6 +699,23 @@ describe('POST /api/assistant: a question about a hotel', () => {
       map,
     })
     expect(vi.mocked(geoTurn).mock.calls[0][0]).toMatchObject({ id: hotelId })
+  })
+
+  // assistant-search, Requirement: Смешанный вопрос
+  it('answers both parts of «бар рядом и можно ли с собакой?»: the places by the geo steps, the pets by the data', async () => {
+    setModel(undefined)
+    vi.mocked(geoTurn).mockResolvedValue({
+      steps: [],
+      summary: 'По данным OpenStreetMap: бар рядом.',
+      planner: 'rules',
+    })
+    const body = await (await aboutHotel('Есть бар рядом и можно ли с собакой?')).json()
+    expect(geoTurn).toHaveBeenCalledTimes(1)
+    expect(body.reply).toMatch(
+      /^По данным OpenStreetMap: бар рядом\.\n\n(Да, можно с питомцами|В данных отеля о размещении с питомцами)/,
+    )
+    // The places are not answered twice: the hotel part has none.
+    expect(body.reply).not.toContain('Рядом с отелем, по данным Островка')
   })
 
   it('asks the geo steps only of a question about the places near', async () => {

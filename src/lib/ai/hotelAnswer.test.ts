@@ -107,6 +107,16 @@ describe('ruleAnswer', () => {
     expect(ruleAnswer('Можно с питомцами?', bare).answer).toContain('о размещении с питомцами ничего не сказано')
   })
 
+  it('tells a word from a word that holds its letters (Scenario: Центр)', () => {
+    // «центра» and «оценки» hold «цен» but ask for no prices; «стиральная машина» is no parking.
+    expect(ruleAnswer('Далеко ли до центра?', hotel).answer).not.toContain('Номера отеля')
+    expect(ruleAnswer('Какие оценки у отеля?', hotel).answer).not.toContain('Номера отеля')
+    expect(ruleAnswer('Есть стиральная машина?', hotel).answer).not.toMatch(/парковка/)
+    expect(ruleAnswer('Какая цена?', hotel).answer).toContain('Номера отеля')
+    expect(ruleAnswer('Сколько стоит номер?', hotel).answer).toContain('Номера отеля')
+    expect(ruleAnswer('Можно с собакой?', hotel).answer).toMatch(/^Да, можно с питомцами/)
+  })
+
   it('refuses «Что рядом?» without a place, with the distances only (Scenario: Без модели)', () => {
     const { answer } = ruleAnswer('Что рядом с отелем?', hotel)
     expect(answer).toContain(NO_NEARBY_DATA)
