@@ -46,6 +46,7 @@ import { FiltersPanel } from './FiltersPanel'
 import { FiltersSheet } from './FiltersSheet'
 import { Pagination } from './Pagination'
 import { ResultTile } from './ResultTile'
+import { useHotelierHotels } from './useHotelierHotels'
 import { MapUnavailable, SEARCH_MAP_HINT } from '@/components/MapUnavailable/MapUnavailable'
 import {
   entryState,
@@ -200,6 +201,7 @@ interface ResultsProps {
 function Results({ query, target, initialFilters, hotelId, top = false }: ResultsProps) {
   const params = useSearchParams()
   const router = useRouter()
+  const hotelierHotels = useHotelierHotels()
   const [status, setStatus] = useState<Status>({ state: 'loading' })
   const [filters, setFilters] = useState(initialFilters)
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -407,6 +409,7 @@ function Results({ query, target, initialFilters, hotelId, top = false }: Result
                         active={item.hotel.id === activeId}
                         onActivate={setActiveId}
                         onOpen={leaveFor}
+                        hotelier={hotelierHotels.get(item.hotel.id)}
                       />
                     </li>
                   ))}

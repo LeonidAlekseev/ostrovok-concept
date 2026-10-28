@@ -7,6 +7,8 @@ import { noiseMapOperations } from '@/app/api/hotels/[hotelId]/noise-map/schema'
 import { viewMapOperations } from '@/app/api/hotels/[hotelId]/view-map/schema'
 import { viewOperations } from '@/app/api/hotels/[hotelId]/view/schema'
 import { hotelierOperations } from '@/app/api/hotelier/schema'
+import { hotelierHotelsOperations } from '@/app/api/hotelier/hotels/schema'
+import { hotelierFactsOperations } from '@/app/api/hotels/[hotelId]/hotelier/facts/schema'
 import { hotelsOperations } from '@/app/api/hotels/schema'
 import { openApiOperations } from '@/app/api/openapi.json/schema'
 import { supabaseOpenApiOperations } from '@/app/api/openapi/supabase.json/schema'
@@ -27,6 +29,8 @@ export const API_OPERATIONS: readonly ApiOperation[] = [
   ...noiseMapOperations,
   ...claimsOperations,
   ...searchOperations,
+  ...hotelierFactsOperations,
+  ...hotelierHotelsOperations,
   ...relationsOperations,
   ...assistantOperations,
   ...hotelierOperations,

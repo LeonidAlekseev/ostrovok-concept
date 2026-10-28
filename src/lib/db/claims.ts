@@ -248,6 +248,37 @@ export async function loadHotelierClaims(hotelId: string): Promise<HotelClaim[] 
   }
 }
 
+/** A hotel the hotelier told something of: how many current characteristics, and whether they are demonstration. */
+export interface HotelierHotel {
+  hotelId: string
+  facts: number
+  demo: boolean
+}
+
+/** The hotels with current characteristics of their hotelier, read fresh; `null` when unreadable. */
+export async function loadHotelierHotels(): Promise<HotelierHotel[] | null> {
+  try {
+    const { data, error } = await anonClient()
+      .from('claims')
+      .select('is_demo, entity:entities!inner(hotel_id)')
+      .like('property', 'hotelier.%')
+      .or(`valid_to.is.null,valid_to.gt.${new Date().toISOString()}`)
+      .limit(5000)
+    if (error) throw error
+    const hotels = new Map<string, HotelierHotel>()
+    for (const row of (data ?? []) as unknown as { is_demo: boolean; entity: { hotel_id: string | null } }[]) {
+      const hotelId = row.entity?.hotel_id
+      if (!hotelId) continue
+      const hotel = hotels.get(hotelId) ?? { hotelId, facts: 0, demo: false }
+      hotels.set(hotelId, { hotelId, facts: hotel.facts + 1, demo: hotel.demo || row.is_demo })
+    }
+    return [...hotels.values()].sort((a, b) => a.hotelId.localeCompare(b.hotelId))
+  } catch (error) {
+    console.warn(`hotelier hotels: not read (${String((error as { code?: unknown })?.code ?? 'error').slice(0, 40)})`)
+    return null
+  }
+}
+
 /** A chunk of a hotel's document that matched: its text is the source's, untrusted. */
 export interface HotelChunk {
   chunkId: string

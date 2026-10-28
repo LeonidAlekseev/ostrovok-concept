@@ -30,6 +30,7 @@ type Service = SupabaseClient<Database>
 export const HOTELIER_PROVIDER = 'Отельер'
 const HOTELIER_SOURCE = 'hotelier:'
 const SUPERSEDED = 'Заменено более поздним ответом отельера'
+const CONFLICT = 'Противоречит другому ответу отельера: уточняется'
 const REVOKED = 'Отозвано отельером'
 const REPORTED = 'Сообщено отельером, сервис это не проверял'
 
@@ -139,6 +140,7 @@ async function writeFacts(
   answer: Answer,
   facts: readonly HotelierFact[],
   model: string,
+  { conflict = false }: { conflict?: boolean } = {},
 ): Promise<Written> {
   const { message, hotelId, request, demo } = answer
   const observedAt = message.created_at
@@ -209,23 +211,46 @@ async function writeFacts(
           { onConflict: 'claim_id,evidence_id' },
         ),
     )
-    // The older answers of the same characteristic (and room) end; their rows and sources stay.
+    // The older answers of the same characteristic (and room) end; their rows and sources stay. An answer that
+    // contradicts them without replacing them (`conflict`) leaves both standing, each marked, until it is cleared up.
     const older = must(
       await db
         .from('claims')
-        .select('id, limitations, source_key')
+        .select('id, limitations, source_key, observed_at')
         .eq('entity_id', entity)
         .eq('property', property)
         .like('source_key', `${HOTELIER_SOURCE}%`)
         .neq('source_key', `${sourceKey}${room}`)
         .is('valid_to', null),
     ).filter((c) => (room ? c.source_key.endsWith(room) : !c.source_key.slice(HOTELIER_SOURCE.length).includes(':')))
-    for (const old of older)
+    // An answer older than one already stored (an answer processed late) ends itself, not the newer one.
+    const newer = older.filter((c) => c.observed_at !== null && c.observed_at > observedAt)
+    if (newer.length > 0 && !conflict) {
       done(
         await db
           .from('claims')
-          .update({ valid_to: observedAt, limitations: [...new Set([...old.limitations, SUPERSEDED])] })
+          .update({ valid_to: newer[0].observed_at, limitations: [REPORTED, SUPERSEDED] })
+          .eq('id', claim.id),
+      )
+      older.splice(0, older.length)
+    }
+    for (const old of older.filter((c) => !(c.observed_at !== null && c.observed_at > observedAt)))
+      done(
+        await db
+          .from('claims')
+          .update(
+            conflict
+              ? { limitations: [...new Set([...old.limitations, CONFLICT])] }
+              : { valid_to: observedAt, limitations: [...new Set([...old.limitations, SUPERSEDED])] },
+          )
           .eq('id', old.id),
+      )
+    if (conflict && older.length > 0)
+      done(
+        await db
+          .from('claims')
+          .update({ limitations: [REPORTED, CONFLICT] })
+          .eq('id', claim.id),
       )
     claims.push({
       id: claim.id,
@@ -415,6 +440,29 @@ async function finishRuns(db: Service, requestId: string, written: Written | nul
       )
     }
   }
+}
+
+/**
+ * The facts given for a hotelier's answer, written as an extracted answer's are — the claims, their source, the
+ * document of the search with its vectors, the waiting runs — without a model: the demo data
+ * (`npm run db:seed:hotelier-demo`) know their facts. `conflict`: the answer contradicts the hotelier's earlier one
+ * and both stand. `null` when the message is not a hotelier's shareable answer.
+ */
+export async function writeHotelierFacts(
+  messageId: string,
+  facts: readonly HotelierFact[],
+  { model, conflict = false }: { model: string; conflict?: boolean },
+) {
+  const db = await serviceClient()
+  if (!db) throw new Error('hotelier knowledge: no service role key')
+  const answer = await readAnswer(db, messageId)
+  if (!answer || !answer.message.shareable || facts.length === 0) return null
+  const written = await writeFacts(db, answer, facts, model, { conflict })
+  if (answer.request) {
+    await finishRuns(db, answer.request.id, written, REPORTED)
+    await setKnowledge(db, answer.request.id, 'done')
+  }
+  return written
 }
 
 /**

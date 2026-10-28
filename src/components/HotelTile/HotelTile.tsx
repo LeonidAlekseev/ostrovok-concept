@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import type { ComponentProps } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { MapPin } from 'lucide-react'
 import { cn } from 'cn'
 import { Separator } from '@/components/ui/separator'
@@ -26,6 +26,8 @@ interface Props extends Omit<ComponentProps<'article'>, 'children'> {
   heading?: 'h2' | 'h3' | 'h4'
   /** The simple card of the persona selections: one photo, without badges, arrows and the kind of stay. */
   plain?: boolean
+  /** A line under the badges: «Сведения отельера» of the search results. */
+  note?: ReactNode
 }
 
 /**
@@ -42,6 +44,7 @@ export function HotelTile({
   freeCancellation = hasFreeCancellation(hotel),
   heading: Heading = 'h3',
   plain = false,
+  note,
   className,
   ...props
 }: Props) {
@@ -96,6 +99,7 @@ export function HotelTile({
           )}
         </div>
         {!plain && <TileBadges hotel={hotel} freeCancellation={freeCancellation} />}
+        {note}
         <p className="flex items-center gap-1 text-sm/[normal] text-muted-foreground">
           <MapPin className="size-4 shrink-0" aria-hidden />
           {/* From 281px the city follows the distance; the screen reader always gets the whole text. */}

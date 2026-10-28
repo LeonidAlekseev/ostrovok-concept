@@ -23,6 +23,7 @@ import {
 } from '@/lib/hotelierChat'
 import { followConversation, loadMessages, loadRequests, markRead } from '@/lib/hotelierChatRemote'
 import { RunSources } from '../AssistantPage/ChatCards'
+import { DemoBadge } from '../DemoBadge'
 import { getBrowserClient } from '@/lib/supabase/client'
 
 const KNOWLEDGE_LABEL: Record<HotelierRequest['knowledgeStatus'], string> = {
@@ -47,6 +48,7 @@ function Message({ message, onRevoke }: { message: HotelierMessage; onRevoke: (i
     <div className={cn('flex max-w-[85%] flex-col gap-0.5', own ? 'items-end self-end' : 'items-start self-start')}>
       <span className="px-1 text-xs font-semibold text-muted-foreground">
         {senderLabel(message.sender, 'hotelier')}
+        {message.demo && <DemoBadge className="ml-1.5" />}
       </span>
       <p
         className={cn(
@@ -302,7 +304,7 @@ export function ConversationView({
               Можно использовать в общих сведениях об отеле (без данных гостя)
             </label>
           </div>
-          <Button type="submit" className="ml-auto" disabled={busy || closed || !text.trim()}>
+          <Button type="submit" className="ml-auto" disabled={busy || closed || loaded !== 'ready' || !text.trim()}>
             <SendHorizontal aria-hidden />
             Ответить
           </Button>

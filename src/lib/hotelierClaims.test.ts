@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { HotelClaim } from './db/claims'
-import { claimValueText, hotelierClaimLine, hotelierToolClaim } from './hotelierClaims'
+import { claimValueText, conflictingIds, hotelierClaimLine, hotelierNotes, hotelierToolClaim } from './hotelierClaims'
 
 const claim = (extra: Partial<HotelClaim> = {}): HotelClaim => ({
   id: 'c1',
@@ -41,5 +41,27 @@ describe('the hotelier’s characteristics', () => {
       demo: true,
     })
     expect(hotelierToolClaim(claim())).not.toHaveProperty('demo')
+  })
+
+  it('find the answers that contradict each other, room by room', () => {
+    const yard = claim({ id: 'a', value: { kind: 'text', value: 'во двор' } })
+    const street = claim({ id: 'b', value: { kind: 'text', value: 'на улицу' } })
+    const other = claim({ id: 'c', value: { kind: 'text', value: 'на улицу' }, method: { room: 'Standard' } })
+    expect([...conflictingIds([yard, street, other])].sort()).toEqual(['a', 'b'])
+    expect(hotelierClaimLine(yard, true)).toMatch(/\[противоречие\]$/)
+  })
+
+  it('make an answer from the hotelier’s words say the demo’s and the contradictions', () => {
+    const demo = claim({ demo: true })
+    expect(hotelierNotes('По словам отельера, балкон есть.', [demo])).toEqual([
+      'Сведения отельера здесь — демонстрационные (демо), не настоящий ответ отеля.',
+    ])
+    expect(hotelierNotes('По словам отельера (демо), балкон есть.', [demo])).toEqual([])
+    expect(hotelierNotes('Балкон есть.', [demo])).toEqual([])
+    const yard = claim({ id: 'a', value: { kind: 'text', value: 'во двор' } })
+    const street = claim({ id: 'b', value: { kind: 'text', value: 'на улицу' } })
+    expect(hotelierNotes('По словам отельера, окна во двор.', [yard, street])).toEqual([
+      'Ответы отельера об этом расходятся: уточните у отеля перед бронированием.',
+    ])
   })
 })

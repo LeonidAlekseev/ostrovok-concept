@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { cn } from 'cn'
 import { Badge } from '@/components/ui/badge'
+import { DemoBadge } from '../DemoBadge'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
@@ -195,16 +196,6 @@ const SOURCE_TYPE: Record<ToolEvidence['source_type'], string> = {
   hotelier: 'Ответ отельера',
 }
 
-/** The mark of synthetic demonstration data. */
-const DemoMark = () => (
-  <Badge
-    className="ml-1.5 h-4 px-1.5 align-middle text-[11px]"
-    title="Демонстрационные данные, не настоящий ответ отеля"
-  >
-    демо
-  </Badge>
-)
-
 /** «26 октября 2026 г.»; nothing for a date that does not read. */
 function dateLabel(iso: string | null): string | null {
   const time = iso ? Date.parse(iso) : NaN
@@ -235,7 +226,7 @@ function SourceItem({ source }: { source: ToolEvidence }) {
     <li className="flex flex-col gap-0.5 rounded-xl bg-card px-3 py-2 text-sm/[1.35]">
       <span className="font-semibold text-foreground">
         {source.source_name}
-        {source.demo && <DemoMark />}
+        {source.demo && <DemoBadge className="ml-1.5" />}
       </span>
       {source.source_url && isSafeUrl(source.source_url) ? (
         <a
@@ -271,7 +262,7 @@ function ClaimItem({ claim, names }: { claim: ToolClaim; names: ReadonlyMap<stri
     <li className="text-sm/[1.35]">
       <span className="text-foreground">
         {claim.label}: <span className="font-semibold">{claim.value}</span>
-        {claim.demo && <DemoMark />}
+        {claim.demo && <DemoBadge className="ml-1.5" />}
       </span>
       <span className={`block ${greyMutedText}`}>{origin.join(' · ')}</span>
     </li>

@@ -53,6 +53,7 @@ function fake(answers: Record<string, Answer[]>, rpc: Answer = { data: true, err
         insert: (value: unknown) => ((call.op = 'insert'), (call.value = value), query),
         eq: (k: string, v: unknown) => (call.filters.push(['eq', k, v]), query),
         neq: (k: string, v: unknown) => (call.filters.push(['neq', k, v]), query),
+        limit: async () => next({ ...call, op: 'limit' }),
         maybeSingle: async () => next(call),
         single: async () => next(call),
       }
@@ -129,6 +130,23 @@ describe('sendHotelierMessage', () => {
     const result = await sendHotelierMessage(client, 'h1', 'c1', { text: 'Да', shareable: true, requestId: 'r1' })
     expect(result).toMatchObject({ ok: true, value: { sender: 'hotelier', shareable: true } })
     expect(calls[0].value).toMatchObject({ sender: 'hotelier', author_id: 'h1', request_id: 'r1', shareable: true })
+  })
+})
+
+describe('the hotelier’s answer without its request', () => {
+  it('answers the conversation’s only open request, and none when there are two', async () => {
+    const one = fake({
+      'hotelier_requests:limit': [{ data: [{ id: 'r1' }], error: null }],
+      'hotelier_messages:insert': [{ data: messageRow({ sender: 'hotelier', request_id: 'r1' }), error: null }],
+    })
+    await sendHotelierMessage(one.client, 'h1', 'c1', { text: 'Да', shareable: true })
+    expect(one.calls.find((c) => c.op === 'insert')?.value).toMatchObject({ request_id: 'r1' })
+    const two = fake({
+      'hotelier_requests:limit': [{ data: [{ id: 'r1' }, { id: 'r2' }], error: null }],
+      'hotelier_messages:insert': [{ data: messageRow({ sender: 'hotelier' }), error: null }],
+    })
+    await sendHotelierMessage(two.client, 'h1', 'c1', { text: 'Да', shareable: true })
+    expect(two.calls.find((c) => c.op === 'insert')?.value).toMatchObject({ request_id: null })
   })
 })
 

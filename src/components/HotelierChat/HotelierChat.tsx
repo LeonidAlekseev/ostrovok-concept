@@ -10,6 +10,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { messageTime } from '@/lib/assistantChatList'
 import { MAX_HOTELIER_MESSAGE, STATUS_LABEL, senderLabel, type HotelierMessage } from '@/lib/hotelierChat'
 import { RunSources } from '../AssistantPage/ChatCards'
+import { DemoBadge } from '../DemoBadge'
 import { useHotelierChat, type HotelierChat as Chat } from './useHotelierChat'
 
 const HotelierChatContext = createContext<Chat | null>(null)
@@ -41,8 +42,11 @@ function Bubble({ message }: { message: HotelierMessage }) {
   const own = message.sender === 'user'
   return (
     <div className={cn('flex max-w-[88%] flex-col gap-0.5', own ? 'items-end self-end' : 'items-start self-start')}>
-      {!own && (
-        <span className="px-1 text-xs font-semibold text-muted-foreground">{senderLabel(message.sender, 'user')}</span>
+      {(!own || message.demo) && (
+        <span className="px-1 text-xs font-semibold text-muted-foreground">
+          {!own && senderLabel(message.sender, 'user')}
+          {message.demo && <DemoBadge className={own ? undefined : 'ml-1.5'} />}
+        </span>
       )}
       <p
         className={cn(

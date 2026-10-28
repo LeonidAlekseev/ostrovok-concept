@@ -64,6 +64,7 @@ export const conversationSchema = component(
       lastSender: z.enum(HOTELIER_SENDERS).nullable(),
       userUnread: z.number().meta({ description: 'Не прочитано путешественником' }),
       hotelierUnread: z.number().meta({ description: 'Не прочитано отельером' }),
+      demo: z.boolean().meta({ description: 'Демонстрационное обращение: отвечает демо-отельер или это демо-данные' }),
       createdAt: z.string(),
     })
     .meta({ description: 'Обращение к отелю: без имени и почты гостя' }),
@@ -81,6 +82,7 @@ export const messageSchema = component(
       requestId: z.string().nullable(),
       shareable: z.boolean(),
       knowledgeRevokedAt: z.string().nullable().meta({ description: 'Когда отельер отозвал сведения из ответа' }),
+      demo: z.boolean().meta({ description: 'Демонстрационное сообщение: показывается с пометкой «демо»' }),
       readAt: z.string().nullable(),
       createdAt: z.string(),
       run: toolRunSchema
@@ -122,6 +124,7 @@ const example = {
     lastSender: 'user',
     userUnread: 0,
     hotelierUnread: 1,
+    demo: false,
     createdAt: '2026-10-28T10:00:00.000Z',
   },
   message: {
@@ -132,6 +135,7 @@ const example = {
     requestId: null,
     shareable: false,
     knowledgeRevokedAt: null,
+    demo: false,
     readAt: null,
     createdAt: '2026-10-28T10:00:00.000Z',
   },

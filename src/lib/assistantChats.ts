@@ -80,6 +80,8 @@ export interface MessageData {
    * browser only with «Подтвердить».
    */
   change?: { proposal: DateChange; state: DateChangeState }
+  /** The demo hotelier's answer or a message of the demo data: shown marked «демо». */
+  demo?: true
 }
 
 export interface ChatMessage {
@@ -235,6 +237,7 @@ export function parseData(value: unknown): MessageData | null {
     ...(isBrief(value.notFound) && { notFound: value.notFound }),
     ...(value.rerun === true && { rerun: true as const }),
     ...(parseChange(value.change) && { change: parseChange(value.change) }),
+    ...(value.demo === true && { demo: true as const }),
   }
 }
 
