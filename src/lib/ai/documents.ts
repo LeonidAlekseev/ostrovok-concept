@@ -2,6 +2,7 @@ import { scenarios, type Destination } from '../../data/destinations'
 import { AMENITIES, STAY_TYPES, hasStars, isRated, isSyntheticHotel, type Hotel } from '../catalog'
 import { featureLines, type HotelFeatures } from '../features'
 import { distanceLabel, type HotelDetails } from '../hotelDetails'
+import { kmFromCentre } from '../format'
 import { VIBE_AXES, type VibeScale } from '../vibe'
 
 /**
@@ -53,7 +54,7 @@ export function hotelDocument(
     `${kind} «${hotel.name}»${stars} — ${destination.name}, ${destination.country}.`,
     themes.length ? `Город: ${themes.join(', ')}.` : '',
     `${isRated(hotel) ? `Рейтинг гостей ${hotel.rating.toFixed(1)} из 10, ${hotel.reviewCount} отзывов.` : 'Оценок гостей пока нет.'} Цена от ${hotel.priceFrom} ₽ за ночь.`,
-    `${wifi}${hotel.distanceKm.toFixed(1)} км от центра.`,
+    `${wifi}${kmFromCentre(hotel.distanceKm)}.`,
     ...featureLines(features),
     sentence(hotel.description),
     groups.length

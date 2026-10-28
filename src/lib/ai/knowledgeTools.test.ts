@@ -258,6 +258,17 @@ describe('the runs of the tools', () => {
     expect(result.limitations[0]).toMatch(/^Нет данных — не значит «тихо»/)
   })
 
+  it('says the data is incomplete when some reads of the chosen hotels got no answer', () => {
+    const result = featuresResult(
+      { criteria: { nightBelowDb: 50 }, candidates, chosen: ['ota-1'], incomplete: ['ota-1'] },
+      levels,
+      new Map([['ota-1', quietClaims]]),
+    )
+    valid(result)
+    expect(result.summary).toContain('данные неполные')
+    expect(result.limitations.some((l) => l.startsWith('Данные неполные'))).toBe(true)
+  })
+
   it('says the store could not be read instead of choosing', () => {
     const result = featuresResult({ criteria: { nightBelowDb: 50 }, candidates, chosen: [] }, null, new Map())
     valid(result)

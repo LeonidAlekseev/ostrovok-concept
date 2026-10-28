@@ -107,56 +107,65 @@ export function ruleAnswer(
   withNearby = true,
 ): HotelAnswer {
   const has = (...keys: (keyof typeof AMENITIES)[]) => keys.find((key) => hotel.amenities.includes(key))
+  // A question of several topics gets each topic's answer, in this order.
+  const answers: string[] = []
   if (PETS.test(text)) {
     const pets = has('pets')
     const fees = policyLines(details, /питомц/i).join('')
-    return {
-      answer: pets
+    answers.push(
+      pets
         ? `Да, ${amenityLabel(pets).toLocaleLowerCase('ru')}${paid(pets)}.${fees}`
         : 'В данных отеля о размещении с питомцами ничего не сказано. Уточните это у отеля до бронирования.',
-    }
+    )
   }
   if (PARKING.test(text)) {
     const parking = has('parking', 'parking-nearby')
     const fees = policyLines(details, /^Парковка/).join('')
-    return {
-      answer: parking
+    answers.push(
+      parking
         ? `Да: ${amenityLabel(parking).toLocaleLowerCase('ru')}${paid(parking)}.${fees}`
         : fees
           ? `По данным отеля:${fees}`
           : 'В данных отеля парковка не указана. Уточните это у отеля до бронирования.',
-    }
+    )
   }
   if (isNoiseQuestion(text) && noiseTool) {
-    if (noiseTool.status === 'error') return { answer: 'Сейчас не могу ответить: данные о шуме не прочитались.' }
-    const lines = noiseTool.claims.map((claim) => `${claim.label}: ${claim.value}`)
-    return {
-      answer: lines.length
-        ? `О шуме у отеля, по данным хранилища (источники — в блоке «${NOISE_TOOL_LABEL}»):\n${lines.map((line) => `• ${line}`).join('\n')}`
-        : 'Сейчас не могу ответить: данных о шуме у этого отеля нет. Это не значит, что там тихо.',
+    if (noiseTool.status === 'error') answers.push('Сейчас не могу ответить: данные о шуме не прочитались.')
+    else {
+      const lines = noiseTool.claims.map((claim) => `${claim.label}: ${claim.value}`)
+      answers.push(
+        lines.length
+          ? `О шуме у отеля, по данным хранилища (источники — в блоке «${NOISE_TOOL_LABEL}»):\n${lines.map((line) => `• ${line}`).join('\n')}`
+          : 'Сейчас не могу ответить: данных о шуме у этого отеля нет. Это не значит, что там тихо.',
+      )
     }
-  }
-  if (isNoiseQuestion(text)) {
+  } else if (isNoiseQuestion(text)) {
     const lines = noiseLines(noise)
-    return {
-      answer: lines.length
+    answers.push(
+      lines.length
         ? `О шуме у отеля, по картам шума EEA и OpenStreetMap:\n${lines.map((line) => `• ${line}`).join('\n')}`
         : 'Сейчас не могу ответить: данных о шуме у этого отеля нет.',
-    }
+    )
   }
-  if (withNearby && NEARBY.test(text)) {
+  // «Шумно ли рядом» is a question of the noise, not of the places.
+  if (withNearby && !isNoiseQuestion(text) && NEARBY.test(text)) {
     const nearby = details?.nearby.slice(0, NEARBY_SHOWN) ?? []
-    if (nearby.length === 0) return { answer: `${NO_NEARBY_DATA} Расстояния: ${distanceLine(hotel)}.` }
-    return {
-      answer: `Рядом с отелем, по данным Островка:\n${nearby.map((place) => `• ${placeLine(place)}`).join('\n')}`,
-    }
+    answers.push(
+      nearby.length === 0
+        ? `${NO_NEARBY_DATA} Расстояния: ${distanceLine(hotel)}.`
+        : `Рядом с отелем, по данным Островка:\n${nearby.map((place) => `• ${placeLine(place)}`).join('\n')}`,
+    )
   }
   if (ROOMS.test(text)) {
     const lines = roomLines(hotel, dates)
-    if (lines.length === 0) return { answer: 'В данных отеля номеров нет.' }
     const hint = dates ? '' : '\nВыберите даты — покажу цены.'
-    return { answer: `Номера отеля:\n${lines.map((line) => `• ${line}`).join('\n')}${hint}` }
+    answers.push(
+      lines.length === 0
+        ? 'В данных отеля номеров нет.'
+        : `Номера отеля:\n${lines.map((line) => `• ${line}`).join('\n')}${hint}`,
+    )
   }
+  if (answers.length > 0) return { answer: answers.join('\n\n') }
   return { answer: HOTEL_UNAVAILABLE }
 }
 

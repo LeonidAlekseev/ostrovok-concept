@@ -608,8 +608,11 @@ export async function POST(request: Request) {
   const ip = clientIp(request)
   const parsedBody = assistantRequestSchema.safeParse(await request.json().catch(() => null))
   if (!parsedBody.success) return apiError(400, 'Invalid request')
-  // A chat about a hotel counts its questions apart from the search's requests.
-  const allowed = typeof parsedBody.data.brief.hotelId === 'string' ? allowHotelRequest : allowRequest
+  // A chat about a hotel answers about it; an id the catalogue does not know is a chat like any other.
+  const askedHotelId = parsedBody.data.brief.hotelId
+  const hotel = typeof askedHotelId === 'string' ? await loadHotel(askedHotelId).catch(() => undefined) : undefined
+  // Only a hotel the catalogue knows counts its questions apart from the search's requests: a made-up id gets no second counter.
+  const allowed = hotel ? allowHotelRequest : allowRequest
   if (!(await allowed(ip))) return apiError(429, 'Too many requests')
 
   const { messages, photos = [], rerun } = parsedBody.data
@@ -635,8 +638,6 @@ export async function POST(request: Request) {
       ),
     )
   }
-  // A chat about a hotel answers about it; an id the catalogue does not know is a chat like any other.
-  const hotel = brief.hotelId ? await loadHotel(brief.hotelId).catch(() => undefined) : undefined
   if (brief.hotelId && !hotel) delete brief.hotelId
   if (hotel) {
     return hotelTurn(hotel, { brief, messages, signal: request.signal, deadline, chatId, messageId })
