@@ -104,10 +104,10 @@ function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 }
 
 /** The catalog's database with the anon key: the functions are `security definer`, the table is closed. */
-const database = () =>
+export const database = () =>
   createClient<Database>(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } })
 
-const warn = (what: string, error: unknown) =>
+export const warn = (what: string, error: unknown) =>
   // The kind and the provider's short message; never the query itself.
   console.warn(
     `semantic: ${what} (${error instanceof Error ? `${error.name}: ${error.message.slice(0, 200)}` : error})`,

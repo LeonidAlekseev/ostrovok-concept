@@ -2018,6 +2018,65 @@
         }
       }
     },
+    "/rpc/match_hotel_photos": {
+      "post": {
+        "operationId": "rpc_match_hotel_photos",
+        "tags": ["Функции"],
+        "summary": "match_hotel_photos",
+        "description": "Функция `match_hotel_photos` базы через PostgREST.",
+        "x-used-in": ["src/lib/ai/photoSearch.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "destination_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "match_count": {
+                    "type": "number"
+                  },
+                  "query_embedding": {}
+                },
+                "required": ["query_embedding"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "destination_id": {
+                        "type": "string"
+                      },
+                      "hotel_id": {
+                        "type": "string"
+                      },
+                      "similarity": {
+                        "type": "number"
+                      }
+                    },
+                    "required": ["destination_id", "hotel_id", "similarity"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/rpc/osm_place_area_add": {
       "post": {
         "operationId": "rpc_osm_place_area_add",
