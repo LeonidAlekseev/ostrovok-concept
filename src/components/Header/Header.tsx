@@ -1,13 +1,15 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useSession } from '@/hooks/useStore'
+import { isHotelier } from '@/lib/hotelierChatRemote'
 import { signOut } from '@/lib/session'
+import { getBrowserClient } from '@/lib/supabase/client'
 import { cn } from 'cn'
 
 // The header's look follows the page content, not the pathname: `usePathname()` is not reliable in the server
@@ -29,6 +31,28 @@ const links = [
   { href: '/trips', label: 'Мои поездки' },
   { href: '/favorites', label: 'Избранное' },
 ]
+
+/** «Панель отельера» for a hotelier's account: asked of the database when the menu opens. */
+function HotelierLink({ email, onClick }: { email: string; onClick: () => void }) {
+  const [hotelier, setHotelier] = useState<{ email: string; is: boolean } | null>(null)
+  useEffect(() => {
+    const client = getBrowserClient()
+    if (!client) return
+    let current = true
+    isHotelier(client)
+      .then((is) => current && setHotelier({ email, is }))
+      .catch(() => undefined)
+    return () => {
+      current = false
+    }
+  }, [email])
+  if (!hotelier?.is || hotelier.email !== email) return null
+  return (
+    <Link className={cn(menuItemClass, 'mb-2')} href="/hotelier" onClick={onClick}>
+      Панель отельера
+    </Link>
+  )
+}
 
 export function Header() {
   const [open, setOpen] = useState(false)
@@ -102,6 +126,7 @@ export function Header() {
                 <section aria-label="Аккаунт" className="-mx-1.5 mt-3 border-t px-1.5 pt-3">
                   <p className="m-0 truncate px-1.5 font-[650]">{session.name}</p>
                   <p className="m-0 mb-2 truncate px-1.5 text-sm text-muted-foreground">{session.email}</p>
+                  <HotelierLink email={session.email} onClick={close} />
                   <Button
                     variant="outline"
                     className="w-full"

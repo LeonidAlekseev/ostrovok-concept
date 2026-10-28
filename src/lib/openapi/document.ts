@@ -6,6 +6,7 @@ import { relationsOperations } from '@/app/api/hotels/[hotelId]/relations/schema
 import { noiseMapOperations } from '@/app/api/hotels/[hotelId]/noise-map/schema'
 import { viewMapOperations } from '@/app/api/hotels/[hotelId]/view-map/schema'
 import { viewOperations } from '@/app/api/hotels/[hotelId]/view/schema'
+import { hotelierOperations } from '@/app/api/hotelier/schema'
 import { hotelsOperations } from '@/app/api/hotels/schema'
 import { openApiOperations } from '@/app/api/openapi.json/schema'
 import { supabaseOpenApiOperations } from '@/app/api/openapi/supabase.json/schema'
@@ -28,6 +29,7 @@ export const API_OPERATIONS: readonly ApiOperation[] = [
   ...searchOperations,
   ...relationsOperations,
   ...assistantOperations,
+  ...hotelierOperations,
   ...revalidateOperations,
   ...openApiOperations,
   ...supabaseOpenApiOperations,
@@ -41,6 +43,7 @@ const TAGS = [
     description: 'Хранилище знаний: утверждения с источниками, поиск по отзывам, связи с местами',
   },
   { name: 'Эвал', description: 'Ассистент: диалог, подбор отелей, вопросы об отеле с картой' },
+  { name: 'Чат с отельером', description: 'Путешественник пишет отелю, отельер отвечает; нужна сессия' },
   { name: 'Служебные', description: 'Для скриптов: нужен секрет' },
   { name: 'Документация', description: 'Документы OpenAPI этой страницы' },
 ]
@@ -130,6 +133,12 @@ export function apiDocument() {
     components: {
       schemas: componentSchemas(),
       securitySchemes: {
+        session: {
+          type: 'apiKey',
+          in: 'cookie',
+          name: 'sb-<project>-auth-token',
+          description: 'Сессия Supabase Auth в cookie браузера: вход на сайте.',
+        },
         serviceRole: {
           type: 'http',
           scheme: 'bearer',
