@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { loadHotelierNoise } from '@/lib/db/claims'
 import { loadLevelIndex, loadNearIndex } from '@/lib/db/knowledge'
 import { loadHotelSummaries } from '@/lib/db/catalog'
 import { isSupabaseConfigured } from '@/lib/supabase/config'
@@ -21,6 +22,7 @@ describe.runIf(process.env.LIVE_DB === '1' && isSupabaseConfigured)('the tools o
     expect(candidates.length).toBeGreaterThan(100)
     const deps: KnowledgeDeps = {
       levels: loadLevelIndex,
+      hotelierNoise: loadHotelierNoise,
       near: loadNearIndex,
       runFeatures: runFeaturesTool,
       runNear: runNearTool,

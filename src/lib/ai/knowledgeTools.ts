@@ -5,9 +5,11 @@ import { isRealHotelId } from '../db/anon'
 import {
   loadEvidence,
   loadHotelClaims,
+  loadHotelierClaims,
   searchHotelReviews,
   type ClaimEvidence,
   type HotelChunk,
+  type HotelierNoise,
   type HotelClaim,
 } from '../db/claims'
 import type { LevelRow, NearRow } from '../db/knowledge'
@@ -145,16 +147,37 @@ const HEIGHT = 'building.height'
 /** The upper bound of a band: an open one is the loudest. */
 const upper = (row: { max: number | null }) => row.max ?? Infinity
 
+/** What a hotelier's words on the noise say: «тихо», «шумно», or nothing a rule can read. */
+export type NoiseWords = 'quiet' | 'loud' | 'unknown'
+
+const NEGATED = /(?<!\p{L})не\s+(?:\p{L}+\s+)?(?:бес)?(?:тих|шум|громк)/iu
+const QUIET = /тих|бесшум/iu
+const LOUD = /(?<!бес)шумн|громк/iu
+
+/** The rules, no model: a negation («не тихо»), both words or neither is `unknown`. */
+export function noiseWords(text: string): NoiseWords {
+  if (NEGATED.test(text)) return 'unknown'
+  const quiet = QUIET.test(text)
+  const loud = LOUD.test(text)
+  return quiet === loud ? 'unknown' : quiet ? 'quiet' : 'loud'
+}
+
 /** What the levels say of a hotel: the night and the day at the facade to the street, the height. */
 export interface HotelLevels {
   night?: number
   day?: number
   height?: number
+  /** The hotelier calls the hotel quiet at night in every current answer: those answers. */
+  hotelierQuiet?: HotelierNoise[]
 }
 
-/** The levels of each hotel of the index. */
-export function levelsOf(rows: readonly LevelRow[]): Map<string, HotelLevels> {
+/** The levels of each hotel of the index; the hotelier's answers on the noise are kept for the hotels they all call quiet. */
+export function levelsOf(rows: readonly LevelRow[], hotelier: readonly HotelierNoise[] = []): Map<string, HotelLevels> {
   const levels = new Map<string, HotelLevels>()
+  const answers = new Map<string, HotelierNoise[]>()
+  for (const answer of hotelier) answers.set(answer.hotelId, [...(answers.get(answer.hotelId) ?? []), answer])
+  for (const [hotelId, own] of answers)
+    if (own.every((a) => noiseWords(a.text) === 'quiet')) levels.set(hotelId, { hotelierQuiet: own })
   for (const row of rows) {
     const known = levels.get(row.hotelId) ?? {}
     if (NIGHT.test(row.property)) known.night = Math.max(known.night ?? -Infinity, upper(row))
@@ -165,13 +188,17 @@ export function levelsOf(rows: readonly LevelRow[]): Map<string, HotelLevels> {
   return levels
 }
 
+/** The hotelier's «тихо» closes a missing night level for a threshold at or above `QUIET_NIGHT_DB`, the number «тихо» means. */
+export const quietByHotelier = (levels: HotelLevels | undefined, criteria: FeatureCriteria) =>
+  levels?.night === undefined && !!levels?.hotelierQuiet && (criteria.nightBelowDb ?? -Infinity) >= QUIET_NIGHT_DB
+
 /** The verdict of each criterion of a hotel: a value the threshold passes, one it does not, or none. */
 export function criteriaVerdicts(levels: HotelLevels | undefined, criteria: FeatureCriteria) {
   const of = (value: number | undefined, passes: (v: number) => boolean): Verdict =>
     value === undefined ? 'nodata' : passes(value) ? 'match' : 'miss'
   return {
     ...(criteria.nightBelowDb !== undefined && {
-      night: of(levels?.night, (v) => v < criteria.nightBelowDb!),
+      night: quietByHotelier(levels, criteria) ? 'match' : of(levels?.night, (v) => v < criteria.nightBelowDb!),
     }),
     ...(criteria.dayBelowDb !== undefined && { day: of(levels?.day, (v) => v < criteria.dayBelowDb!) }),
     ...((criteria.heightMinM !== undefined || criteria.heightMaxM !== undefined) && {
@@ -192,8 +219,9 @@ export function featureVerdicts(
   index: readonly LevelRow[],
   hotelIds: readonly string[],
   criteria: FeatureCriteria,
+  hotelier: readonly HotelierNoise[] = [],
 ): Map<string, HotelVerdict> {
-  const levels = levelsOf(index)
+  const levels = levelsOf(index, hotelier)
   return new Map(
     hotelIds.map((id) => {
       const own = levels.get(id)
@@ -319,6 +347,7 @@ class Gathered {
       value: value.slice(0, 500),
       status: claim.status,
       confidence: claim.confidence,
+      ...(claim.demo && { demo: true }),
       evidence_ids: [...new Set(ids)],
       calculation_id: calculation && this.calculations.has(calculation.id) ? calculation.id : null,
     })
@@ -361,6 +390,7 @@ function noDataGroup(gathered: Gathered, id: string, names: readonly string[], w
 const FEATURE_LIMITATIONS = [
   'Нет данных — не значит «тихо» или «шумно»: такой отель не считается ни подходящим, ни неподходящим',
   'Уровни EEA — модельная карта снаружи здания полосами по 5 дБ; звукоизоляция окон и номеров не оценивается',
+  'Слова отельера — его слова, сервис их не проверял (уверенность 75 %); демо-сведения помечены «демо»',
   'Высота — у ближайшего к точке отеля здания EUBUCCO, не обязательно здания отеля',
 ]
 
@@ -371,7 +401,11 @@ export interface FeaturesInput {
   chosen: readonly string[]
   /** The cities the hotels are of, for the summary: «Валенсии». */
   where?: string
+  /** The hotels' current answers on the noise: they close a night level the EEA lacks. */
+  hotelier?: readonly HotelierNoise[]
 }
+
+const HOTELIER_NOISE = 'hotelier.room.noise'
 
 /** The loudest of the claims of a kind: the band that decides. */
 function loudest(claims: readonly HotelClaim[], pattern: RegExp): HotelClaim | undefined {
@@ -392,7 +426,7 @@ const VERDICT_NOTE: Record<Verdict, string> = { match: 'подходит', miss:
  * at the facade to the street, the building's height — with the verdict of each criterion.
  */
 export function featuresResult(
-  { criteria, candidates, chosen, where }: FeaturesInput,
+  { criteria, candidates, chosen, where, hotelier }: FeaturesInput,
   index: readonly LevelRow[] | null,
   claims: ReadonlyMap<string, readonly HotelClaim[] | null>,
 ): ToolResult {
@@ -401,15 +435,18 @@ export function featuresResult(
       limitations: FEATURE_LIMITATIONS,
     })
   const ids = candidates.map((c) => c.id)
-  const verdicts = featureVerdicts(index, ids, criteria)
+  const verdicts = featureVerdicts(index, ids, criteria, hotelier)
   const counts = verdictCounts(verdicts)
-  const levels = levelsOf(index)
+  const levels = levelsOf(index, hotelier)
   const names = new Map(candidates.map((c) => [c.id, c.name]))
   const gathered = new Gathered()
   for (const id of chosen) {
     const own = claims.get(id) ?? []
     const by = criteriaVerdicts(levels.get(id), criteria)
-    const night = by.night && loudest(own, NIGHT)
+    const reported = quietByHotelier(levels.get(id), criteria)
+      ? own.filter((c) => c.property === HOTELIER_NOISE && c.value.kind === 'text')
+      : []
+    const night = by.night && !reported.length && loudest(own, NIGHT)
     const day = (by.day || by.night) && loudest(own, DAY)
     const height = by.height && own.find((c) => c.property === HEIGHT && c.value.kind === 'number')
     const range = (claim: HotelClaim) =>
@@ -418,6 +455,9 @@ export function featuresResult(
         : ''
     const shown = [
       night && gathered.claim(night, id, 'Фасад на улицу, ночью (23:00–07:00)', range(night)),
+      ...reported.map(
+        (c) => c.value.kind === 'text' && gathered.claim(c, id, 'Шум в номере, со слов отельера', c.value.value),
+      ),
       day && gathered.claim(day, id, 'Фасад на улицу, днём (07:00–19:00)', range(day)),
       height &&
         height.value.kind === 'number' &&
@@ -429,7 +469,8 @@ export function featuresResult(
         ),
     ].map((c) => c || null)
     const parts = [
-      by.night && `ночь: ${VERDICT_NOTE[by.night]}`,
+      by.night &&
+        `ночь: ${VERDICT_NOTE[by.night]}${reported.length ? ` (со слов отельера${reported.some((c) => c.demo) ? ', демо' : ''}; по EEA данных нет)` : ''}`,
       by.day && `день: ${VERDICT_NOTE[by.day]}`,
       by.height && `высота: ${VERDICT_NOTE[by.height]}`,
     ].filter(Boolean)
@@ -458,6 +499,8 @@ export function featuresResult(
         'Ночью отель тише порога, если оценка у фасада на улицу (карты шума EEA и заведения рядом) заканчивается ниже порога',
         'Днём — по оценке у фасада на улицу днём (07:00–19:00)',
         'Отели без характеристики — «нет данных», они не отбираются и не отбрасываются',
+        `Слова отельера о шуме в номере читают правила: «тих», «бесшум» — тихо, «шумн», «громк» — шумно, отрицание, оба слова или ни одного — нет данных; тихо закрывает «нет данных» по ночи при пороге от ${QUIET_NIGHT_DB} дБ и никогда не перебивает уровень EEA`,
+        'Если отельер отвечал о шуме по-разному, а также если ответ отозван, он не учитывается',
       ],
     },
     limitations: [
@@ -670,11 +713,13 @@ export async function runFeaturesTool(input: FeaturesInput, index: readonly Leve
     const real = input.chosen.filter(isRealHotelId)
     const read = await Promise.all(
       real.map(async (id) => {
-        const [noise, building] = await Promise.all([
+        const [noise, building, told] = await Promise.all([
           loadHotelClaims(id, 'noise.estimate.street.'),
           loadHotelClaims(id, 'building.'),
+          input.hotelier?.length ? loadHotelierClaims(id) : Promise.resolve([]),
         ])
-        return [id, noise && building ? [...noise, ...building] : (noise ?? building)] as const
+        const own = [noise, building, told && told.filter((c) => c.property === HOTELIER_NOISE)]
+        return [id, own.every((c) => c === null) ? null : own.flatMap((c) => c ?? [])] as const
       }),
     )
     return featuresResult(input, index, new Map(read))

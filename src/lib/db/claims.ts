@@ -248,6 +248,43 @@ export async function loadHotelierClaims(hotelId: string): Promise<HotelClaim[] 
   }
 }
 
+/** A current answer of a hotelier on the noise (`hotelier.room.noise`): its claim, its words, whether it is demonstration. */
+export interface HotelierNoise {
+  hotelId: string
+  claimId: string
+  text: string
+  demo: boolean
+}
+
+/** The current answers on the noise of every hotel, read fresh like the hotelier's other facts; `null` when unreadable. */
+export async function loadHotelierNoise(): Promise<HotelierNoise[] | null> {
+  try {
+    const { data, error } = await anonClient()
+      .from('claims')
+      .select('id, value_text, is_demo, entity:entities!inner(hotel_id)')
+      .eq('property', 'hotelier.room.noise')
+      .not('value_text', 'is', null)
+      .or(`valid_to.is.null,valid_to.gt.${new Date().toISOString()}`)
+      .limit(5000)
+    if (error) throw error
+    return (
+      (data ?? []) as unknown as {
+        id: string
+        value_text: string
+        is_demo: boolean
+        entity: { hotel_id: string | null }
+      }[]
+    ).flatMap((row) =>
+      row.entity?.hotel_id
+        ? [{ hotelId: row.entity.hotel_id, claimId: row.id, text: row.value_text, demo: row.is_demo }]
+        : [],
+    )
+  } catch (error) {
+    console.warn(`hotelier noise: not read (${String((error as { code?: unknown })?.code ?? 'error').slice(0, 40)})`)
+    return null
+  }
+}
+
 /** A hotel the hotelier told something of: how many current characteristics, and whether they are demonstration. */
 export interface HotelierHotel {
   hotelId: string
