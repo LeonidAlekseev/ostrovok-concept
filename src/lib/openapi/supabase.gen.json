@@ -2211,6 +2211,9 @@
       "assistant_chat_shares": {
         "type": "object",
         "properties": {
+          "chat_id": {
+            "type": ["string", "null"]
+          },
           "created_at": {
             "type": "string"
           },
@@ -2228,7 +2231,7 @@
             "type": "string"
           }
         },
-        "required": ["created_at", "id", "snapshot", "title", "user_id"]
+        "required": ["chat_id", "created_at", "id", "snapshot", "title", "user_id"]
       },
       "assistant_chats": {
         "type": "object",
