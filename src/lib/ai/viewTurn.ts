@@ -371,7 +371,7 @@ export async function viewTurn(
     `Из отеля (${windowLabel(view.window)}; проверены этажи с 1-го по ${view.window.floors}-й${floor ? `, отдельно — ${floor}-й` : ''}):`,
     ...lines,
     ...placeLines,
-    ...(quote ? [`Гость о виде (${quote.author}): «${quote.text}»`] : []),
+    ...(quote ? [`Гость о виде: «${quote.text}»`] : []),
     NOTE,
   ].join('\n')
 

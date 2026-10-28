@@ -403,6 +403,8 @@ export interface FeaturesInput {
   where?: string
   /** The hotels' current answers on the noise: they close a night level the EEA lacks. */
   hotelier?: readonly HotelierNoise[]
+  /** The chosen hotels some of whose reads got no answer: what the block shows of them may be incomplete. */
+  incomplete?: readonly string[]
 }
 
 const HOTELIER_NOISE = 'hotelier.room.noise'
@@ -426,7 +428,7 @@ const VERDICT_NOTE: Record<Verdict, string> = { match: 'подходит', miss:
  * at the facade to the street, the building's height — with the verdict of each criterion.
  */
 export function featuresResult(
-  { criteria, candidates, chosen, where, hotelier }: FeaturesInput,
+  { criteria, candidates, chosen, where, hotelier, incomplete }: FeaturesInput,
   index: readonly LevelRow[] | null,
   claims: ReadonlyMap<string, readonly HotelClaim[] | null>,
 ): ToolResult {
@@ -482,6 +484,7 @@ export function featuresResult(
   const summary = [
     `${label}: подходят ${counts.match} из ${ofHotels(ids.length)}${where ? ` ${where}` : ''}`,
     counts.nodata > 0 && `нет данных у ${counts.nodata}`,
+    incomplete?.length && 'данные неполные',
   ]
     .filter(Boolean)
     .join('; ')
@@ -507,6 +510,9 @@ export function featuresResult(
       ...FEATURE_LIMITATIONS,
       ...(chosen.some((id) => claims.get(id) === null)
         ? ['Подробности части отелей прочитать не удалось: показаны только итоги отбора']
+        : []),
+      ...(incomplete?.length
+        ? ['Данные неполные: часть запросов по выбранным отелям не ответила, показанного может быть меньше, чем есть']
         : []),
     ],
   })
@@ -719,10 +725,12 @@ export async function runFeaturesTool(input: FeaturesInput, index: readonly Leve
           input.hotelier?.length ? loadHotelierClaims(id) : Promise.resolve([]),
         ])
         const own = [noise, building, told && told.filter((c) => c.property === HOTELIER_NOISE)]
-        return [id, own.every((c) => c === null) ? null : own.flatMap((c) => c ?? [])] as const
+        const claims = own.every((c) => c === null) ? null : own.flatMap((c) => c ?? [])
+        return [id, claims, claims !== null && own.some((c) => c === null)] as const
       }),
     )
-    return featuresResult(input, index, new Map(read))
+    const incomplete = read.filter(([, , partial]) => partial).map(([id]) => id)
+    return featuresResult({ ...input, incomplete }, index, new Map(read.map(([id, claims]) => [id, claims])))
   } catch (error) {
     failed(FEATURES_TOOL, error)
     return errorResult('tool_failed', 'Отбор по характеристикам не удался', { limitations: FEATURE_LIMITATIONS })
