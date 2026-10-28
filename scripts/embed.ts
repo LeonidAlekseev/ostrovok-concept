@@ -73,7 +73,7 @@ const features = withoutDoubtfulBuildings(
   featuresOf(
     (await readAll<FeatureRow>(
       'hotel_features',
-      'hotel_id, floors, height_m, lden_min, lden_max, lnight_min, lnight_max',
+      'hotel_id, floors, height_m, height_source, height_lower_m, height_upper_m, floors_source, lden_min, lden_max, lnight_min, lnight_max',
       ['hotel_id'],
     )) ?? [],
     (await readAll<RoomViewRow>('hotel_room_views_named', 'hotel_id, view, room_name', [

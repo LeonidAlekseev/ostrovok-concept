@@ -12,7 +12,10 @@ https://download.geofabrik.de/europe/spain/valencia-latest.osm.pbf (© OpenStree
 
 Keeps the elements of the rectangle whose tags may be of a category of src/lib/geo/categories.ts — a loose filter, the loader classifies them itself. As Overpass gives them:
 nodes with `lat`/`lon`, the ways of the shape categories (beaches, the coast, parks) with `geometry`, the other ways
-and the multipolygon relations with `center` (the middle of their bounding box). Node locations are kept in a file
+and the multipolygon relations with `center` (the middle of their bounding box). A relation of a shape category (a park
+or a beach mapped as a multipolygon) also has `polygons`, which Overpass does not give: the polygons osmium assembles
+from its member ways, each a list of rings, the outer ring first and the inner rings (holes) after, each ring a closed
+list of `{lat, lon}`; the loader stores them as a MULTIPOLYGON, so distances are to the park's border, not to its middle. Node locations are kept in a file
 next to the output, not in memory, and removed at the end.
 """
 
@@ -90,6 +93,7 @@ class Elements(osmium.SimpleHandler):
         super().__init__()
         self.rel = relations
         self.out = []
+        self.polygons = {}  # relation id -> polygons of the assembled areas
 
     def node(self, n):
         if not n.tags or not n.location.valid():
@@ -119,6 +123,26 @@ class Elements(osmium.SimpleHandler):
             centre = {'lat': (min(lats) + max(lats)) / 2, 'lon': (min(lons) + max(lons)) / 2}
             self.out.append({'type': 'way', 'id': w.id, 'tags': tags, 'center': centre})
 
+    def area(self, a):
+        """The multipolygons osmium assembles (it needs the node locations): those of a relation of a shape category."""
+        if a.from_way() or a.orig_id() not in self.rel.relations:
+            return
+        if not is_shape(self.rel.relations[a.orig_id()]['tags']):
+            return
+        polygons = []
+        for outer in a.outer_rings():
+            rings = [outer] + list(a.inner_rings(outer))
+            polygons.append([ring_points(ring) for ring in rings])
+        self.polygons.setdefault(a.orig_id(), []).extend(polygons)
+
+
+def ring_points(ring):
+    """A ring of nodes as a closed list of points."""
+    points = [{'lat': n.lat, 'lon': n.lon} for n in ring]
+    if points and points[0] != points[-1]:
+        points.append(points[0])
+    return points
+
 
 def main():
     global BOX
@@ -141,7 +165,10 @@ def main():
             continue
         centre = {'lat': (box[0] + box[2]) / 2, 'lon': (box[1] + box[3]) / 2}
         if inside(centre['lat'], centre['lon']):
-            elements.out.append({'type': 'relation', 'id': relation_id, 'tags': relation['tags'], 'center': centre})
+            element = {'type': 'relation', 'id': relation_id, 'tags': relation['tags'], 'center': centre}
+            if relation_id in elements.polygons:
+                element['polygons'] = elements.polygons[relation_id]
+            elements.out.append(element)
     timestamp = osmium.io.Reader(source, osmium.osm.osm_entity_bits.NOTHING).header().get('osmosis_replication_timestamp')
     with open(target, 'w') as f:
         json.dump({'version': 0.6, 'generator': 'osm-pbf-to-overpass.py', 'osm3s': {'timestamp_osm_base': timestamp},

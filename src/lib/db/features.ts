@@ -29,7 +29,9 @@ const readFeatures = catalogCached(['features'], async (): Promise<[string, Hote
     readAll((from, to) =>
       db
         .from('hotel_features')
-        .select('hotel_id, floors, height_m, lden_min, lden_max, lnight_min, lnight_max')
+        .select(
+          'hotel_id, floors, height_m, height_source, height_lower_m, height_upper_m, floors_source, lden_min, lden_max, lnight_min, lnight_max',
+        )
         .order('hotel_id')
         .range(from, to),
     ),

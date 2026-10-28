@@ -35,7 +35,7 @@ describe.runIf(process.env.LIVE_DB === '1' && isSupabaseConfigured)('the tools o
       deps,
     })
     expect(outcome.complete).toBe(true)
-    // The night at the facade to the street (noise-estimate-v1): fewer hotels are quiet than by the point's bands.
+    // The night at the facade to the street (noise-estimate-v2): fewer hotels are quiet than by the point's bands.
     expect(outcome.chosen.length).toBeGreaterThan(0)
     expect(outcome.chosen.length).toBeLessThanOrEqual(6)
     const [features, pharmacy, reviews] = outcome.runs.map((r) => r.run.result)

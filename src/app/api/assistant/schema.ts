@@ -164,6 +164,12 @@ const featuresSchema = component(
     .object({
       floors: z.number().optional(),
       heightM: z.number().optional(),
+      heightEstimated: z.literal(true).optional().meta({ description: 'Высоту оценила модель EUBUCCO' }),
+      heightRangeM: z
+        .tuple([z.number(), z.number()])
+        .optional()
+        .meta({ description: 'Интервал оценённой высоты, м: от и до' }),
+      floorsEstimated: z.literal(true).optional().meta({ description: 'Этажность оценила модель EUBUCCO' }),
       lden: band.optional().meta({ description: 'Самая громкая полоса шума за сутки, дБ' }),
       lnight: band.optional().meta({ description: 'Самая громкая полоса ночью, дБ' }),
       views: z.array(z.object({ roomName: z.string(), view: z.enum(Object.keys(VIEW_LABEL) as [ViewKind]) })),
