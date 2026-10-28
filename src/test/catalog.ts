@@ -43,3 +43,7 @@ export async function catalogFetch(input: RequestInfo | URL): Promise<Response> 
       : await loadCityHotels(listOf(url.searchParams.get('destinations')))
   return Response.json({ hotels: found })
 }
+
+/** The generator makes no hotels for real Valencia: these are the generated ones placed there, for the selections. */
+export const valenciaHotels = (): Hotel[] =>
+  allHotels().map((h, i) => (i % 4 === 0 ? { ...h, destinationId: 'valencia' } : h))
