@@ -34,6 +34,7 @@ import {
   newId,
   parseMessage,
   saveGuestChats,
+  isPending,
   shownHotels,
   type Chat,
   type ChatMessage,
@@ -52,6 +53,7 @@ import {
   SIGNED_URL_REFRESH_MS,
   uploadPhotos,
 } from '@/lib/assistantChatsRemote'
+import { deleteChatShares } from '@/lib/assistantShare'
 import type { PhotoUrl } from './ChatPhotos'
 import { savedParams } from '@/lib/sessionMemory'
 import type { HotelSummary } from '@/lib/catalog'
@@ -375,15 +377,16 @@ export function useChats(
     const client = getBrowserClient()
     if (!client) return
     for (const chat of chats) {
-      const before = saved.current.get(chat.id)
-      if (before === chat || chat.messages.length === 0) continue
+      if (saved.current.get(chat.id) === chat || chat.messages.length === 0) continue
       const ids = new Set(chat.messages.map((m) => m.id))
-      const gone = (before?.messages ?? []).filter((m) => !ids.has(m.id)).map((m) => m.id)
       queue.current = queue.current
         .then(async () => {
+          // What is saved when this turn of the queue comes, not when it was queued: an earlier write may still
+          // have been in flight, and a step it wrote would be left in the database for good.
+          const gone = (saved.current.get(chat.id)?.messages ?? []).filter((m) => !ids.has(m.id)).map((m) => m.id)
           await saveRemoteChat(client, chat)
           await deleteRemoteMessages(client, gone)
-          if (saved.current.get(chat.id) === before) saved.current.set(chat.id, chat)
+          saved.current.set(chat.id, chat)
         })
         .catch((error: unknown) => {
           console.warn(`chats: not saved (${error instanceof Error ? error.message.slice(0, 200) : 'error'})`)
@@ -654,7 +657,7 @@ export function useChats(
     const sent = options.photos ?? []
     // The newest state, not the render's: two calls before a re-render are one message.
     const current = chatsRef.current.find((c) => c.id === active.id) ?? active
-    if ((!text && sent.length === 0) || current.messages.some((m) => m.status === 'pending')) return
+    if ((!text && sent.length === 0) || isPending(current)) return
     const now = new Date().toISOString()
     const user: ChatMessage = {
       id: newId(),
@@ -778,6 +781,12 @@ export function useChats(
           console.warn(`chats: photos not deleted (${reason(error)})`)
         }),
       )
+      // The chat's «Поделиться» snapshots go with it; a failure to delete them does not keep the chat.
+      .then(() =>
+        deleteChatShares(client, chatId).catch((error: unknown) => {
+          console.warn(`chats: shares not deleted (${reason(error)})`)
+        }),
+      )
       .then(() => deleteRemoteChat(client, chatId))
       .catch((error: unknown) => {
         console.warn(`chats: not deleted (${error instanceof Error ? error.message.slice(0, 200) : 'error'})`)
@@ -807,7 +816,7 @@ export function useChats(
 
   const research = (chatId: string, brief: Brief) => {
     const chat = chatsRef.current.find((c) => c.id === chatId)
-    if (!chat || chat.messages.some((m) => m.status === 'pending')) return
+    if (!chat || isPending(chat)) return
     const now = new Date().toISOString()
     const memory = memoryMessage(chat, brief, now)
     // Nothing changed: nothing to look for again.

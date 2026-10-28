@@ -134,7 +134,11 @@ export function chatTitle(text: string): string {
   return line.length > TITLE_LENGTH ? `${line.slice(0, TITLE_LENGTH - 1).trimEnd()}…` : line
 }
 
-export const isPending = (chat: Chat) => chat.messages.some((m) => m.status === 'pending')
+/**
+ * A message still waits for its answer. A pending step of an agent alone is no wait: it is the turn's sign of work,
+ * and the turn that left it has finished (a step orphaned by a lost write must not block the chat for good).
+ */
+export const isPending = (chat: Chat) => chat.messages.some((m) => m.status === 'pending' && m.role !== 'agent')
 
 /** The hotels the chat's answers have shown. */
 export const shownHotels = (chat: Chat): Set<string> =>
@@ -296,6 +300,7 @@ export function parseChat(value: unknown): Chat | null {
   if (!Array.isArray(value.messages)) return null
   const messages = value.messages.map(parseMessage)
   if (messages.some((m) => m === null)) return null
+  const waits = (messages as ChatMessage[]).some((m) => m.status === 'pending' && m.role !== 'agent')
   return {
     id: value.id,
     title: value.title,
@@ -304,7 +309,10 @@ export function parseChat(value: unknown): Chat | null {
     unread: value.unread === true,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
-    messages: messages as ChatMessage[],
+    // The steps no turn waits for any more (the answer is done) are failed ones.
+    messages: (messages as ChatMessage[]).map((m) =>
+      !waits && m.role === 'agent' && m.status === 'pending' ? { ...m, status: 'failed' as const } : m,
+    ),
   }
 }
 

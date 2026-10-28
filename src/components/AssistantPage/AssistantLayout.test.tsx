@@ -9,6 +9,7 @@ import { addDays, todayIso } from '../../lib/dates'
 import { catalogFetch } from '../../test/catalog'
 import { NARROW, setScreen, WIDE } from '../../test/screen'
 import { AssistantSearch } from './AssistantSearch'
+import { Feed } from './ChatFeed'
 import { SharedChat } from './SharedChat'
 
 const push = vi.fn()
@@ -436,7 +437,8 @@ describe('the feed', () => {
         data: { step: { agent: 'geo', title: 'Проверяю места рядом с отелем' } },
       }),
     )
-    renderWith([chat])
+    // The feed alone: a loaded chat turns the steps of a finished turn into failed ones.
+    render(<Feed chatId={chat.id} messages={chat.messages} onChoose={() => ({})} />)
     expect(within(log()).getByRole('status', { name: 'Ищу подходящие варианты…' })).toBeTruthy()
     expect(within(log()).getByRole('status', { name: 'Проверяю места рядом с отелем…' })).toBeTruthy()
     const rows = within(log()).getAllByRole('status')
