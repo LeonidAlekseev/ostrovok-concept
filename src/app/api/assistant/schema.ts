@@ -152,6 +152,10 @@ const briefSchema = component(
       party: z.enum(['solo', 'couple', 'family', 'friends', 'any']).optional(),
       mood: z.enum(['calm', 'active']).optional(),
       budget: z.number().optional().meta({ description: 'Бюджет на всю поездку, ₽' }),
+      budgetPerNight: z
+        .number()
+        .optional()
+        .meta({ description: 'Бюджет за ночь, ₽: пока ночи не известны; потом Эвал считает бюджет на поездку' }),
       quiet: z.literal(true).optional().meta({ description: 'Тихо ночью' }),
       height: z.enum(['high', 'low']).optional(),
       view: z.enum([...(Object.keys(VIEW_LABEL) as ViewKind[]), 'any']).optional(),
