@@ -152,8 +152,6 @@
   --decor-vibe-calm-to: #7048e8;
   --decor-vibe-loud-from: #d6336c;
   --decor-vibe-loud-to: #e8590c;
-  --decor-vibe-calm: linear-gradient(135deg, var(--decor-vibe-calm-from), var(--decor-vibe-calm-to));
-  --decor-vibe-loud: linear-gradient(135deg, var(--decor-vibe-loud-from), var(--decor-vibe-loud-to));
   /* The «N из 7» bar fills blue to violet; the shade under the white captions of the vibe photos. */
   --decor-vibe-progress: linear-gradient(90deg, var(--brand-blue), var(--decor-violet));
   /* The «Это твой вайб» block: the gradient word, the glow of the frames and of the button, the shade under the title. */

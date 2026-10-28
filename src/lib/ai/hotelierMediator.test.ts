@@ -11,8 +11,7 @@ const db = vi.hoisted(() => ({
 }))
 const deps = vi.hoisted(() => ({ models: undefined as unknown, claims: [] as unknown[] }))
 
-vi.mock('../db/hotelierKnowledge', async (load) => ({
-  ...(await load<typeof import('../db/hotelierKnowledge')>()),
+vi.mock('../db/serviceClient', () => ({
   serviceClient: async () => ({
     from: (table: string) => {
       const query = {

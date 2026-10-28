@@ -1,6 +1,6 @@
 import 'server-only'
 import { createHash } from 'node:crypto'
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { embedMany } from 'ai'
 import { CONFIDENCE_POLICY, confidenceFor } from '../confidence'
 import { contentHash, embeddingModel, toVector } from '../ai/embedding'
@@ -9,9 +9,9 @@ import { getTextModels } from '../ai/model'
 import { NVIDIA_KEY } from '../ai/nvidia'
 import { characteristicLabel, hotelierProperty } from '../hotelierFacts'
 import { getSecret } from '../secrets'
-import { isSupabaseConfigured, supabaseUrl } from '../supabase/config'
 import { parseToolRun, toolResultSchema, type ToolClaim, type ToolEvidence, type ToolResult } from '../toolResult'
 import type { Database, Json } from './database.types'
+import { serviceClient } from './serviceClient'
 
 /**
  * The hotel's knowledge from its hotelier's answers (hotelier-knowledge), written by the server after the answer:
@@ -50,19 +50,6 @@ export const MAX_KNOWLEDGE_ATTEMPTS = 5
 export const retryDelayMs = (attempt: number) => 60_000 * 4 ** (attempt - 1)
 /** A server instance looks for due answers at most this often: after the responses of the routes that read them. */
 const SWEEP_EVERY_MS = 60_000
-
-let service: Promise<Service | null> | undefined
-
-/** The client with the service role; `null` without Supabase or the key. */
-export function serviceClient(): Promise<Service | null> {
-  service ??= (async () => {
-    const key = isSupabaseConfigured ? await getSecret('SUPABASE_SERVICE_ROLE_KEY').catch(() => undefined) : undefined
-    return key
-      ? createClient<Database>(supabaseUrl, key, { auth: { persistSession: false, autoRefreshToken: false } })
-      : null
-  })()
-  return service
-}
 
 const warn = (what: string, error: unknown) =>
   console.warn(`hotelier knowledge: ${what} (${String((error as { code?: unknown })?.code ?? 'error').slice(0, 40)})`)

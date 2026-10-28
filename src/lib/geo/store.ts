@@ -2,7 +2,7 @@ import 'server-only'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import type { Database } from '@/lib/db/database.types'
-import { getSecret } from '@/lib/secrets'
+import { serviceClient } from '@/lib/db/serviceClient'
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/config'
 import { PLACE_CATEGORIES } from './categories'
 import type { LatLon } from './distance'
@@ -30,9 +30,8 @@ let clients: Promise<{ read: Client | null; write: Client | null }> | undefined
 function supabase() {
   clients ??= (async () => {
     if (!isSupabaseConfigured) return { read: null, write: null }
+    const write = await serviceClient()
     const options = { auth: { persistSession: false, autoRefreshToken: false } }
-    const key = await getSecret('SUPABASE_SERVICE_ROLE_KEY').catch(() => undefined)
-    const write = key ? createClient<Database>(supabaseUrl, key, options) : null
     return { read: write ?? createClient<Database>(supabaseUrl, supabaseAnonKey, options), write }
   })()
   return clients
