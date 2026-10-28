@@ -26,7 +26,6 @@ import {
 } from '../SearchResultsPage/mapSetup'
 import { HOTEL_MAP_ZOOM } from './hotelMap'
 
-
 /** The colour of a shape by its `level`; the quiet (below 40 dB) the first, a day piece without an estimate grey. */
 const FILL_COLOR: ExpressionSpecification = [
   'case',

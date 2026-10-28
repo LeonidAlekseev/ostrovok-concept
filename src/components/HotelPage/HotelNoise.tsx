@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { Car, Factory, Moon, Plane, Sun, Sunset, TrainFront, type LucideIcon } from 'lucide-react'
 import { cn } from 'cn'
@@ -38,6 +38,7 @@ import {
   type SideLevels,
   type SourceNoise,
 } from '@/lib/noise'
+import type { NoiseWidget } from '@/lib/chatWidget'
 import { useHotelJson } from './useHotelJson'
 
 // MapLibre is loaded only in the browser.
@@ -69,10 +70,23 @@ const PLACES_SHOWN = 6
 /**
  * The legend of the map: the colours of the bands, the quiet below 40 dB first, each under its lower bound, and the dots of the loud places shown.
  */
-function Legend({ indicator, places }: { indicator: NoiseMapIndicator; places: readonly NoisyPlace[] }) {
+function Legend({
+  indicator,
+  places,
+  compact,
+}: {
+  indicator: NoiseMapIndicator
+  places: readonly NoisyPlace[]
+  compact: boolean
+}) {
   const groups = NOISY_GROUPS.filter((g) => places.some((p) => g.categories.includes(p.category)))
   return (
-    <div className="flex flex-col gap-1.5 rounded-xl bg-card p-2.5 text-xs text-foreground shadow-sm sm:bg-white/90 sm:dark:bg-card/90">
+    <div
+      className={cn(
+        'flex flex-col gap-1.5 rounded-xl bg-card p-2.5 text-xs text-foreground shadow-sm',
+        !compact && 'sm:bg-white/90 sm:dark:bg-card/90',
+      )}
+    >
       <span className="font-semibold">{MAP_TITLE[indicator]}</span>
       <ul className="flex">
         {NOISE_COLORS.map((color, i) => (
@@ -106,21 +120,37 @@ function Legend({ indicator, places }: { indicator: NoiseMapIndicator; places: r
   )
 }
 
-function NoiseMapCard({ hotel, noise }: { hotel: Hotel; noise: HotelNoiseData }) {
+function NoiseMapCard({
+  hotel,
+  noise,
+  compact = false,
+}: {
+  hotel: Pick<Hotel, 'id' | 'lat' | 'lon'>
+  noise: HotelNoiseData
+  compact?: boolean
+}) {
   // The noise contours around the hotel for the map.
   const { value: contours } = useHotelJson<NoiseMapData>(hotel.id, 'noise-map', 'map')
   const [indicator, setIndicator] = useState<NoiseMapIndicator>('Lday')
   const [failed, setFailed] = useState(false)
   return (
-    // On a phone the legend and the switch stand above the map, from `sm` on it.
-    <div className="flex flex-col gap-2 sm:relative">
+    // On a phone and in the chat (`compact`) the legend and the switch stand above the map, from `sm` on it.
+    <div className={cn('flex flex-col gap-2', !compact && 'sm:relative')}>
       {!failed && (
-        <div className="flex flex-wrap items-start justify-between gap-2 sm:pointer-events-none sm:absolute sm:inset-x-2 sm:top-2 sm:z-1">
-          <Legend indicator={indicator} places={noise.places} />
+        <div
+          className={cn(
+            'flex flex-wrap items-start justify-between gap-2',
+            !compact && 'sm:pointer-events-none sm:absolute sm:inset-x-2 sm:top-2 sm:z-1',
+          )}
+        >
+          <Legend indicator={indicator} places={noise.places} compact={compact} />
           <div
             role="group"
             aria-label="Показатель шума"
-            className="pointer-events-auto flex rounded-full bg-card p-1 text-sm shadow-sm sm:bg-white sm:dark:bg-card"
+            className={cn(
+              'pointer-events-auto flex rounded-full bg-card p-1 text-sm shadow-sm',
+              !compact && 'sm:bg-white sm:dark:bg-card',
+            )}
           >
             {(['Lday', 'Lnight'] as const).map((value) => (
               <button
@@ -139,7 +169,7 @@ function NoiseMapCard({ hotel, noise }: { hotel: Hotel; noise: HotelNoiseData })
           </div>
         </div>
       )}
-      <div className="h-[clamp(18rem,55vw,28rem)] overflow-hidden rounded-2xl bg-muted">
+      <div className={cn('overflow-hidden rounded-2xl bg-muted', compact ? 'h-64' : 'h-[clamp(18rem,55vw,28rem)]')}>
         {failed ? (
           <MapUnavailable />
         ) : (
@@ -204,9 +234,10 @@ function LevelCard({ noise, estimate }: { noise: HotelNoiseData; estimate: Noise
   const night = loudestSource(noise, 'Lnight')
   const who = night && whoLine(night, 'Lnight')
   const venues = venuesLine(estimate.venues)
+  const titleId = useId()
   return (
-    <section aria-labelledby="noise-level-title" className={card}>
-      <h3 id="noise-level-title" className="text-lg font-bold">
+    <section aria-labelledby={titleId} className={card}>
+      <h3 id={titleId} className="text-lg font-bold">
         Уровень шума у отеля
       </h3>
       <p className="text-sm text-muted-foreground">Оценка снаружи у стены здания, дБ.</p>
@@ -234,9 +265,10 @@ function LevelCard({ noise, estimate }: { noise: HotelNoiseData; estimate: Noise
 /** The EEA layers at the facade and the loud places of OSM nearby. */
 function SourcesCard({ noise }: { noise: HotelNoiseData }) {
   const places = noise.places.slice(0, PLACES_SHOWN)
+  const titleId = useId()
   return (
-    <section aria-labelledby="noise-sources-title" className={card}>
-      <h3 id="noise-sources-title" className="text-lg font-bold">
+    <section aria-labelledby={titleId} className={card}>
+      <h3 id={titleId} className="text-lg font-bold">
         Источники шума
       </h3>
       {noise.sources.length > 0 ? (
@@ -297,12 +329,21 @@ function SourcesCard({ noise }: { noise: HotelNoiseData }) {
   )
 }
 
+/** The estimate at the facade, or «нет данных EEA», never «тихо». */
+function NoiseLevel({ noise, estimate }: { noise: HotelNoiseData; estimate: NoiseEstimate | null }) {
+  return estimate ? (
+    <LevelCard noise={noise} estimate={estimate} />
+  ) : (
+    <p className={card}>{NO_EEA}. Это не значит, что здесь тихо.</p>
+  )
+}
+
 const link = 'text-primary hover:underline'
 
 /** How the estimate is computed, the sources last. */
-function MethodCard() {
+function MethodCard({ className = 'md:col-span-2' }: { className?: string }) {
   return (
-    <details className={cn(card, 'gap-2 md:col-span-2')}>
+    <details className={cn(card, 'gap-2', className)}>
       <summary className="cursor-pointer font-semibold">Как мы считаем</summary>
       <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm text-muted-foreground">
         {NOISE_ESTIMATE_NOTES.map((line) => (
@@ -347,14 +388,28 @@ export function HotelNoise({ hotel, noise }: { hotel: Hotel; noise: HotelNoiseDa
       </div>
       <NoiseMapCard hotel={hotel} noise={noise} />
       <div className="grid gap-4 md:grid-cols-2">
-        {estimate ? (
-          <LevelCard noise={noise} estimate={estimate} />
-        ) : (
-          <p className={card}>{NO_EEA}. Это не значит, что здесь тихо.</p>
-        )}
+        <NoiseLevel noise={noise} estimate={estimate} />
         <SourcesCard noise={noise} />
         <MethodCard />
       </div>
     </section>
+  )
+}
+
+/**
+ * «Шум и окружение» in Эвал's answer: the same map by day and by night, the estimate at the facade to the street and
+ * to the yard, the sources and the method, one column for the chat. Without the map (no WebGL, no contours) the
+ * estimate and the sources stay.
+ */
+export function NoiseAnswer({ widget }: { widget: NoiseWidget }) {
+  const { hotel, noise } = widget
+  const estimate = noiseEstimate(noise)
+  return (
+    <div className="flex flex-col gap-3">
+      <NoiseMapCard hotel={hotel} noise={noise} compact />
+      <NoiseLevel noise={noise} estimate={estimate} />
+      <SourcesCard noise={noise} />
+      <MethodCard className="" />
+    </div>
   )
 }

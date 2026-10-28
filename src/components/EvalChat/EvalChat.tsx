@@ -14,6 +14,7 @@ import { useDestinations } from '../Catalog/useDestinations'
 import { ToolRunCard } from '../AssistantPage/ChatCards'
 import { DemoBadge } from '../DemoBadge'
 import { Feed } from '../AssistantPage/ChatFeed'
+import { ChatWidget } from '../AssistantPage/ChatWidget'
 import { MapMessage } from '../AssistantPage/MapMessage'
 import { useChats, type Chats, type HotelContext, type TripsContext } from '../AssistantPage/useChats'
 
@@ -75,6 +76,7 @@ function Bubble({ message, onRetry }: { message: ChatMessage; onRetry: () => voi
         </div>
       )}
       {data.map && <MapMessage map={data.map} compact className="[&_figcaption]:text-[13px]" />}
+      {data.widget && <ChatWidget widget={data.widget} />}
       {status === 'failed' && (
         <Button variant="outline" size="sm" shape="pill" onClick={onRetry}>
           <RotateCcw className="size-4" aria-hidden />

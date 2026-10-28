@@ -354,6 +354,9 @@ export const sideOf = (id: SideId) => SIDES.find((s) => s.id === id)!
 export const inSide = (bearing: number, side: SideId) =>
   bearingGap(bearing, sideOf(side).bearing) <= SIDE_HALF_WIDTH_DEG
 
+/** The side a bearing looks to. */
+export const sideAt = (bearing: number): SideId => SIDES.find((s) => inSide(bearing, s.id))!.id
+
 /**
  * The side of the windows of a room type, for when the data comes (from the hotel or Ostrovok): nothing fills it yet,
  * and nothing guesses it — the page asks the traveller to pick a side.

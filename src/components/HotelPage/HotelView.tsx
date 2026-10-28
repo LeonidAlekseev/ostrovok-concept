@@ -1,57 +1,41 @@
 'use client'
 
-import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useState, useSyncExternalStore, type ReactNode } from 'react'
 import dynamic from 'next/dynamic'
 import { Building2, ChevronDown, Landmark, Sunrise, Sunset, Waves } from 'lucide-react'
 import { cn } from 'cn'
 import { MapUnavailable } from '@/components/MapUnavailable/MapUnavailable'
 import { Slider } from '@/components/ui/slider'
 import type { Hotel } from '@/lib/catalog'
-import type { ViewMap as ViewMapData } from '@/lib/db/view'
 import { todayIso } from '@/lib/dates'
 import { countRu } from '@/lib/format'
 import { distanceLabel, type HotelBuilding } from '@/lib/hotelDetails'
 import {
   bearingLabel,
-  blockersAt,
-  eyeOf,
   floorLabel,
   fromFloor,
-  inSide,
-  lineVerdict,
   localTime,
   RAY_LENGTH_M,
   reachLabel,
   reachTone,
-  seaReach,
-  seaSeen,
   sideOf,
-  sideSummary,
   SIDES,
-  openestSide,
   SUN_CHECK_ALTITUDE_DEG,
-  sunBlockers,
-  sunReach,
-  sunriseOf,
   sunriseRange,
-  sunsetOf,
   sunsetRange,
-  targetReach,
-  VERDICT_LABEL,
-  VERDICT_TONE,
   verdictText,
   VIEW_ASSUMPTIONS,
   windowLabel,
   windowOf,
   windowSideLabel,
-  type HotelView as HotelViewData,
   type Reach,
   type SideId,
   type SightLine,
   type Tone,
   type ViewTarget,
 } from '@/lib/view'
-import { useHotelJson } from './useHotelJson'
+import { VIEW_FOCUSES, type ViewFocus, type ViewWidget } from '@/lib/chatWidget'
+import { useViewScene, type ViewScene } from './useViewScene'
 import {
   BLOCKER_COLOR,
   HOTEL_BUILDING_COLOR,
@@ -199,126 +183,18 @@ function Legend({ side, floor, compact }: { side: SideId; floor: number | null; 
 type SceneHotel = Pick<Hotel, 'id' | 'lat' | 'lon'>
 
 /**
- * What the map and the lists of the view show from a floor: the hotel's data of the page (`GET …/view`, the buildings
- * of `…/view-map`), the floor (the top one by default), the side (picked; else the side of `focus` — the sunset's, the
- * sunrise's, the coast's —, else the openest from the top floor), the sun of `date`, the dots and the lines of the map
- * and the buildings in the way. The page knows the window before the data; the chat's widget takes the data's. The
- * `places` of the chat's answer are dots with their lines besides the page's.
- */
-export function useViewScene(
-  hotel: SceneHotel,
-  {
-    window: known,
-    enabled,
-    floor: picked,
-    date,
-    side,
-    focus,
-    places = NO_PLACES,
-  }: {
-    window: ViewWindow | null
-    enabled: boolean
-    floor: number | null
-    date: string
-    side: SideId | null
-    focus?: ViewFocus
-    places?: readonly ViewPlace[]
-  },
-) {
-  // The view from every floor, asked only when the floors of the window may be known.
-  const { value: view, loading } = useHotelJson<HotelViewData>(hotel.id, 'view', 'view', enabled)
-  // The buildings around the hotel for the map.
-  const { value: buildings } = useHotelJson<ViewMapData>(hotel.id, 'view-map', 'map')
-  const viewWindow = known ?? view?.window ?? null
-  const floor = viewWindow ? Math.min(picked ?? viewWindow.floors, viewWindow.floors) : null
-  const eyeM = viewWindow && floor ? eyeOf(viewWindow, floor) : 0
-  const ready = view && !loading && floor ? view : null
-  const sunset = date ? sunsetOf(date, hotel.lat, hotel.lon) : null
-  const sunrise = date ? sunriseOf(date, hotel.lat, hotel.lon) : null
-  const sea = ready ? seaReach(ready) : null
-  const focusBearing =
-    focus === 'sunset' ? sunset?.azimuth : focus === 'sunrise' ? sunrise?.azimuth : focus && sea?.point?.bearing
-  // The side the page opens on is the openest from the top floor: it does not jump with the slider.
-  const shownSide =
-    side ??
-    (ready
-      ? focusBearing !== undefined
-        ? sideAt(focusBearing)
-        : openestSide(ready.rays, eyeOf(ready.window, ready.window.floors))
-      : 'w')
-  const sunsetSun = ready && sunset ? sunReach(ready, sunset.checkAzimuth) : null
-  const sunriseSun = ready && sunrise ? sunReach(ready, sunrise.checkAzimuth) : null
-  const seaShown = ready ? seaSeen(ready, eyeM) : null
-  const sideSea = ready ? seaReach(ready, shownSide) : null
-  const landmarks = useMemo(
-    () => (ready ? ready.landmarks.map((target) => ({ target, reach: targetReach(target, ready.window) })) : []),
-    [ready],
-  )
-  const inView = landmarks.filter(({ target }) => inSide(target.bearing, shownSide))
-  const summary = ready ? sideSummary(ready.rays, shownSide, eyeM) : null
-  // A dot for the sea and every landmark of the list, on any side; the line only for the ones of the shown side.
-  const sidePoint = sideSea?.point
-  const dots = [
-    ...new Set([
-      ...(sea?.point ? [sea.point] : []),
-      ...(sidePoint ? [sidePoint] : []),
-      ...landmarks.map((l) => l.target),
-    ]),
-  ]
-  const mapTargets: MapTarget[] = [
-    ...dots.map((t) => {
-      const verdict = lineVerdict(t.line, eyeM)
-      return {
-        name: t.name,
-        category: t.category,
-        lat: t.lat,
-        lon: t.lon,
-        distanceM: t.distanceM,
-        tone: VERDICT_TONE[verdict],
-        verdict: VERDICT_LABEL[verdict],
-        line: t === sidePoint || inView.some(({ target }) => target === t),
-      }
-    }),
-    ...places.map(({ blockers, ...place }) => ({ ...place, line: true })),
-  ]
-  const blockers = [
-    ...sunBlockers(sunsetSun?.ray, eyeM),
-    ...sunBlockers(sunriseSun?.ray, eyeM),
-    ...(sideSea?.point ? blockersAt(sideSea.point.line, eyeM) : []),
-    ...inView.flatMap(({ target }) => blockersAt(target.line, eyeM)),
-  ]
-    .map((b) => b.id)
-    .concat(places.flatMap((p) => p.blockers))
-  return {
-    view,
-    loading,
-    buildings,
-    viewWindow,
-    floor,
-    eyeM,
-    ready,
-    shownSide,
-    sunset,
-    sunrise,
-    sunsetSun,
-    sunriseSun,
-    sea,
-    seaShown,
-    landmarks,
-    summary,
-    mapTargets,
-    blockers,
-  }
-}
-type ViewScene = ReturnType<typeof useViewScene>
-
-const NO_PLACES: readonly ViewPlace[] = []
-
-/**
  * The map of the view with its legend: over the map on a wide page, above it in the chat (`compact`); «Карта
  * недоступна» when MapLibre cannot load.
  */
-export function ViewMapPanel({ hotel, scene, compact = false }: { hotel: SceneHotel; scene: ViewScene; compact?: boolean }) {
+export function ViewMapPanel({
+  hotel,
+  scene,
+  compact = false,
+}: {
+  hotel: SceneHotel
+  scene: ViewScene
+  compact?: boolean
+}) {
   const [failed, setFailed] = useState(false)
   return (
     <div className={cn('flex flex-col gap-2', !compact && 'md:relative')}>
@@ -637,5 +513,75 @@ export function ViewMethod({ className }: { className?: string }) {
         </li>
       </ul>
     </details>
+  )
+}
+
+const dayOf = (date: string) =>
+  new Date(`${date}T12:00:00Z`).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+
+/**
+ * «Вид из отеля» in Эвал's answer: the map turned to the side of what is asked, the lines of sight from the floor
+ * asked (the top one when none is) and the verdicts of the sunset, the sunrise and the sea, from the same functions
+ * as the page. Without the data or the map the answer's text says it all.
+ */
+export function ViewAnswer({ widget }: { widget: ViewWidget }) {
+  const { hotel, date, focus, places } = widget
+  const scene = useViewScene(hotel, {
+    window: null,
+    enabled: true,
+    floor: widget.floor,
+    date,
+    side: null,
+    focus: focus[0],
+    places,
+  })
+  const { loading, ready, floor, eyeM, shownSide, sunset, sunrise, sunsetSun, sunriseSun, sea, summary } = scene
+  if (loading) return <p className="h-24 animate-pulse rounded-xl bg-card" aria-label="Загружаю карту вида" />
+  if (!ready || !floor)
+    return <p className="text-sm text-muted-foreground">Карты вида нет: линии взгляда не загрузились.</p>
+  const asked = new Set<ViewFocus>(focus.length ? focus : VIEW_FOCUSES)
+  const unknown: Reach = { kind: 'unknown' }
+  return (
+    <div className="flex flex-col gap-3">
+      <ViewMapPanel hotel={hotel} scene={scene} compact />
+      <ul className="flex flex-col gap-3 rounded-2xl bg-card p-4" aria-label="Итог">
+        {asked.has('sunset') && sunset && (
+          <Row
+            icon={Sunset}
+            title={`Закат ${dayOf(date)} в ${localTime(sunset.at)}`}
+            reach={sunsetSun?.reach ?? unknown}
+            lines={[floorLine(sunsetSun?.ray?.line, floor, eyeM, 1)]}
+          />
+        )}
+        {asked.has('sunrise') && sunrise && (
+          <Row
+            icon={Sunrise}
+            title={`Восход ${dayOf(date)} в ${localTime(sunrise.at)}`}
+            reach={sunriseSun?.reach ?? unknown}
+            lines={[floorLine(sunriseSun?.ray?.line, floor, eyeM, 1)]}
+          />
+        )}
+        {asked.has('sea') &&
+          (ready.seaChecked && sea?.point ? (
+            <Row
+              icon={Waves}
+              title={`Море, берег в ${distanceLabel(sea.point.distanceM)}`}
+              reach={sea.reach}
+              lines={[floorLine(sea.point.line, floor, eyeM)]}
+            />
+          ) : (
+            <li className="text-sm text-muted-foreground">
+              Море: {ready.seaChecked ? 'берега ближе 6 км по OpenStreetMap нет' : 'нет данных о береге'}.
+            </li>
+          ))}
+        {summary && (
+          <li className="text-sm text-muted-foreground">
+            {windowSideLabel(shownSide, floor)}: поверх крыш до {distanceLabel(RAY_LENGTH_M)} открыто {summary.open} из{' '}
+            {summary.rays} направлений.
+          </li>
+        )}
+      </ul>
+      <ViewMethod />
+    </div>
   )
 }
