@@ -1,3 +1,4 @@
+import { globeCities } from '../../data/globeCities'
 import type { GlobeView } from '../../lib/globe'
 import { advance, ahead, createFlyers, reroute, type Flyer, type Vec3 } from './globeFlyers'
 
@@ -16,6 +17,17 @@ const DOT_LEVELS = [
 const LAND_STYLE = '#86d264'
 const GRID_STYLE = 'rgba(255, 255, 255, 0.22)'
 const COAST_STYLE = 'rgba(255, 255, 255, 0.7)'
+/** City dots in the brand blue (--brand-blue): a capital is bigger and ringed in white, a resort is small and plain. */
+const CITY_STYLE = '#0645e8'
+const CAPITAL_RADIUS = 3.6
+const CAPITAL_RING = 1.4
+const RESORT_RADIUS = 2.4
+/** City dots dim towards the limb in steps, like the land dots. */
+const CITY_LEVELS = [
+  { depth: 0.05, alpha: 0.35 },
+  { depth: 0.2, alpha: 0.7 },
+  { depth: 0.4, alpha: 1 },
+]
 /** Planes cruise slowly, balloons drift slower still; speeds in degrees of arc per second. */
 const PLANE_COUNT = 9
 const PLANE_SPEEDS: Flyer['speeds'] = [0.8, 1.6]
@@ -85,6 +97,7 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
   if (!ctx) return null
 
   const grid = polylines(graticule())
+  const cities = toSphere(globeCities.flatMap((c) => [c.lon * 10, c.lat * 10]))
   let dots: Float32Array = new Float32Array()
   let coast: Polylines = { points: new Float32Array(), starts: [0] }
   let land: Polylines = { points: new Float32Array(), starts: [0] }
@@ -192,6 +205,36 @@ export function createGlobeRenderer(canvas: HTMLCanvasElement, url: string): Glo
       DOT_LEVELS.forEach(({ alpha }, level) => {
         ctx.globalAlpha = alpha
         ctx.fill(levels[level])
+      })
+
+      // Capitals: a white ring under a blue dot; resorts: a smaller blue dot. Batched by opacity level.
+      const rings = CITY_LEVELS.map(() => new Path2D())
+      const capitals = CITY_LEVELS.map(() => new Path2D())
+      const resorts = CITY_LEVELS.map(() => new Path2D())
+      for (let i = 0; i < globeCities.length; i++) {
+        project(cities, i * 3, q)
+        if (q.depth < CITY_LEVELS[0].depth || q.y >= visible + CAPITAL_RADIUS * pixelRatio * 2) continue
+        let level = CITY_LEVELS.length - 1
+        while (q.depth < CITY_LEVELS[level].depth) level--
+        if (globeCities[i].kind === 'capital') {
+          const rad = CAPITAL_RADIUS * pixelRatio
+          rings[level].moveTo(q.x + rad + CAPITAL_RING * pixelRatio, q.y)
+          rings[level].arc(q.x, q.y, rad + CAPITAL_RING * pixelRatio, 0, TAU)
+          capitals[level].moveTo(q.x + rad, q.y)
+          capitals[level].arc(q.x, q.y, rad, 0, TAU)
+        } else {
+          const rad = RESORT_RADIUS * pixelRatio
+          resorts[level].moveTo(q.x + rad, q.y)
+          resorts[level].arc(q.x, q.y, rad, 0, TAU)
+        }
+      }
+      CITY_LEVELS.forEach(({ alpha }, level) => {
+        ctx.globalAlpha = alpha
+        ctx.fillStyle = '#fff'
+        ctx.fill(rings[level])
+        ctx.fillStyle = CITY_STYLE
+        ctx.fill(capitals[level])
+        ctx.fill(resorts[level])
       })
 
       /** Projects a flyer into `q`; returns its opacity, 0 when it is out of sight. */
