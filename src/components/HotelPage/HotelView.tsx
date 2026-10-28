@@ -1,57 +1,41 @@
 'use client'
 
-import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useState, useSyncExternalStore, type ReactNode } from 'react'
 import dynamic from 'next/dynamic'
 import { Building2, ChevronDown, Landmark, Sunrise, Sunset, Waves } from 'lucide-react'
 import { cn } from 'cn'
 import { MapUnavailable } from '@/components/MapUnavailable/MapUnavailable'
 import { Slider } from '@/components/ui/slider'
 import type { Hotel } from '@/lib/catalog'
-import type { ViewMap as ViewMapData } from '@/lib/db/view'
 import { todayIso } from '@/lib/dates'
 import { countRu } from '@/lib/format'
 import { distanceLabel, type HotelBuilding } from '@/lib/hotelDetails'
 import {
   bearingLabel,
-  blockersAt,
-  eyeOf,
   floorLabel,
   fromFloor,
-  inSide,
-  lineVerdict,
   localTime,
   RAY_LENGTH_M,
   reachLabel,
   reachTone,
-  seaReach,
-  seaSeen,
   sideOf,
-  sideSummary,
   SIDES,
-  openestSide,
   SUN_CHECK_ALTITUDE_DEG,
-  sunBlockers,
-  sunReach,
-  sunriseOf,
   sunriseRange,
-  sunsetOf,
   sunsetRange,
-  targetReach,
-  VERDICT_LABEL,
-  VERDICT_TONE,
   verdictText,
   VIEW_ASSUMPTIONS,
   windowLabel,
   windowOf,
   windowSideLabel,
-  type HotelView as HotelViewData,
   type Reach,
   type SideId,
   type SightLine,
   type Tone,
   type ViewTarget,
 } from '@/lib/view'
-import { useHotelJson } from './useHotelJson'
+import { VIEW_FOCUSES, type ViewFocus, type ViewWidget } from '@/lib/chatWidget'
+import { useViewScene, type ViewScene } from './useViewScene'
 import {
   BLOCKER_COLOR,
   HOTEL_BUILDING_COLOR,
@@ -149,7 +133,7 @@ const TONE_LEGEND: { tone: Tone; label: string }[] = [
 ]
 
 /** The legend of the map, over it on a wide screen and above it on a narrow one: the window, then a row a kind. */
-function Legend({ side, floor }: { side: SideId; floor: number | null }) {
+function Legend({ side, floor, compact }: { side: SideId; floor: number | null; compact: boolean }) {
   const lineItem = (color: string, label: string, dashed = false) => (
     <li key={label} className="flex items-center gap-1.5">
       <span
@@ -173,7 +157,13 @@ function Legend({ side, floor }: { side: SideId; floor: number | null }) {
     </div>
   )
   return (
-    <div className="flex flex-col gap-2 rounded-xl bg-card p-2.5 text-xs text-foreground shadow-sm md:pointer-events-none md:absolute md:top-2 md:left-2 md:max-w-72 md:bg-white/90 md:dark:bg-card/90">
+    <div
+      className={cn(
+        'flex flex-col gap-2 rounded-xl bg-card p-2.5 text-xs text-foreground shadow-sm',
+        !compact &&
+          'md:pointer-events-none md:absolute md:top-2 md:left-2 md:max-w-72 md:bg-white/90 md:dark:bg-card/90',
+      )}
+    >
       <span className="text-sm font-semibold">{windowSideLabel(side, floor)}</span>
       {group(
         'Линия взгляда',
@@ -185,6 +175,52 @@ function Legend({ side, floor }: { side: SideId; floor: number | null }) {
         boxItem(BLOCKER_COLOR, 'закрывает вид'),
         boxItem(SECTOR_COLOR, 'сектор окна', 0.3),
       ])}
+    </div>
+  )
+}
+
+/** The hotel of a map of the view: its id for the routes and its point. */
+type SceneHotel = Pick<Hotel, 'id' | 'lat' | 'lon'>
+
+/**
+ * The map of the view with its legend: over the map on a wide page, above it in the chat (`compact`); «Карта
+ * недоступна» when MapLibre cannot load.
+ */
+export function ViewMapPanel({
+  hotel,
+  scene,
+  compact = false,
+}: {
+  hotel: SceneHotel
+  scene: ViewScene
+  compact?: boolean
+}) {
+  const [failed, setFailed] = useState(false)
+  return (
+    <div className={cn('flex flex-col gap-2', !compact && 'md:relative')}>
+      {!failed && <Legend side={scene.shownSide} floor={scene.ready ? scene.floor : null} compact={compact} />}
+      <div
+        className={cn(
+          'relative overflow-hidden rounded-2xl bg-muted',
+          compact ? 'h-64' : 'h-[clamp(18rem,55vw,28rem)] md:order-first',
+        )}
+      >
+        {failed ? (
+          <MapUnavailable />
+        ) : (
+          <ViewMap
+            center={{ lat: hotel.lat, lon: hotel.lon }}
+            buildings={scene.buildings}
+            bearing={sideOf(scene.shownSide).bearing}
+            sunsetAzimuth={scene.sunset?.azimuth ?? null}
+            sunriseAzimuth={scene.sunrise?.azimuth ?? null}
+            targets={scene.mapTargets}
+            blockers={scene.blockers}
+            hotelBuilding={scene.view?.ownBuilding ?? null}
+            onFail={() => setFailed(true)}
+          />
+        )}
+      </div>
     </div>
   )
 }
@@ -207,69 +243,21 @@ export function HotelView({
   building: HotelBuilding | null | undefined
   roomFloors: number | null | undefined
 }) {
-  const viewWindow = windowOf(building, roomFloors)
   const [picked, setPickedFloor] = useState<number | null>(null)
-  const floor = viewWindow ? Math.min(picked ?? viewWindow.floors, viewWindow.floors) : null
-  // The view from every floor, asked only when the floors of the window are known.
-  const { value: view, loading } = useHotelJson<HotelViewData>(hotel.id, 'view', 'view', Boolean(viewWindow))
-  // The buildings around the hotel for the map.
-  const { value: buildings } = useHotelJson<ViewMapData>(hotel.id, 'view-map', 'map')
-  const [failed, setFailed] = useState(false)
   // The date is the visitor's today in the browser (the prerendered page has none) until one is picked.
   const today = useSyncExternalStore(noChanges, todayIso, () => '')
   const [pickedDate, setPickedDate] = useState<string | null>(null)
   const date = pickedDate ?? today
   const [side, setSide] = useState<SideId | null>(null)
   const [allLandmarks, setAllLandmarks] = useState(false)
-
-  const eyeM = viewWindow && floor ? eyeOf(viewWindow, floor) : 0
-  const ready = view && !loading && floor ? view : null
-  // The side the page opens on is the openest from the top floor: it does not jump with the slider.
-  const shownSide = side ?? (ready ? openestSide(ready.rays, eyeOf(ready.window, ready.window.floors)) : 'w')
+  const known = windowOf(building, roomFloors)
+  const scene = useViewScene(hotel, { window: known, enabled: Boolean(known), floor: picked, date, side })
+  const { viewWindow, floor, loading, ready, eyeM, shownSide, sunset, sunrise, sunsetSun, sunriseSun, sea, seaShown } =
+    scene
+  const { landmarks, summary } = scene
   const year = Number(date.slice(0, 4))
-  const sunset = date ? sunsetOf(date, hotel.lat, hotel.lon) : null
-  const sunrise = date ? sunriseOf(date, hotel.lat, hotel.lon) : null
   const setRange = date ? sunsetRange(year, hotel.lat, hotel.lon) : null
   const riseRange = date ? sunriseRange(year, hotel.lat, hotel.lon) : null
-  const sunsetSun = ready && sunset ? sunReach(ready, sunset.checkAzimuth) : null
-  const sunriseSun = ready && sunrise ? sunReach(ready, sunrise.checkAzimuth) : null
-  const sea = ready ? seaReach(ready) : null
-  const seaShown = ready ? seaSeen(ready, eyeM) : null
-  const sideSea = ready ? seaReach(ready, shownSide) : null
-  const landmarks = useMemo(
-    () => (ready ? ready.landmarks.map((target) => ({ target, reach: targetReach(target, ready.window) })) : []),
-    [ready],
-  )
-  const inView = landmarks.filter(({ target }) => inSide(target.bearing, shownSide))
-  const summary = ready ? sideSummary(ready.rays, shownSide, eyeM) : null
-  // A dot for the sea and every landmark of the list, on any side; the line only for the ones of the shown side.
-  const sidePoint = sideSea?.point
-  const dots = [
-    ...new Set([
-      ...(sea?.point ? [sea.point] : []),
-      ...(sidePoint ? [sidePoint] : []),
-      ...landmarks.map((l) => l.target),
-    ]),
-  ]
-  const mapTargets = dots.map((t) => {
-    const verdict = lineVerdict(t.line, eyeM)
-    return {
-      name: t.name,
-      category: t.category,
-      lat: t.lat,
-      lon: t.lon,
-      distanceM: t.distanceM,
-      tone: VERDICT_TONE[verdict],
-      verdict: VERDICT_LABEL[verdict],
-      line: t === sidePoint || inView.some(({ target }) => target === t),
-    }
-  })
-  const blockers = [
-    ...sunBlockers(sunsetSun?.ray, eyeM),
-    ...sunBlockers(sunriseSun?.ray, eyeM),
-    ...(sideSea?.point ? blockersAt(sideSea.point.line, eyeM) : []),
-    ...inView.flatMap(({ target }) => blockersAt(target.line, eyeM)),
-  ].map((b) => b.id)
   const unknown: Reach = { kind: 'unknown' }
 
   return (
@@ -283,26 +271,7 @@ export function HotelView({
         </p>
       </div>
 
-      <div className="flex flex-col gap-2 md:relative">
-        {!failed && <Legend side={shownSide} floor={ready ? floor : null} />}
-        <div className="relative h-[clamp(18rem,55vw,28rem)] overflow-hidden rounded-2xl bg-muted md:order-first">
-          {failed ? (
-            <MapUnavailable />
-          ) : (
-            <ViewMap
-              center={{ lat: hotel.lat, lon: hotel.lon }}
-              buildings={buildings}
-              bearing={sideOf(shownSide).bearing}
-              sunsetAzimuth={sunset?.azimuth ?? null}
-              sunriseAzimuth={sunrise?.azimuth ?? null}
-              targets={mapTargets}
-              blockers={blockers}
-              hotelBuilding={view?.ownBuilding ?? null}
-              onFail={() => setFailed(true)}
-            />
-          )}
-        </div>
-      </div>
+      <ViewMapPanel hotel={hotel} scene={scene} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <section aria-labelledby="view-window-title" className={cn(card, 'md:col-span-2')}>
@@ -506,36 +475,113 @@ export function HotelView({
         </section>
       )}
 
-      <details className={cn(card, 'gap-2')}>
-        <summary className="cursor-pointer font-semibold">Как мы считаем</summary>
-        <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm text-muted-foreground">
-          {VIEW_ASSUMPTIONS.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-          <li>
-            Источники:{' '}
-            <a
-              href="https://eubucco.com/data/download/v0.2"
-              target="_blank"
-              rel="noopener"
-              className="text-primary hover:underline"
-            >
-              EUBUCCO v0.2
-            </a>{' '}
-            (здания и высоты),{' '}
-            <a
-              href="https://www.openstreetmap.org/copyright"
-              target="_blank"
-              rel="noopener"
-              className="text-primary hover:underline"
-            >
-              © OpenStreetMap
-            </a>{' '}
-            (берег, достопримечательности), Островок (места рядом, этажи номеров); солнце — астрономический расчёт
-            (приближение NOAA).
-          </li>
-        </ul>
-      </details>
+      <ViewMethod />
     </section>
+  )
+}
+
+/** How the view is checked, the sources last. */
+export function ViewMethod({ className }: { className?: string }) {
+  return (
+    <details className={cn(card, 'gap-2', className)}>
+      <summary className="cursor-pointer font-semibold">Как мы считаем</summary>
+      <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm text-muted-foreground">
+        {VIEW_ASSUMPTIONS.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+        <li>
+          Источники:{' '}
+          <a
+            href="https://eubucco.com/data/download/v0.2"
+            target="_blank"
+            rel="noopener"
+            className="text-primary hover:underline"
+          >
+            EUBUCCO v0.2
+          </a>{' '}
+          (здания и высоты),{' '}
+          <a
+            href="https://www.openstreetmap.org/copyright"
+            target="_blank"
+            rel="noopener"
+            className="text-primary hover:underline"
+          >
+            © OpenStreetMap
+          </a>{' '}
+          (берег, достопримечательности), Островок (места рядом, этажи номеров); солнце — астрономический расчёт
+          (приближение NOAA).
+        </li>
+      </ul>
+    </details>
+  )
+}
+
+const dayOf = (date: string) =>
+  new Date(`${date}T12:00:00Z`).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+
+/**
+ * «Вид из отеля» in Эвал's answer: the map turned to the side of what is asked, the lines of sight from the floor
+ * asked (the top one when none is) and the verdicts of the sunset, the sunrise and the sea, from the same functions
+ * as the page. Without the data or the map the answer's text says it all.
+ */
+export function ViewAnswer({ widget }: { widget: ViewWidget }) {
+  const { hotel, date, focus, places } = widget
+  const scene = useViewScene(hotel, {
+    window: null,
+    enabled: true,
+    floor: widget.floor,
+    date,
+    side: null,
+    focus: focus[0],
+    places,
+  })
+  const { loading, ready, floor, eyeM, shownSide, sunset, sunrise, sunsetSun, sunriseSun, sea, summary } = scene
+  if (loading) return <p className="h-24 animate-pulse rounded-xl bg-card" aria-label="Загружаю карту вида" />
+  if (!ready || !floor)
+    return <p className="text-sm text-muted-foreground">Карты вида нет: линии взгляда не загрузились.</p>
+  const asked = new Set<ViewFocus>(focus.length ? focus : VIEW_FOCUSES)
+  const unknown: Reach = { kind: 'unknown' }
+  return (
+    <div className="flex flex-col gap-3">
+      <ViewMapPanel hotel={hotel} scene={scene} compact />
+      <ul className="flex flex-col gap-3 rounded-2xl bg-card p-4" aria-label="Итог">
+        {asked.has('sunset') && sunset && (
+          <Row
+            icon={Sunset}
+            title={`Закат ${dayOf(date)} в ${localTime(sunset.at)}`}
+            reach={sunsetSun?.reach ?? unknown}
+            lines={[floorLine(sunsetSun?.ray?.line, floor, eyeM, 1)]}
+          />
+        )}
+        {asked.has('sunrise') && sunrise && (
+          <Row
+            icon={Sunrise}
+            title={`Восход ${dayOf(date)} в ${localTime(sunrise.at)}`}
+            reach={sunriseSun?.reach ?? unknown}
+            lines={[floorLine(sunriseSun?.ray?.line, floor, eyeM, 1)]}
+          />
+        )}
+        {asked.has('sea') &&
+          (ready.seaChecked && sea?.point ? (
+            <Row
+              icon={Waves}
+              title={`Море, берег в ${distanceLabel(sea.point.distanceM)}`}
+              reach={sea.reach}
+              lines={[floorLine(sea.point.line, floor, eyeM)]}
+            />
+          ) : (
+            <li className="text-sm text-muted-foreground">
+              Море: {ready.seaChecked ? 'берега ближе 6 км по OpenStreetMap нет' : 'нет данных о береге'}.
+            </li>
+          ))}
+        {summary && (
+          <li className="text-sm text-muted-foreground">
+            {windowSideLabel(shownSide, floor)}: поверх крыш до {distanceLabel(RAY_LENGTH_M)} открыто {summary.open} из{' '}
+            {summary.rays} направлений.
+          </li>
+        )}
+      </ul>
+      <ViewMethod />
+    </div>
   )
 }
