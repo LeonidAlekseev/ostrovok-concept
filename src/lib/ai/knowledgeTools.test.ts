@@ -83,11 +83,11 @@ const claim = (fields: Partial<HotelClaim> & Pick<HotelClaim, 'id' | 'property' 
   evidence: [eea],
   ...fields,
 })
-/** The calculation of noise-estimate-v1 the estimates at the facade share. */
+/** The calculation of noise-estimate-v2 the estimates at the facade share. */
 const estimate = {
   id: '44444444-4444-4444-8444-444444444444',
   method: 'Оценка шума у фасада: самые громкие (улица) и самые тихие (двор) полосы карт шума EEA у контура здания',
-  version: 'noise-estimate-v1',
+  version: 'noise-estimate-v2',
   inputs: { zone: { kind: 'building', building_id: 'b-1', buffer_m: 5 } },
   parameters: { facade_buffer_m: 5 },
   limitations: ['Экранирование зданиями не учитывается: шум заведения доходит до фасада и двора без препятствий'],

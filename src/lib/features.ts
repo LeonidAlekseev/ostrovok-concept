@@ -38,6 +38,11 @@ export interface RoomView {
 export interface HotelFeatures {
   floors?: number
   heightM?: number
+  /** EUBUCCO's model estimated the height (`height_source` `estimated`), with its interval, m; 182 of 196 real hotels. */
+  heightEstimated?: true
+  heightRangeM?: [number, number]
+  /** EUBUCCO's model estimated the floors (`floors_source` `estimated`). */
+  floorsEstimated?: true
   /** The loudest band at the hotel over the day, evening and night (Lden) and at night (Lnight). */
   lden?: NoiseBand
   lnight?: NoiseBand
@@ -52,12 +57,23 @@ export interface HotelFeatures {
   seaM?: number
 }
 
+/** The tallest storey a hotel building has, m: a building of 17 m with 1 floor mixes the cadastre's floors with a model's height. */
+export const MAX_STOREY_M = 8
+
 /**
  * The building EUBUCCO found at the hotel's point cannot be the hotel's when the hotel's rooms take more floors (as the
- * hotel says, Ostrovok's `floorsNumber`) than the building has: the point matched another building.
+ * hotel says, Ostrovok's `floorsNumber`) than the building has: the point matched another building. It is doubtful as
+ * well when its height and floors cannot be of one building: more than `MAX_STOREY_M` of height a floor.
  */
-export const isDoubtfulBuilding = (buildingFloors: number | null | undefined, roomFloors: number | null | undefined) =>
-  Boolean(buildingFloors && roomFloors && roomFloors > buildingFloors)
+export const isDoubtfulBuilding = (
+  buildingFloors: number | null | undefined,
+  roomFloors: number | null | undefined,
+  heightM?: number | null,
+) =>
+  Boolean(
+    buildingFloors &&
+    ((roomFloors && roomFloors > buildingFloors) || (heightM && heightM / buildingFloors > MAX_STOREY_M)),
+  )
 
 /**
  * The features without the doubtful buildings' floors and height (`isDoubtfulBuilding`), marked `buildingDoubtful`;
@@ -69,12 +85,35 @@ export function withoutDoubtfulBuildings(
 ): Map<string, HotelFeatures> {
   return new Map(
     [...features].map(([id, f]) => {
-      if (!isDoubtfulBuilding(f.floors, roomFloors.get(id))) return [id, f]
-      const { floors: _floors, heightM: _height, ...rest } = f
+      if (!isDoubtfulBuilding(f.floors, roomFloors.get(id), f.heightM)) return [id, f]
+      const {
+        floors: _floors,
+        heightM: _height,
+        heightEstimated: _estimated,
+        heightRangeM: _range,
+        floorsEstimated: _floorsEstimated,
+        ...rest
+      } = f
       return [id, { ...rest, buildingDoubtful: true as const }]
     }),
   )
 }
+
+/** «≈17 м (по оценке модели, 14–20 м)» for a height a model estimated, «17 м» for a measured or tagged one. */
+export function heightText({ heightM, heightEstimated, heightRangeM }: HotelFeatures): string {
+  if (!heightM) return ''
+  if (!heightEstimated) return `${Math.round(heightM)} м`
+  const range = heightRangeM && `${Math.round(heightRangeM[0])}–${Math.round(heightRangeM[1])} м`
+  return `≈${Math.round(heightM)} м (по оценке модели${range ? `, ${range}` : ''})`
+}
+
+/** «12 этажей», «≈2 этажа (по оценке модели)». */
+export const floorsText = ({ floors, floorsEstimated }: HotelFeatures): string =>
+  floors
+    ? floorsEstimated
+      ? `≈${countRu(floors, ['этаж', 'этажа', 'этажей'])} (по оценке модели)`
+      : countRu(floors, ['этаж', 'этажа', 'этажей'])
+    : ''
 
 /** What the traveller asked of the hotel. */
 export type Criterion = 'sea' | 'quiet' | 'height' | 'view'
@@ -168,8 +207,7 @@ export function featureReasons(features: HotelFeatures | undefined, wish: Featur
         : `нет данных о ${CRITERION_LABEL[criterion]}`
     const f = features!
     if (criterion === 'quiet') return `ночью ${bandLabel(f.lnight!)}${f.lden ? `, за сутки ${bandLabel(f.lden)}` : ''}`
-    if (criterion === 'height')
-      return `здание ${countRu(f.floors!, ['этаж', 'этажа', 'этажей'])}${f.heightM ? `, ${Math.round(f.heightM)} м` : ''}`
+    if (criterion === 'height') return `здание ${floorsText(f)}${f.heightM ? `, ${heightText(f)}` : ''}`
     const rooms = matchingViews(f, wish.view)
     const label = wish.view === 'any' ? VIEW_LABEL[rooms[0].view] : VIEW_LABEL[wish.view!]
     // The room types are a directory of names from the suppliers, not the rooms on sale: no room is promised.
@@ -227,9 +265,7 @@ export function featureLines(features: HotelFeatures | undefined): string[] {
   if (!features) return []
   const lines: string[] = []
   if (features.floors)
-    lines.push(
-      `Здание: ${countRu(features.floors, ['этаж', 'этажа', 'этажей'])}${features.heightM ? `, высота ${Math.round(features.heightM)} м` : ''}.`,
-    )
+    lines.push(`Здание: ${floorsText(features)}${features.heightM ? `, высота ${heightText(features)}` : ''}.`)
   if (features.lnight || features.lden)
     lines.push(
       `Шум по карте шума: ${[
@@ -249,6 +285,11 @@ export interface FeatureRowRead {
   hotel_id: string
   floors: number | null
   height_m: number | null
+  /** The source of the height and of the floors in EUBUCCO, and the height's interval; absent in older reads. */
+  height_source?: string | null
+  height_lower_m?: number | null
+  height_upper_m?: number | null
+  floors_source?: string | null
   lden_min: number | null
   lden_max: number | null
   lnight_min: number | null
@@ -277,6 +318,15 @@ export function featuresOf(
     byId.set(row.hotel_id, {
       ...(row.floors !== null && { floors: row.floors }),
       ...(row.height_m !== null && { heightM: row.height_m }),
+      ...(row.height_m !== null &&
+        row.height_source === 'estimated' && {
+          heightEstimated: true as const,
+          ...(typeof row.height_lower_m === 'number' &&
+            typeof row.height_upper_m === 'number' && {
+              heightRangeM: [row.height_lower_m, row.height_upper_m] as [number, number],
+            }),
+        }),
+      ...(row.floors !== null && row.floors_source === 'estimated' && { floorsEstimated: true as const }),
       ...(lden && { lden }),
       ...(lnight && { lnight }),
       views: [],

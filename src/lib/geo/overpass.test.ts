@@ -71,6 +71,36 @@ describe('the Overpass answer', () => {
     expect(rows().get('node/34105607')!.categories).toEqual(['centre'])
   })
 
+  it('keeps a park mapped as a relation as its border, the centre as the marker, and the others as a centre', () => {
+    const square = (x: number, y: number, size: number) => [
+      { lat: y, lon: x },
+      { lat: y, lon: x + size },
+      { lat: y + size, lon: x + size },
+      { lat: y + size, lon: x },
+      { lat: y, lon: x },
+    ]
+    const park = elementRow({
+      type: 'relation',
+      id: 5,
+      tags: { leisure: 'park', name: 'Parque' },
+      center: { lat: 39.5, lon: -0.5 },
+      polygons: [[square(-0.51, 39.49, 0.02), square(-0.505, 39.495, 0.01)], [square(-0.4, 39.4, 0.01)]],
+    })!
+    expect(park).toMatchObject({ osm_type: 'relation', categories: ['park'], lat: 39.5, lon: -0.5 })
+    expect(park.geom).toBe(
+      'SRID=4326;MULTIPOLYGON(((-0.51 39.49,-0.49 39.49,-0.49 39.51,-0.51 39.51,-0.51 39.49),' +
+        '(-0.505 39.495,-0.495 39.495,-0.495 39.505,-0.505 39.505,-0.505 39.495)),' +
+        '((-0.4 39.4,-0.39 39.4,-0.39 39.41,-0.4 39.41,-0.4 39.4)))',
+    )
+    // Without usable polygons (an online answer has none) or for a relation that is no shape, the centre stays.
+    const centre = { type: 'relation', id: 5, tags: { leisure: 'park' }, center: { lat: 39.5, lon: -0.5 } }
+    expect(elementRow(centre)!.geom).toBe('SRID=4326;POINT(-0.5 39.5)')
+    expect(elementRow({ ...centre, polygons: [[[{ lat: 1, lon: 1 }]]] })!.geom).toBe('SRID=4326;POINT(-0.5 39.5)')
+    expect(elementRow({ ...centre, tags: { amenity: 'hospital' }, polygons: [[square(0, 0, 1)]] })!.geom).toBe(
+      'SRID=4326;POINT(-0.5 39.5)',
+    )
+  })
+
   it('tells the metro from the tram', () => {
     expect(rows().get('node/100986804')!.categories).toEqual(['metro'])
     expect(rows().get('node/107171636')!.categories).toEqual(['tram'])

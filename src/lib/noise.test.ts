@@ -149,9 +149,11 @@ describe('noiseLines', () => {
   it('state the estimate at the facade to the street and to the yard, the places, the layers and the places nearby', () => {
     const lines = noiseLines(roads)
     expect(lines[0]).toMatch(
-      /^Оценка шума у фасада на улицу \(noise-estimate-v1: карты шума EEA 2022 и шумные места OpenStreetMap\): днём 59–69 дБ, вечером 59–69 дБ, ночью 55–60 дБ, за сутки \(Lden\) 65–70 дБ\.$/,
+      /^Оценка шума у фасада на улицу \(noise-estimate-v2: карты шума EEA 2022 и шумные места OpenStreetMap\): днём 59–69 дБ, вечером 59–69 дБ, ночью 55–60 дБ, за сутки \(Lden\) 65–70 дБ\.$/,
     )
-    expect(lines[1]).toMatch(/^Окна во двор \(самые тихие полосы EEA у здания и те же места\): днём /)
+    expect(lines[1]).toMatch(
+      /^Окна во двор \(самые тихие полосы EEA у здания, без заведений: здание их экранирует\): днём /,
+    )
     expect(lines[2]).toBe('Вклад заведений рядом (2 места в 200 м): днём ≈40 дБ, вечером ≈47 дБ, ночью ≈44 дБ.')
     expect(lines[3]).toBe(
       'Карты шума EEA у фасада на улицу: Промышленность ниже 40 дБ за сутки ниже 40 дБ ночью; Дороги города 65–69 дБ за сутки 55–59 дБ ночью; ночью выше рекомендации ВОЗ (45 дБ ночью).',
@@ -178,7 +180,7 @@ describe('noiseLines', () => {
 })
 
 // hotel-knowledge, Requirement: Оценка шума у фасада
-describe('noise-estimate-v1', () => {
+describe('noise-estimate-v2', () => {
   it('lets a place fall by 20·lg(d/10) from its level at 10 m, no closer than 3 m', () => {
     expect(venueLevel(60, 10)).toBe(60)
     expect(venueLevel(60, 100)).toBeCloseTo(40, 6)
@@ -234,9 +236,10 @@ describe('noise-estimate-v1', () => {
       energySum([venueLevel(60, 47.6), venueLevel(60, 52.7), venueLevel(60, 75.2), venueLevel(58, 85.5)]),
       6,
     )
-    // The yard: the quietest bands below 40 dB, the places on top of them (no screening).
-    expect(estimate.yard.lnight!.min).toBeCloseTo(venueLevel(62, 85.5), 6)
-    expect(estimate.yard.lnight!.max).toBeCloseTo(energySum([40, 40, 40, venueLevel(62, 85.5)]), 6)
+    // The yard: the quietest bands below 40 dB alone — the building screens the places from it.
+    expect(estimate.yard.lnight).toEqual(estimate.eea.yard.lnight)
+    expect(estimate.yard.lnight!.min).toBe(-Infinity)
+    expect(estimate.yard.lnight!.max).toBeCloseTo(energySum([40, 40, 40]), 6)
   })
 
   it('keeps an open band open at the top', () => {

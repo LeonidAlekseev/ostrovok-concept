@@ -21,7 +21,7 @@ const geo = {
   noise: [],
 }
 
-/** The facade of the hotel: the roads to the street, the estimate of noise-estimate-v1 from them and a bar. */
+/** The facade of the hotel: the roads to the street, the estimate of noise-estimate-v2 from them and a bar. */
 const sources: HotelNoise['sources'] = [
   { source: 'roadsInAgglomeration', lden: { min: 65, max: 69 }, lnight: { max: 39 } },
   { source: 'industryInAgglomeration', lden: { max: 39 } },
@@ -60,7 +60,7 @@ describe('featureRow', () => {
       floors_lower: null,
       floors_upper: null,
       noise_dataset: 'eea-noise-end2022-v01_r00',
-      noise_method: 'noise-estimate-v1',
+      noise_method: 'noise-estimate-v2',
       noise_zone: 'building',
       street_lday_min: round(estimate.street.lday!.min),
       street_lday_max: round(estimate.street.lday!.max),
@@ -71,8 +71,9 @@ describe('featureRow', () => {
       yard_lnight_min: round(estimate.yard.lnight!.min),
       yard_lnight_max: round(estimate.yard.lnight!.max),
     })
-    // The bar at 40 m is the only sound of the yard by night: 62 − 20·lg(4) ≈ 50 dB, over the roads below 40 dB.
-    expect(round(estimate.yard.lnight!.min)).toBe(50)
+    // The yard is the roads below 40 dB alone: the building screens the bar at 40 m from it.
+    expect(round(estimate.yard.lnight!.min)).toBeNull()
+    expect(round(estimate.yard.lnight!.max)).toBe(40)
   })
 
   it('a floor bound of 0 is kept, a negative or missing one is not', () => {

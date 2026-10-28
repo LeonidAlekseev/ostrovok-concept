@@ -154,8 +154,11 @@ describe('nearbyStore', () => {
       unit: 'm',
       epistemic_status: 'derived',
       calculation: 'noise.nearby:ota-1',
-      confidence: 1,
-      method: { categories: ['bar', 'restaurant'], confidence: { policy: 'confidence-1', rule: 'osm_distance' } },
+      confidence: 0.9,
+      method: {
+        categories: ['bar', 'restaurant'],
+        confidence: { policy: 'confidence-1', rule: 'osm_distance_facade' },
+      },
     })
     expect(store.relations).toContainEqual({
       subject: 'hotel:ota-1',
@@ -163,7 +166,7 @@ describe('nearbyStore', () => {
       object: 'osm_place:node/2',
       claim: claimKey(distance),
       evidence: 'OpenStreetMap:node/2',
-      confidence: 1,
+      confidence: 0.9,
     })
     const count = (category: string) => store.claims.find((c) => c.property === `noise.nearby.${category}.count`)
     // Two bars reach the answer's limit: «2 and more».
@@ -495,7 +498,7 @@ describe('estimateStore', () => {
     const [calculation] = store.calculations
     expect(calculation).toMatchObject({
       key: 'noise.estimate:ota-1',
-      version: 'noise-estimate-v1',
+      version: 'noise-estimate-v2',
       inputs: {
         hotel_id: 'ota-1',
         zone: { kind: 'building', building_id: '21adf97303954791-16', buffer_m: 5 },
@@ -509,7 +512,7 @@ describe('estimateStore', () => {
       parameters: { facade_buffer_m: 5, circle_radius_m: 25, places_radius_m: 200, min_distance_m: 3 },
     })
     expect(calculation.limitations).toContain(
-      'Экранирование зданиями не учитывается: шум заведения доходит до фасада и двора без препятствий',
+      'Здание отеля полностью экранирует двор от заведений (к окнам во двор они не прибавляются); другие здания между заведением и фасадом не учитываются',
     )
     expect(value('noise.estimate.street.lnight')).toMatchObject({
       value_min: 65,
@@ -523,8 +526,8 @@ describe('estimateStore', () => {
     expect(value('noise.estimate.facade.lday')!.confidence).toBe(0.8)
     expect(value('noise.estimate.street.lday')!.confidence).toBe(0.4)
     expect(value('noise.estimate.venues.lnight')).toMatchObject({ value_numeric: 43.4, confidence: 0.6 })
-    // The yard: the roads below 40 dB and the bar at night, 10·lg(10^4 + 10^4.34) = 45 dB at most.
-    expect(value('noise.estimate.yard.lnight')).toMatchObject({ value_min: 43.4, value_max: 45 })
+    // The yard: the roads below 40 dB alone, 40 dB at most; the building screens the bar from it.
+    expect(value('noise.estimate.yard.lnight')).toMatchObject({ value_min: null, value_max: 40, confidence: 0.9 })
   })
 
   it('cites the datasets, and the places open in its period for a level of the places', () => {
@@ -592,6 +595,7 @@ describe('the confidence of the claims', () => {
       noise_estimate_day: 0.4,
       noise_estimate_no_places: 0.8,
       noise_estimate_no_places_day: 0.7,
+      osm_distance_facade: 0.9,
       inferred: 0.5,
     })
   })
@@ -622,6 +626,7 @@ describe('the confidence of the claims', () => {
       new Set([
         'eea_band',
         'day_estimate',
+        'osm_distance_facade',
         'osm_distance',
         'osm_count',
         'building_distance',
