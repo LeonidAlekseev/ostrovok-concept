@@ -212,6 +212,10 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
         hotelier={hotelier.chats}
         hotelierActive={hotelierHotel}
         onChooseHotelier={(hotelId) => choose(hotelierChatId(hotelId))}
+        onDeleteHotelier={(chat) => {
+          if (chat.hotelId === hotelierHotel) backToList()
+          return hotelier.remove(chat.id)
+        }}
         className={`${panelClass} max-lg:p-0 lg:bg-(--decor-light) lg:p-4 ${screen === 'chat' ? 'max-lg:hidden' : ''}`}
       />
 

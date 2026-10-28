@@ -86,6 +86,8 @@ export interface MessageData {
   change?: { proposal: DateChange; state: DateChangeState }
   /** The demo hotelier's answer or a message of the demo data: shown marked «демо». */
   demo?: true
+  /** An `owner` message written by the hotel's AI assistant, not the hotelier in person: shown marked as such. */
+  hotelAi?: true
 }
 
 export interface ChatMessage {
@@ -247,6 +249,7 @@ export function parseData(value: unknown): MessageData | null {
     ...(value.rerun === true && { rerun: true as const }),
     ...(parseChange(value.change) && { change: parseChange(value.change) }),
     ...(value.demo === true && { demo: true as const }),
+    ...(value.hotelAi === true && { hotelAi: true as const }),
   }
 }
 

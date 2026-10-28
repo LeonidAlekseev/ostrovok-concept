@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   addMessage,
+  chatOfConversation,
   conversationOf,
   matchesFilter,
   putConversation,
@@ -93,5 +94,19 @@ describe('the chat with the hotelier', () => {
     expect(conversationOf(row)).toMatchObject({ hotelName: 'Hotel A', status: 'resolved', lastSender: 'hotelier' })
     // The traveller's id never leaves the row.
     expect(conversationOf(row)).not.toHaveProperty('userId')
+  })
+})
+
+describe('chatOfConversation (the snapshot of «Поделиться»)', () => {
+  it('signs the hotelier, marks the hotel’s assistant and keeps no ids of people', () => {
+    const chat = chatOfConversation(conversation('c1', '2026-10-28T10:00:00Z', { hotelName: 'Hotel A' }), [
+      { ...message('m1', '2026-10-28T09:00:00Z'), text: 'Есть балкон?' },
+      { ...message('m2', '2026-10-28T09:05:00Z'), sender: 'hotelier', text: 'Да', demo: true },
+      { ...message('m3', '2026-10-28T09:06:00Z'), sender: 'ai_assistant', text: 'Этаж 3' },
+    ])
+    expect(chat.title).toBe('Чат с отельером «Hotel A»')
+    expect(chat.messages.map((m) => m.role)).toEqual(['user', 'owner', 'owner'])
+    expect(chat.messages.map((m) => m.data)).toEqual([{}, { demo: true }, { hotelAi: true }])
+    expect(JSON.stringify(chat)).not.toMatch(/user_id|author|email/)
   })
 })

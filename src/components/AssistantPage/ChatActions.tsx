@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { useEffect, useEffectEvent, useState, type FormEvent } from 'react'
 import { Check, Copy, LoaderCircle, Share2 } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -15,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { Chat } from '../../lib/assistantChats'
 import { SHARE_ERROR, UNSHARE_ERROR, deleteShare, shareChat, shareHref } from '../../lib/assistantShare'
+import type { Database } from '../../lib/db/database.types'
 import { getBrowserClient } from '../../lib/supabase/client'
 
 // The actions of a chat the header and the rows of the list share.
@@ -56,6 +58,9 @@ export function RenameForm({
   )
 }
 
+/** The chat to share: as it is, or read when «Поделиться» is pressed (a chat with a hotelier is not in memory). */
+export type ChatSource = Chat | ((client: SupabaseClient<Database>) => Promise<Chat>)
+
 type ShareState =
   | { kind: 'idle' }
   | { kind: 'saving' }
@@ -78,7 +83,7 @@ type ShareState =
  * a guest is offered to sign in. The snapshot is the chat as it is now; a new press makes a new one. The link can
  * be deleted: its snapshot and photos go, and the link opens nothing.
  */
-function useShare(chat: Chat, signedIn: boolean) {
+function useShare(chat: ChatSource, signedIn: boolean) {
   const [state, setState] = useState<ShareState>({ kind: 'idle' })
 
   const share = async () => {
@@ -86,7 +91,7 @@ function useShare(chat: Chat, signedIn: boolean) {
     if (!client) return setState({ kind: 'error', message: SHARE_ERROR })
     setState({ kind: 'saving' })
     try {
-      const id = await shareChat(client, chat)
+      const id = await shareChat(client, typeof chat === 'function' ? await chat(client) : chat)
       const url = new URL(shareHref(id), window.location.origin).toString()
       const copied = await navigator.clipboard?.writeText(url).then(
         () => true,
@@ -221,7 +226,15 @@ function ShareBody({ share, signedIn }: { share: ReturnType<typeof useShare>; si
 }
 
 /** «Поделиться» of the header: a round button with the popover of the link. */
-export function SharePopover({ chat, signedIn, className }: { chat: Chat; signedIn: boolean; className?: string }) {
+export function SharePopover({
+  chat,
+  signedIn,
+  className,
+}: {
+  chat: ChatSource
+  signedIn: boolean
+  className?: string
+}) {
   const share = useShare(chat, signedIn)
   return (
     <Popover onOpenChange={share.toggle}>
@@ -242,7 +255,7 @@ export function ShareDialog({
   open,
   onOpenChange,
 }: {
-  chat: Chat
+  chat: ChatSource
   signedIn: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -274,11 +287,14 @@ export function DeleteDialog({
   open,
   onOpenChange,
   onDelete,
+  description,
 }: {
-  chat: Chat
+  chat: Pick<Chat, 'title'>
   open: boolean
   onOpenChange: (open: boolean) => void
   onDelete: () => void
+  /** What the deletion does, when it is not the deletion of Эвал's chat. */
+  description?: string
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -286,8 +302,8 @@ export function DeleteDialog({
         <DialogHeader>
           <DialogTitle>Удалить чат?</DialogTitle>
           <DialogDescription>
-            «{chat.title || 'Новый чат'}» и все его сообщения удалятся без возможности восстановить. Ссылки, которыми вы
-            уже поделились, продолжат открываться.
+            {description ??
+              `«${chat.title || 'Новый чат'}» и все его сообщения удалятся без возможности восстановить. Ссылки, которыми вы уже поделились, продолжат открываться.`}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

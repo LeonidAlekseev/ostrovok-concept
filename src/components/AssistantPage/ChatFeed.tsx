@@ -236,7 +236,7 @@ function MessageItem({ message, photoUrl, onChoose, onRetry, actions, params, on
       <MessageContent className="gap-1">
         {role === 'owner' && (
           <MessageHeader className="px-0">
-            Отельер
+            {data.hotelAi ? 'AI-помощник отеля' : 'Отельер'}
             {data.demo && <DemoBadge className="ml-1.5" />}
           </MessageHeader>
         )}

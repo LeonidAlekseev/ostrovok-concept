@@ -52,6 +52,16 @@ export async function loadMyChats(client: Client): Promise<HotelierConversation[
   return (data as unknown as ConversationRow[]).map(conversationOf)
 }
 
+/**
+ * «Удалить» a chat on «Мои чаты»: it leaves the traveller's list. Nothing is deleted: the hotelier keeps the
+ * conversation and what was extracted from it; a new message shows the chat again.
+ */
+export async function hideMyChat(client: Client, conversationId: string): Promise<void> {
+  const { data, error } = await client.rpc('hotelier_hide_chat', { conversation_id: conversationId })
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error('chat not found')
+}
+
 /** The conversations the hotelier may answer, newest first. */
 export async function loadInbox(client: Client): Promise<HotelierConversation[]> {
   const { data, error } = await client
