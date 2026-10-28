@@ -333,7 +333,7 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
               <InputGroupTextarea
                 ref={inputRef}
                 id={inputId}
-                className="max-h-[min(9.5rem,30dvh)] self-center overflow-y-auto p-0 py-2 text-base leading-[1.4] field-sizing-content placeholder:text-(--decor-assistant-text-2)"
+                className="max-h-[min(9.5rem,30dvh)] self-center overflow-y-auto p-0 py-2 text-base leading-[1.4] field-sizing-content placeholder:text-(--muted-foreground-strong)"
                 rows={1}
                 value={text}
                 enterKeyHint="send"
@@ -365,7 +365,7 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
             </p>
           )}
           {!signedIn && ready && (guestWarned || attach.photos.length > 0) && (
-            <p className="mt-1.5 px-2 text-sm text-(--decor-assistant-text-2)" role="status">
+            <p className="mt-1.5 px-2 text-sm text-(--muted-foreground-strong)" role="status">
               Чат с фото сохранится, только если вы войдёте.{' '}
               <Link
                 href="/login?next=/assistant"

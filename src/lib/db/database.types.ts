@@ -1960,19 +1960,6 @@ export type Database = {
           vector_place: number
         }[]
       }
-      hotel_chunks_search: {
-        Args: { hotel_id: string; max_rows?: number; query: string }
-        Returns: {
-          chunk_id: string
-          document_id: string
-          evidence_id: string
-          kind: string
-          metadata: Json
-          ord: number
-          rank: number
-          text: string
-        }[]
-      }
       hotel_geo: { Args: { lat: number; lon: number }; Returns: Json }
       hotel_geo_features: { Args: { lat: number; lon: number; radius_m?: number }; Returns: Json }
       hotel_noise_day: { Args: { lat: number; lon: number; radius_m?: number }; Returns: Json }

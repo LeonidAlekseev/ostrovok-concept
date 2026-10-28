@@ -5,7 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { TileHotel } from '@/lib/catalog'
 import { PERSONA_LABEL, type Persona } from '@/lib/personas'
 import { hotelHref } from '@/lib/search'
-import { HotelTile } from '../HotelTile/HotelTile'
+import { cn } from 'cn'
+import { HOTEL_TILE_SLOT, HotelTile } from '../HotelTile/HotelTile'
 
 export interface PersonaSelection {
   persona: Persona
@@ -48,7 +49,7 @@ export function PersonaCarousel({ selections }: { selections: readonly PersonaSe
               className={`${strip} snap-x snap-mandatory scroll-px-(--page-x) gap-[clamp(10px,2.4vw,20px)] pb-4 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0`}
             >
               {hotels.map((hotel) => (
-                <li key={hotel.id} className="w-[min(78vw,20rem)] flex-none snap-start md:w-auto">
+                <li key={hotel.id} className={cn(HOTEL_TILE_SLOT, 'md:w-auto')}>
                   <HotelTile hotel={hotel} href={hotelHref(hotel.id)} plain />
                 </li>
               ))}

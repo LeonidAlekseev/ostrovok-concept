@@ -23,6 +23,9 @@ interface Props {
   children?: ReactNode
 }
 
+/** The first photos of a strip load at once: the others are off the screen and lazy loading would shift the strip. */
+const EAGER_PHOTOS = 3
+
 // A bare chevron with a soft shadow, readable on any photo; the 44 px button around it takes the tap.
 const arrowClass =
   'absolute top-1/2 flex size-11 -translate-y-1/2 items-center justify-center text-(--decor-light) opacity-0 rounded-full outline-offset-[-4px] group-hover/carousel:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-ring [@media(hover:none)]:opacity-100 [&>svg]:size-7 [&>svg]:stroke-[2.5] [&>svg]:drop-shadow-[0_1px_2px_rgb(0_0_0/0.6)]'
@@ -75,7 +78,7 @@ export function PhotoCarousel({
           href ? (
             // The hotel name is the link for the keyboard and screen readers; the photo only takes the click.
             <Link key={photo.id} href={href} tabIndex={-1} aria-hidden className="size-full shrink-0 snap-start">
-              <PhotoPlaceholder photo={photo} className="size-full" />
+              <PhotoPlaceholder photo={photo} eager={i < EAGER_PHOTOS} className="size-full" />
             </Link>
           ) : onOpen ? (
             <button
@@ -85,10 +88,15 @@ export function PhotoCarousel({
               className="size-full shrink-0 snap-start"
               onClick={() => onOpen(i)}
             >
-              <PhotoPlaceholder photo={photo} className="size-full" />
+              <PhotoPlaceholder photo={photo} eager={i < EAGER_PHOTOS} className="size-full" />
             </button>
           ) : (
-            <PhotoPlaceholder key={photo.id} photo={photo} className="size-full shrink-0 snap-start" />
+            <PhotoPlaceholder
+              key={photo.id}
+              photo={photo}
+              eager={i < EAGER_PHOTOS}
+              className="size-full shrink-0 snap-start"
+            />
           ),
         )}
       </div>
