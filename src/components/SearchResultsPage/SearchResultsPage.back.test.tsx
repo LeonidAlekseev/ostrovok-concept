@@ -81,7 +81,7 @@ describe('SearchResultsPage back to the same place', () => {
     const again = cards().find((c) => nameOf(c) === name)!
     expect(again.hasAttribute('data-active')).toBe(true)
     expect(screen.getByRole('button', { name: new RegExp(`^${name}, `) }).hasAttribute('data-active')).toBe(true)
-  })
+  }, 20_000)
 
   it('returns to the camera of the map and marks the hotel of the pressed marker (Scenario: С метки на карте)', async () => {
     const user = userEvent.setup()

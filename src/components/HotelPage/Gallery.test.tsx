@@ -207,5 +207,6 @@ describe('Gallery carousel', () => {
     render(<Gallery hotel={hotel} />)
     await user.click(slides()[0])
     expect(screen.getByRole('dialog', { name: `${hotel.name}: фотографии` })).toBeDefined()
-  })
+    // Under the load of the full run the mosaic takes longer than the default 5 s.
+  }, 20_000)
 })

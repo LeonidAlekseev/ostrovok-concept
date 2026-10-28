@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { ChevronDown, ChevronRight, MapPin } from 'lucide-react'
 import { cn } from 'cn'
 import type { Hotel } from '@/lib/catalog'
-import { formatDecimal } from '@/lib/format'
+import { kmFromCentre } from '@/lib/format'
 import { distanceLabel, NEARBY_SHOWN, type HotelDetails, type NearbyPlace } from '@/lib/hotelDetails'
 import { HotelMapDialog } from './HotelMapDialog'
 
@@ -77,8 +77,6 @@ function MapPreview({ className }: { className?: string }) {
   )
 }
 
-const kmFromCentre = (hotel: Hotel) => `${formatDecimal(hotel.distanceKm)} км от центра`
-
 /**
  * "Расположение" of the column: the map preview with the address and the kilometres from the centre, opening
  * the map, and «Что рядом» from Ostrovok's places, or the stand-in without them.
@@ -101,7 +99,7 @@ export function HotelLocation({ hotel, details }: { hotel: Hotel; details?: Hote
             <MapPreview className="w-[clamp(110px,30%,220px)] self-stretch" />
             <span className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 px-4 py-4">
               <b className="text-base/snug">{hotel.address}</b>
-              <span className="text-sm text-muted-foreground">{kmFromCentre(hotel)}</span>
+              <span className="text-sm text-muted-foreground">{kmFromCentre(hotel.distanceKm)}</span>
               <span className="mt-1 text-sm font-semibold text-primary">Показать на карте</span>
             </span>
             <ChevronRight className="mr-3 size-5 shrink-0 self-center text-muted-foreground" aria-hidden />
@@ -133,7 +131,7 @@ export function LocationCard({
         <h2 id="location-card-title" className="text-lg font-bold">
           Расположение
         </h2>
-        <span className="text-sm text-muted-foreground">{kmFromCentre(hotel)}</span>
+        <span className="text-sm text-muted-foreground">{kmFromCentre(hotel.distanceKm)}</span>
       </div>
       <HotelMapDialog
         hotel={hotel}

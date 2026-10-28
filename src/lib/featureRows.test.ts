@@ -167,4 +167,15 @@ describe('diffRows', () => {
     expect(diffRows([before], [after], (r) => r.hotel_id).upsert).toEqual([after])
     expect(diffRows(rows, rows.slice(0, 1), key).remove).toEqual(rows.slice(1))
   })
+
+  it('compares jsonb deeply: the order of keys does not rewrite, a changed value does', () => {
+    const row = (value: unknown) => [{ id: 'a', data: value }]
+    const id = (r: { id: string }) => r.id
+    const a = { x: 1, y: [{ p: 1, q: 2 }], z: null }
+    expect(diffRows(row(a), row({ z: null, y: [{ q: 2, p: 1 }], x: 1 }), id).upsert).toEqual([])
+    expect(diffRows(row(a), row({ ...a, y: [{ p: 1, q: 3 }] }), id).upsert).toHaveLength(1)
+    expect(diffRows(row(a), row({ ...a, y: [] }), id).upsert).toHaveLength(1)
+    expect(diffRows(row(a), row({ x: 1, y: a.y }), id).upsert).toHaveLength(1)
+    expect(diffRows(row(null), row({}), id).upsert).toHaveLength(1)
+  })
 })

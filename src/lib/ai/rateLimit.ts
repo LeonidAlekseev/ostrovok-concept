@@ -1,9 +1,6 @@
 import 'server-only'
 import { createHash } from 'node:crypto'
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type { Database } from '@/lib/db/database.types'
-import { getSecret } from '@/lib/secrets'
-import { isSupabaseConfigured, supabaseUrl } from '@/lib/supabase/config'
+import { serviceClient } from '@/lib/db/serviceClient'
 
 export const RATE_LIMIT = 20
 /** The photos of the chat a minute: the model that sees them is the heavy one, and the key allows 40 requests. */
@@ -42,26 +39,13 @@ export async function allowRequest(ip: string, now = Date.now()): Promise<boolea
   return (await allowShared(sharedKey('request', ip), RATE_LIMIT).catch(() => null)) ?? allow(hits, RATE_LIMIT, ip, now)
 }
 
-let counterClient: Promise<SupabaseClient<Database> | null> | undefined
-
-/** The client of the shared counter, with the service role key; `null` without Supabase or the key. */
-function sharedCounter() {
-  counterClient ??= (async () => {
-    const key = isSupabaseConfigured ? await getSecret('SUPABASE_SERVICE_ROLE_KEY').catch(() => undefined) : undefined
-    return key
-      ? createClient<Database>(supabaseUrl, key, { auth: { persistSession: false, autoRefreshToken: false } })
-      : null
-  })()
-  return counterClient
-}
-
 /**
  * Counts a hit in Supabase (`rate_limit_hit`, supabase/migrations/…_photo_limit_and_shared_photos.sql), one window
  * for every instance; `null` when the counter is not there (no Supabase or key, the migration not applied, an error,
  * no answer in time), and the instance counts in its memory instead.
  */
 async function allowShared(key: string, limit: number): Promise<boolean | null> {
-  const client = await sharedCounter()
+  const client = await serviceClient()
   if (!client) return null
   const { data, error } = await client
     .rpc('rate_limit_hit', { hit_key: key, hit_limit: limit, window_seconds: RATE_WINDOW_MS / 1000 })
