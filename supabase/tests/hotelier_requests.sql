@@ -1,7 +1,8 @@
 -- Эвал's questions to the hotelier (`create_hotelier_request`, `answer_hotelier_request`) and the hybrid search of a
--- hotel's documents (`hotel_chunks_hybrid`): a traveller asks only for their own chat and run, an identical open
--- question is one request, the limits hold; only a hotelier of the hotel answers, and the answer finishes the waiting
--- run, its step and tells the chat. Everything is rolled back. Run against the database (the transaction pooler: only
+-- hotel's documents (`hotel_chunks_hybrid`): only the server asks, for a running run of `ask_hotelier` in the
+-- traveller's own chat, never the traveller themselves; an identical open question is one request, the limits hold;
+-- only a hotelier of the hotel answers, and the answer finishes the waiting run, its step and tells the chat.
+-- Everything is rolled back. Run against the database (the transaction pooler: only
 -- `set local`):
 --   psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/hotelier_requests.sql
 -- A failed check raises an exception and psql stops with it; success prints «hotelier requests: ok».
@@ -21,25 +22,74 @@ insert into public.assistant_chats (id, user_id)
 values ('00000000-0000-4000-8000-00000000c0a1', '00000000-0000-4000-8000-0000000000a1');
 
 create temporary table req_hotel on commit drop as select id from public.hotels order by id limit 1;
-grant select on req_hotel to authenticated, anon;
+grant select on req_hotel to authenticated, anon, service_role;
 
--- A's chat with Эвал: the step of the tool and its run, waiting.
-set local role authenticated;
-set local request.jwt.claims = '{"sub": "00000000-0000-4000-8000-0000000000a1", "role": "authenticated"}';
-insert into public.tool_runs (id, chat_id, tool_name, status, resume)
-values ('00000000-0000-4000-8000-0000000001a1', '00000000-0000-4000-8000-00000000c0a1', 'ask_hotelier', 'waiting',
-  '{"request_id": "pending"}');
-insert into public.assistant_messages (id, chat_id, role, text, data)
-values ('00000000-0000-4000-8000-0000000002a1', '00000000-0000-4000-8000-00000000c0a1', 'agent', '',
+-- A's chat with Эвал: the step of the tool and its run, started by the route (`running`); B's run of their own chat.
+insert into public.assistant_chats (id, user_id)
+values ('00000000-0000-4000-8000-00000000c0b2', '00000000-0000-4000-8000-0000000000b2');
+insert into public.tool_runs (id, chat_id, user_id, tool_name, status)
+values
+  ('00000000-0000-4000-8000-0000000001a1', '00000000-0000-4000-8000-00000000c0a1',
+    '00000000-0000-4000-8000-0000000000a1', 'ask_hotelier', 'running'),
+  ('00000000-0000-4000-8000-0000000001a2', '00000000-0000-4000-8000-00000000c0a1',
+    '00000000-0000-4000-8000-0000000000a1', 'ask_hotelier', 'running'),
+  ('00000000-0000-4000-8000-0000000001a3', '00000000-0000-4000-8000-00000000c0a1',
+    '00000000-0000-4000-8000-0000000000a1', 'ask_hotelier', 'running'),
+  ('00000000-0000-4000-8000-0000000001a4', '00000000-0000-4000-8000-00000000c0a1',
+    '00000000-0000-4000-8000-0000000000a1', 'ask_hotelier', 'running'),
+  ('00000000-0000-4000-8000-0000000001a5', '00000000-0000-4000-8000-00000000c0a1',
+    '00000000-0000-4000-8000-0000000000a1', 'ask_hotelier', 'running'),
+  ('00000000-0000-4000-8000-0000000001a6', '00000000-0000-4000-8000-00000000c0a1',
+    '00000000-0000-4000-8000-0000000000a1', 'hotel_noise', 'running'),
+  ('00000000-0000-4000-8000-0000000001b1', '00000000-0000-4000-8000-00000000c0b2',
+    '00000000-0000-4000-8000-0000000000b2', 'ask_hotelier', 'running');
+insert into public.tool_runs (id, chat_id, user_id, tool_name, status, completed_at)
+values ('00000000-0000-4000-8000-0000000001a7', '00000000-0000-4000-8000-00000000c0a1',
+  '00000000-0000-4000-8000-0000000000a1', 'ask_hotelier', 'success', now());
+insert into public.assistant_messages (id, chat_id, user_id, role, text, data)
+values ('00000000-0000-4000-8000-0000000002a1', '00000000-0000-4000-8000-00000000c0a1',
+  '00000000-0000-4000-8000-0000000000a1', 'agent', '',
   '{"step": {"agent": "hotelier", "title": "Запрос отельеру", "run": {"id": "00000000-0000-4000-8000-0000000001a1", "result": {"status": "pending"}}}}');
 
+-- A asks nothing by themselves: neither the function nor a row of their own looks like Эвал's question.
+set local role authenticated;
+set local request.jwt.claims = '{"sub": "00000000-0000-4000-8000-0000000000a1", "role": "authenticated"}';
+do $$
+begin
+  begin
+    perform public.create_hotelier_request(
+      '00000000-0000-4000-8000-0000000000a1', (select id from req_hotel),
+      'Свой вопрос',
+      '00000000-0000-4000-8000-00000000c0a1', '00000000-0000-4000-8000-0000000001a1');
+    raise exception 'A called create_hotelier_request';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    with c as (
+      insert into public.hotelier_conversations (hotel_id, user_id)
+      select id, '00000000-0000-4000-8000-0000000000a1' from req_hotel
+      returning id, hotel_id
+    )
+    insert into public.hotelier_requests (conversation_id, hotel_id, user_id, question, dedupe_key)
+    select c.id, c.hotel_id, '00000000-0000-4000-8000-0000000000a1', 'Свой вопрос', repeat('0', 64) from c;
+    raise exception 'A inserted a request';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+
+-- The server asks for A, for the run it started in A's chat.
+reset request.jwt.claims;
+reset role;
 create temporary table req_made (request uuid, conversation uuid, reused boolean) on commit drop;
-grant all on req_made to authenticated;
+grant all on req_made to authenticated, service_role;
+set local role service_role;
 insert into req_made
 select * from public.create_hotelier_request(
-  (select id from req_hotel), '  Есть ли балкон   в номерах Deluxe? ', array['room.balcony', 'bad key'], null,
-  'Гость ищет номер с балконом', '00000000-0000-4000-8000-00000000c0a1', '00000000-0000-4000-8000-0000000001a1');
-update public.tool_runs set resume = jsonb_build_object('request_id', (select request from req_made))
+  '00000000-0000-4000-8000-0000000000a1', (select id from req_hotel),
+  '  Есть ли балкон   в номерах Deluxe? ',
+  '00000000-0000-4000-8000-00000000c0a1', '00000000-0000-4000-8000-0000000001a1',
+  array['room.balcony', 'bad key'], null, 'Гость ищет номер с балконом');
+update public.tool_runs set status = 'waiting', resume = jsonb_build_object('request_id', (select request from req_made))
 where id = '00000000-0000-4000-8000-0000000001a1';
 
 do $$
@@ -51,7 +101,9 @@ begin
   select * into made from req_made;
   if made.reused then raise exception 'a new question was reused'; end if;
   select * into c from public.hotelier_conversations where id = made.conversation;
-  if c.kind <> 'ai_request' or c.status <> 'waiting_hotelier' or c.hotelier_unread <> 1 then
+  if c.kind <> 'ai_request' or c.status <> 'waiting_hotelier' or c.hotelier_unread <> 1
+    or c.user_id <> '00000000-0000-4000-8000-0000000000a1' or c.origin_tool_run_id <> '00000000-0000-4000-8000-0000000001a1'
+  then
     raise exception 'the request conversation is wrong: % % %', c.kind, c.status, c.hotelier_unread;
   end if;
   if (select characteristic_keys from public.hotelier_requests where id = made.request) <> array['room.balcony'] then
@@ -61,46 +113,97 @@ begin
     <> 'ai_assistant:Есть ли балкон в номерах Deluxe?' then
     raise exception 'the assistant did not ask the question';
   end if;
-  -- The same open question, in other spacing and case, is the same request.
+  -- The same open question, in other spacing and case, of another run is the same request.
   select * into again from public.create_hotelier_request(
-    (select id from req_hotel), 'есть ли балкон в номерах deluxe?', array['room.balcony']);
+    '00000000-0000-4000-8000-0000000000a1', (select id from req_hotel),
+    'есть ли балкон в номерах deluxe?',
+    '00000000-0000-4000-8000-00000000c0a1', '00000000-0000-4000-8000-0000000001a2',
+    array['room.balcony']);
   if not again.reused or again.request <> made.request then raise exception 'the identical question was duplicated'; end if;
-  -- A writes no assistant message and no answer.
+  -- Only a run of ask_hotelier of the traveller's chat, still running and not linked yet.
   begin
-    perform public.answer_hotelier_request(made.request, (select id from public.hotelier_messages limit 1));
-    if (select status from public.hotelier_requests where id = made.request) <> 'pending' then
-      raise exception 'the traveller answered';
-    end if;
+    perform public.create_hotelier_request(
+      '00000000-0000-4000-8000-0000000000a1', (select id from req_hotel),
+      'Тот же запуск',
+      '00000000-0000-4000-8000-00000000c0a1', '00000000-0000-4000-8000-0000000001a1');
+    raise exception 'a run asked twice';
+  exception when raise_exception then
+    if sqlerrm <> 'hotelier_request_invalid' then raise; end if;
+  end;
+  begin
+    perform public.create_hotelier_request(
+      '00000000-0000-4000-8000-0000000000a1', (select id from req_hotel),
+      'Без запуска',
+      '00000000-0000-4000-8000-00000000c0a1', null);
+    raise exception 'a question without a run';
+  exception when raise_exception then
+    if sqlerrm <> 'hotelier_request_invalid' then raise; end if;
+  end;
+  begin
+    perform public.create_hotelier_request(
+      '00000000-0000-4000-8000-0000000000a1', (select id from req_hotel),
+      'Другой инструмент',
+      '00000000-0000-4000-8000-00000000c0a1', '00000000-0000-4000-8000-0000000001a6');
+    raise exception 'a run of another tool asked';
+  exception when raise_exception then
+    if sqlerrm <> 'hotelier_request_invalid' then raise; end if;
+  end;
+  begin
+    perform public.create_hotelier_request(
+      '00000000-0000-4000-8000-0000000000a1', (select id from req_hotel),
+      'Законченный запуск',
+      '00000000-0000-4000-8000-00000000c0a1', '00000000-0000-4000-8000-0000000001a7');
+    raise exception 'a finished run asked';
+  exception when raise_exception then
+    if sqlerrm <> 'hotelier_request_invalid' then raise; end if;
+  end;
+  begin
+    perform public.create_hotelier_request(
+      '00000000-0000-4000-8000-0000000000a1', (select id from req_hotel),
+      'Чужой запуск',
+      '00000000-0000-4000-8000-00000000c0a1', '00000000-0000-4000-8000-0000000001b1');
+    raise exception 'A asked for B''s run';
+  exception when raise_exception then
+    if sqlerrm <> 'hotelier_request_invalid' then raise; end if;
+  end;
+  begin
+    perform public.create_hotelier_request(
+      '00000000-0000-4000-8000-0000000000b2', (select id from req_hotel),
+      'Чужой чат',
+      '00000000-0000-4000-8000-00000000c0a1', '00000000-0000-4000-8000-0000000001a3');
+    raise exception 'B asked for A''s chat';
+  exception when raise_exception then
+    if sqlerrm <> 'hotelier_request_invalid' then raise; end if;
   end;
   -- At most 3 open questions a hotel.
-  perform public.create_hotelier_request((select id from req_hotel), 'Вопрос 2');
-  perform public.create_hotelier_request((select id from req_hotel), 'Вопрос 3');
+  perform public.create_hotelier_request(
+    '00000000-0000-4000-8000-0000000000a1', (select id from req_hotel),
+    'Вопрос 2',
+    '00000000-0000-4000-8000-00000000c0a1', '00000000-0000-4000-8000-0000000001a3');
+  perform public.create_hotelier_request(
+    '00000000-0000-4000-8000-0000000000a1', (select id from req_hotel),
+    'Вопрос 3',
+    '00000000-0000-4000-8000-00000000c0a1', '00000000-0000-4000-8000-0000000001a4');
   begin
-    perform public.create_hotelier_request((select id from req_hotel), 'Вопрос 4');
+    perform public.create_hotelier_request(
+      '00000000-0000-4000-8000-0000000000a1', (select id from req_hotel),
+      'Вопрос 4',
+      '00000000-0000-4000-8000-00000000c0a1', '00000000-0000-4000-8000-0000000001a5');
     raise exception 'a fourth open question was made';
   exception when raise_exception then
     if sqlerrm <> 'hotelier_request_limit' then raise; end if;
   end;
 end $$;
 
--- B asks for no chat or run of A's.
-set local request.jwt.claims = '{"sub": "00000000-0000-4000-8000-0000000000b2", "role": "authenticated"}';
+-- A answers nothing of their own question.
+set local role authenticated;
+set local request.jwt.claims = '{"sub": "00000000-0000-4000-8000-0000000000a1", "role": "authenticated"}';
 do $$
 begin
-  begin
-    perform public.create_hotelier_request((select id from req_hotel), 'Чужой чат', '{}', null, null,
-      '00000000-0000-4000-8000-00000000c0a1');
-    raise exception 'B asked for A''s chat';
-  exception when raise_exception then
-    if sqlerrm <> 'hotelier_request_invalid' then raise; end if;
-  end;
-  begin
-    perform public.create_hotelier_request((select id from req_hotel), 'Чужой запуск', '{}', null, null, null,
-      '00000000-0000-4000-8000-0000000001a1');
-    raise exception 'B asked for A''s run';
-  exception when raise_exception then
-    if sqlerrm <> 'hotelier_request_invalid' then raise; end if;
-  end;
+  if exists (select 1 from public.answer_hotelier_request((select request from req_made),
+    (select id from public.hotelier_messages limit 1))) then
+    raise exception 'the traveller answered';
+  end if;
 end $$;
 
 -- H2 has no access to the hotel: their answer does nothing.
@@ -185,7 +288,10 @@ set local role anon;
 do $$
 begin
   begin
-    perform public.create_hotelier_request((select id from req_hotel), 'Гость');
+    perform public.create_hotelier_request(
+      '00000000-0000-4000-8000-0000000000a1', (select id from req_hotel),
+      'Гость',
+      '00000000-0000-4000-8000-00000000c0a1', '00000000-0000-4000-8000-0000000001a5');
     raise exception 'a guest asked';
   exception when insufficient_privilege then null;
   end;

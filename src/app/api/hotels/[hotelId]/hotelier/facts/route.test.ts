@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HotelClaim } from '@/lib/db/claims'
 import { GET } from './route'
 
-const mocks = vi.hoisted(() => ({ hotel: vi.fn(), claims: vi.fn() }))
+const mocks = vi.hoisted(() => ({ hotel: vi.fn(), claims: vi.fn(), later: [] as (() => unknown)[], retry: vi.fn() }))
+vi.mock('next/server', async (load) => ({
+  ...(await load<typeof import('next/server')>()),
+  after: (callback: () => unknown) => void mocks.later.push(callback),
+}))
+vi.mock('@/lib/db/hotelierKnowledge', () => ({ retryDueHotelierKnowledge: mocks.retry }))
 vi.mock('@/lib/api', async (original) => ({ ...(await original<object>()), loadVisibleHotel: mocks.hotel }))
 vi.mock('@/lib/db/anon', async (original) => ({
   ...(await original<object>()),
@@ -79,5 +84,13 @@ describe('GET /api/hotels/{hotelId}/hotelier/facts', () => {
     expect((await get('nowhere')).status).toBe(404)
     mocks.claims.mockResolvedValue(null)
     expect((await get('ota-1')).status).toBe(503)
+  })
+
+  it('tries the answers whose knowledge failed again after the response', async () => {
+    mocks.later.length = 0
+    await get('nowhere')
+    expect(mocks.retry).not.toHaveBeenCalled()
+    for (const callback of mocks.later.splice(0)) await callback()
+    expect(mocks.retry).toHaveBeenCalledTimes(1)
   })
 })

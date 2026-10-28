@@ -14,9 +14,10 @@ import { parseToolRun, toolResultSchema, type ToolClaim, type ToolEvidence, type
 import type { Database, Json } from './database.types'
 
 /**
- * The hotel's knowledge from its hotelier's answers (hotelier-knowledge), written by the server after the answer
- * (`after()` of the route, or `npm run db:hotelier-knowledge` for what failed): the only module of the app with the
- * service role, which the store of claims needs — no browser, no request of a user reaches it. Only an answer the
+ * The hotel's knowledge from its hotelier's answers (hotelier-knowledge), written by the server after the answer:
+ * `after()` of the route, then — for a try that failed or was cut off — again by itself after the responses of the
+ * routes that read the knowledge (`retryDueHotelierKnowledge`), with `npm run db:hotelier-knowledge` left for the
+ * operator. It has the service role, which the store of claims needs — no browser, no request of a user reaches it. Only an answer the
  * hotelier marked shareable becomes knowledge, and only its impersonal facts: the conversation itself stays private.
  * Each fact is a claim `reported` of the hotel (or its room) with the policy's confidence of an owner's answer
  * (`owner_answer`, 0.75) and the answer as its evidence; a later answer of the same characteristic ends the older claim
@@ -33,6 +34,22 @@ const SUPERSEDED = 'Заменено более поздним ответом о
 const CONFLICT = 'Противоречит другому ответу отельера: уточняется'
 const REVOKED = 'Отозвано отельером'
 const REPORTED = 'Сообщено отельером, сервис это не проверял'
+/** The line of a run whose answer's characteristics are on their way (`answer_hotelier_request`). */
+const EXTRACTING = 'Характеристики из ответа извлекаются'
+const NOT_EXTRACTED = 'Характеристики из ответа не удалось сохранить: ответ отельера — выше'
+const REVOKED_RUN = 'Отельер отозвал сведения из этого ответа: Эвал их больше не использует'
+
+/**
+ * An answer's knowledge is taken for this long (`knowledge_due_at`): longer than a function may run after its response
+ * (`maxDuration`), so a worker cut off by it leaves the answer due again instead of waiting for a person.
+ */
+const LEASE_MS = 10 * 60_000
+/** The tries of an answer's knowledge at most; then the request is `failed` until `npm run db:hotelier-knowledge`. */
+export const MAX_KNOWLEDGE_ATTEMPTS = 5
+/** The pause after the failed try `attempt` (1, 2, …): 1, 4, 16, 64 minutes. */
+export const retryDelayMs = (attempt: number) => 60_000 * 4 ** (attempt - 1)
+/** A server instance looks for due answers at most this often: after the responses of the routes that read them. */
+const SWEEP_EVERY_MS = 60_000
 
 let service: Promise<Service | null> | undefined
 
@@ -382,7 +399,31 @@ async function retireDocuments(db: Service, hotelId: string) {
 }
 
 /** The runs of Эвал that waited for the request: its facts and their source join the result in place. */
-async function finishRuns(db: Service, requestId: string, written: Written | null, limitation: string) {
+function finishRuns(db: Service, requestId: string, written: Written | null, limitation: string) {
+  return updateRuns(
+    db,
+    requestId,
+    (before) => ({
+      ...before,
+      data: { ...before.data, knowledge: written ? 'done' : 'none' },
+      evidence: written ? [written.evidence] : before.evidence,
+      claims: written ? written.claims : before.claims,
+      limitations: [...before.limitations.filter((line) => !line.startsWith(EXTRACTING)), limitation].slice(0, 20),
+    }),
+    written?.evidenceId,
+  )
+}
+
+/**
+ * The runs of Эвал of the request, each result changed in place — in `tool_runs` and in the step of the chat's message
+ * that shows it, so the block «Запрос отельеру» shows the change at once (Realtime) and after a reload.
+ */
+async function updateRuns(
+  db: Service,
+  requestId: string,
+  change: (before: ToolResult) => ToolResult,
+  evidenceId?: string,
+) {
   const runs = must(
     await db
       .from('tool_runs')
@@ -393,28 +434,18 @@ async function finishRuns(db: Service, requestId: string, written: Written | nul
   for (const run of runs) {
     const parsed = toolResultSchema.safeParse(run.result_data)
     if (!parsed.success) continue
-    const before = parsed.data
-    const result: ToolResult = {
-      ...before,
-      data: { ...before.data, knowledge: written ? 'done' : 'none' },
-      evidence: written ? [written.evidence] : before.evidence,
-      claims: written ? written.claims : before.claims,
-      limitations: [
-        ...before.limitations.filter((line) => !line.startsWith('Характеристики из ответа извлекаются')),
-        limitation,
-      ].slice(0, 20),
-    }
+    const result = change(parsed.data)
     done(
       await db
         .from('tool_runs')
         .update({ result_data: result as unknown as Json, updated_at: new Date().toISOString() })
         .eq('id', run.id),
     )
-    if (written)
+    if (evidenceId)
       await db
         .from('tool_run_evidence')
         .upsert(
-          { tool_run_id: run.id, user_id: run.user_id, evidence_id: written.evidenceId },
+          { tool_run_id: run.id, user_id: run.user_id, evidence_id: evidenceId },
           { onConflict: 'tool_run_id,evidence_id' },
         )
     // The step of the chat's message shows the same result after a reload.
@@ -456,29 +487,77 @@ export async function writeHotelierFacts(
   const db = await serviceClient()
   if (!db) throw new Error('hotelier knowledge: no service role key')
   const answer = await readAnswer(db, messageId)
-  if (!answer || !answer.message.shareable || facts.length === 0) return null
+  if (!answer || !answer.message.shareable) return null
+  // The demo data know the facts of their answers: none is left for the extraction.
+  if (facts.length === 0) {
+    await settle(db, messageId)
+    return null
+  }
   const written = await writeFacts(db, answer, facts, model, { conflict })
   if (answer.request) {
     await finishRuns(db, answer.request.id, written, REPORTED)
     await setKnowledge(db, answer.request.id, 'done')
   }
+  await settle(db, messageId)
   return written
 }
 
 /**
- * The knowledge of a hotelier's answer: its facts when it is shareable, the waiting runs with them, the request's
- * `knowledge_status`. Never throws; a failure leaves the request `failed` for the re-run.
+ * Takes the answer's knowledge for this worker, for a lease: it is due (or `force`: the operator's re-run) and nobody
+ * took it since it was read — the try counts compare (`knowledge_attempts`), so of two workers one wins. The try's
+ * number; `null` when there is nothing to take.
  */
-export async function processHotelierAnswer(messageId: string): Promise<'done' | 'none' | 'failed'> {
+async function claimKnowledge(db: Service, messageId: string, force: boolean): Promise<number | null> {
+  const row = maybe(
+    await db.from('hotelier_messages').select('knowledge_attempts, knowledge_due_at').eq('id', messageId).maybeSingle(),
+  )
+  const now = Date.now()
+  if (!row || (!force && (!row.knowledge_due_at || Date.parse(row.knowledge_due_at) > now))) return null
+  const attempt = row.knowledge_attempts + 1
+  const claimed = must(
+    await db
+      .from('hotelier_messages')
+      .update({ knowledge_attempts: attempt, knowledge_due_at: new Date(now + LEASE_MS).toISOString() })
+      .eq('id', messageId)
+      .eq('knowledge_attempts', row.knowledge_attempts)
+      .select('id'),
+  )
+  return claimed.length > 0 ? attempt : null
+}
+
+/** The answer's knowledge is settled: nothing is due any more. */
+async function settle(db: Service, messageId: string) {
+  done(await db.from('hotelier_messages').update({ knowledge_due_at: null }).eq('id', messageId))
+}
+
+/**
+ * The knowledge of a hotelier's shareable answer, once it is due (`knowledge_due_at`, from the moment it was written):
+ * its facts, the waiting runs with them, the request's `knowledge_status`. The answer is taken for a lease first, so
+ * two workers never extract it twice and one cut off by `maxDuration` leaves it due again; a failed try is due again
+ * after a pause (`retryDelayMs`), the request still `queued`; after `MAX_KNOWLEDGE_ATTEMPTS` the request is `failed`,
+ * its runs say so, and only `force` (the operator's `npm run db:hotelier-knowledge`) tries it again. Idempotent: an
+ * answer done again is rewritten in place. `skipped` when it is not due or another worker has it. Never throws.
+ */
+export async function processHotelierAnswer(
+  messageId: string,
+  { force = false }: { force?: boolean } = {},
+): Promise<'done' | 'none' | 'failed' | 'skipped'> {
   const db = await serviceClient()
   if (!db) return 'failed'
   let answer: Answer | null = null
+  let attempt: number | null = null
   try {
+    attempt = await claimKnowledge(db, messageId, force)
+    if (attempt === null) return 'skipped'
     answer = await readAnswer(db, messageId)
-    if (!answer) return 'none'
+    if (!answer) {
+      await settle(db, messageId)
+      return 'none'
+    }
     const { message, request } = answer
     if (!message.shareable || message.knowledge_revoked_at) {
       if (request) await setKnowledge(db, request.id, 'done')
+      await settle(db, messageId)
       return 'none'
     }
     const extracted = await extractHotelierFacts(await getTextModels(), {
@@ -486,11 +565,16 @@ export async function processHotelierAnswer(messageId: string): Promise<'done' |
       question: request?.question ?? null,
       answer: message.text,
     })
-    if (!extracted) {
-      if (request) await setKnowledge(db, request.id, 'failed')
-      return 'failed'
-    }
+    if (!extracted) throw { code: 'not_extracted' }
     const written = extracted.facts.length > 0 ? await writeFacts(db, answer, extracted.facts, extracted.model) : null
+    // Withdrawn while the model read it: what was just written goes as the rest of the answer's knowledge did.
+    const latest = maybe(await db.from('hotelier_messages').select('knowledge_revoked_at').eq('id', messageId).single())
+    if (latest?.knowledge_revoked_at) {
+      await withdraw(db, messageId, request?.id ?? null, latest.knowledge_revoked_at)
+      if (request) await setKnowledge(db, request.id, 'done')
+      await settle(db, messageId)
+      return 'none'
+    }
     if (request) {
       await finishRuns(
         db,
@@ -500,11 +584,60 @@ export async function processHotelierAnswer(messageId: string): Promise<'done' |
       )
       await setKnowledge(db, request.id, 'done')
     }
+    await settle(db, messageId)
     return written ? 'done' : 'none'
   } catch (error) {
     warn('answer not processed', error)
-    if (answer?.request) await setKnowledge(db, answer.request.id, 'failed').catch(() => undefined)
+    if (attempt !== null) await retryLater(db, messageId, answer?.request?.id ?? null, attempt).catch(() => undefined)
     return 'failed'
+  }
+}
+
+/**
+ * A failed try: due again after a pause, the request still on its way; after the last try the request is `failed` and
+ * its runs stop waiting for the characteristics.
+ */
+async function retryLater(db: Service, messageId: string, requestId: string | null, attempt: number) {
+  const last = attempt >= MAX_KNOWLEDGE_ATTEMPTS
+  done(
+    await db
+      .from('hotelier_messages')
+      .update({ knowledge_due_at: last ? null : new Date(Date.now() + retryDelayMs(attempt)).toISOString() })
+      .eq('id', messageId),
+  )
+  if (!requestId || !last) return
+  await setKnowledge(db, requestId, 'failed')
+  await finishRuns(db, requestId, null, NOT_EXTRACTED)
+}
+
+let lastSweep = 0
+
+/**
+ * The automatic retry of the answers' knowledge, without a queue or a scheduler of its own: after the response of a
+ * route that reads the hotels' knowledge or answers in the panel (`after()`), the due answers — failed tries whose
+ * pause is over, workers cut off by `maxDuration` — are processed, at most `limit` and at most once a minute per
+ * server instance. Each is taken for a lease (`processHotelierAnswer`), so parallel instances never repeat one. The
+ * answers processed.
+ */
+export async function retryDueHotelierKnowledge(limit = 2): Promise<number> {
+  if (Date.now() - lastSweep < SWEEP_EVERY_MS) return 0
+  lastSweep = Date.now()
+  const db = await serviceClient()
+  if (!db) return 0
+  try {
+    const due = must(
+      await db
+        .from('hotelier_messages')
+        .select('id')
+        .lte('knowledge_due_at', new Date().toISOString())
+        .order('knowledge_due_at')
+        .limit(limit),
+    )
+    for (const { id } of due) await processHotelierAnswer(id)
+    return due.length
+  } catch (error) {
+    warn('due answers not read', error)
+    return 0
   }
 }
 
@@ -521,33 +654,53 @@ export async function revokeHotelierAnswer(messageId: string): Promise<boolean> 
   if (!db) return false
   try {
     const now = new Date().toISOString()
-    done(await db.from('hotelier_messages').update({ knowledge_revoked_at: now }).eq('id', messageId))
-    const evidence = maybe(
+    const message = must(
       await db
-        .from('evidence')
-        .select('id')
-        .eq('provider', HOTELIER_PROVIDER)
-        .eq('external_id', messageId)
-        .maybeSingle(),
+        .from('hotelier_messages')
+        .update({ knowledge_revoked_at: now, knowledge_due_at: null })
+        .eq('id', messageId)
+        .select('request_id')
+        .single(),
     )
-    if (!evidence) return true
-    const links = must(await db.from('claim_evidence').select('claim_id').eq('evidence_id', evidence.id))
-    for (const { claim_id } of links) {
-      const claim = must(await db.from('claims').select('limitations').eq('id', claim_id).single())
-      done(
-        await db
-          .from('claims')
-          .update({ valid_to: now, limitations: [...new Set([...claim.limitations, REVOKED])] })
-          .eq('id', claim_id)
-          .is('valid_to', null),
-      )
-    }
-    done(await db.from('documents').delete().eq('evidence_id', evidence.id))
+    await withdraw(db, messageId, message.request_id, now)
     return true
   } catch (error) {
     warn('answer not revoked', error)
     return false
   }
+}
+
+/**
+ * The answer's knowledge goes: its claims end (kept, with «Отозвано отельером»), its document leaves the search, and the
+ * blocks «Запрос отельеру» of its request say it is withdrawn, without its characteristics.
+ */
+async function withdraw(db: Service, messageId: string, requestId: string | null, now: string) {
+  if (requestId)
+    await updateRuns(db, requestId, (before) => ({
+      ...before,
+      data: { ...before.data, knowledge: 'revoked' },
+      claims: [],
+      limitations: [
+        ...before.limitations.filter((line) => !line.startsWith(EXTRACTING) && line !== REPORTED),
+        REVOKED_RUN,
+      ].slice(0, 20),
+    }))
+  const evidence = maybe(
+    await db.from('evidence').select('id').eq('provider', HOTELIER_PROVIDER).eq('external_id', messageId).maybeSingle(),
+  )
+  if (!evidence) return
+  const links = must(await db.from('claim_evidence').select('claim_id').eq('evidence_id', evidence.id))
+  for (const { claim_id } of links) {
+    const claim = must(await db.from('claims').select('limitations').eq('id', claim_id).single())
+    done(
+      await db
+        .from('claims')
+        .update({ valid_to: now, limitations: [...new Set([...claim.limitations, REVOKED])] })
+        .eq('id', claim_id)
+        .is('valid_to', null),
+    )
+  }
+  done(await db.from('documents').delete().eq('evidence_id', evidence.id))
 }
 
 /** The same key as `create_hotelier_request`'s: the hotel, the words, the characteristics, the room. */

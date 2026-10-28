@@ -11,9 +11,28 @@ import { parseToolRun, type ToolRun } from './toolResult'
  */
 
 type Tables = Database['public']['Tables']
-export type ConversationRow = Tables['hotelier_conversations']['Row']
-export type MessageRow = Tables['hotelier_messages']['Row']
-export type RequestRow = Tables['hotelier_requests']['Row']
+
+/**
+ * The columns a signed-in user may select (supabase/migrations/20261028160000_hotelier_hardening.sql): all but the
+ * traveller's identity and the server's columns, so the hotelier never gets who the traveller is — neither here nor
+ * by Realtime. A read of these tables names them; `*` is refused.
+ */
+export const CONVERSATION_COLUMNS =
+  'id, hotel_id, kind, status, last_message_at, last_message_text, last_sender, user_unread, hotelier_unread, is_demo, created_at, updated_at'
+export const MESSAGE_COLUMNS =
+  'id, conversation_id, sender, text, data, request_id, shareable, knowledge_revoked_at, is_demo, read_at, created_at'
+export const REQUEST_COLUMNS =
+  'id, conversation_id, hotel_id, room_entity_id, question, characteristic_keys, context_summary, status, dedupe_key, answer_message_id, knowledge_status, answered_at, expires_at, created_at, updated_at'
+
+export type ConversationRow = Omit<
+  Tables['hotelier_conversations']['Row'],
+  'user_id' | 'origin_chat_id' | 'origin_tool_run_id'
+>
+export type MessageRow = Omit<
+  Tables['hotelier_messages']['Row'],
+  'author_id' | 'knowledge_due_at' | 'knowledge_attempts'
+>
+export type RequestRow = Omit<Tables['hotelier_requests']['Row'], 'user_id' | 'origin_chat_id' | 'origin_tool_run_id'>
 
 export const HOTELIER_SENDERS = ['user', 'hotelier', 'ai_assistant'] as const
 export type HotelierSender = (typeof HOTELIER_SENDERS)[number]
