@@ -11,6 +11,8 @@ import {
 } from '../db/claims'
 import type { Json } from '../db/database.types'
 import { loadHotelDetails } from '../db/hotelDetails'
+import { loadHotelFeatures } from '../db/features'
+import { loadHotelNoise } from '../db/noise'
 import { dedupeKey } from '../db/hotelierKnowledge'
 import { serviceClient } from '../db/serviceClient'
 import {
@@ -25,6 +27,7 @@ import type { ToolEvidence, ToolResult } from '../toolResult'
 import { firstAnswer } from './chain'
 import { backgroundLinks } from './hotelierExtract'
 import { hotelFacts, isRussian } from './hotelAnswer'
+import { placesAnswer } from './mediatorPlaces'
 import { getTextModels } from './model'
 import { queryVectorOrNull } from './semantic'
 import { clipText } from '../format'
@@ -209,21 +212,46 @@ export async function mediate(conversationId: string, messageId: string): Promis
     let chunks: KnowledgeChunk[] = []
     if (!confirmOnly) {
       const vector = await queryVectorOrNull(question.text, 6000)
-      const [details, hotelier, found] = await Promise.all([
+      const [details, hotelier, found, features, noise, models] = await Promise.all([
         loadHotelDetails(hotel.id),
         loadHotelierClaims(hotel.id),
         searchHotelKnowledge(hotel.id, question.text, KNOWLEDGE_CHUNKS, vector),
+        loadHotelFeatures()
+          .then((all) => all?.get(hotel.id))
+          .catch(() => undefined),
+        loadHotelNoise(hotel).catch(() => null),
+        getTextModels(),
       ])
       claims = hotelier ?? []
       chunks = found ?? []
-      const models = await getTextModels()
+      // The noise, the view and the places near are Эвал's own steps (hotelTurn): the same text, estimates and sources.
+      const deadline = Date.now() + MEDIATOR_MS
+      const places = await placesAnswer(hotel, dialog, {
+        details,
+        models: models ? backgroundLinks(models) : undefined,
+        deadline,
+        signal: AbortSignal.timeout(MEDIATOR_MS),
+        onError: (id, error) =>
+          console.warn(`hotelier mediator: ${id} failed on places (${error instanceof Error ? error.name : 'error'})`),
+      })
+      if (places && isRussian(places.answer)) {
+        const { error } = await db.from('hotelier_messages').insert({
+          conversation_id: conversationId,
+          sender: 'ai_assistant',
+          author_id: null,
+          text: places.answer,
+          data: { run: { id: crypto.randomUUID(), result: places.result } } as unknown as NonNullable<Json>,
+        })
+        if (error) throw error
+        return 'answered'
+      }
       if (models && !contradicts(claims)) {
-        const system = prompt(hotelFacts(hotel, undefined, undefined, details), claims, chunks)
+        const system = prompt(hotelFacts(hotel, undefined, features, details, noise), claims, chunks)
         const result = await firstAnswer(
           backgroundLinks(models),
           (model, signal) => decide(model, system, dialog, signal),
           {
-            deadline: Date.now() + MEDIATOR_MS,
+            deadline,
             onError: (id, error) =>
               console.warn(`hotelier mediator: ${id} failed (${error instanceof Error ? error.name : 'error'})`),
           },

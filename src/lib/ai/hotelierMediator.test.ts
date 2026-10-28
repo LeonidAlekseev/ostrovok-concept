@@ -9,7 +9,12 @@ const db = vi.hoisted(() => ({
   messages: [] as object[],
   writes: [] as { table: string; op: string; value: unknown }[],
 }))
-const deps = vi.hoisted(() => ({ models: undefined as unknown, claims: [] as unknown[] }))
+const deps = vi.hoisted(() => ({
+  models: undefined as unknown,
+  claims: [] as unknown[],
+  places: null as { answer: string; result: object } | null,
+  asked: [] as string[],
+}))
 
 vi.mock('../db/serviceClient', () => ({
   serviceClient: async () => ({
@@ -40,6 +45,15 @@ vi.mock('../db/claims', () => ({
   loadHotelierClaims: async () => deps.claims,
   searchHotelKnowledge: async () => [],
   loadEvidence: async () => [],
+}))
+vi.mock('../db/features', () => ({ loadHotelFeatures: async () => new Map() }))
+vi.mock('../db/noise', () => ({ loadHotelNoise: async () => null }))
+// Эвал's steps for the noise, the view and the places near are tested in mediatorPlaces.test.ts.
+vi.mock('./mediatorPlaces', () => ({
+  placesAnswer: async (_hotel: unknown, dialog: { text: string }[]) => {
+    deps.asked.push(dialog.at(-1)!.text)
+    return deps.places
+  },
 }))
 vi.mock('./model', () => ({ getTextModels: async () => deps.models, REMARK_MODEL_ID: 'bolt' }))
 vi.mock('../secrets', () => ({ getSecret: async () => undefined }))
@@ -99,6 +113,8 @@ beforeEach(() => {
   db.writes = []
   deps.claims = [claim({ kind: 'boolean', value: true })]
   deps.models = undefined
+  deps.places = null
+  deps.asked = []
   vi.spyOn(console, 'warn').mockImplementation(() => {})
 })
 
@@ -168,6 +184,29 @@ describe('the hotel’s AI assistant', () => {
     expect(await ask('Есть ли балкон?')).toBe('escalated')
     deps.models = undefined
     expect(await ask('Есть ли балкон?')).toBe('escalated')
+  })
+
+  // hotelier-chat, Requirement: the assistant knows what Эвал knows of the hotel
+  it('answers a question of the beach, the noise or the view with Эвал’s steps and their sources, not the hotelier', async () => {
+    deps.places = {
+      answer: 'По данным OpenStreetMap: ближайший пляж — «Platja del Cabanyal», 2,6 км от отеля по прямой.',
+      result: { status: 'success', evidence: [{ id: 'mediator-osm', source_name: 'OpenStreetMap' }] },
+    }
+    expect(await ask('Сколько идти до пляжа?')).toBe('answered')
+    expect(deps.asked).toEqual(['Сколько идти до пляжа?'])
+    expect(written('hotelier_requests')).toEqual([])
+    expect(written('hotelier_messages')[0].value).toMatchObject({
+      sender: 'ai_assistant',
+      text: expect.stringContaining('2,6 км'),
+      data: { run: { result: { evidence: [{ source_name: 'OpenStreetMap' }] } } },
+    })
+  })
+
+  it('still passes a guarantee of the view to the hotelier, without the steps', async () => {
+    deps.places = { answer: 'Море не видно.', result: { status: 'success' } }
+    expect(await ask('Вы гарантируете вид на море?')).toBe('escalated')
+    expect(deps.asked).toEqual([])
+    expect(written('hotelier_requests')).toHaveLength(1)
   })
 
   it('stays silent while the hotelier is in the chat, and for a closed or an old message', async () => {
