@@ -1745,6 +1745,43 @@
         }
       }
     },
+    "/rpc/hotelier_hide_chat": {
+      "post": {
+        "operationId": "rpc_hotelier_hide_chat",
+        "tags": ["Функции"],
+        "summary": "hotelier_hide_chat",
+        "description": "Функция `hotelier_hide_chat` базы через PostgREST.",
+        "x-used-in": ["src/lib/hotelierChatRemote.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "conversation_id": {
+                    "type": "string"
+                  }
+                },
+                "required": ["conversation_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/rpc/hotelier_my_chats": {
       "post": {
         "operationId": "rpc_hotelier_my_chats",
@@ -1815,6 +1852,9 @@
                       "user_id": {
                         "type": "string"
                       },
+                      "user_hidden_at": {
+                        "type": ["string", "null"]
+                      },
                       "user_unread": {
                         "type": "number"
                       }
@@ -1834,6 +1874,7 @@
                       "status",
                       "updated_at",
                       "user_id",
+                      "user_hidden_at",
                       "user_unread"
                     ]
                   }
@@ -3033,6 +3074,9 @@
           "user_id": {
             "type": "string"
           },
+          "user_hidden_at": {
+            "type": ["string", "null"]
+          },
           "user_unread": {
             "type": "number"
           }
@@ -3052,6 +3096,7 @@
           "status",
           "updated_at",
           "user_id",
+          "user_hidden_at",
           "user_unread"
         ]
       },

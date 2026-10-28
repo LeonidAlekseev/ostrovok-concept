@@ -1,4 +1,5 @@
 import type { Database } from './db/database.types'
+import type { Chat, ChatMessage } from './assistantChats'
 import { parseToolRun, type ToolRun } from './toolResult'
 
 /**
@@ -26,7 +27,7 @@ export const REQUEST_COLUMNS =
 
 export type ConversationRow = Omit<
   Tables['hotelier_conversations']['Row'],
-  'user_id' | 'origin_chat_id' | 'origin_tool_run_id'
+  'user_id' | 'origin_chat_id' | 'origin_tool_run_id' | 'user_hidden_at'
 >
 export type MessageRow = Omit<
   Tables['hotelier_messages']['Row'],
@@ -210,3 +211,33 @@ export const matchesFilter = (conversation: HotelierConversation, { status, kind
   (!status || conversation.status === status) &&
   (!kind || conversation.kind === kind) &&
   (!hotelId || conversation.hotelId === hotelId)
+
+/**
+ * The traveller's chat with a hotelier as a chat of Эвал's feed, for «Поделиться» (src/lib/assistantShare.ts): the
+ * traveller's messages are theirs, the hotelier's are `owner` («Отельер»), the hotel's AI assistant's are `owner` marked
+ * `hotelAi`. Nothing that names the traveller goes in: no ids, only the texts, the times and the demo mark; the sources
+ * of the assistant's answers stay out.
+ */
+export function chatOfConversation(conversation: HotelierConversation, messages: readonly HotelierMessage[]): Chat {
+  const title = conversation.hotelName ? `Чат с отельером «${conversation.hotelName}»` : 'Чат с отельером'
+  return {
+    id: conversation.id,
+    title,
+    brief: {},
+    question: null,
+    unread: false,
+    createdAt: conversation.createdAt,
+    updatedAt: conversation.lastMessageAt,
+    messages: messages.map((m): ChatMessage => ({
+      id: m.id,
+      role: m.sender === 'user' ? 'user' : 'owner',
+      status: 'done',
+      text: m.text,
+      data: {
+        ...(m.demo && { demo: true as const }),
+        ...(m.sender === 'ai_assistant' && { hotelAi: true as const }),
+      },
+      createdAt: m.createdAt,
+    })),
+  }
+}

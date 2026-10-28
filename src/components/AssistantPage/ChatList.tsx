@@ -26,7 +26,8 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/in
 import { chatKind, chatPreview, chatTime, groupChats, searchChats, type ChatKind } from '../../lib/assistantChatList'
 import { DeleteDialog, RenameForm, ShareDialog } from './ChatActions'
 import { isPending, type Chat } from '../../lib/assistantChats'
-import type { HotelierConversation } from '../../lib/hotelierChat'
+import { chatOfConversation, type HotelierConversation } from '../../lib/hotelierChat'
+import { loadMessages } from '../../lib/hotelierChatRemote'
 
 /** The icon of a chat by the kind of trip, on its tint. */
 const KIND_ICON: Record<ChatKind, { icon: LucideIcon; tint: string }> = {
@@ -76,6 +77,8 @@ interface Props {
   /** The hotel whose chat is open. */
   hotelierActive: string | null
   onChooseHotelier: (hotelId: string) => void
+  /** «Удалить» of a chat with a hotelier: it leaves the list. */
+  onDeleteHotelier: (chat: HotelierConversation) => Promise<void>
   className?: string
 }
 
@@ -96,6 +99,7 @@ export function ChatList({
   hotelier,
   hotelierActive,
   onChooseHotelier,
+  onDeleteHotelier,
   className = '',
 }: Props) {
   const [query, setQuery] = useState('')
@@ -173,7 +177,9 @@ export function ChatList({
                     chat={chat}
                     now={now}
                     current={chat.hotelId === hotelierActive}
+                    signedIn={signedIn}
                     onChoose={onChooseHotelier}
+                    onDelete={() => onDeleteHotelier(chat)}
                   />
                 </li>
               ))}
@@ -310,42 +316,84 @@ interface HotelierRowProps {
   chat: HotelierConversation
   now: Date
   current: boolean
+  signedIn: boolean
   onChoose: (hotelId: string) => void
+  onDelete: () => Promise<void>
 }
 
-/** A chat with a hotelier: the hotel's name, the time and the start of the last message. */
-function HotelierRow({ chat, now, current, onChoose }: HotelierRowProps) {
+/** A chat with a hotelier: the hotel's name, the time and the start of the last message; the menu of «Поделиться» and «Удалить». */
+function HotelierRow({ chat, now, current, signedIn, onChoose, onDelete }: HotelierRowProps) {
   const title = chat.hotelName ?? 'Отель'
+  const [sharing, setSharing] = useState(false)
+  const [confirm, setConfirm] = useState(false)
   return (
-    <button
-      type="button"
-      className="group flex w-full min-w-0 items-center gap-3 rounded-2xl px-2 py-3 text-left transition-colors hover:bg-(--decor-light) aria-[current=true]:bg-[color-mix(in_srgb,var(--primary)_10%,var(--decor-light))]"
+    <div
+      className="group flex items-center gap-1 rounded-2xl pr-1 transition-colors hover:bg-(--decor-light) aria-[current=true]:bg-[color-mix(in_srgb,var(--primary)_10%,var(--decor-light))]"
       aria-current={current}
-      onClick={() => onChoose(chat.hotelId)}
     >
-      <span
-        className="grid size-12 flex-none place-items-center rounded-full bg-muted text-muted-foreground-strong"
-        aria-hidden
+      <button
+        type="button"
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-2 py-3 text-left"
+        aria-current={current}
+        onClick={() => onChoose(chat.hotelId)}
       >
-        <BellRing className="size-5" />
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex items-baseline gap-2">
-          <span className="min-w-0 flex-1 truncate text-base/[1.3] font-bold group-aria-[current=true]:text-primary">
-            {title}
+        <span
+          className="grid size-12 flex-none place-items-center rounded-full bg-muted text-muted-foreground-strong"
+          aria-hidden
+        >
+          <BellRing className="size-5" />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex items-baseline gap-2">
+            <span className="min-w-0 flex-1 truncate text-base/[1.3] font-bold group-aria-[current=true]:text-primary">
+              {title}
+            </span>
+            <time
+              dateTime={chat.lastMessageAt}
+              className="flex-none text-xs/[normal] text-muted-foreground group-aria-[current=true]:text-primary"
+            >
+              {chatTime(chat.lastMessageAt, now)}
+            </time>
           </span>
-          <time
-            dateTime={chat.lastMessageAt}
-            className="flex-none text-xs/[normal] text-muted-foreground group-aria-[current=true]:text-primary"
-          >
-            {chatTime(chat.lastMessageAt, now)}
-          </time>
+          <span className="flex items-center gap-1.5 text-sm/[1.3] text-muted-foreground">
+            <span className="min-w-0 flex-1 truncate">{chat.lastMessageText || 'Отельер'}</span>
+            {chat.userUnread > 0 && <Badge className="h-4 flex-none px-1.5 text-[11px]">новое</Badge>}
+          </span>
         </span>
-        <span className="flex items-center gap-1.5 text-sm/[1.3] text-muted-foreground">
-          <span className="min-w-0 flex-1 truncate">{chat.lastMessageText || 'Отельер'}</span>
-          {chat.userUnread > 0 && <Badge className="h-4 flex-none px-1.5 text-[11px]">новое</Badge>}
-        </span>
-      </span>
-    </button>
+      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={<Button variant="ghost" size="icon-sm" className="flex-none text-muted-foreground" />}
+          aria-label={`Действия с чатом «${title}»`}
+        >
+          <EllipsisVertical className="size-5" aria-hidden />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuItem onClick={() => setSharing(true)}>
+            <Share2 aria-hidden />
+            Поделиться
+          </DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={() => setConfirm(true)}>
+            <Trash2 aria-hidden />
+            Удалить
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ShareDialog
+        chat={async (client) => chatOfConversation(chat, await loadMessages(client, chat.id))}
+        signedIn={signedIn}
+        open={sharing}
+        onOpenChange={setSharing}
+      />
+      <DeleteDialog
+        chat={{ title }}
+        description={`«${title}» пропадёт из ваших чатов. Отельер сохранит переписку; ссылки, которыми вы поделились, перестанут открываться.`}
+        open={confirm}
+        onOpenChange={setConfirm}
+        onDelete={() =>
+          void onDelete().catch((e: unknown) => console.warn(`hotelier chats: not deleted (${String(e)})`))
+        }
+      />
+    </div>
   )
 }
