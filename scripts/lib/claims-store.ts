@@ -47,7 +47,7 @@ interface Sync {
   next: Row[]
   /** A column set to now on every written row: `updated_at`, and `computed_at` of a calculation. */
   stamp: string[]
-  /** Columns written but not compared: the chunk's `embedding`, emptied when its text changes. */
+  /** Columns written but not compared: the chunk's `embedding` and `content_hash`, emptied when it changes. */
   extra?: Row
   /** The stale rows are deleted by this column (`id`), or by their key. */
   removeBy?: string
@@ -280,8 +280,8 @@ export async function writeClaims(supabase: Client, store: Store, dryRun: boolea
       })),
     ),
     stamp: ['updated_at'],
-    // A chunk with a new text has no vector of it yet.
-    extra: { embedding: null },
+    // A changed chunk has no vector of it yet: `npm run db:embed:chunks` embeds it again.
+    extra: { embedding: null, content_hash: null },
     removeBy: 'id',
   })
 

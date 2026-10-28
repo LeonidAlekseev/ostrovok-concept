@@ -143,9 +143,14 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
   полосы EEA у отеля (`reported`), оценка Lday (`derived` с расчётом), шумные места OSM в 200 м (связи `near` и
   расстояния), аптеки, супермаркеты, больницы, остановки, пляжи и парки в 1 км (по 5 ближайших каждой категории из
   кэша `osm_places`; место Островка тех же видов вместо совпавшего места OSM), ближайшее здание EUBUCCO в 50 м (связь
-  `nearest_building`, высота и этажность), отзывы как документы с полнотекстовым поиском (`hotel_chunks_search`) и их
+  `nearest_building`, высота и этажность), отзывы как документы с гибридным поиском (`hotel_chunks_hybrid`: слова и смысл) и их
   слова о шуме и тишине. У каждого утверждения — уверенность по политике `src/lib/confidence.ts` (версия в
-  `method.confidence`). Пишет только новое и изменённое, повторный запуск ничего не дублирует. Чтение — `src/lib/db/claims.ts`. Затем — `npm run db:embed`.
+  `method.confidence`). Пишет только новое и изменённое, повторный запуск ничего не дублирует. Чтение — `src/lib/db/claims.ts`. Затем — `npm run db:embed` и `npm run db:embed:chunks`.
+- `npm run db:embed:chunks` — `scripts/embed-chunks.ts`: векторы фрагментов документов отелей (`document_chunks`:
+  отзывы и сведения отельера) для гибридного поиска `hotel_chunks_hybrid`. Идемпотентен: `content_hash` (модель,
+  размерность, текст) пишется только вместе с вектором, в модель уходят фрагменты без вектора и с изменённым текстом;
+  пачки по 32, не больше 40 запросов в минуту, при 429 и 5xx — повтор с паузой. Фрагмент без вектора ищется по словам.
+  Запускать после `db:features`; нужен `NVIDIA_API_KEY`. Печатает: всего, посчитано, без изменений, ошибок.
 - `npm run db:city-places -- --city <город> --pbf-url <выгрузка Geofabrik>` — `scripts/load-city-places.ts`: места
   OpenStreetMap города для гео-инструментов Эвала (`src/lib/geo`), вся загрузка одним шагом — см. «Загрузка мест
   другого города». Шаг записи отдельно — `npm run db:osm-places -- --bbox <s,w,n,e> [--centre <lat,lon>] [--file
@@ -180,6 +185,7 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 | `osm-pbf-to-overpass.py`                                                              | выгрузка `.osm.pbf` → ответ Overpass, когда Overpass недоступен                                    |
 | `hotel-features.ts` (`db:features`)                                                   | свойства отелей, вид номеров, готовые карты шума, хранилище утверждений                            |
 | `embed.ts` (`db:embed`)                                                               | векторы поиска по смыслу                                                                           |
+| `embed-chunks.ts` (`db:embed:chunks`)                                                 | векторы фрагментов отзывов и сведений отельера                                                     |
 | `semantic-eval.ts`                                                                    | качество поиска по смыслу на живой базе                                                            |
 | `clean-shared-photos.ts` (`db:clean:shared-photos`)                                   | фото снимков без снимка                                                                            |
 | `db-push.mjs`, `db-types.mjs` (`db:push`, `db:types`)                                 | миграции и типы `Database`                                                                         |
