@@ -96,11 +96,12 @@ export function Feed({
   return (
     // A new provider per chat: each opens at its own end.
     <MessageScrollerProvider key={chatId} autoScroll defaultScrollPosition="end">
-      {/* On phones the feed spans the screen: the scrollbar sits on its edge, the messages keep the chat's inset. */}
-      <MessageScroller className="flex-1 max-lg:-mx-[clamp(12px,3vw,20px)] max-lg:w-auto">
+      {/* The feed spans the section's width: the scrollbar sits on its edge, the messages keep the chat's inset, and the
+          card shadows fit in that inset instead of being clipped by the scroller. */}
+      <MessageScroller className="-mx-[clamp(12px,3vw,20px)] w-auto flex-1">
         <MessageScrollerViewport
           aria-label="Лента чата"
-          className="px-0.5 pt-0.5 pb-1 max-lg:px-[calc(clamp(12px,3vw,20px)+0.125rem)]"
+          className="px-[calc(clamp(12px,3vw,20px)+0.125rem)] pt-3 pb-10"
         >
           <MessageScrollerContent aria-label="Диалог с Эвалом" className="gap-3">
             {shown.map((message) => (
@@ -109,7 +110,7 @@ export function Feed({
                 messageId={message.id}
                 scrollAnchor={message.role === 'user'}
                 data-step={message.role === 'agent' && message.data.step ? message.status : undefined}
-                className="animate-in duration-250 ease-out fade-in slide-in-from-bottom-[6px]"
+                className="animate-in [content-visibility:visible] duration-250 ease-out fade-in slide-in-from-bottom-[6px]"
               >
                 <MessageItem
                   message={message}
@@ -356,7 +357,7 @@ function HotelRow({ plan, full, onChoose }: HotelRowProps) {
       <ul
         ref={row}
         aria-label="Отели"
-        className="-mx-0.5 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-0.5 pt-0.5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="-mx-3 -mt-3 -mb-6 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-3 pt-3 pb-6 scroll-px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {plan.options.map((option) => (
           <li key={option.hotel?.id ?? option.destination.id} className="flex w-[min(78vw,20rem)] flex-none snap-start">
