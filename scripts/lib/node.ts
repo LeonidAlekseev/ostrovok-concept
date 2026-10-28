@@ -23,7 +23,7 @@ registerHooks({
 /** A table of the schema, for the helpers that take its name. */
 export type Table = keyof Database['public']['Tables']
 
-/** The variable from .env.local (`node --env-file-if-exists`), or a failure that names it and never prints a value. */
+/** The variable from .env (`node --env-file-if-exists`), or a failure that names it and never prints a value. */
 export function required(name: string): string {
   const value = process.env[name]
   if (!value) throw new Error(`${name} is not set: run npm run secrets:reveal`)

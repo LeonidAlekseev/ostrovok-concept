@@ -6,7 +6,7 @@ vi.mock('next/cache', () => ({ unstable_cache: (read: unknown) => read }))
 
 /**
  * The graph of a hotel on the real database (read with the anon key): run on demand with
- * `LIVE_DB=1 node --env-file=.env.local node_modules/vitest/vitest.mjs run src/lib/db/knowledge.db.test.ts`.
+ * `LIVE_DB=1 node --env-file=.env node_modules/vitest/vitest.mjs run src/lib/db/knowledge.db.test.ts`.
  */
 describe.runIf(process.env.LIVE_DB === '1' && isSupabaseConfigured)('loadHotelRelations on the database', () => {
   const hotel = { id: 'ota-9096882', lat: 39.3833, lon: -0.33254 }

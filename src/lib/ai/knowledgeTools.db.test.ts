@@ -11,7 +11,7 @@ vi.mock('next/cache', () => ({ unstable_cache: (read: unknown) => read }))
 
 /**
  * The tools of the choice on the real database (read with the anon key, as the site), the runs not written (a guest):
- * `LIVE_DB=1 node --env-file=.env.local node_modules/vitest/vitest.mjs run src/lib/ai/knowledgeTools.db.test.ts`.
+ * `LIVE_DB=1 node --env-file=.env node_modules/vitest/vitest.mjs run src/lib/ai/knowledgeTools.db.test.ts`.
  */
 describe.runIf(process.env.LIVE_DB === '1' && isSupabaseConfigured)('the tools of the choice on the database', () => {
   it('finds hotels of Valencia with a pharmacy near and a quiet night, with the store’s claims', async () => {
