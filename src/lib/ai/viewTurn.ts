@@ -4,7 +4,8 @@ import { todayIso } from '../dates'
 import { countRu } from '../format'
 import { checkViewPoints, loadHotelView } from '../db/view'
 import { CATEGORY } from '../geo/categories'
-import { MAP_ATTRIBUTION_TEXT, MAX_MAP_POINTS, distanceText, type ChatMap, type MapPoint } from '../geo/chatMap'
+import { MAX_VIEW_PLACES, VIEW_FOCUSES, type ViewWidget } from '../chatWidget'
+import { distanceText } from '../geo/chatMap'
 import { haversineMeters, type LatLon } from '../geo/distance'
 import type { Geocoded, Nearby } from '../geo/places'
 import { questionCategories } from '../geo/questions'
@@ -17,8 +18,10 @@ import {
   asksSunset,
   bearingDeg,
   bearingLabel,
+  blockersAt,
   clampFloor,
   eyeOf,
+  lineVerdict,
   localTime,
   reachLabel,
   reachOf,
@@ -27,6 +30,8 @@ import {
   sunReach,
   sunriseOf,
   sunsetOf,
+  VERDICT_LABEL,
+  VERDICT_TONE,
   verdictReason,
   verdictText,
   windowLabel,
@@ -224,6 +229,8 @@ export async function viewTurn(
   const point = { lat: hotel.lat, lon: hotel.lon }
   const lines: string[] = []
   const checked: Checked[] = []
+  // The places looked up for the question, not of the page's data.
+  const lookedUp: Checked[] = []
   const wantsSea = asksSea(text)
   const wantsSunset = asksSunset(text)
   const wantsSunrise = asksSunrise(text)
@@ -330,7 +337,7 @@ export async function viewTurn(
       })
       found.forEach((f, i) => {
         const line: SightLine | null = sightLines?.[i] ?? null
-        checked.push({
+        lookedUp.push({
           label: f.label,
           category: f.category,
           point: f.point,
@@ -339,6 +346,7 @@ export async function viewTurn(
           reach: reachOf(line, view.window),
         })
       })
+      checked.push(...lookedUp)
     } else if (kinds.length) lines.push(`• ${capital(kinds.map((k) => CATEGORY[k].label).join(', '))}: рядом не нашёл.`)
   }
 
@@ -367,20 +375,27 @@ export async function viewTurn(
     NOTE,
   ].join('\n')
 
-  const places: MapPoint[] = checked.map((c) => ({
-    kind: 'place',
-    label: c.label,
-    category: `${c.category} · ${reachLabel(c.reach)}`,
-    distanceM: c.distanceM,
-    lat: c.point.lat,
-    lon: c.point.lon,
-  }))
-  const map: ChatMap | undefined = places.length
-    ? {
-        points: [{ kind: 'hotel', label: hotel.name, ...point }, ...places.slice(0, MAX_MAP_POINTS - 1)],
-        routes: [],
-        attribution: MAP_ATTRIBUTION_TEXT,
+  // The widget's map: the lines of the page's data are read by the widget, the places looked up come with it.
+  const eyeM = eyeOf(view.window, floor ?? view.window.floors)
+  const widget: ViewWidget = {
+    kind: 'view',
+    hotel: { id: hotel.id, name: hotel.name, ...point },
+    floor,
+    date,
+    focus: VIEW_FOCUSES.filter((f) => ({ sea: wantsSea, sunset: wantsSunset, sunrise: wantsSunrise })[f]),
+    places: lookedUp.slice(0, MAX_VIEW_PLACES).map((c) => {
+      const verdict = lineVerdict(c.line, eyeM)
+      return {
+        name: c.label,
+        category: c.category,
+        lat: c.point.lat,
+        lon: c.point.lon,
+        distanceM: c.distanceM,
+        tone: VERDICT_TONE[verdict],
+        verdict: VERDICT_LABEL[verdict],
+        blockers: blockersAt(c.line, eyeM).map((b) => b.id),
       }
-    : undefined
-  return { steps, summary, planner, ...(map && { map }), ...(modelsDown && { modelsDown: true as const }) }
+    }),
+  }
+  return { steps, summary, planner, widget, ...(modelsDown && { modelsDown: true as const }) }
 }

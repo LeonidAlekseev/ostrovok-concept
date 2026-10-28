@@ -32,13 +32,10 @@ import {
   SUNSET_COLOR,
   TONE_COLOR,
 } from './viewColors'
+import { HOTEL_MAP_ZOOM } from './hotelMap'
 
-/** The blocks around the hotel, tilted so the buildings stand. */
-const ZOOM = 16
+/** Tilted so the buildings stand; the zoom is the noise map's (`HOTEL_MAP_ZOOM`). */
 const PITCH = 55
-
-/** The room round the dots when the map fits them, of their span. */
-const FIT_ROOM = 0.3
 
 /** The fan of the chosen side and the sun's line, m. */
 const SECTOR_M = 450
@@ -142,7 +139,7 @@ export default function ViewMap({
           container,
           style: MAP_STYLE,
           center: [center.lon, center.lat],
-          zoom: ZOOM,
+          zoom: HOTEL_MAP_ZOOM,
           pitch: PITCH,
           // The page scrolls past the map: the wheel does not zoom it.
           scrollZoom: false,
@@ -239,23 +236,12 @@ export default function ViewMap({
     map.setPaintProperty('view-buildings', 'fill-extrusion-color', buildingColor(blockers, hotelBuilding))
   }, [map, blockers, hotelBuilding])
 
-  // The chosen side faces up, the hotel and all the dots in view under the legend.
+  // The chosen side faces up round the hotel at the noise map's zoom: a far dot stays beyond the edge.
   useEffect(() => {
     if (!map) return
     map.getSource<GeoJSONSource>('view-sector')?.setData(sector(center, bearing))
-    const lons = [center.lon, ...targets.map((t) => t.lon)]
-    const lats = [center.lat, ...targets.map((t) => t.lat)]
-    // The tilt widens what stands near the bottom and the fit does not know it: the box has some room.
-    const [west, east, south, north] = [Math.min(...lons), Math.max(...lons), Math.min(...lats), Math.max(...lats)]
-    const room = FIT_ROOM * Math.max(east - west, north - south, 0.002)
-    map.fitBounds(
-      [
-        [west - room, south - room],
-        [east + room, north + room],
-      ],
-      { bearing, padding: { top: 110, bottom: 40, left: 40, right: 40 }, maxZoom: ZOOM, duration: 600 },
-    )
-  }, [map, center, bearing, targets])
+    map.easeTo({ center: [center.lon, center.lat], zoom: HOTEL_MAP_ZOOM, bearing, duration: 600 })
+  }, [map, center, bearing])
 
   useEffect(() => {
     if (!map) return

@@ -130,12 +130,12 @@ export function compose(
   }
   // A chat about a hotel: the answer is the text, the model's general knowledge goes apart; no questions, no plan.
   if (brief.hotelId) {
-    const { unverified, map } = response
+    const { unverified, map, widget } = response
     return {
       brief,
       question: null,
       text: remark ?? HOTEL_UNAVAILABLE,
-      data: { ...(unverified && { unverified }), ...(map && { map }) },
+      data: { ...(unverified && { unverified }), ...(map && { map }), ...(widget && { widget }) },
     }
   }
   // The photos: Эвал asks what to do with them, or says it could not look at them.

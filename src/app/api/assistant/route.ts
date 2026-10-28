@@ -2,6 +2,7 @@ import { apiError } from '@/lib/api'
 import { firstAnswer } from '@/lib/ai/chain'
 import { geoTurn } from '@/lib/ai/geoTurn'
 import { viewTurn } from '@/lib/ai/viewTurn'
+import { noiseWidget } from '@/lib/chatWidget'
 import { answerWithModel, ruleAnswer } from '@/lib/ai/hotelAnswer'
 import { getTextModels, getVisionModels } from '@/lib/ai/model'
 import { APICallError } from 'ai'
@@ -244,6 +245,8 @@ async function hotelTurn(
       : null,
   ])
   const steps = noiseRun ? { steps: [noiseStep(noiseRun)] } : {}
+  // The noise map of the page beside the answer, from the data the answer was told from.
+  const widget = noiseRun && noise ? { widget: noiseWidget(hotel, noise) } : {}
   const noiseTool = noiseRun?.result
   const geo = isHotelViewQuestion(text)
     ? await viewTurn(hotel, messages, {
@@ -270,6 +273,7 @@ async function hotelTurn(
       source: geo.planner,
       steps: geo.steps,
       ...(geo.map && { map: geo.map }),
+      ...(geo.widget && { widget: geo.widget }),
       ...(geo.modelsDown && { modelsDown: true }),
     } satisfies AssistantResponse)
   let down = false
@@ -304,6 +308,7 @@ async function hotelTurn(
         ...(unverified && { unverified }),
         source: 'model',
         ...withSteps(steps, asked),
+        ...widget,
       } satisfies AssistantResponse)
     }
     down = result.failed.length > 0
@@ -318,6 +323,7 @@ async function hotelTurn(
     source: 'rules',
     ...(down && { modelsDown: true }),
     ...withSteps(steps, asked),
+    ...widget,
   } satisfies AssistantResponse)
 }
 

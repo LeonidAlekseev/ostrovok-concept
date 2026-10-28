@@ -24,9 +24,8 @@ import {
   MAP_STYLE,
   manageAttribution,
 } from '../SearchResultsPage/mapSetup'
+import { HOTEL_MAP_ZOOM } from './hotelMap'
 
-/** The streets around the hotel, seen from above. */
-const ZOOM = 16.3
 
 /** The colour of a shape by its `level`; the quiet (below 40 dB) the first, a day piece without an estimate grey. */
 const FILL_COLOR: ExpressionSpecification = [
@@ -80,7 +79,7 @@ export default function NoiseMap({
           container,
           style: MAP_STYLE,
           center: [center.lon, center.lat],
-          zoom: ZOOM,
+          zoom: HOTEL_MAP_ZOOM,
           // A flat map: no tilt, no turn.
           pitch: 0,
           maxPitch: 0,

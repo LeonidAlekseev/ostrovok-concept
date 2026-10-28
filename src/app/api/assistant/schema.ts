@@ -10,6 +10,7 @@ import {
 } from '@/lib/assistant'
 import { VIEW_LABEL, type HotelFeatures, type ViewKind } from '@/lib/features'
 import type { ChatMap } from '@/lib/geo/chatMap'
+import { chatWidgetSchema } from '@/lib/chatWidget'
 import { MAX_PHOTO_URL_LENGTH, PHOTO_DATA_URL } from '@/lib/ai/vision'
 import { RATE_LIMIT } from '@/lib/ai/rateLimit'
 import { toolRunSchema } from '@/lib/toolResult'
@@ -255,6 +256,7 @@ export const assistantResponseSchema = component(
         .meta({ description: 'Что вышло с фото запроса' }),
       modelsDown: z.literal(true).optional().meta({ description: 'Ни одна модель не ответила, ответили правила' }),
       map: chatMapSchema.optional(),
+      widget: chatWidgetSchema.optional(),
       findings: z.string().optional().meta({
         description:
           'Ответ инструментов хранилища при подборе: отели с характеристиками, местами рядом и отзывами, по которым они подобраны (только данные запусков `steps[].run`)',
