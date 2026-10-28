@@ -38,6 +38,23 @@ Supabase (причины — в [README](../README.md#почему-база-вн
 (`--mount=type=secret`) и в образе не остаётся. Во время работы серверные ключи берутся из окружения контейнера
 (`env_file`) или расшифровываются из `secrets.app.env.age` (см. [«Ключи API»](secrets.md)).
 
+## TLS: сертификат НУЦ Минцифры (GigaChat)
+
+`gigachat.devices.sberbank.ru` отдаёт сертификат, выпущенный Russian Trusted Sub CA под корнем **Russian Trusted Root CA**
+(НУЦ Минцифры). Его нет в хранилище Node, поэтому без корня запрос падает с `SELF_SIGNED_CERT_IN_CHAIN`. Корневой
+сертификат лежит в репозитории — `certs/russian_trusted_root_ca.pem` (публичный, скачан с
+https://gu-st.ru/content/Other/doc/russian_trusted_root_ca.cer, SHA-256
+`D2:6D:2D:02:31:B7:C3:9F:92:CC:73:85:12:BA:54:10:35:19:E4:40:5D:68:B5:BD:70:3E:97:88:CA:8E:CF:31`, действует до
+2032-02-27) — и подключается в `Dockerfile` (стадии `runner` и `tools`) переменной
+`NODE_EXTRA_CA_CERTS=/app/certs/russian_trusted_root_ca.pem`: Node добавляет его к обычным корням, остальные HTTPS-адреса
+(Supabase, NVIDIA) проверяются как раньше. Промежуточный Sub CA сервер присылает сам. Проверка вне Docker:
+`NODE_EXTRA_CA_CERTS=certs/russian_trusted_root_ca.pem node -e "fetch('https://gigachat.devices.sberbank.ru/api/v1/models').then(r=>console.log(r.status))"`
+печатает `401` (без ключа), без переменной — `SELF_SIGNED_CERT_IN_CHAIN`.
+
+На Vercel (нативная сборка) `NODE_EXTRA_CA_CERTS` нужно задать в Environment Variables путём к файлу, который есть в
+функции; проще передать сертификат в запрос самому (`ca` в `https.Agent`/`undici.Agent`), читая
+`certs/russian_trusted_root_ca.pem` (включить файл в `outputFileTracingIncludes`). Это делает код, который вызывает GigaChat.
+
 ## Сидирование
 
 `make seed` запускает сервис `tools` и по порядку выполняет `scripts/seed-all.sh`: `db:push`, `db:seed`, `db:hotelier`,

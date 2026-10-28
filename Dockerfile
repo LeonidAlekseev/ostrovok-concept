@@ -14,7 +14,7 @@ COPY . .
 
 # `docker compose run tools …` (make seed): dev dependencies and scripts/, keys from the environment at run time.
 FROM source AS tools
-ENV NODE_ENV=development
+ENV NODE_ENV=development NODE_EXTRA_CA_CERTS=/app/certs/russian_trusted_root_ca.pem
 CMD ["sh"]
 
 FROM source AS build
@@ -38,6 +38,9 @@ RUN addgroup -S app && adduser -S app -G app
 COPY --from=build --chown=app:app /app/.next/standalone ./
 COPY --from=build --chown=app:app /app/.next/static ./.next/static
 COPY --from=build --chown=app:app /app/public ./public
+# GigaChat (Sber) serves a certificate of the Russian Trusted Root CA, which Node does not know; see docs/docker.md.
+COPY --chown=app:app certs/russian_trusted_root_ca.pem /app/certs/russian_trusted_root_ca.pem
+ENV NODE_EXTRA_CA_CERTS=/app/certs/russian_trusted_root_ca.pem
 USER app
 EXPOSE 8080
 # Logs go to stdout and stderr of this process.
