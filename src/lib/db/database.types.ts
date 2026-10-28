@@ -970,6 +970,304 @@ export type Database = {
           },
         ]
       }
+      hotelier_conversations: {
+        Row: {
+          created_at: string
+          hotel_id: string
+          hotelier_unread: number
+          id: string
+          kind: string
+          last_message_at: string
+          last_message_text: string
+          last_sender: string | null
+          origin_chat_id: string | null
+          origin_tool_run_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          user_unread: number
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          hotel_id: string
+          hotelier_unread?: number
+          id?: string
+          kind?: string
+          last_message_at?: string
+          last_message_text?: string
+          last_sender?: string | null
+          origin_chat_id?: string | null
+          origin_tool_run_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          user_unread?: number
+        }
+        Update: {
+          created_at?: string
+          hotel_id?: string
+          hotelier_unread?: number
+          id?: string
+          kind?: string
+          last_message_at?: string
+          last_message_text?: string
+          last_sender?: string | null
+          origin_chat_id?: string | null
+          origin_tool_run_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          user_unread?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'hotelier_conversations_hotel_id_fkey'
+            columns: ['hotel_id']
+            isOneToOne: false
+            referencedRelation: 'hotels'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'hotelier_conversations_origin_chat_id_user_id_fkey'
+            columns: ['origin_chat_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'assistant_chats'
+            referencedColumns: ['id', 'user_id']
+          },
+          {
+            foreignKeyName: 'hotelier_conversations_origin_tool_run_id_user_id_fkey'
+            columns: ['origin_tool_run_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'tool_runs'
+            referencedColumns: ['id', 'user_id']
+          },
+        ]
+      }
+      hotelier_hotel_access: {
+        Row: {
+          created_at: string
+          hotel_id: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          hotel_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hotel_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'hotelier_hotel_access_hotel_id_fkey'
+            columns: ['hotel_id']
+            isOneToOne: false
+            referencedRelation: 'hotels'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'hotelier_hotel_access_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'hotelier_profiles'
+            referencedColumns: ['user_id']
+          },
+        ]
+      }
+      hotelier_messages: {
+        Row: {
+          author_id: string | null
+          conversation_id: string
+          created_at: string
+          data: NonNullable<Json>
+          id: string
+          read_at: string | null
+          request_id: string | null
+          sender: string
+          shareable: boolean
+          text: string
+        }
+        ComputedFields: never
+        Insert: {
+          author_id?: string | null
+          conversation_id: string
+          created_at?: string
+          data?: NonNullable<Json>
+          id?: string
+          read_at?: string | null
+          request_id?: string | null
+          sender: string
+          shareable?: boolean
+          text: string
+        }
+        Update: {
+          author_id?: string | null
+          conversation_id?: string
+          created_at?: string
+          data?: NonNullable<Json>
+          id?: string
+          read_at?: string | null
+          request_id?: string | null
+          sender?: string
+          shareable?: boolean
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'hotelier_messages_conversation_id_fkey'
+            columns: ['conversation_id']
+            isOneToOne: false
+            referencedRelation: 'hotelier_conversations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'hotelier_messages_request_id_fkey'
+            columns: ['request_id']
+            isOneToOne: false
+            referencedRelation: 'hotelier_requests'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      hotelier_profiles: {
+        Row: {
+          all_hotels: boolean
+          created_at: string
+          display_name: string
+          is_demo: boolean
+          updated_at: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          all_hotels?: boolean
+          created_at?: string
+          display_name?: string
+          is_demo?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          all_hotels?: boolean
+          created_at?: string
+          display_name?: string
+          is_demo?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      hotelier_requests: {
+        Row: {
+          answer_message_id: string | null
+          answered_at: string | null
+          characteristic_keys: string[]
+          context_summary: string | null
+          conversation_id: string
+          created_at: string
+          dedupe_key: string
+          expires_at: string | null
+          hotel_id: string
+          id: string
+          knowledge_status: string
+          origin_chat_id: string | null
+          origin_tool_run_id: string | null
+          question: string
+          room_entity_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          answer_message_id?: string | null
+          answered_at?: string | null
+          characteristic_keys?: string[]
+          context_summary?: string | null
+          conversation_id: string
+          created_at?: string
+          dedupe_key: string
+          expires_at?: string | null
+          hotel_id: string
+          id?: string
+          knowledge_status?: string
+          origin_chat_id?: string | null
+          origin_tool_run_id?: string | null
+          question: string
+          room_entity_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          answer_message_id?: string | null
+          answered_at?: string | null
+          characteristic_keys?: string[]
+          context_summary?: string | null
+          conversation_id?: string
+          created_at?: string
+          dedupe_key?: string
+          expires_at?: string | null
+          hotel_id?: string
+          id?: string
+          knowledge_status?: string
+          origin_chat_id?: string | null
+          origin_tool_run_id?: string | null
+          question?: string
+          room_entity_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'hotelier_requests_answer_message_id_fkey'
+            columns: ['answer_message_id']
+            isOneToOne: false
+            referencedRelation: 'hotelier_messages'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'hotelier_requests_conversation_id_user_id_fkey'
+            columns: ['conversation_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'hotelier_conversations'
+            referencedColumns: ['id', 'user_id']
+          },
+          {
+            foreignKeyName: 'hotelier_requests_hotel_id_fkey'
+            columns: ['hotel_id']
+            isOneToOne: false
+            referencedRelation: 'hotels'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'hotelier_requests_origin_chat_id_user_id_fkey'
+            columns: ['origin_chat_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'assistant_chats'
+            referencedColumns: ['id', 'user_id']
+          },
+          {
+            foreignKeyName: 'hotelier_requests_origin_tool_run_id_user_id_fkey'
+            columns: ['origin_tool_run_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'tool_runs'
+            referencedColumns: ['id', 'user_id']
+          },
+          {
+            foreignKeyName: 'hotelier_requests_room_entity_id_fkey'
+            columns: ['room_entity_id']
+            isOneToOne: false
+            referencedRelation: 'entities'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       hotels: {
         Row: {
           data: NonNullable<Json>
@@ -1593,7 +1891,12 @@ export type Database = {
         }[]
       }
       hotel_view_eyes: { Args: { lat: number; lon: number; targets: Json }; Returns: Json }
+      hotelier_conversation_read: { Args: { conversation_id: string }; Returns: undefined }
+      hotelier_conversation_status: { Args: { conversation_id: string; status: string }; Returns: boolean }
       hotels_outside_noise: { Args: Record<PropertyKey, never>; Returns: string[] }
+      is_hotelier: { Args: Record<PropertyKey, never>; Returns: boolean }
+      is_hotelier_conversation: { Args: { conversation_id: string }; Returns: boolean }
+      is_hotelier_of: { Args: { hotel_id: string }; Returns: boolean }
       match_embeddings: {
         Args: { destination_ids?: string[]; match_count?: number; match_kind: string; query_embedding: unknown }
         Returns: {

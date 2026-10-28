@@ -45,6 +45,20 @@ describe('signInDemo', () => {
     expect(nav.redirect).toHaveBeenLastCalledWith('/')
   })
 
+  it('signs in to the demo hotelier and opens the panel, whatever the `next`', async () => {
+    mocks.secrets = { DEMO_HOTELIER_EMAIL: 'hotelier@example.com', DEMO_HOTELIER_PASSWORD: 'hotelier-password' }
+    await expect(signInDemo('/trips', 'hotelier')).rejects.toThrow('redirect /hotelier')
+    expect(mocks.signInWithPassword).toHaveBeenCalledWith({
+      email: 'hotelier@example.com',
+      password: 'hotelier-password',
+    })
+  })
+
+  it('is unavailable without the hotelier account, never falling back to the traveller', async () => {
+    expect(await signInDemo(null, 'hotelier')).toEqual({ error: 'Вход временно недоступен' })
+    expect(mocks.signInWithPassword).not.toHaveBeenCalled()
+  })
+
   it('reports a failed sign-in without details', async () => {
     mocks.signInWithPassword.mockResolvedValueOnce({ error: { message: 'Invalid login credentials' } })
     expect(await signInDemo()).toEqual({ error: 'Не удалось войти в демо-аккаунт, попробуйте ещё раз' })

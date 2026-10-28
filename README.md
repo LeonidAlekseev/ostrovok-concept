@@ -98,6 +98,9 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 - `npm run db:seed` — `scripts/seed.ts` (Node исполняет TypeScript сам): строит каталог генератором
   `src/lib/catalogGenerator.ts` (с порядком `position`), делает upsert пачками по 100 и печатает число строк; повторный запуск оставляет те же строки.
   Создаёт демо-аккаунт «Демо-путешественник» из `DEMO_USER_EMAIL`/`DEMO_USER_PASSWORD`, если его нет.
+- `npm run db:hotelier` — `scripts/hotelier-account.ts`: аккаунт «Демо отельер» из `DEMO_HOTELIER_EMAIL`/
+  `DEMO_HOTELIER_PASSWORD` и его профиль `hotelier_profiles` с `all_hotels` (отельер всех отелей); повторный запуск
+  оставляет тот же аккаунт и профиль.
   `SUPABASE_SERVICE_ROLE_KEY` читают только этот скрипт и сервер, никогда клиент.
 - `npm run db:seed:valencia -- <search.json>` — `scripts/seed-valencia.ts`: выдача Островка по Валенсии. Сырые отели
   кладёт в `ota_hotels` (ключ `master_id`, уникальный `ota_hotel_id`), остальное о поиске — в `ota_searches`, а отели
@@ -510,6 +513,22 @@ Supabase; `src/proxy.ts` обновляет её на запросах с это
 (`src/lib/session.ts`, `onAuthStateChange`, имя — из `profiles`, затем из данных регистрации, затем часть email до
 `@`). «Выйти» (`signOut`, `scope: 'local'` — демо-аккаунт общий) завершает сессию только в этом браузере: избранное и
 бронирования остаются. Без `NEXT_PUBLIC_SUPABASE_*` вход сообщает «Вход временно недоступен».
+
+Рядом — «Демо отельер»: тот же `signInDemo` с `account: 'hotelier'` (`DEMO_HOTELIER_EMAIL`/`DEMO_HOTELIER_PASSWORD`,
+аккаунт — `npm run db:hotelier`) открывает панель отельера `/hotelier`.
+
+### Чат с отельером
+
+Карточка помощника на странице отеля — вкладки «Эвал | Отельер» (`HotelAssistant`): у каждой своя история и черновик.
+Во вкладке «Отельер» (`src/components/HotelierChat`) вошедший путешественник пишет отелю
+(`POST /api/hotels/<id>/hotelier/messages`), гостю предлагается войти. Отельер отвечает в панели `/hotelier`
+(`src/components/HotelierPanel`): список обращений своих отелей с фильтрами по статусу, инициатору и отелю, переписка,
+контекст запроса Эвала и характеристики, «Решено» / «Закрыть» / «Открыть снова»
+(`POST /api/hotelier/conversations/<id>/messages` и `…/status`). Путешественник для отельера — «Гость». Новые сообщения
+и статусы приходят через Supabase Realtime (`src/lib/hotelierChatRemote.ts`; канал подключается с токеном сессии, иначе
+политики отклоняют строки). Таблицы, RLS, право `is_hotelier_of` и лимит 20 сообщений автора в минуту — миграция
+`20261028130000_hotelier_chat.sql`; проверка RLS — `supabase/tests/hotelier_chat_rls.sql` (запуск — в шапке файла,
+всё откатывается).
 
 `/login` и `/register` — полные страницы (`AuthPage`). Переход на них из приложения (ссылка «Войти» в
 шапке) перехватывается: параллельный маршрут `@modal` с `(.)login` и `(.)register` показывает ту же форму диалогом
