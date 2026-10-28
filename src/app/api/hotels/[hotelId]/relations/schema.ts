@@ -99,7 +99,7 @@ export const relationsOperations: ApiOperation[] = [
         headers: cacheHeader,
         examples: {
           real: {
-            summary: 'ota-9096882, `near` `pharmacy`',
+            summary: 'ota-7481548, `near` `pharmacy`',
             description: `${relationsExample.response.relations.length} связей из ответа`,
             value: relationsExample.response,
           },

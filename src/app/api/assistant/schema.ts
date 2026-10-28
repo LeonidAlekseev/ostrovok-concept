@@ -22,6 +22,15 @@ import noiseExample from '@/lib/openapi/examples/assistant-noise.json'
 import wishExample from '@/lib/openapi/examples/assistant-wish.json'
 import knowledgeExample from '@/lib/openapi/examples/assistant-knowledge.json'
 import tripsExample from '@/lib/openapi/examples/assistant-trips.json'
+import view9Example from '@/lib/openapi/examples/assistant-view-9.json'
+import view12Example from '@/lib/openapi/examples/assistant-view-12.json'
+import walkExample from '@/lib/openapi/examples/assistant-walk.json'
+import carExample from '@/lib/openapi/examples/assistant-car.json'
+import untilExample from '@/lib/openapi/examples/assistant-until.json'
+import accessibleExample from '@/lib/openapi/examples/assistant-accessible.json'
+import hotelReviewsExample from '@/lib/openapi/examples/assistant-hotel-reviews.json'
+import semanticExample from '@/lib/openapi/examples/assistant-semantic.json'
+import photoExample from '@/lib/openapi/examples/assistant-photo.json'
 
 /** `POST /api/assistant`: the traveller's newest message to Эвал and its answer. */
 
@@ -282,11 +291,22 @@ export const assistantOperations: ApiOperation[] = [
     tags: ['Эвал'],
     summary: 'Сообщение Эвалу',
     description: [
-      'Новое сообщение путешественника:',
-      '- с `brief.hotelId` — вопрос об отеле: ответ из данных отеля, о местах рядом и маршрутах — с картой `map`, о виде из окон — по линиям взгляда, о шуме — по инструменту «Анализ шума» (шаг с `run`);',
-      '- с `brief.trips` — вопрос о бронированиях `bookings`: детали брони (шаг «Бронирования» с `run`) или смена дат — пересчёт цены тарифа и условий отмены (шаг «Пересчёт при смене дат», предложение `change`); применяет изменение браузер после «Подтвердить», сервер брони не хранит;',
-      '- с `photos` — найти похожие отели или учесть фото в запросе;',
-      '- иначе — пожелание: бриф дополняется, а когда он полный — отели `matches` поиска по смыслу; пожелание о шуме, местах рядом или отзывах подбирается инструментами хранилища (шаги с `run`, ответ `findings`).',
+      'Новое сообщение путешественника. Что делает Эвал, зависит от брифа и сообщения:',
+      '',
+      '**Вопрос об отеле** (`brief.hotelId`; сообщение — вопрос об одном настоящем отеле):',
+      '- места рядом, «сколько идти до …», маршрут пешком и на машине — места Островка и OpenStreetMap, `geocode` по названию после «до …», маршрут OSRM; ответ с картой `map` (точки и маршруты `foot`/`car`), шаги `agent: geo`;',
+      '- вид из окна, закат, море, ориентир с этажа («Виден ли ТЦ Aqua с 9 этажа?») — линии взгляда над зданиями EUBUCCO по этажам; виджет `widget.kind = view` (этаж, фокус, места, вердикты `seen`/`partly`/`closed`/`unknown`), дата заката — сегодняшняя;',
+      '- шум — инструмент «Анализ шума» (шаг с `run`), виджет `widget.kind = noise`;',
+      '- отзывы гостей и сведения отельера — гибридный поиск (как `GET /api/hotels/{hotelId}/documents/search`), ответ из цитат; сведения отельера — характеристики `hotelier.*` (этажи номеров, окна, вид, шум);',
+      '- доступность (первый этаж, коляска, гость на инвалидной коляске) — по списку удобств страницы отеля («Доступность») и сведениям отельера; чего в данных нет, того Эвал не выдумывает и может спросить отельера: шаг `agent: hotelier` («Запрос отельеру») — только для вошедшего пользователя, иначе шаг `failed` «Войдите, чтобы Эвал спросил отельера». Переписка с отельером — маршруты тега «Чат с отельером»;',
+      '',
+      '**Подбор** (без `brief.hotelId`; пожелание по описанию):',
+      '- по смыслу описания — `matches` (поиск по векторам описаний; «уютный отель с террасой на крыше»), критерии вида и шума добавляются шагами `features`;',
+      '- по фото (`photos`) — найти похожие отели по вектору фото среди фото каталога Валенсии (`match_hotel_photos`, шаг `search` «Ищу отели, похожие на фото», `photo.action = similar`; без вектора — по описанию фото) или учесть фото в запросе (`refine`);',
+      '- по характеристикам хранилища — шум ночью и днём, высота здания, место рядом (аптека, метро, пляж…) и отзывы по теме: шаги с `run` и ответ `findings`; отели без данных — «нет данных», а не «подходит»;',
+      '- по месту («рядом с Центральным рынком») — отели находятся по описанию места; расстояния и маршруты до места Эвал считает только в вопросе об отеле. Критериев «первый этаж» и «доступность» у подбора нет: их проверяют вопросом об отеле;',
+      '',
+      '**Бронирования** (`brief.trips`): детали брони (шаг «Бронирования» с `run`) или смена дат — пересчёт цены тарифа и условий отмены (шаг «Пересчёт при смене дат», предложение `change`); применяет изменение браузер после «Подтвердить», сервер брони не хранит.',
       '',
       `Отвечает за 15 с (с фото — за 28 с). Не больше ${RATE_LIMIT} запросов в минуту с одного адреса, вопросы об отеле (brief.hotelId) — отдельно, ещё ${HOTEL_RATE_LIMIT}. Модели и их ключи — только на сервере.`,
     ].join('\n'),
@@ -295,9 +315,18 @@ export const assistantOperations: ApiOperation[] = [
       schema: assistantRequestSchema,
       examples: {
         geo: { summary: 'Об отеле: места рядом и маршрут', value: geoExample.request },
+        view9: { summary: 'Об отеле: что видно с 9-го этажа (ТЦ Aqua)', value: view9Example.request },
+        view12: { summary: 'Об отеле: закат и море с 12-го этажа', value: view12Example.request },
+        walk: { summary: 'Об отеле: пеший маршрут', value: walkExample.request },
+        car: { summary: 'Об отеле: маршрут на машине', value: carExample.request },
+        until: { summary: 'Об отеле: «сколько идти до …» (geocode)', value: untilExample.request },
+        accessible: { summary: 'Об отеле: коляска и первый этаж', value: accessibleExample.request },
+        hotelReviews: { summary: 'Об отеле: что пишут гости', value: hotelReviewsExample.request },
         noise: { summary: 'Об отеле: шум', value: noiseExample.request },
         wish: { summary: 'Пожелание с полным брифом', value: wishExample.request },
         knowledge: { summary: 'Подбор: аптека рядом и тихо ночью', value: knowledgeExample.request },
+        semantic: { summary: 'Подбор по описанию', value: semanticExample.request },
+        photo: { summary: 'Подбор по фото (data URL, 200 px)', value: photoExample.request },
         trips: { summary: 'Поездки: перенести бронь на другие даты', value: tripsExample.request },
       },
     },
@@ -307,12 +336,12 @@ export const assistantOperations: ApiOperation[] = [
         schema: assistantResponseSchema,
         examples: {
           geo: {
-            summary: 'Аптека рядом с ota-9096882',
+            summary: 'Аптека рядом с ota-7481548',
             description: 'Точки отеля и места, пеший маршрут',
             value: geoExample.response,
           },
           noise: {
-            summary: 'Шум у ota-9096882',
+            summary: 'Шум у ota-7481548',
             description: 'Шаг «Анализ шума» с запуском `run`: источники EEA и OpenStreetMap, характеристики, расчёты',
             value: noiseExample.response,
           },
@@ -327,6 +356,53 @@ export const assistantOperations: ApiOperation[] = [
             description:
               'Шаг «Пересчёт при смене дат» с запуском `run` (цена тарифа из каталога, расчёт, условия отмены) и предложение `change`',
             value: tripsExample.response,
+          },
+          view9: {
+            summary: 'ТЦ Aqua с 9-го этажа ota-7481548',
+            description:
+              'Виджет `view`: этаж 9, места с вердиктами (`tone`) и закрывающие здания; линии взгляда рисуются по `GET /api/hotels/ota-7481548/view`',
+            value: view9Example.response,
+          },
+          view12: {
+            summary: 'Закат и море с 12-го этажа ota-7481548',
+            description: 'Виджет `view` с фокусом `sea` и `sunset`: закат в 18:05, берег в 3,2 км',
+            value: view12Example.response,
+          },
+          walk: {
+            summary: 'Пешком до метро',
+            description: 'Точки и пеший маршрут `foot` в `map`; шаги `geo`',
+            value: walkExample.response,
+          },
+          car: {
+            summary: 'На машине до аэропорта',
+            description: 'Маршрут `car` в `map`: расстояние по дорогам и время без пробок',
+            value: carExample.response,
+          },
+          until: {
+            summary: 'Сколько идти до Центрального рынка',
+            description: 'Название после «до» ищет `geocode` в OpenStreetMap; маршруты пешком в `map`',
+            value: untilExample.response,
+          },
+          accessible: {
+            summary: 'Коляска и первый этаж',
+            description: 'Ответ по удобствам страницы отеля и сведениям отельера; чего в данных нет — не выдумывается',
+            value: accessibleExample.response,
+          },
+          hotelReviews: {
+            summary: 'Что гости пишут про завтрак',
+            description: 'Ответ по цитатам отзывов (гибридный поиск), без шагов',
+            value: hotelReviewsExample.response,
+          },
+          semantic: {
+            summary: 'Подбор по описанию',
+            description: 'Первые 3 отеля `matches` поиска по смыслу и их `features`',
+            value: semanticExample.response,
+          },
+          photo: {
+            summary: 'Подбор по фото',
+            description:
+              'Шаг «Ищу отели, похожие на фото» (`match_hotel_photos`), `photo.action = similar`, первые 3 отеля',
+            value: photoExample.response,
           },
           wish: {
             summary: 'Тихий отель у моря в Валенсии',
