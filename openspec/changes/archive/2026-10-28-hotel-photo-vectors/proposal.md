@@ -20,7 +20,7 @@
 
 ## Impact
 
-- Код: `supabase/migrations/20261028190000_hotel_photo_embeddings.sql`, `src/lib/ai/photoEmbedding.ts`,
+- Код: `supabase/migrations/20261029120000_hotel_photo_embeddings.sql`, `src/lib/ai/photoEmbedding.ts`,
   `src/lib/ai/photoSearch.ts`, `src/app/api/assistant/route.ts`, `scripts/embed-photos.ts`, `package.json`,
   `src/lib/db/database.types.ts`, спеки `semantic-search`, `assistant-search`.
 - Данные: векторы фото каталога Валенсии — после слияния командой `npm run db:embed:photos`. Миграцию применяет
