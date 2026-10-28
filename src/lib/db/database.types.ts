@@ -942,6 +942,41 @@ export type Database = {
         }
         Relationships: []
       }
+      hotel_photo_embeddings: {
+        Row: {
+          content_hash: string
+          destination_id: string
+          embedding: unknown
+          hotel_id: string
+          photo_key: string
+          updated_at: string
+        }
+        Insert: {
+          content_hash: string
+          destination_id: string
+          embedding: unknown
+          hotel_id: string
+          photo_key: string
+          updated_at?: string
+        }
+        Update: {
+          content_hash?: string
+          destination_id?: string
+          embedding?: unknown
+          hotel_id?: string
+          photo_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'hotel_photo_embeddings_destination_id_fkey'
+            columns: ['destination_id']
+            isOneToOne: false
+            referencedRelation: 'destinations'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       hotel_room_views: {
         Row: {
           hotel_id: string
@@ -1925,19 +1960,6 @@ export type Database = {
           vector_place: number
         }[]
       }
-      hotel_chunks_search: {
-        Args: { hotel_id: string; max_rows?: number; query: string }
-        Returns: {
-          chunk_id: string
-          document_id: string
-          evidence_id: string
-          kind: string
-          metadata: Json
-          ord: number
-          rank: number
-          text: string
-        }[]
-      }
       hotel_geo: { Args: { lat: number; lon: number }; Returns: Json }
       hotel_geo_features: { Args: { lat: number; lon: number; radius_m?: number }; Returns: Json }
       hotel_noise_day: { Args: { lat: number; lon: number; radius_m?: number }; Returns: Json }
@@ -1956,6 +1978,26 @@ export type Database = {
       hotel_view_eyes: { Args: { lat: number; lon: number; targets: Json }; Returns: Json }
       hotelier_conversation_read: { Args: { conversation_id: string }; Returns: undefined }
       hotelier_conversation_status: { Args: { conversation_id: string; status: string }; Returns: boolean }
+      hotelier_my_chats: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          created_at: string
+          hotel_id: string
+          hotelier_unread: number
+          id: string
+          is_demo: boolean
+          kind: string
+          last_message_at: string
+          last_message_text: string
+          last_sender: string | null
+          origin_chat_id: string | null
+          origin_tool_run_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          user_unread: number
+        }[]
+      }
       hotelier_own_answer: { Args: { message_id: string }; Returns: boolean }
       hotelier_traveller_chat: {
         Args: { hotel_id: string }
@@ -1988,6 +2030,14 @@ export type Database = {
           content: string
           destination_id: string
           ref_id: string
+          similarity: number
+        }[]
+      }
+      match_hotel_photos: {
+        Args: { destination_ids?: string[]; match_count?: number; query_embedding: unknown }
+        Returns: {
+          destination_id: string
+          hotel_id: string
           similarity: number
         }[]
       }

@@ -5,6 +5,7 @@ import type { ModelLink } from '@/lib/ai/chain'
 import { geoTurn } from '@/lib/ai/geoTurn'
 import { getTextModels, getVisionModels } from '@/lib/ai/model'
 import { allowVisionRequest } from '@/lib/ai/rateLimit'
+import { searchHotelsByPhotos } from '@/lib/ai/photoSearch'
 import { semanticSearch } from '@/lib/ai/semantic'
 import { loadHotelFeatures } from '@/lib/db/features'
 import type { HotelFeatures } from '@/lib/features'
@@ -21,6 +22,7 @@ import { stayTotal } from '@/lib/offer'
 import { POST } from './route'
 
 vi.mock('@/lib/ai/model', () => ({ getTextModels: vi.fn(), getVisionModels: vi.fn(), REMARK_MODEL_ID: 'remark' }))
+vi.mock('@/lib/ai/photoSearch', () => ({ searchHotelsByPhotos: vi.fn() }))
 vi.mock('@/lib/ai/semantic', () => ({ SEMANTIC_TIMEOUT_MS: 8000, semanticSearch: vi.fn() }))
 vi.mock('@/lib/db/catalog', () => import('@/test/catalog'))
 vi.mock('@/lib/db/features', () => ({ loadHotelFeatures: vi.fn() }))
@@ -104,6 +106,7 @@ beforeEach(() => {
   vi.mocked(getVisionModels).mockResolvedValue(undefined)
   vi.spyOn(console, 'warn').mockImplementation(() => {})
   vi.mocked(semanticSearch).mockResolvedValue({ status: 'empty' })
+  vi.mocked(searchHotelsByPhotos).mockResolvedValue({ status: 'empty' })
   vi.mocked(loadHotelFeatures).mockResolvedValue(new Map())
   // The tests' hotels have no places loaded: the geo steps give way to the hotel's data.
   vi.mocked(geoTurn).mockResolvedValue(null)
@@ -921,6 +924,46 @@ describe('POST /api/assistant with photos', () => {
     }[]
     const parts = vision.doGenerateCalls[0].prompt.at(-1)!.content as { type: string }[]
     expect(parts.map((p) => p.type)).toEqual(['file', 'text'])
+  })
+
+  it('looks for similar hotels by the vectors of the photos, not their description (Scenario: Поиск по вектору фото)', async () => {
+    setModel(undefined)
+    sees({ description: 'Номер с видом на море.', features: ['вид на море'] })
+    vi.mocked(searchHotelsByPhotos).mockResolvedValue(found('prague-skyline-hostel', 'prague-central-hostel'))
+    const body = await (await withPhotos('найди похожий')).json()
+    expect(body.matches.map((h: { id: string }) => h.id)).toEqual(['prague-skyline-hostel', 'prague-central-hostel'])
+    expect(body.steps).toEqual([
+      { agent: 'search', title: 'Ищу отели, похожие на фото', status: 'done', result: 'нашёл 2' },
+    ])
+    expect(vi.mocked(searchHotelsByPhotos).mock.calls[0][0]).toEqual([photo])
+    expect(semanticSearch).not.toHaveBeenCalled()
+    // Valencia is a city of the photos' vectors too.
+    await withPhotos('найди похожий', [photo], { destinationId: 'valencia' })
+    expect(searchHotelsByPhotos).toHaveBeenCalledTimes(2)
+  })
+
+  it('falls back to the photo’s description when the vectors give nothing or do not answer', async () => {
+    setModel(undefined)
+    sees({ description: 'Номер с видом на море.', features: ['вид на море'] })
+    vi.mocked(semanticSearch).mockResolvedValue(found('prague-skyline-hostel'))
+    for (const result of [{ status: 'empty' }, { status: 'failed', reason: 'timeout' }] as const) {
+      vi.mocked(semanticSearch).mockClear()
+      vi.mocked(searchHotelsByPhotos).mockResolvedValueOnce(result)
+      const body = await (await withPhotos('найди похожий')).json()
+      expect(body.matches.map((h: { id: string }) => h.id)).toEqual(['prague-skyline-hostel'])
+      expect(body.photo.missed).toBeUndefined()
+      expect(semanticSearch).toHaveBeenCalledTimes(1)
+    }
+  })
+
+  it('does not use the vectors of Valencia’s photos for another city (Scenario: Другой город)', async () => {
+    setModel(undefined)
+    sees({ description: 'Номер с видом на море.', features: ['вид на море'] })
+    vi.mocked(semanticSearch).mockResolvedValue(found('prague-skyline-hostel'))
+    const body = await (await withPhotos('найди похожий', [photo], { destinationId: 'prague' })).json()
+    expect(searchHotelsByPhotos).not.toHaveBeenCalled()
+    expect(body.matches.map((h: { id: string }) => h.id)).toEqual(['prague-skyline-hostel'])
+    expect(vi.mocked(semanticSearch).mock.calls[0][1].destinationIds).toEqual(['prague'])
   })
 
   it('tries again with other words when the search does not answer, then says so honestly', async () => {

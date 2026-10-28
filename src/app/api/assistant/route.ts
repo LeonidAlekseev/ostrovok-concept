@@ -7,7 +7,9 @@ import { answerWithModel, asksHotelFacts, ruleAnswer } from '@/lib/ai/hotelAnswe
 import { getTextModels, getVisionModels } from '@/lib/ai/model'
 import { APICallError } from 'ai'
 import { allowHotelRequest, allowRequest, allowVisionRequest, clientIp } from '@/lib/ai/rateLimit'
-import { SEMANTIC_TIMEOUT_MS, semanticSearch } from '@/lib/ai/semantic'
+import { PHOTO_CITIES } from '@/lib/ai/photoEmbedding'
+import { searchHotelsByPhotos } from '@/lib/ai/photoSearch'
+import { SEMANTIC_TIMEOUT_MS, semanticSearch, type SemanticHit } from '@/lib/ai/semantic'
 import { MATCHES, featuresStep, runTurn, type TurnContext } from '@/lib/ai/turn'
 import {
   KNOWLEDGE_PLAN_MS,
@@ -487,8 +489,11 @@ async function look(
   return { failed: 'down', steps }
 }
 
-/** The hotels by the meaning of the photo's description, in the brief's city when it has one. */
-async function similarTurn(sight: PhotoSight, { brief, deadline, signal }: WishContext) {
+/**
+ * The hotels like the photos: first by the photos' own vectors (the catalog's photos of Valencia, when the brief's city
+ * is none or Valencia), then, where that gave nothing, by the meaning of the photo's description in the brief's city.
+ */
+async function similarTurn(photos: readonly string[], sight: PhotoSight, { brief, deadline, signal }: WishContext) {
   const title = 'Ищу отели, похожие на фото'
   const like = sightFeatures(sight)
   const [query, retry] = similarQueries(sight)
@@ -504,9 +509,18 @@ async function similarTurn(sight: PhotoSight, { brief, deadline, signal }: WishC
     missed = result.status === 'failed'
     return result.status === 'found' ? result.hits : null
   }
+  let hits: SemanticHit[] | null = null
+  if (!brief.destinationId || PHOTO_CITIES.includes(brief.destinationId)) {
+    const result = await searchHotelsByPhotos(photos, {
+      k: MATCHES,
+      timeoutMs: Math.min(FIRST_SEARCH_MS, deadline - Date.now() - SEARCH_RESERVE_MS),
+      signal,
+    })
+    if (result.status === 'found') hits = result.hits
+  }
   // The embedding of the NVIDIA API now and then stalls for minutes: a short first try, then other words with
   // the rest of the answer's time.
-  let hits = await search(query, Math.min(FIRST_SEARCH_MS, deadline - Date.now() - SEARCH_RESERVE_MS))
+  hits ??= await search(query, Math.min(FIRST_SEARCH_MS, deadline - Date.now() - SEARCH_RESERVE_MS))
   const left = Math.min(SEMANTIC_TIMEOUT_MS, deadline - Date.now() - SEARCH_RESERVE_MS)
   if (!hits && left >= MIN_SEARCH_MS) hits = await search(retry, left)
   const byId = new Map(hits?.length ? (await loadHotelSummaries().catch(() => [])).map((h) => [h.id, h]) : [])
@@ -580,7 +594,7 @@ async function photoTurn(photos: readonly string[], ip: string, context: WishCon
   // Nothing on the photo to choose a hotel by: no search and no wish of it, Эвал asks for words.
   if (sight.unusable)
     return withSteps({ brief, source: 'model', photo: { action: 'unusable', seen: sight.description } })
-  if (intent === 'similar') return withSteps(await similarTurn(sight, context))
+  if (intent === 'similar') return withSteps(await similarTurn(photos, sight, context))
   const text = refinedText(input, sight).slice(0, MAX_MESSAGE_LENGTH)
   const answer = await wishTurn({ ...context, messages: [...messages.slice(0, -1), { role: 'user', text }] })
   return withSteps({ ...answer, photo: { action: 'refine', seen: sight.description } })
@@ -594,8 +608,11 @@ export async function POST(request: Request) {
   const ip = clientIp(request)
   const parsedBody = assistantRequestSchema.safeParse(await request.json().catch(() => null))
   if (!parsedBody.success) return apiError(400, 'Invalid request')
-  // A chat about a hotel counts its questions apart from the search's requests.
-  const allowed = typeof parsedBody.data.brief.hotelId === 'string' ? allowHotelRequest : allowRequest
+  // A chat about a hotel answers about it; an id the catalogue does not know is a chat like any other.
+  const askedHotelId = parsedBody.data.brief.hotelId
+  const hotel = typeof askedHotelId === 'string' ? await loadHotel(askedHotelId).catch(() => undefined) : undefined
+  // Only a hotel the catalogue knows counts its questions apart from the search's requests: a made-up id gets no second counter.
+  const allowed = hotel ? allowHotelRequest : allowRequest
   if (!(await allowed(ip))) return apiError(429, 'Too many requests')
 
   const { messages, photos = [], rerun } = parsedBody.data
@@ -621,8 +638,6 @@ export async function POST(request: Request) {
       ),
     )
   }
-  // A chat about a hotel answers about it; an id the catalogue does not know is a chat like any other.
-  const hotel = brief.hotelId ? await loadHotel(brief.hotelId).catch(() => undefined) : undefined
   if (brief.hotelId && !hotel) delete brief.hotelId
   if (hotel) {
     return hotelTurn(hotel, { brief, messages, signal: request.signal, deadline, chatId, messageId })

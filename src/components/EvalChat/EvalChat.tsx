@@ -232,7 +232,7 @@ export function EvalChat({ className, subtitle, greeting, questions, inputLabel,
               variant="secondary"
               shape="pill"
               size="sm"
-              className="h-auto min-h-8 bg-muted px-3 py-1.5 text-sm font-normal whitespace-normal text-muted-foreground-strong hover:bg-[var(--brand-line)]"
+              className="h-auto min-h-8 bg-muted px-3 py-1.5 text-sm font-normal whitespace-normal text-muted-foreground-strong hover:bg-[color-mix(in_srgb,var(--muted),var(--foreground)_9%)]"
               disabled={thinking || !ready}
               onClick={() => ask(question)}
             >

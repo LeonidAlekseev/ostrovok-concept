@@ -71,9 +71,18 @@ function Bubble({ message }: { message: HotelierMessage }) {
 /**
  * «Отельер» on the hotel's page: the traveller writes to the hotel and its hotelier answers in person. The history is
  * the traveller's own and apart from the chat with Эвал; a guest is asked to sign in. `visible`: the tab is shown, so
- * the answers that came are read.
+ * the answers that came are read. `fill`: on the page «Мои чаты» the chat takes the room it has, under a header of
+ * that page's own.
  */
-export function HotelierChat({ className, visible = true }: { className?: string; visible?: boolean }) {
+export function HotelierChat({
+  className,
+  visible = true,
+  fill = false,
+}: {
+  className?: string
+  visible?: boolean
+  fill?: boolean
+}) {
   const { state, conversation, messages, sending, sendError, send, read } = useHotelierChatContext()
   const pathname = usePathname()
   const [text, setText] = useState('')
@@ -96,8 +105,8 @@ export function HotelierChat({ className, visible = true }: { className?: string
   }
 
   return (
-    <section aria-labelledby={titleId} className={cn('flex flex-col gap-3', className)}>
-      <header className="flex items-center gap-3">
+    <section aria-labelledby={titleId} className={cn('flex flex-col gap-3', fill && 'min-h-0 flex-1', className)}>
+      <header className={cn('flex items-center gap-3', fill && 'sr-only')}>
         <span
           className="flex size-12 flex-none items-center justify-center rounded-full bg-muted text-muted-foreground-strong"
           aria-hidden
@@ -138,14 +147,19 @@ export function HotelierChat({ className, visible = true }: { className?: string
           ref={log}
           role="log"
           aria-label="Чат с отельером"
-          className="flex max-h-72 flex-col gap-2 overflow-y-auto overscroll-contain"
+          className={cn('flex flex-col gap-2 overflow-y-auto overscroll-contain', fill ? 'min-h-0 flex-1' : 'max-h-72')}
         >
           {messages.map((message) => (
             <Bubble key={message.id} message={message} />
           ))}
         </div>
       ) : (
-        <p className="rounded-xl bg-muted px-3.5 py-3 text-[15px]/[1.45] text-muted-foreground-strong">
+        <p
+          className={cn(
+            'rounded-xl bg-muted px-3.5 py-3 text-[15px]/[1.45] text-muted-foreground-strong',
+            fill && 'flex-1',
+          )}
+        >
           Спросите отель о том, чего нет в описании: балкон, вид, этаж, тишина. Отельер ответит здесь.
         </p>
       )}

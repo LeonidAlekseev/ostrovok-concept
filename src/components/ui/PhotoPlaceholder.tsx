@@ -18,6 +18,8 @@ interface Props {
   className?: string
   /** The gallery's size of a real photo; cards and thumbnails get the small one. */
   large?: boolean
+  /** Load the image at once: a photo that sits in a scrolling strip, off the screen, would otherwise load late. */
+  eager?: boolean
   /** Called with the natural width / height once the real image has loaded. */
   onRatio?: (ratio: number) => void
 }
@@ -26,7 +28,7 @@ interface Props {
  * A hotel photo: a tinted tile with an icon and the caption, and the real image over it when the photo has one.
  * The demo hotels have no images; a real one that fails to load leaves the tile (the image has an empty alt).
  */
-export function PhotoPlaceholder({ photo, kind = 'hotel', className, large = false, onRatio }: Props) {
+export function PhotoPlaceholder({ photo, kind = 'hotel', className, large = false, eager = false, onRatio }: Props) {
   const Icon = kind === 'room' ? BedDouble : Building2
   return (
     <span
@@ -48,7 +50,7 @@ export function PhotoPlaceholder({ photo, kind = 'hotel', className, large = fal
         <img
           src={ostrovokImage(photo.url, large ? '1024x768' : '640x400')}
           alt=""
-          loading="lazy"
+          loading={eager ? 'eager' : 'lazy'}
           decoding="async"
           onLoad={(e) => {
             const { naturalWidth, naturalHeight } = e.currentTarget

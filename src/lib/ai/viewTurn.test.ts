@@ -184,7 +184,7 @@ describe('the view steps of a hotel question', () => {
     expect(outcome.summary).toContain(
       '• Море (берег в 4,4 км, азимут 110° (восток)): видно с 9-го этажа (ниже — возможно, закрыто: здание ≈ 40 м в 800 м от отеля может быть выше — до 43 м).',
     )
-    expect(outcome.summary).toContain('Гость о виде (Анна): «Из окна видно море»')
+    expect(outcome.summary).toContain('Гость о виде: «Из окна видно море»')
     // The map of the page's view comes as the widget: the lines are its own data, nothing looked up besides.
     expect(outcome.map).toBeUndefined()
     expect(outcome.widget).toEqual({

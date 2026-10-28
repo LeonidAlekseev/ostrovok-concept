@@ -309,6 +309,46 @@ function RunGroups({ result, names }: { result: ToolResult; names: ReadonlyMap<s
   )
 }
 
+/** The technical id of an Ostrovok hotel («ota-7481882»): the person sees the hotel's name, not this. */
+const TECHNICAL_ID = /^ota-\d+$/
+
+/**
+ * The calculations of a run by method and version: the same calculation of every hotel is one line. The inputs are
+ * shown for a single calculation only (they differ by hotel), the assumptions are those of the group, once each.
+ */
+function groupCalculations(calculations: ToolResult['calculations']) {
+  const groups = new Map<
+    string,
+    {
+      key: string
+      name: string
+      version: string
+      count: number
+      inputs: { label: string; value: string }[]
+      assumptions: string[]
+    }
+  >()
+  for (const { name, version, inputs, assumptions } of calculations) {
+    const key = `${name}\u0000${version}`
+    const group = groups.get(key)
+    if (group) {
+      group.count += 1
+      group.inputs = []
+      for (const text of assumptions) if (!group.assumptions.includes(text)) group.assumptions.push(text)
+    } else {
+      groups.set(key, {
+        key,
+        name,
+        version,
+        count: 1,
+        inputs: inputs.filter((line) => !TECHNICAL_ID.test(line.value)),
+        assumptions: [...new Set(assumptions)],
+      })
+    }
+  }
+  return [...groups.values()]
+}
+
 /** «Источники и данные» of a run: the characteristics with their origin, the calculations, the sources, the limits. */
 function RunDetails({ result }: { result: ToolResult }) {
   const names = new Map(result.evidence.map((e) => [e.id, e.source_name]))
@@ -330,18 +370,19 @@ function RunDetails({ result }: { result: ToolResult }) {
       {result.calculations.length > 0 && (
         <RunSection title="Расчёты">
           <ul className="flex flex-col gap-2">
-            {result.calculations.map((calculation) => (
-              <li key={calculation.id} className="flex flex-col gap-0.5 text-sm/[1.35]">
+            {groupCalculations(result.calculations).map((group) => (
+              <li key={group.key} className="flex flex-col gap-0.5 text-sm/[1.35]">
                 <span className="text-foreground">
-                  {calculation.name} <span className={greyMutedText}>(версия {calculation.version})</span>
+                  {group.name} <span className={greyMutedText}>(версия {group.version})</span>
+                  {group.count > 1 && <span className={greyMutedText}> · {group.count} шт.</span>}
                 </span>
-                {calculation.inputs.length > 0 && (
+                {group.inputs.length > 0 && (
                   <span className={greyMutedText}>
-                    Входные данные: {calculation.inputs.map((i) => `${i.label} — ${i.value}`).join('; ')}
+                    Входные данные: {group.inputs.map((i) => `${i.label} — ${i.value}`).join('; ')}
                   </span>
                 )}
-                {calculation.assumptions.length > 0 && (
-                  <span className={greyMutedText}>Допущения: {calculation.assumptions.join('; ')}</span>
+                {group.assumptions.length > 0 && (
+                  <span className={greyMutedText}>Допущения: {group.assumptions.join('; ')}</span>
                 )}
               </li>
             ))}

@@ -109,11 +109,11 @@ describe('Header', () => {
     const nav = screen.getByRole('navigation', { name: 'Основное меню' })
     const items = [...nav.querySelectorAll('a, button')].map((el) => [el.textContent, el.getAttribute('href')])
     expect(items).toEqual([
-      ['Спросить Эвал', '/assistant'],
+      ['Мои чаты', '/assistant'],
       ['Искать вручную', '/search'],
       ['Мои поездки', '/trips'],
       ['Избранное', '/favorites'],
-      ['API', '/api/docs'],
+      ['API Docs', '/api/docs'],
       ['Войти', '/login'],
     ])
     await user.click(screen.getByRole('link', { name: 'Избранное' }))
@@ -128,7 +128,7 @@ describe('Header', () => {
     expect(within(nav).queryByText('Уведомления')).toBeNull()
     expect(within(nav).queryByText('Поддержка')).toBeNull()
     expect(within(nav).getByRole('link', { name: 'Мои поездки' }).getAttribute('href')).toBe('/trips')
-    expect(within(nav).getByRole('link', { name: 'API' }).getAttribute('href')).toBe('/api/docs')
+    expect(within(nav).getByRole('link', { name: 'API Docs' }).getAttribute('href')).toBe('/api/docs')
   })
 
   // site-header, Requirement: Меню разделов, Scenario: Документация API
@@ -139,8 +139,8 @@ describe('Header', () => {
     const user = userEvent.setup()
     render(<EnvHeader />)
     await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
-    expect(screen.getByRole('link', { name: 'API' }).getAttribute('href')).toBe('/api/docs')
-    await user.click(screen.getByRole('link', { name: 'API' }))
+    expect(screen.getByRole('link', { name: 'API Docs' }).getAttribute('href')).toBe('/api/docs')
+    await user.click(screen.getByRole('link', { name: 'API Docs' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Меню' })).toBeNull())
     vi.unstubAllEnvs()
   })

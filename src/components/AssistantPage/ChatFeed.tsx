@@ -24,7 +24,8 @@ import { messageTime, nightsLabel } from '../../lib/assistantChatList'
 import type { ChatMessage } from '../../lib/assistantChats'
 import { formatDateRange, type IsoDate } from '../../lib/dates'
 import { formatPrice, guestsLabel } from '../../lib/format'
-import { HotelTile } from '../HotelTile/HotelTile'
+import { cn } from 'cn'
+import { HOTEL_TILE_SLOT, HotelTile } from '../HotelTile/HotelTile'
 import { DemoBadge } from '../DemoBadge'
 import { ChatWidget } from './ChatWidget'
 import { DateChangeCard, MemoryCard, SessionParamsCard, ToolCard, ToolRunCard, WorkingRow } from './ChatCards'
@@ -362,7 +363,7 @@ function HotelRow({ plan, full, onChoose }: HotelRowProps) {
         className="-mx-3 -mt-3 -mb-6 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-3 pt-3 pb-6 scroll-px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {plan.options.map((option) => (
-          <li key={option.hotel?.id ?? option.destination.id} className="flex w-[min(78vw,20rem)] flex-none snap-start">
+          <li key={option.hotel?.id ?? option.destination.id} className={cn(HOTEL_TILE_SLOT, 'flex')}>
             <OptionCard option={option} full={full} plan={plan} onChoose={onChoose} />
           </li>
         ))}

@@ -15,11 +15,13 @@ import { useDestinations } from '../Catalog/useDestinations'
 import { ChatHeader, NewChatHeader } from './ChatHeader'
 import { ChatList } from './ChatList'
 import { AttachedPhotos } from './ChatPhotos'
+import { HotelierRoom } from './HotelierRoom'
 import { Feed, type ChooseSearch } from './ChatFeed'
 import { TripDialog, TripPanel } from './TripPanel'
-import { backToList, goToChat, useChatPath } from './useChatPath'
+import { backToList, goToChat, hotelierChatId, hotelierHotelOf, useChatPath } from './useChatPath'
 import { useAttachPhotos } from './useAttachPhotos'
 import { useChats } from './useChats'
+import { useHotelierChats } from './useHotelierChats'
 
 interface Props {
   /** The "recently added" hotels the plan's options suggest. */
@@ -41,7 +43,11 @@ const actionClass = `h-9 flex-none gap-1.5 bg-(--decor-light) px-3 text-sm font-
 export function AssistantSearch({ newHotels, onChoose }: Props) {
   const destinations = useDestinations()
   const today = useToday()
-  const pathId = useChatPath()
+  const openId = useChatPath()
+  // `/assistant/hotelier-<hotelId>` is the traveller's chat with a hotelier; any other id is one of Эвал's chats.
+  const hotelierHotel = hotelierHotelOf(openId)
+  const pathId = hotelierHotel ? null : openId
+  const hotelier = useHotelierChats(openId)
   const {
     chats,
     active,
@@ -74,15 +80,16 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
   const plan = lastPlan(active)
   const recent = recentRequests(chats)
   // Phones show the list at `/assistant` once there is a chat to list; the chat otherwise.
-  const screen = pathId || (ready && chats.length === 0) ? 'chat' : 'list'
+  const screen =
+    openId || (ready && hotelier.ready && chats.length === 0 && hotelier.chats.length === 0) ? 'chat' : 'list'
 
   // Wider screens open the newest chat at `/assistant`, so a reload keeps the dialog; phones show the list there.
   const opened = useRef(false)
   useEffect(() => {
     if (!ready || opened.current) return
     opened.current = true
-    if (!pathId && chats[0] && isWide()) goToChat(chats[0].id, { replace: true })
-  }, [ready, pathId, chats])
+    if (!openId && chats[0] && isWide()) goToChat(chats[0].id, { replace: true })
+  }, [ready, openId, chats])
 
   const submit = (value: string, options?: { more?: boolean }) => {
     if (!ready || thinking || !value.trim()) return
@@ -195,19 +202,32 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
     >
       <ChatList
         chats={chats}
-        activeId={started || pathId ? active.id : null}
+        activeId={!hotelierHotel && (started || pathId) ? active.id : null}
         ready={ready}
         signedIn={signedIn}
         onChoose={choose}
         onNew={fresh}
         onRename={rename}
         onDelete={removeChat}
+        hotelier={hotelier.chats}
+        hotelierActive={hotelierHotel}
+        onChooseHotelier={(hotelId) => choose(hotelierChatId(hotelId))}
         className={`${panelClass} max-lg:p-0 lg:bg-(--decor-light) lg:p-4 ${screen === 'chat' ? 'max-lg:hidden' : ''}`}
       />
 
+      {hotelierHotel && (
+        <HotelierRoom
+          key={hotelierHotel}
+          hotelId={hotelierHotel}
+          hotelName={hotelier.chats.find((c) => c.hotelId === hotelierHotel)?.hotelName ?? null}
+          onBack={backToList}
+          className={`${panelClass} bg-(--decor-light) p-[clamp(12px,3vw,20px)] max-lg:pt-[max(12px,env(safe-area-inset-top))] max-lg:pb-[max(12px,env(safe-area-inset-bottom))] lg:col-span-2`}
+        />
+      )}
+
       <section
         aria-label="Чат с Эвалом"
-        className={`${panelClass} flex min-h-0 min-w-0 flex-col gap-3 bg-(--decor-light) p-[clamp(12px,3vw,20px)] max-lg:pt-[max(12px,env(safe-area-inset-top))] max-lg:pb-[max(12px,env(safe-area-inset-bottom))] ${screen === 'list' ? 'max-lg:hidden' : ''}`}
+        className={`${panelClass} min-h-0 min-w-0 flex-col gap-3 bg-(--decor-light) p-[clamp(12px,3vw,20px)] max-lg:pt-[max(12px,env(safe-area-inset-top))] max-lg:pb-[max(12px,env(safe-area-inset-bottom))] ${hotelierHotel ? 'hidden' : screen === 'list' ? 'flex max-lg:hidden' : 'flex'}`}
       >
         {started ? (
           <ChatHeader
@@ -333,7 +353,7 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
               <InputGroupTextarea
                 ref={inputRef}
                 id={inputId}
-                className="max-h-[min(9.5rem,30dvh)] self-center overflow-y-auto p-0 py-2 text-base leading-[1.4] field-sizing-content placeholder:text-(--decor-assistant-text-2)"
+                className="max-h-[min(9.5rem,30dvh)] self-center overflow-y-auto p-0 py-2 text-base leading-[1.4] field-sizing-content placeholder:text-(--muted-foreground-strong)"
                 rows={1}
                 value={text}
                 enterKeyHint="send"
@@ -365,7 +385,7 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
             </p>
           )}
           {!signedIn && ready && (guestWarned || attach.photos.length > 0) && (
-            <p className="mt-1.5 px-2 text-sm text-(--decor-assistant-text-2)" role="status">
+            <p className="mt-1.5 px-2 text-sm text-(--muted-foreground-strong)" role="status">
               Чат с фото сохранится, только если вы войдёте.{' '}
               <Link
                 href="/login?next=/assistant"
@@ -385,7 +405,7 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
         busy={thinking || !ready}
         onEdit={() => setTripOpen(true)}
         onAsk={(request) => submit(request)}
-        className="max-lg:hidden"
+        className={hotelierHotel ? 'hidden' : 'flex max-lg:hidden'}
       />
 
       <TripDialog
