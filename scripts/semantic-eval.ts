@@ -1,6 +1,6 @@
 // The semantic search's quality on the live database, outside CI: Russian queries with a rule for the hotels
 // that answer them; for each, the relevant hotels in the top 5 by the vectors alone and after the reranker.
-//   npm run db:embed && node --env-file=.env.local scripts/semantic-eval.ts [--plain-query]
+//   npm run db:embed && node --env-file=.env scripts/semantic-eval.ts [--plain-query]
 // `--plain-query` embeds the queries as documents (`input_type: passage`), to see what the asymmetric mode gives.
 // Needs NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY and NVIDIA_API_KEY; at most 40 requests a minute,
 // a 429 waits and tries again; prints no keys.

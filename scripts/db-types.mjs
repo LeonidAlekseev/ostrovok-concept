@@ -1,4 +1,4 @@
-// Generates src/lib/db/database.types.ts from the live schema: npm run db:types (SUPABASE_DB_URL from .env.local).
+// Generates src/lib/db/database.types.ts from the live schema: npm run db:types (SUPABASE_DB_URL from .env).
 // Read-only: the CLI only introspects the schema. The connection string goes to it as an argument and is never printed.
 import { spawnSync } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
