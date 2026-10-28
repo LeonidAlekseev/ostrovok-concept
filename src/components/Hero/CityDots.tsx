@@ -2,7 +2,7 @@ import { useId, type KeyboardEventHandler, type Ref } from 'react'
 import { globeCities, type GlobeCity } from '../../data/globeCities'
 
 const label =
-  'pointer-events-none absolute top-0 left-0 z-4 flex w-max flex-col items-center rounded-sm bg-card px-2 py-1 text-xs/[1.25] shadow-(--shadow-soft) translate-x-[calc(var(--x)_*_var(--unit)_-_50%)] translate-y-[calc(var(--y)_*_var(--unit)_-_100%_-_12px)] data-hidden:invisible'
+  'pointer-events-none absolute top-0 left-0 z-4 flex w-max max-w-[min(14rem,calc(100vw-2rem))] flex-col items-center text-center rounded-sm bg-card px-2 py-1 text-xs/[1.25] shadow-(--shadow-soft) translate-x-[calc(var(--x)_*_var(--unit)_-_50%)] translate-y-[calc(var(--y)_*_var(--unit)_-_100%_-_12px)] data-hidden:invisible'
 
 interface LabelProps {
   city: GlobeCity | null

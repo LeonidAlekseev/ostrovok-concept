@@ -146,7 +146,12 @@ export function TravelTiles({ hotel }: { hotel: Hotel }) {
           <span className="flex min-w-0 flex-col">
             <span className="text-xs text-muted-foreground sm:text-sm">{label}</span>
             <b className="text-lg/tight">{formatDecimal(km)} км</b>
-            <span className="truncate text-xs text-muted-foreground sm:text-sm">{note}</span>
+            <span
+              className="line-clamp-2 text-xs text-muted-foreground [overflow-wrap:anywhere] sm:text-sm"
+              title={note}
+            >
+              {note}
+            </span>
           </span>
         </li>
       ))}

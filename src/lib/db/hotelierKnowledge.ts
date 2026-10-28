@@ -16,7 +16,7 @@ import { serviceClient } from './serviceClient'
 /**
  * The hotel's knowledge from its hotelier's answers (hotelier-knowledge), written by the server after the answer:
  * `after()` of the route, then — for a try that failed or was cut off — again by itself after the responses of the
- * routes that read the knowledge (`retryDueHotelierKnowledge`), with `npm run db:hotelier-knowledge` left for the
+ * routes that read the knowledge (`retryDueHotelierKnowledge`) and by the scheduler's `POST /api/hotelier/knowledge/retry`, with `npm run db:hotelier-knowledge` left for the
  * operator. It has the service role, which the store of claims needs — no browser, no request of a user reaches it. Only an answer the
  * hotelier marked shareable becomes knowledge, and only its impersonal facts: the conversation itself stays private.
  * Each fact is a claim `reported` of the hotel (or its room) with the policy's confidence of an owner's answer
@@ -609,6 +609,11 @@ let lastSweep = 0
 export async function retryDueHotelierKnowledge(limit = 2): Promise<number> {
   if (Date.now() - lastSweep < SWEEP_EVERY_MS) return 0
   lastSweep = Date.now()
+  return processDueHotelierKnowledge(limit)
+}
+
+/** The due answers, at most `limit`, without the pause between sweeps: the schedule's route and the sweep above. */
+export async function processDueHotelierKnowledge(limit: number): Promise<number> {
   const db = await serviceClient()
   if (!db) return 0
   try {

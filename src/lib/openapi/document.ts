@@ -8,6 +8,7 @@ import { viewMapOperations } from '@/app/api/hotels/[hotelId]/view-map/schema'
 import { viewOperations } from '@/app/api/hotels/[hotelId]/view/schema'
 import { hotelierOperations } from '@/app/api/hotelier/schema'
 import { hotelierHotelsOperations } from '@/app/api/hotelier/hotels/schema'
+import { knowledgeRetryOperations } from '@/app/api/hotelier/knowledge/retry/schema'
 import { hotelierFactsOperations } from '@/app/api/hotels/[hotelId]/hotelier/facts/schema'
 import { hotelsOperations } from '@/app/api/hotels/schema'
 import { openApiOperations } from '@/app/api/openapi.json/schema'
@@ -31,6 +32,7 @@ export const API_OPERATIONS: readonly ApiOperation[] = [
   ...searchOperations,
   ...hotelierFactsOperations,
   ...hotelierHotelsOperations,
+  ...knowledgeRetryOperations,
   ...relationsOperations,
   ...assistantOperations,
   ...hotelierOperations,

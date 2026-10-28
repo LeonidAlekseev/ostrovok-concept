@@ -15,6 +15,9 @@ import { FavoriteButton } from '../FavoriteButton/FavoriteButton'
 import { PhotoStars } from './PhotoStars'
 import { TileBadges } from './TileBadges'
 
+/** A tile's slot in a horizontal strip: a phone-sized card, 440 px from `md` up (the home strips lay it out on a grid). */
+export const HOTEL_TILE_SLOT = 'w-[min(78vw,20rem)] flex-none snap-start md:w-110'
+
 interface Props extends Omit<ComponentProps<'article'>, 'children'> {
   hotel: TileHotel
   href: string

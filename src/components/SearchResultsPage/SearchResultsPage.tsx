@@ -308,6 +308,8 @@ function Results({ query, target, initialFilters, hotelId, top = false }: Result
   const updateFilters = (next: Filters) => {
     setFilters(next)
     const url = setFilterParams(new URLSearchParams(window.location.search), next)
+    // The blank search defaults to the best rated, so the other default must be named in the address to survive a reload.
+    if (top && next.sort === 'popular') url.set('sort', 'popular')
     // The new filters are a new search for the kept view: the map stays, its camera frames the new list.
     saveView(searchViewKey(url, [PAGE_PARAM, HOTEL_PARAM]), view)
     window.history.replaceState(entryState(), '', `?${url}`)
