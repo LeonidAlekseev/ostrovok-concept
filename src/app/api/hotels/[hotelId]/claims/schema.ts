@@ -162,7 +162,7 @@ export const claimsOperations: ApiOperation[] = [
         headers: cacheHeader,
         examples: {
           real: {
-            summary: 'ota-9096882, `noise.lnight.`',
+            summary: 'ota-7481548, `noise.lnight.`',
             description: `${claimsExample.response.claims.length} утверждений из ответа`,
             value: claimsExample.response,
           },

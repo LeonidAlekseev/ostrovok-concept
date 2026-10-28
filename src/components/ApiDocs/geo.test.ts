@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { apiDocument } from '@/lib/openapi/document'
 import assistantGeo from '@/lib/openapi/examples/assistant-geo.json'
+import assistantView9 from '@/lib/openapi/examples/assistant-view-9.json'
+import assistantView12 from '@/lib/openapi/examples/assistant-view-12.json'
+import assistantNoise from '@/lib/openapi/examples/assistant-noise.json'
 import assistantWish from '@/lib/openapi/examples/assistant-wish.json'
 import hotelsBbox from '@/lib/openapi/examples/hotels-bbox.json'
 import relationsExample from '@/lib/openapi/examples/relations.json'
@@ -16,9 +19,10 @@ describe('geoOfResponse', () => {
   it('draws the hotels as points', () => {
     const answer = geoOfResponse('/api/hotels', hotelsBbox.response)
     expect(answer?.title).toBe('Отели: 3')
+    const [first] = hotelsBbox.response.hotels
     expect(answer?.features[0]).toMatchObject({
-      geometry: { type: 'Point', coordinates: [-0.33254, 39.3833] },
-      properties: { kind: 'hotel', label: 'You & Co. Saler Beach Boutique Hotel' },
+      geometry: { type: 'Point', coordinates: [first.lon, first.lat] },
+      properties: { kind: 'hotel', label: first.name },
     })
   })
 
@@ -49,8 +53,21 @@ describe('geoOfResponse', () => {
 
   it("draws Эвал's map: the route, the hotel and the places", () => {
     const answer = geoOfResponse('/api/assistant', assistantGeo.response)!
-    expect(kinds(answer)).toEqual(['route', 'hotel', 'place'])
+    expect(kinds(answer)).toEqual(['route', 'hotel', ...assistantGeo.response.map.points.slice(1).map(() => 'place')])
     expect(answer.features[1].properties.color).toBe(HOTEL_COLOR)
+  })
+
+  it("draws the places of Эвал's view widget with the colour of their verdict, and none for a widget without places", () => {
+    const answer = geoOfResponse('/api/assistant', assistantView9.response)!
+    expect(kinds(answer)).toEqual(['line', 'place', 'hotel'])
+    expect(answer.sources).toEqual(['eubucco'])
+    expect(geoOfResponse('/api/assistant', assistantView12.response)).toBeNull()
+  })
+
+  it("draws the loud places of Эвал's noise widget", () => {
+    const answer = geoOfResponse('/api/assistant', assistantNoise.response)!
+    expect(kinds(answer)?.at(-1)).toBe('hotel')
+    expect(answer.sources).toEqual(['eea'])
   })
 
   it('draws the places of the relations of the hotel, with their distances', () => {
@@ -89,6 +106,16 @@ describe('boundsOf', () => {
   })
 })
 
+/** The examples of Эвал's answers with a map (route, places) or a widget with places, in the order of the document. */
+const assistantTitles = [
+  'Аптека рядом с ota-7481548',
+  'Шум у ota-7481548',
+  'ТЦ Aqua с 9-го этажа ota-7481548',
+  'Пешком до метро',
+  'На машине до аэропорта',
+  'Сколько идти до Центрального рынка',
+]
+
 describe('geoExamples', () => {
   it('lists the examples of the geo routes the map can draw, with their paths filled', () => {
     const examples = geoExamples(apiDocument())
@@ -97,11 +124,12 @@ describe('geoExamples', () => {
       '/api/hotels',
       '/api/hotels',
       '/api/hotels/ota-9096882/view',
-      '/api/hotels/ota-9096882/view-map',
-      '/api/hotels/ota-9096882/noise-map',
-      '/api/hotels/ota-9096882/relations',
-      '/api/assistant',
+      '/api/hotels/ota-7481548/view-map',
+      '/api/hotels/ota-7481548/noise-map',
+      '/api/hotels/ota-7481548/relations',
+      ...assistantTitles.map(() => '/api/assistant'),
     ])
-    expect(examples.find((e) => e.path.endsWith('/noise-map'))?.title).toBe('Шум вокруг отеля · ota-9096882')
+    expect(examples.filter((e) => e.path === '/api/assistant').map((e) => e.summary)).toEqual(assistantTitles)
+    expect(examples.find((e) => e.path.endsWith('/noise-map'))?.title).toBe('Шум вокруг отеля · ota-7481548')
   })
 })

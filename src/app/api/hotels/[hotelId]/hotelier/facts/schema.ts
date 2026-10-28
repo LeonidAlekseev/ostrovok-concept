@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { HOTELIER_KEYS } from '@/lib/hotelierFacts'
 import { component, errorSchema, type ApiOperation } from '@/lib/openapi/operation'
 import { hotelIdParameter } from '../../../schema'
+import factsExample from '@/lib/openapi/examples/hotelier-facts.json'
 
 /** `GET /api/hotels/{hotelId}/hotelier/facts`: the hotelier's current characteristics of a real hotel. */
 
@@ -53,7 +54,7 @@ export const hotelierFactsOperations: ApiOperation[] = [
     summary: 'Сведения отельера',
     description:
       'Действующие характеристики настоящего отеля со слов его отельера (утверждения `hotelier.*`, `reported`): значение, номер, дата ответа, уверенность, источник. Отозванные и заменённые не входят; противоречащие друг другу отмечены `conflict`. Демонстрационные — `demo: true`. Читается без кэша.',
-    parameters: [hotelIdParameter],
+    parameters: [{ ...hotelIdParameter, example: 'ota-7568446' }],
     responses: {
       200: {
         description: 'Сведения (возможно, ни одного)',
@@ -61,29 +62,8 @@ export const hotelierFactsOperations: ApiOperation[] = [
         examples: {
           demo: {
             summary: 'Демо-ответ отельера',
-            value: {
-              hotelId: 'ota-9096882',
-              facts: [
-                {
-                  id: '6f1c1d6e-2f4a-4c55-9d3b-0b9a3f1e2a10',
-                  characteristic: 'room.balcony',
-                  label: 'Балкон в номере',
-                  room: 'Superior',
-                  value: 'да',
-                  status: 'reported',
-                  confidence: 0.75,
-                  observedAt: '2026-10-21T09:00:00.000Z',
-                  conflict: false,
-                  demo: true,
-                  limitations: ['Сообщено отельером, сервис это не проверял'],
-                  source: {
-                    title: 'Ответ отельера на вопрос: Есть ли балкон в номерах Superior?',
-                    excerpt: 'Со слов отельера, номера Superior: балкон в номере — да.',
-                    retrievedAt: '2026-10-21T09:00:00.000Z',
-                  },
-                },
-              ],
-            },
+            description: 'Живой ответ для ota-7568446: сведения демонстрационные (`demo: true`)',
+            value: factsExample.response,
           },
         },
       },

@@ -34,11 +34,69 @@
             "photos": [
               {
                 "id": "room-1",
+                "url": "https://cdn.ostrovok.ru/t/{size}/ostrovok/84/ce/84ce0cbe3c4f48781473190179be9fe8417ed0f3.JPEG",
                 "tone": 0,
-                "caption": "Двухместный номер Cosy"
+                "caption": "Двухместный номер Cosy, фото 1"
+              },
+              {
+                "id": "room-2",
+                "url": "https://cdn.ostrovok.ru/t/{size}/ostrovok/42/4d/424db4f9c52e967219ac5f063f370ea6bf47951b.JPEG",
+                "tone": 0,
+                "caption": "Двухместный номер Cosy, фото 2"
+              },
+              {
+                "id": "room-3",
+                "url": "https://cdn.ostrovok.ru/t/{size}/ostrovok/25/cd/25cd7b05a2ab9e5d69cfb430bbec91ea01719e02.JPEG",
+                "tone": 0,
+                "caption": "Двухместный номер Cosy, фото 3"
+              },
+              {
+                "id": "room-4",
+                "url": "https://cdn.ostrovok.ru/t/{size}/ostrovok/89/e4/89e485e98740b13e2ca86b2a5fc824174e60a283.JPEG",
+                "tone": 0,
+                "caption": "Двухместный номер Cosy, фото 4"
+              },
+              {
+                "id": "room-5",
+                "url": "https://cdn.ostrovok.ru/t/{size}/content/b8/0f/b80ff89811e7e01b21c206025e77492a122bd859.jpeg",
+                "tone": 0,
+                "caption": "Двухместный номер Cosy, фото 5"
+              },
+              {
+                "id": "room-6",
+                "url": "https://cdn.ostrovok.ru/t/{size}/content/18/70/187035c530d68a51469ececc87fa0cea98908d05.jpeg",
+                "tone": 0,
+                "caption": "Двухместный номер Cosy, фото 6"
+              },
+              {
+                "id": "room-7",
+                "url": "https://cdn.ostrovok.ru/t/{size}/content/8c/31/8c31fd7cac39ff7c3c8261e9247e45f466f8ff97.jpeg",
+                "tone": 0,
+                "caption": "Двухместный номер Cosy, фото 7"
+              },
+              {
+                "id": "room-8",
+                "url": "https://cdn.ostrovok.ru/t/{size}/content/9b/5a/9b5a6dd357b7ef28706375c1f8425069e125edcb.jpeg",
+                "tone": 0,
+                "caption": "Двухместный номер Cosy, фото 8"
               }
             ],
-            "capacity": 2
+            "capacity": 2,
+            "amenities": [
+              "Кондиционер",
+              "Затемняющие шторы",
+              "Письменный стол",
+              "Фен",
+              "Отопление",
+              "Мини-бар",
+              "Собственная ванная",
+              "Сейф",
+              "Душ",
+              "Туалетные принадлежности",
+              "Полотенца",
+              "Телевизор",
+              "Wi‑Fi"
+            ]
           }
         ],
         "stars": 3,
@@ -103,11 +161,72 @@
             "photos": [
               {
                 "id": "room-1",
+                "url": "https://cdn.ostrovok.ru/t/{size}/content/b6/c8/b6c8935e52c837815050865d862d32ef646b49eb.jpeg",
                 "tone": 0,
-                "caption": "Двухместный номер"
+                "caption": "Двухместный номер, фото 1"
+              },
+              {
+                "id": "room-2",
+                "url": "https://cdn.ostrovok.ru/t/{size}/content/48/1c/481cb135e55c929ccf52a71c8137ad61b98a106d.jpeg",
+                "tone": 0,
+                "caption": "Двухместный номер, фото 2"
+              },
+              {
+                "id": "room-3",
+                "url": "https://cdn.ostrovok.ru/t/{size}/content/26/5f/265f334b475fb001a431d02cb13116c8d52d9139.jpeg",
+                "tone": 0,
+                "caption": "Двухместный номер, фото 3"
+              },
+              {
+                "id": "room-4",
+                "url": "https://cdn.ostrovok.ru/t/{size}/content/7d/f5/7df543b4a33d5f578b218ee5a87f03b1efe93190.jpeg",
+                "tone": 0,
+                "caption": "Двухместный номер, фото 4"
+              },
+              {
+                "id": "room-5",
+                "url": "https://cdn.ostrovok.ru/t/{size}/content/7f/67/7f67c24ddfa3139b1a9c43ec33856da6d37ce64f.jpeg",
+                "tone": 0,
+                "caption": "Двухместный номер, фото 5"
+              },
+              {
+                "id": "room-6",
+                "url": "https://cdn.ostrovok.ru/t/{size}/content/65/d5/65d5de11671fcf05313a51d8fe4d36151a768247.jpeg",
+                "tone": 0,
+                "caption": "Двухместный номер, фото 6"
+              },
+              {
+                "id": "room-7",
+                "url": "https://cdn.ostrovok.ru/t/{size}/content/69/f4/69f4be3aac1faa549a6bd41450f89b32812660cd.jpeg",
+                "tone": 0,
+                "caption": "Двухместный номер, фото 7"
+              },
+              {
+                "id": "room-8",
+                "url": "https://cdn.ostrovok.ru/t/{size}/content/4d/ba/4dbae3f69f165138baeab4d11adbcff59960cfab.jpeg",
+                "tone": 0,
+                "caption": "Двухместный номер, фото 8"
               }
             ],
-            "capacity": 2
+            "capacity": 2,
+            "amenities": [
+              "Кондиционер",
+              "Кофе",
+              "Письменный стол",
+              "Фен",
+              "Отопление",
+              "Мини-бар",
+              "Собственная ванная",
+              "Сейф",
+              "Звукоизоляция",
+              "Чай",
+              "Чай или кофе",
+              "Телефон",
+              "Полотенца",
+              "Телевизор",
+              "Питьевая вода",
+              "Wi‑Fi"
+            ]
           }
         ],
         "stars": 4,

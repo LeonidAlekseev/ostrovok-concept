@@ -66,7 +66,7 @@ export const viewMapOperations: ApiOperation[] = [
         headers: cacheHeader,
         examples: {
           real: {
-            summary: 'ota-9096882',
+            summary: 'ota-7481548',
             description: `${countRu(viewMapExample.map.features.length, ['здание', 'здания', 'зданий'])} из ответа`,
             value: viewMapExample,
           },
