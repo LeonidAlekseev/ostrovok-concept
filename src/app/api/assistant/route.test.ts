@@ -763,6 +763,48 @@ describe('POST /api/assistant: a question about a hotel', () => {
     expect(body).toMatchObject({ source: 'rules', modelsDown: true })
   })
 
+  // hotelier-knowledge, Requirement: Запрос отельеру
+  it('runs «Запрос отельеру» when the model asks it: the run waits, the answer stays the model’s', async () => {
+    const model = new MockLanguageModelV4({
+      doGenerate: {
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify({
+              answer: 'В данных этого нет — спрошу отельера, ответ придёт в блок «Запрос отельеру».',
+              unverified: null,
+              ask_hotelier: {
+                question: 'Есть ли балкон в номерах Deluxe?',
+                characteristic_keys: ['room.balcony', 'bad'],
+              },
+            }),
+          },
+        ],
+        finishReason: { unified: 'stop' as const, raw: undefined },
+        usage,
+        warnings: [],
+      },
+    })
+    setModel(model)
+    const body = await (await aboutHotel('Есть ли балкон в номере Deluxe?')).json()
+    expect(body.reply).toBe('В данных этого нет — спрошу отельера, ответ придёт в блок «Запрос отельеру».')
+    const step = body.steps.at(-1)
+    expect(step).toMatchObject({ agent: 'hotelier', title: 'Запрос отельеру', params: 'Балкон в номере' })
+    // A guest's question is not left for the hotelier: the block asks to sign in.
+    expect(step.run.result).toMatchObject({ status: 'error', error: { code: 'sign_in_required' } })
+    // The model's facts tell it what the hotelier said and that it does not confirm free rooms or prices.
+    const instructions = JSON.stringify(model.doGenerateCalls[0].prompt)
+    expect(instructions).toContain('ask_hotelier')
+    expect(instructions).toContain('Никогда не подтверждай сам наличие свободных номеров')
+  })
+
+  it('asks the hotelier by the rules when the traveller asks it in words and no model answered', async () => {
+    setModel(undefined)
+    const body = await (await aboutHotel('Уточните у отеля, есть ли балкон?')).json()
+    expect(body.reply).toContain('Спросил отельера')
+    expect(body.steps.at(-1)).toMatchObject({ agent: 'hotelier', params: 'Балкон в номере' })
+  })
+
   it('treats an id the catalogue does not know as a chat like any other', async () => {
     setModel(undefined)
     const body = await (await ask('в горы', { hotelId: 'no-such-hotel' })).json()

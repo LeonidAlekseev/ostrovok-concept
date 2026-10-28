@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { messageTime } from '@/lib/assistantChatList'
 import { MAX_HOTELIER_MESSAGE, STATUS_LABEL, senderLabel, type HotelierMessage } from '@/lib/hotelierChat'
+import { RunSources } from '../AssistantPage/ChatCards'
 import { useHotelierChat, type HotelierChat as Chat } from './useHotelierChat'
 
 const HotelierChatContext = createContext<Chat | null>(null)
@@ -51,6 +52,11 @@ function Bubble({ message }: { message: HotelierMessage }) {
       >
         {message.text}
       </p>
+      {message.run && (
+        <div className="w-full rounded-xl bg-muted px-3 pb-1">
+          <RunSources result={message.run.result} label="Источники ответа AI-помощника" />
+        </div>
+      )}
       <time dateTime={message.createdAt} className="px-1 text-[11px] text-muted-foreground">
         {messageTime(message.createdAt)}
       </time>

@@ -11,9 +11,11 @@ vi.mock('@/lib/db/anon', async (original) => ({
 vi.mock('@/lib/db/claims', () => ({
   CHUNKS_LIMIT: 50,
   QUERY_CHARS: 500,
-  searchHotelChunks: mocks.search,
+  searchHotelKnowledge: mocks.search,
   loadEvidence: mocks.evidence,
 }))
+// Without the key the search is by the words alone: no vector is asked.
+vi.mock('@/lib/secrets', () => ({ getSecret: async () => undefined }))
 
 const chunk = (text: string) => ({
   chunkId: 'c1',
@@ -23,7 +25,9 @@ const chunk = (text: string) => ({
   ord: 0,
   text,
   metadata: {},
-  rank: 0.06,
+  rank: 0.016,
+  ftsPlace: 1,
+  vectorPlace: null,
 })
 
 const get = (hotelId: string, query: string) =>
@@ -45,7 +49,7 @@ describe('GET /api/hotels/{hotelId}/documents/search', () => {
     const response = await get('ota-1', `?q=${encodeURIComponent('  шум  ')}&limit=3`)
     expect(response.status).toBe(200)
     expect(response.headers.get('Cache-Control')).toMatch(/s-maxage=\d+/)
-    expect(mocks.search).toHaveBeenCalledWith('ota-1', 'шум', 3)
+    expect(mocks.search).toHaveBeenCalledWith('ota-1', 'шум', 3, null)
     const body = await response.json()
     expect(body.query).toBe('шум')
     expect(body.chunks[0]).toMatchObject({ text, evidence: { id: 'e1', provider: 'Островок' } })

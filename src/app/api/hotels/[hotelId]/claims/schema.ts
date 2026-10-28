@@ -34,7 +34,7 @@ export const evidenceSchema = component(
       role: z.enum(['source', 'input']).nullable().meta({
         description: '`source` — утверждение сообщает это; `input` — вход расчёта; `null` — не при утверждении',
       }),
-      type: z.string().meta({ description: '`dataset`, `osm`, `review`, `ota_page`, `calculation`' }),
+      type: z.string().meta({ description: '`dataset`, `osm`, `review`, `ota_page`, `calculation`, `hotelier`' }),
       title: z.string(),
       provider: z.string().meta({ description: '`EEA`, `OpenStreetMap`, `Островок`' }),
       externalId: z.string().nullable().meta({ description: 'Id у источника: набор, `node/123`, отзыв' }),
@@ -42,6 +42,10 @@ export const evidenceSchema = component(
       retrievedAt: z.string().nullable(),
       excerpt: z.string().nullable().meta({ description: 'Слова источника, на которых держится утверждение' }),
       datasetId: z.string().nullable(),
+      demo: z
+        .literal(true)
+        .optional()
+        .meta({ description: 'Есть только у демонстрационных данных: не настоящий источник' }),
     })
     .meta({ description: 'Источник утверждения: набор данных, элемент OSM, отзыв, страница Островка' }),
 )
@@ -104,6 +108,9 @@ export const claimSchema = component(
         .nullable()
         .meta({ description: 'Расчёт производного значения; `null` у не производных' }),
       evidence: z.array(evidenceSchema),
+      demo: z.literal(true).optional().meta({
+        description: 'Есть только у демонстрационных утверждений: синтетический ответ отельера, помечается «демо»',
+      }),
     })
     .meta({ description: 'Утверждение об отеле со значением, статусом, уверенностью, расчётом и источниками' }),
 )

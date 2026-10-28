@@ -1,4 +1,6 @@
+import { after } from 'next/server'
 import { apiError, loadVisibleHotel } from '@/lib/api'
+import { mediate } from '@/lib/ai/hotelierMediator'
 import { allowRequest, clientIp } from '@/lib/ai/rateLimit'
 import { sendTravellerMessage, signedInUser } from '@/lib/db/hotelierChat'
 import { createClient } from '@/lib/supabase/server'
@@ -14,8 +16,9 @@ import {
 
 /**
  * The signed-in traveller's message to the hotel's hotelier, into their open chat with the hotel (a new one when there
- * is none). Written as the traveller under RLS; the hotelier answers in their panel, and the browser gets it by
- * Realtime. 400 for a bad text, 401 for a guest, 404 for an unknown or hidden hotel, 409 for a closed chat, 429 over
+ * is none). Written as the traveller under RLS; after the response the hotel's AI assistant answers from the hotel's
+ * data with its sources or passes the question to the hotelier (`mediate`, `after`): no request waits for it. The
+ * hotelier answers in their panel, and the browser gets both by Realtime. 400 for a bad text, 401 for a guest, 404 for an unknown or hidden hotel, 409 for a closed chat, 429 over
  * the limits, 503 when the database fails.
  */
 export async function POST(request: Request, context: { params: Promise<{ hotelId: string }> }) {
@@ -30,5 +33,8 @@ export async function POST(request: Request, context: { params: Promise<{ hotelI
   const hotel = await loadVisibleHotel(hotelId).catch(() => undefined)
   if (!hotel) return apiError(404, NOT_FOUND_ERROR)
   const result = await sendTravellerMessage(client, userId, hotel.id, body.data.text)
-  return result.ok ? Response.json(result.value) : failureResponse(result.failure)
+  if (!result.ok) return failureResponse(result.failure)
+  const { conversation, message } = result.value
+  after(() => mediate(conversation.id, message.id))
+  return Response.json(result.value)
 }

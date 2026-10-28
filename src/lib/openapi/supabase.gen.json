@@ -123,7 +123,7 @@
         "tags": ["Таблицы"],
         "summary": "assistant_messages",
         "description": "Строки `assistant_messages` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
-        "x-used-in": ["src/lib/assistantChatsRemote.ts"],
+        "x-used-in": ["src/lib/assistantChatsRemote.ts", "src/lib/db/hotelierKnowledge.ts"],
         "parameters": [
           {
             "name": "select",
@@ -161,13 +161,57 @@
         }
       }
     },
+    "/claim_evidence": {
+      "get": {
+        "operationId": "select_claim_evidence",
+        "tags": ["Таблицы"],
+        "summary": "claim_evidence",
+        "description": "Строки `claim_evidence` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/db/hotelierKnowledge.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/claim_evidence"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/claims": {
       "get": {
         "operationId": "select_claims",
         "tags": ["Таблицы"],
         "summary": "claims",
         "description": "Строки `claims` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
-        "x-used-in": ["src/lib/db/claims.ts", "src/lib/db/knowledge.ts"],
+        "x-used-in": ["src/lib/db/claims.ts", "src/lib/db/hotelierKnowledge.ts", "src/lib/db/knowledge.ts"],
         "parameters": [
           {
             "name": "select",
@@ -249,13 +293,145 @@
         }
       }
     },
+    "/document_chunks": {
+      "get": {
+        "operationId": "select_document_chunks",
+        "tags": ["Таблицы"],
+        "summary": "document_chunks",
+        "description": "Строки `document_chunks` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/db/hotelierKnowledge.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/document_chunks"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents": {
+      "get": {
+        "operationId": "select_documents",
+        "tags": ["Таблицы"],
+        "summary": "documents",
+        "description": "Строки `documents` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/db/hotelierKnowledge.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/documents"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/entities": {
+      "get": {
+        "operationId": "select_entities",
+        "tags": ["Таблицы"],
+        "summary": "entities",
+        "description": "Строки `entities` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/db/hotelierKnowledge.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/entities"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/evidence": {
       "get": {
         "operationId": "select_evidence",
         "tags": ["Таблицы"],
         "summary": "evidence",
         "description": "Строки `evidence` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
-        "x-used-in": ["src/lib/db/claims.ts"],
+        "x-used-in": ["src/lib/db/claims.ts", "src/lib/db/hotelierKnowledge.ts"],
         "parameters": [
           {
             "name": "select",
@@ -387,7 +563,12 @@
         "tags": ["Таблицы"],
         "summary": "hotelier_conversations",
         "description": "Строки `hotelier_conversations` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
-        "x-used-in": ["src/lib/db/hotelierChat.ts", "src/lib/hotelierChatRemote.ts"],
+        "x-used-in": [
+          "src/lib/ai/hotelierMediator.ts",
+          "src/lib/db/hotelierChat.ts",
+          "src/lib/db/hotelierKnowledge.ts",
+          "src/lib/hotelierChatRemote.ts"
+        ],
         "parameters": [
           {
             "name": "select",
@@ -431,7 +612,12 @@
         "tags": ["Таблицы"],
         "summary": "hotelier_messages",
         "description": "Строки `hotelier_messages` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
-        "x-used-in": ["src/lib/db/hotelierChat.ts", "src/lib/hotelierChatRemote.ts"],
+        "x-used-in": [
+          "src/lib/ai/hotelierMediator.ts",
+          "src/lib/db/hotelierChat.ts",
+          "src/lib/db/hotelierKnowledge.ts",
+          "src/lib/hotelierChatRemote.ts"
+        ],
         "parameters": [
           {
             "name": "select",
@@ -469,13 +655,61 @@
         }
       }
     },
+    "/hotelier_profiles": {
+      "get": {
+        "operationId": "select_hotelier_profiles",
+        "tags": ["Таблицы"],
+        "summary": "hotelier_profiles",
+        "description": "Строки `hotelier_profiles` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
+        "x-used-in": ["src/lib/db/hotelierKnowledge.ts"],
+        "parameters": [
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Столбцы через запятую",
+            "schema": {
+              "type": "string",
+              "default": "*"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Не больше строк",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Строки",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/hotelier_profiles"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/hotelier_requests": {
       "get": {
         "operationId": "select_hotelier_requests",
         "tags": ["Таблицы"],
         "summary": "hotelier_requests",
         "description": "Строки `hotelier_requests` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
-        "x-used-in": ["src/lib/hotelierChatRemote.ts"],
+        "x-used-in": [
+          "src/lib/ai/hotelierMediator.ts",
+          "src/lib/db/hotelierKnowledge.ts",
+          "src/lib/hotelierChatRemote.ts"
+        ],
         "parameters": [
           {
             "name": "select",
@@ -519,7 +753,7 @@
         "tags": ["Таблицы"],
         "summary": "hotels",
         "description": "Строки `hotels` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
-        "x-used-in": ["src/lib/db/catalog.ts"],
+        "x-used-in": ["src/lib/db/catalog.ts", "src/lib/db/hotelierKnowledge.ts"],
         "parameters": [
           {
             "name": "select",
@@ -783,7 +1017,7 @@
         "tags": ["Таблицы"],
         "summary": "tool_run_evidence",
         "description": "Строки `tool_run_evidence` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
-        "x-used-in": ["src/lib/db/toolRuns.ts"],
+        "x-used-in": ["src/lib/db/hotelierKnowledge.ts", "src/lib/db/toolRuns.ts"],
         "parameters": [
           {
             "name": "select",
@@ -827,7 +1061,11 @@
         "tags": ["Таблицы"],
         "summary": "tool_runs",
         "description": "Строки `tool_runs` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
-        "x-used-in": ["src/lib/db/toolRuns.ts"],
+        "x-used-in": [
+          "src/components/AssistantPage/useLiveRun.ts",
+          "src/lib/db/hotelierKnowledge.ts",
+          "src/lib/db/toolRuns.ts"
+        ],
         "parameters": [
           {
             "name": "select",
@@ -857,6 +1095,49 @@
                   "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/tool_runs"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/answer_hotelier_request": {
+      "post": {
+        "operationId": "rpc_answer_hotelier_request",
+        "tags": ["Функции"],
+        "summary": "answer_hotelier_request",
+        "description": "Функция `answer_hotelier_request` базы через PostgREST.",
+        "x-used-in": ["src/lib/db/hotelierChat.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message_id": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": ["message_id", "request_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
                   }
                 }
               }
@@ -912,6 +1193,173 @@
                       }
                     },
                     "required": ["created_at", "id", "snapshot", "title"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/create_hotelier_request": {
+      "post": {
+        "operationId": "rpc_create_hotelier_request",
+        "tags": ["Функции"],
+        "summary": "create_hotelier_request",
+        "description": "Функция `create_hotelier_request` базы через PostgREST.",
+        "x-used-in": ["src/lib/ai/hotelierTool.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "characteristic_keys": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "context_summary": {
+                    "type": "string"
+                  },
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "hotel_id": {
+                    "type": "string"
+                  },
+                  "origin_chat_id": {
+                    "type": "string"
+                  },
+                  "origin_tool_run_id": {
+                    "type": "string"
+                  },
+                  "question": {
+                    "type": "string"
+                  },
+                  "room_ref": {
+                    "type": "string"
+                  }
+                },
+                "required": ["hotel_id", "question"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "conversation": {
+                        "type": "string"
+                      },
+                      "request": {
+                        "type": "string"
+                      },
+                      "reused": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["conversation", "request", "reused"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/hotel_chunks_hybrid": {
+      "post": {
+        "operationId": "rpc_hotel_chunks_hybrid",
+        "tags": ["Функции"],
+        "summary": "hotel_chunks_hybrid",
+        "description": "Функция `hotel_chunks_hybrid` базы через PostgREST.",
+        "x-used-in": ["src/lib/db/claims.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "hotel_id": {
+                    "type": "string"
+                  },
+                  "max_rows": {
+                    "type": "number"
+                  },
+                  "query": {
+                    "type": "string"
+                  },
+                  "query_embedding": {}
+                },
+                "required": ["hotel_id", "query"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "chunk_id": {
+                        "type": "string"
+                      },
+                      "document_id": {
+                        "type": "string"
+                      },
+                      "evidence_id": {
+                        "type": "string"
+                      },
+                      "fts_place": {
+                        "type": "number"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "metadata": {
+                        "description": "JSON"
+                      },
+                      "ord": {
+                        "type": "number"
+                      },
+                      "rank": {
+                        "type": "number"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "vector_place": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "chunk_id",
+                      "document_id",
+                      "evidence_id",
+                      "fts_place",
+                      "kind",
+                      "metadata",
+                      "ord",
+                      "rank",
+                      "text",
+                      "vector_place"
+                    ]
                   }
                 }
               }
@@ -1785,6 +2233,24 @@
         },
         "required": ["chat_id", "created_at", "data", "id", "role", "status", "text", "updated_at", "user_id"]
       },
+      "claim_evidence": {
+        "type": "object",
+        "properties": {
+          "claim_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "evidence_id": {
+            "type": "string"
+          },
+          "role": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["claim_id", "created_at", "evidence_id", "role"]
+      },
       "claims": {
         "type": "object",
         "properties": {
@@ -1805,6 +2271,9 @@
           },
           "id": {
             "type": "string"
+          },
+          "is_demo": {
+            "type": "boolean"
           },
           "limitations": {
             "type": "array",
@@ -1870,6 +2339,7 @@
           "entity_id",
           "epistemic_status",
           "id",
+          "is_demo",
           "limitations",
           "method",
           "observed_at",
@@ -1906,6 +2376,125 @@
         },
         "required": ["data", "id", "position", "updated_at"]
       },
+      "document_chunks": {
+        "type": "object",
+        "properties": {
+          "content_hash": {
+            "type": ["string", "null"]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "document_id": {
+            "type": "string"
+          },
+          "embedding": {},
+          "fts": {},
+          "id": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": ["object", "array", "string", "number", "boolean"],
+            "description": "JSON"
+          },
+          "ord": {
+            "type": "number"
+          },
+          "text": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "content_hash",
+          "created_at",
+          "document_id",
+          "embedding",
+          "fts",
+          "id",
+          "metadata",
+          "ord",
+          "text",
+          "updated_at"
+        ]
+      },
+      "documents": {
+        "type": "object",
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "entity_id": {
+            "type": ["string", "null"]
+          },
+          "evidence_id": {
+            "type": "string"
+          },
+          "hotel_id": {
+            "type": ["string", "null"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "language": {
+            "type": ["string", "null"]
+          },
+          "metadata": {
+            "type": ["object", "array", "string", "number", "boolean"],
+            "description": "JSON"
+          },
+          "text": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "created_at",
+          "entity_id",
+          "evidence_id",
+          "hotel_id",
+          "id",
+          "kind",
+          "language",
+          "metadata",
+          "text",
+          "updated_at"
+        ]
+      },
+      "entities": {
+        "type": "object",
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "hotel_id": {
+            "type": ["string", "null"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": ["string", "null"]
+          },
+          "ref": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": ["created_at", "hotel_id", "id", "kind", "name", "ref", "updated_at"]
+      },
       "evidence": {
         "type": "object",
         "properties": {
@@ -1923,6 +2512,9 @@
           },
           "id": {
             "type": "string"
+          },
+          "is_demo": {
+            "type": "boolean"
           },
           "metadata": {
             "type": ["object", "array", "string", "number", "boolean"],
@@ -1953,6 +2545,7 @@
           "excerpt",
           "external_id",
           "id",
+          "is_demo",
           "metadata",
           "provider",
           "retrieved_at",
@@ -2192,6 +2785,9 @@
           "id": {
             "type": "string"
           },
+          "knowledge_revoked_at": {
+            "type": ["string", "null"]
+          },
           "read_at": {
             "type": ["string", "null"]
           },
@@ -2214,12 +2810,37 @@
           "created_at",
           "data",
           "id",
+          "knowledge_revoked_at",
           "read_at",
           "request_id",
           "sender",
           "shareable",
           "text"
         ]
+      },
+      "hotelier_profiles": {
+        "type": "object",
+        "properties": {
+          "all_hotels": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "is_demo": {
+            "type": "boolean"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          }
+        },
+        "required": ["all_hotels", "created_at", "display_name", "is_demo", "updated_at", "user_id"]
       },
       "hotelier_requests": {
         "type": "object",

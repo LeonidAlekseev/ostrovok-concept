@@ -8,7 +8,7 @@
 
 | Поле             | Что класть                                                                                                                                                                                                                           |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `status`         | `success` или `error` (`running` — только для показа незавершённого запуска)                                                                                                                                                         |
+| `status`         | `success`, `error` или `pending` — инструмент спросил человека и ждёт (`ask_hotelier`), это не ошибка; `running` — только для показа незавершённого запуска                                                                          |
 | `summary`        | короткий итог по-русски: его видно в свёрнутом блоке                                                                                                                                                                                 |
 | `data`           | машинные данные инструмента; UI их не показывает                                                                                                                                                                                     |
 | `evidence[]`     | источники, прочитанные из базы или у провайдера: `source_type`, `source_name` (провайдер), `source_id` (внешний ID), `source_url` (только http(s), иначе `null`), `title`, `excerpt` (слова источника), `retrieved_at`               |
@@ -38,6 +38,7 @@ const owner = await runOwner(chatId, messageId) // вошедший и его ч
 const run = await recordRun(owner, 'my_tool', 'краткий вход без данных пользователя', () => runMyTool(...))
 ```
 
+- `execute` получает id запуска (`null`, если строки нет — гость): инструмент, который ждёт, связывает с ним то, чего ждёт. Результат `pending` пишется как `waiting` без `completed_at`, с `resume` из `data.request_id`; его завершает событие ответа (`answer_hotelier_request`), а не удержанный запрос.
 - `recordRun` проверяет результат схемой (не по контракту — ошибка `invalid_result`), для вошедшего пишет строку `running` до выполнения, затем `success`/`error`, `result_data`, `completed_at` и `tool_run_evidence` (id источников — uuid строк `evidence`).
 - Запись — клиентом Supabase с сессией пользователя (RLS), без service role. `runOwner` проверяет, что чат его. Гость (`owner = null`) — ничего не пишется.
 - Ошибка записи только логируется кодом; ответ приходит всё равно. Параллельные вызовы — отдельные строки.
@@ -51,7 +52,7 @@ const run = await recordRun(owner, 'my_tool', 'краткий вход без д
 { agent: 'features', title: 'Название операции', params: 'что читаем', status: run.result.status === 'error' ? 'failed' : 'done', result: run.result.summary, run }
 ```
 
-`agent` — один из существующих (`search`, `features`, `vision`, `geo`). Новый агент — правка `TurnStep` и схемы OpenAPI.
+`agent` — один из существующих (`search`, `features`, `vision`, `geo`, `trips`, `hotelier`). Новый агент — правка `TurnStep` и схемы OpenAPI.
 
 ## 4. Браузер и UI
 

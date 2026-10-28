@@ -11,6 +11,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { MAX_MESSAGE_LENGTH } from '@/lib/assistant'
 import { isPending, newId, type Chat, type ChatMessage } from '@/lib/assistantChats'
 import { useDestinations } from '../Catalog/useDestinations'
+import { ToolRunCard } from '../AssistantPage/ChatCards'
 import { Feed } from '../AssistantPage/ChatFeed'
 import { MapMessage } from '../AssistantPage/MapMessage'
 import { useChats, type Chats, type HotelContext, type TripsContext } from '../AssistantPage/useChats'
@@ -20,12 +21,31 @@ const SHOWN_MESSAGES = 4
 
 const NO_HOTELS: [] = []
 
-/** The messages of the compact card: the traveller's and Эвал's, without the steps of agents. */
+/**
+ * The messages of the compact card: the traveller's, Эвал's and the hotelier's answers, and of the steps of agents only
+ * «Запрос отельеру» — the block the answer comes to.
+ */
 const shownMessages = (messages: readonly ChatMessage[]) =>
-  messages.filter((m) => m.role === 'user' || m.role === 'assistant').slice(-SHOWN_MESSAGES)
+  messages
+    .filter(
+      (m) =>
+        m.role === 'user' ||
+        m.role === 'assistant' ||
+        m.role === 'owner' ||
+        (m.role === 'agent' && m.data.step?.agent === 'hotelier' && m.data.step.run),
+    )
+    .slice(-SHOWN_MESSAGES)
 
 function Bubble({ message, onRetry }: { message: ChatMessage; onRetry: () => void }) {
   const { role, status, text, data } = message
+  if (role === 'agent' && data.step?.run) return <ToolRunCard step={data.step} run={data.step.run} />
+  if (role === 'owner')
+    return (
+      <div className="flex max-w-[92%] flex-col items-start gap-0.5 self-start">
+        <span className="px-1 text-xs font-semibold text-muted-foreground">Отельер</span>
+        <p className="rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-sm/[1.4] whitespace-pre-wrap">{text}</p>
+      </div>
+    )
   if (role === 'user')
     return (
       <p className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-primary px-3 py-2 text-sm/[1.4] whitespace-pre-wrap text-primary-foreground">

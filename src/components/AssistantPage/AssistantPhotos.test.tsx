@@ -461,6 +461,13 @@ describe('a signed-in user’s photos', () => {
       auth: { getSession: async () => ({ data: { session: { user: { id: userId, email: 'a@b.c' } } } }) },
       from: (table: string) => query({ data: table === 'assistant_chats' ? [row] : null, error: null }),
       storage: { from: () => ({ download, createSignedUrls }) },
+      // The chats follow the server's messages by Realtime: a channel that never sends.
+      realtime: { setAuth: async () => {} },
+      channel: () => {
+        const channel = { on: () => channel, subscribe: () => channel }
+        return channel
+      },
+      removeChannel: async () => {},
     }
     fetchMock.mockResolvedValue(answer({ brief: {}, photo: { action: 'ask' } }))
     window.history.replaceState(null, '', `/assistant/${chatId}`)

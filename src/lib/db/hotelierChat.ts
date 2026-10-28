@@ -113,6 +113,36 @@ export async function sendHotelierMessage(
   return { ok: true, value: messageOf(data) }
 }
 
+/**
+ * The hotelier's answer `messageId` finishes the request, as the hotelier: the request, the waiting runs of Эвал and
+ * the traveller's chat change in one transaction (`answer_hotelier_request`). The runs finished; none for a request
+ * already answered or not the caller's hotel's.
+ */
+export async function answerRequest(client: Client, requestId: string, messageId: string): Promise<string[]> {
+  const { data, error } = await client.rpc('answer_hotelier_request', { request_id: requestId, message_id: messageId })
+  if (error) {
+    failureOf(error, 'request not answered')
+    return []
+  }
+  return (data ?? []) as string[]
+}
+
+/**
+ * The hotelier may withdraw the knowledge of `messageId`: it is their answer (`sender = 'hotelier'`) in a conversation
+ * RLS shows them — of their hotel.
+ */
+export async function ownAnswer(client: Client, userId: string, messageId: string): Promise<boolean> {
+  const { data, error } = await client
+    .from('hotelier_messages')
+    .select('id')
+    .eq('id', messageId)
+    .eq('sender', 'hotelier')
+    .eq('author_id', userId)
+    .maybeSingle()
+  if (error) failureOf(error, 'answer not read')
+  return Boolean(data)
+}
+
 /** A new state of the conversation; the database's function decides who may set it. */
 export async function setConversationStatus(
   client: Client,

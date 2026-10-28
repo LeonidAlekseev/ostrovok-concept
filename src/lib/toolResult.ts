@@ -24,7 +24,7 @@ const id = text(100).min(1)
 const safeUrl = text(2000).refine(isSafeUrl, 'Only http(s) links')
 
 /** The source types of the store's `evidence.type`. */
-export const SOURCE_TYPES = ['dataset', 'osm', 'review', 'ota_page', 'calculation'] as const
+export const SOURCE_TYPES = ['dataset', 'osm', 'review', 'ota_page', 'calculation', 'hotelier'] as const
 export type SourceType = (typeof SOURCE_TYPES)[number]
 
 /** How a characteristic is known: seen by an instrument, said by a source, calculated by a method, guessed. */
@@ -54,6 +54,8 @@ export const toolEvidenceSchema = z.object({
   retrieved_at: text(40).nullable(),
   entity_id: text(100).nullable(),
   claim_id: text(100).nullable(),
+  /** Synthetic demonstration data (`evidence.is_demo`): the block marks it «демо». */
+  demo: z.boolean().optional(),
 })
 export type ToolEvidence = z.infer<typeof toolEvidenceSchema>
 
@@ -84,10 +86,16 @@ export const toolClaimSchema = z.object({
   confidence: z.number().min(0).max(1).nullable(),
   evidence_ids: z.array(id).max(50),
   calculation_id: id.nullable(),
+  /** Synthetic demonstration data (`claims.is_demo`): the block marks it «демо». */
+  demo: z.boolean().optional(),
 })
 export type ToolClaim = z.infer<typeof toolClaimSchema>
 
-export const TOOL_STATUSES = ['running', 'success', 'error'] as const
+/**
+ * `pending`: the tool asked a person (the hotelier) and waits for the answer — a normal state, not an error; its run
+ * is `waiting` in `tool_runs` until the answer finishes it.
+ */
+export const TOOL_STATUSES = ['running', 'pending', 'success', 'error'] as const
 export type ToolStatus = (typeof TOOL_STATUSES)[number]
 
 export const toolErrorSchema = z.object({ code: text(100).min(1), message: text(500).min(1) })

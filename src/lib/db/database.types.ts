@@ -189,6 +189,7 @@ export type Database = {
           entity_id: string
           epistemic_status: string
           id: string
+          is_demo: boolean
           limitations: string[]
           method: NonNullable<Json>
           observed_at: string | null
@@ -213,6 +214,7 @@ export type Database = {
           entity_id: string
           epistemic_status: string
           id?: string
+          is_demo?: boolean
           limitations?: string[]
           method?: NonNullable<Json>
           observed_at?: string | null
@@ -236,6 +238,7 @@ export type Database = {
           entity_id?: string
           epistemic_status?: string
           id?: string
+          is_demo?: boolean
           limitations?: string[]
           method?: NonNullable<Json>
           observed_at?: string | null
@@ -293,6 +296,7 @@ export type Database = {
       }
       document_chunks: {
         Row: {
+          content_hash: string | null
           created_at: string
           document_id: string
           embedding: unknown
@@ -305,6 +309,7 @@ export type Database = {
         }
         ComputedFields: never
         Insert: {
+          content_hash?: string | null
           created_at?: string
           document_id: string
           embedding?: unknown
@@ -316,6 +321,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          content_hash?: string | null
           created_at?: string
           document_id?: string
           embedding?: unknown
@@ -486,6 +492,7 @@ export type Database = {
           excerpt: string | null
           external_id: string | null
           id: string
+          is_demo: boolean
           metadata: NonNullable<Json>
           provider: string
           retrieved_at: string | null
@@ -501,6 +508,7 @@ export type Database = {
           excerpt?: string | null
           external_id?: string | null
           id?: string
+          is_demo?: boolean
           metadata?: NonNullable<Json>
           provider: string
           retrieved_at?: string | null
@@ -515,6 +523,7 @@ export type Database = {
           excerpt?: string | null
           external_id?: string | null
           id?: string
+          is_demo?: boolean
           metadata?: NonNullable<Json>
           provider?: string
           retrieved_at?: string | null
@@ -1085,6 +1094,7 @@ export type Database = {
           created_at: string
           data: NonNullable<Json>
           id: string
+          knowledge_revoked_at: string | null
           read_at: string | null
           request_id: string | null
           sender: string
@@ -1098,6 +1108,7 @@ export type Database = {
           created_at?: string
           data?: NonNullable<Json>
           id?: string
+          knowledge_revoked_at?: string | null
           read_at?: string | null
           request_id?: string | null
           sender: string
@@ -1110,6 +1121,7 @@ export type Database = {
           created_at?: string
           data?: NonNullable<Json>
           id?: string
+          knowledge_revoked_at?: string | null
           read_at?: string | null
           request_id?: string | null
           sender?: string
@@ -1853,6 +1865,7 @@ export type Database = {
       }
     }
     Functions: {
+      answer_hotelier_request: { Args: { message_id: string; request_id: string }; Returns: string[] }
       assistant_chat_share: {
         Args: { share_id: string }
         Returns: {
@@ -1860,6 +1873,38 @@ export type Database = {
           id: string
           snapshot: Json
           title: string
+        }[]
+      }
+      create_hotelier_request: {
+        Args: {
+          characteristic_keys?: string[]
+          context_summary?: string
+          conversation_id?: string
+          hotel_id: string
+          origin_chat_id?: string
+          origin_tool_run_id?: string
+          question: string
+          room_ref?: string
+        }
+        Returns: {
+          conversation: string
+          request: string
+          reused: boolean
+        }[]
+      }
+      hotel_chunks_hybrid: {
+        Args: { hotel_id: string; max_rows?: number; query: string; query_embedding?: unknown }
+        Returns: {
+          chunk_id: string
+          document_id: string
+          evidence_id: string
+          fts_place: number
+          kind: string
+          metadata: Json
+          ord: number
+          rank: number
+          text: string
+          vector_place: number
         }[]
       }
       hotel_chunks_search: {
