@@ -2,6 +2,7 @@ import 'server-only'
 import { generateText, tool, type LanguageModel } from 'ai'
 import { z } from 'zod'
 import type { AssistantRequest, Brief, TurnStep } from '../assistant'
+import type { HotelierNoise } from '../db/claims'
 import type { LevelRow, NearRow } from '../db/knowledge'
 import { recordRun, type RunOwner } from '../db/toolRuns'
 import { questionCategories } from '../geo/questions'
@@ -281,6 +282,7 @@ export async function planKnowledge(
 /** What the turn reads and runs: the store's in the route, the tests' own. */
 export interface KnowledgeDeps {
   levels: () => Promise<LevelRow[] | null>
+  hotelierNoise: () => Promise<HotelierNoise[] | null>
   near: (category: NearCategory) => Promise<NearRow[] | null>
   runFeatures: typeof runFeaturesTool
   runNear: typeof runNearTool
@@ -363,10 +365,11 @@ export async function runKnowledge(
   const features = calls.some((c) => c.tool === 'features') ? deps.levels() : Promise.resolve(null)
   const categories = [...new Set(calls.flatMap((c) => (c.tool === 'near' ? [c.category] : [])))]
   const near = new Map(categories.map((category) => [category, deps.near(category)]))
+  const hotelier = (calls.some((c) => c.tool === 'features') ? await deps.hotelierNoise() : null) ?? []
   const levels = await features
   const nearIndex = new Map(await Promise.all(categories.map(async (c) => [c, await near.get(c)!] as const)))
   const choices: ReadonlyMap<string, HotelVerdict>[] = calls.flatMap((call) => {
-    if (call.tool === 'features') return levels ? [featureVerdicts(levels, ids, call.criteria)] : []
+    if (call.tool === 'features') return levels ? [featureVerdicts(levels, ids, call.criteria, hotelier)] : []
     if (call.tool === 'near') {
       const index = nearIndex.get(call.category)
       return index ? [nearVerdicts(index, ids, call.radiusM)] : []
@@ -380,7 +383,7 @@ export async function runKnowledge(
     calls.map(async (call) => {
       const execute = (): Promise<ToolResult> =>
         call.tool === 'features'
-          ? deps.runFeatures({ criteria: call.criteria, candidates, chosen }, levels)
+          ? deps.runFeatures({ criteria: call.criteria, candidates, chosen, hotelier }, levels)
           : call.tool === 'near'
             ? deps.runNear(
                 { category: call.category, radiusM: call.radiusM, candidates, chosen },
@@ -417,6 +420,7 @@ function claimLine(result: ToolResult, claimId: string): string | null {
   const origin = [
     sources.join(', ') || EPISTEMIC_LABEL[claim.status],
     claim.confidence !== null && `уверенность ${Math.round(claim.confidence * 100)} %`,
+    claim.demo && 'демо',
   ]
     .filter(Boolean)
     .join(', ')
