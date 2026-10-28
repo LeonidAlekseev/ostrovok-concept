@@ -14,6 +14,7 @@ import {
   type Brief,
   type StayDates,
 } from '../assistant'
+import { budgetOf, parseBudget } from '../currency'
 import { addDays, nightsBetween, type IsoDate } from '../dates'
 import { VIEW_LABEL } from '../features'
 import { isRussian } from './hotelAnswer'
@@ -31,7 +32,7 @@ const optional = <T extends z.ZodType>(schema: T) => schema.nullable().catch(nul
 const wishSchema = z.object({
   destinationId: optional(z.string()).describe('id города из списка, только если город назван; иначе null'),
   vibe: optional(z.string()).describe(
-    'id темы из списка, по смыслу фразы; null, только если о поездке ничего не сказано',
+    'id темы из списка, только если тема названа или ясна по смыслу («тепло и поплавать» — море); пожелания об отеле, номере или фото («ванна», «балкон») — не тема; иначе null',
   ),
   when: optional(z.coerce.string()).describe(
     'номер месяца "1"–"12", soon — в ближайшее время, только если сказано явно; иначе null',
@@ -49,7 +50,11 @@ const wishSchema = z.object({
     'id состава из списка, только если сказано явно: «вдвоём», «нас двое», «двое взрослых», «с женой» — couple; «один», «для меня одного» — solo; иначе null',
   ),
   mood: optional(z.string()).describe('calm — спокойно, active — активно, только если сказано явно; иначе null'),
-  budget: optional(z.coerce.number()).describe('бюджет на всю поездку в рублях, целое; «недорого» без суммы — null'),
+  budget: optional(z.coerce.number()).describe(
+    'сумма бюджета как сказана, без пересчёта в рубли: «до 200 евро за ночь» — 200; «недорого» без суммы — null',
+  ),
+  budgetCurrency: optional(z.string()).describe('валюта суммы: rub, eur или usd; иначе null'),
+  budgetPer: optional(z.string()).describe('night — сумма за ночь или сутки, trip — за всю поездку; иначе null'),
   quiet: optional(z.boolean()).describe(
     'true — просят тишину, чтобы ночью не шумело («тихий», «а потише?»); иначе null',
   ),
@@ -72,7 +77,7 @@ function instructions(brief: Brief, today: IsoDate, destinations: readonly Desti
   return [
     'Ты помощник сервиса путешествий «О!бъективно». Пользователь описывает поездку своими словами.',
     'Извлеки из ПОСЛЕДНЕГО сообщения пользователя только то, что в нём сказано или ясно следует по смыслу',
-    '(«тепло и поплавать с маской» — море, «старинные улочки» — города Европы). Тему (vibe) определяй по смыслу; остальное не додумывай: если не сказано явно — null.',
+    '(«тепло и поплавать с маской» — море, «старинные улочки» — города Европы). Тему (vibe) определяй по смыслу, но не додумывай: «номер с большой ванной и балконом» — не море, тема null; остальное не додумывай: если не сказано явно — null.',
     'Предыдущие сообщения — контекст для коротких ответов на вопрос помощника.',
     'Уточнения («а повыше?», «а потише?») дополняют прежние условия: верни только то, что сказано в последнем сообщении.',
     'Город может стоять в любом падеже («в Валенсии», «в Праге», «во Флоренции», «в Сочи»): destinationId — его id из списка. Если пользователь поправился («в Таллине… то есть в Хельсинки»), бери последний город.',
@@ -101,7 +106,7 @@ const PARTY_COUNT =
  * when the rules see them in the same text (a bare number is not enough for the length: it may be the budget).
  */
 function grounded(key: keyof Brief, parsed: Brief, input: string, destinations: readonly Destination[]): boolean {
-  if (key === 'vibe' || key === 'budget') return true
+  if (key === 'vibe' || key === 'budget' || key === 'budgetPerNight') return true
   const text = input.toLocaleLowerCase('ru')
   if (key === 'destinationId') {
     const name = destinations.find((d) => d.id === parsed.destinationId)?.name.toLocaleLowerCase('ru') ?? ''
@@ -152,12 +157,18 @@ export async function understandWish(
   const when = Number.isInteger(month) && month >= 1 && month <= 12 ? month - 1 : output.when
   // A remark that is not mainly Russian (the model slips into English, Chinese or Korean) is dropped whole.
   const reply = output.reply?.trim().slice(0, 200)
-  const parsed = normalizeBrief({ ...output, when }, destinations)
+  const { budget: said, budgetCurrency, budgetPer, ...rest } = output
+  const parsed = normalizeBrief({ ...rest, when }, destinations)
   const input = messages.at(-1)?.text ?? ''
+  // The sum is the code's: the rules read it from the text, else the model's amount, its currency and period.
+  const named = parseBudget(input.toLocaleLowerCase('ru')) ?? budgetOf(said, budgetCurrency, budgetPer)
+  if (named) Object.assign(parsed, named.perNight ? { budgetPerNight: named.rub } : { budget: named.rub })
   // "не важно" for the asked question is the rules' call in `foldBrief`: the model hands questions over too eagerly.
   // A view `any` is «с видом», not a handed-over question.
   for (const key of Object.keys(parsed) as (keyof Brief)[])
     if ((parsed[key] === 'any' && key !== 'view') || !grounded(key, parsed, input, destinations)) delete parsed[key]
+  // A named city is the whole answer: the theme the model adds to it (the sea for a bath and a balcony) is a guess.
+  if (parsed.vibe && parsed.destinationId && parseWish(input, destinations).vibe === undefined) delete parsed.vibe
   // The distance to the sea is the rules' own: «близко к морю» is 1 km, a named distance is taken as it is.
   const sea = parseWish(input, destinations).seaMaxM
   if (sea) parsed.seaMaxM = sea

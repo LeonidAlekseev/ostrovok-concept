@@ -1,0 +1,16 @@
+# Nothing secret and nothing built goes into the build context: keys come in as build args, a build secret or at run time.
+.env
+.env.*
+!.env.example
+*.key
+.git
+.next
+node_modules
+.claude
+.github
+docs
+openspec
+TODO.md
+*.log
+Dockerfile
+docker-compose.yml

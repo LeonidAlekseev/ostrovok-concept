@@ -7,15 +7,15 @@
       }
     ],
     "brief": {
-      "hotelId": "ota-9096882"
+      "hotelId": "ota-7481548"
     }
   },
   "response": {
     "brief": {
-      "hotelId": "ota-9096882",
+      "hotelId": "ota-7481548",
       "destinationId": "valencia"
     },
-    "reply": "Ночью до 60 дБ на фасаде, окна во двор тише — ниже 46 дБ. Вокрестные рестораны есть, но шумоизоляция номеров не оценивалась.",
+    "reply": "Исходя из данных об инструменте «Анализ шума»: у фасада на улицу шум ночью составляет 60–65 дБ.",
     "source": "model",
     "steps": [
       {
@@ -23,15 +23,15 @@
         "title": "Анализ шума",
         "params": "оценка шума у фасада (карты шума EEA и места OpenStreetMap), отзывы гостей",
         "status": "done",
-        "result": "У фасада на улицу: днём 57–64 дБ, ночью 55–60 дБ; окна во двор: ночью ниже 46 дБ; шумных мест OpenStreetMap в 200 м: 4; отзывов о шуме и тишине: 0",
+        "result": "У фасада на улицу: днём 64–74 дБ, ночью 60–65 дБ; окна во двор: ночью ниже 45 дБ; шумных мест OpenStreetMap в 200 м: 20; отзывов о шуме и тишине: 0",
         "run": {
-          "id": "5ca8b8b2-428e-4851-b071-47c5b78bfe71",
+          "id": "be45d7b4-d343-45f3-9c38-dc5e687ab0a3",
           "result": {
             "status": "success",
-            "summary": "У фасада на улицу: днём 57–64 дБ, ночью 55–60 дБ; окна во двор: ночью ниже 46 дБ; шумных мест OpenStreetMap в 200 м: 4; отзывов о шуме и тишине: 0",
+            "summary": "У фасада на улицу: днём 64–74 дБ, ночью 60–65 дБ; окна во двор: ночью ниже 45 дБ; шумных мест OpenStreetMap в 200 м: 20; отзывов о шуме и тишине: 0",
             "data": {
               "eea": true,
-              "places": 4,
+              "places": 20,
               "reviews": 0
             },
             "evidence": [
@@ -44,7 +44,7 @@
                 "title": "EUBUCCO v0.2",
                 "excerpt": null,
                 "retrieved_at": "2026-10-26T18:10:24.551+00:00",
-                "entity_id": "ota-9096882",
+                "entity_id": "ota-7481548",
                 "claim_id": null
               },
               {
@@ -56,225 +56,523 @@
                 "title": "EEA noise contours, Environmental Noise Directive, round 2022 v01_r00",
                 "excerpt": null,
                 "retrieved_at": "2026-10-26T18:06:03.471+00:00",
-                "entity_id": "ota-9096882",
+                "entity_id": "ota-7481548",
                 "claim_id": null
               },
               {
-                "id": "1138bddd-4e7b-415d-b637-0fcc78d88037",
+                "id": "06523948-a356-44f1-b583-443408e47abd",
                 "source_type": "osm",
                 "source_name": "OpenStreetMap",
-                "source_id": "node/1632037135",
-                "source_url": "https://www.openstreetmap.org/node/1632037135",
-                "title": "Vicent",
+                "source_id": "node/4880301721",
+                "source_url": "https://www.openstreetmap.org/node/4880301721",
+                "title": "La Mie Dorée",
                 "excerpt": null,
-                "retrieved_at": "2026-10-26T19:30:00.378+00:00",
-                "entity_id": "ota-9096882",
+                "retrieved_at": "2026-10-28T13:22:26.449+00:00",
+                "entity_id": "ota-7481548",
                 "claim_id": null
               },
               {
-                "id": "91cef08f-aad9-4074-9067-048d58e98a0a",
+                "id": "0bf55094-81d1-44c3-8f41-f3f5ae23b87e",
                 "source_type": "osm",
                 "source_name": "OpenStreetMap",
-                "source_id": "node/9270705402",
-                "source_url": "https://www.openstreetmap.org/node/9270705402",
-                "title": "Bar Restaurante Casa Pote",
+                "source_id": "node/14084993401",
+                "source_url": "https://www.openstreetmap.org/node/14084993401",
+                "title": "El Kiosko",
                 "excerpt": null,
-                "retrieved_at": "2026-10-26T19:30:00.378+00:00",
-                "entity_id": "ota-9096882",
+                "retrieved_at": "2026-10-28T13:22:26.449+00:00",
+                "entity_id": "ota-7481548",
                 "claim_id": null
               },
               {
-                "id": "b7b322c1-9e17-49d7-aa9a-0bbae744ffb9",
+                "id": "18e0159c-91a6-4d6a-a6c2-e21940c2dabf",
                 "source_type": "osm",
                 "source_name": "OpenStreetMap",
-                "source_id": "node/6551271385",
-                "source_url": "https://www.openstreetmap.org/node/6551271385",
-                "title": "Ca Pepe",
+                "source_id": "way/1172711343",
+                "source_url": "https://www.openstreetmap.org/way/1172711343",
+                "title": "Voltereta, Bienvenido a Kioto",
                 "excerpt": null,
-                "retrieved_at": "2026-10-26T19:30:00.378+00:00",
-                "entity_id": "ota-9096882",
+                "retrieved_at": "2026-10-28T13:22:26.449+00:00",
+                "entity_id": "ota-7481548",
                 "claim_id": null
               },
               {
-                "id": "fe3835a0-1e8b-4a7d-9c31-0cd370fd7f09",
+                "id": "2b0142b4-3443-4e92-b2b4-b8f4701bfc6d",
                 "source_type": "osm",
                 "source_name": "OpenStreetMap",
-                "source_id": "node/1632037131",
-                "source_url": "https://www.openstreetmap.org/node/1632037131",
-                "title": "Pinares 14",
+                "source_id": "node/5992787785",
+                "source_url": "https://www.openstreetmap.org/node/5992787785",
+                "title": "Burritos",
                 "excerpt": null,
-                "retrieved_at": "2026-10-26T19:30:00.378+00:00",
-                "entity_id": "ota-9096882",
+                "retrieved_at": "2026-10-28T13:22:26.449+00:00",
+                "entity_id": "ota-7481548",
+                "claim_id": null
+              },
+              {
+                "id": "377974be-020b-4275-aa8d-45b40194e8c1",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/14084959901",
+                "source_url": "https://www.openstreetmap.org/node/14084959901",
+                "title": "Begin Huerta",
+                "excerpt": null,
+                "retrieved_at": "2026-10-28T13:22:26.449+00:00",
+                "entity_id": "ota-7481548",
+                "claim_id": null
+              },
+              {
+                "id": "61ecbafb-2110-4bf6-8388-f0e8370587ce",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/5230914722",
+                "source_url": "https://www.openstreetmap.org/node/5230914722",
+                "title": "Taberna",
+                "excerpt": null,
+                "retrieved_at": "2026-10-28T13:22:26.449+00:00",
+                "entity_id": "ota-7481548",
+                "claim_id": null
+              },
+              {
+                "id": "67a0f681-5d68-48ff-8275-c776ac446779",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/10239137798",
+                "source_url": "https://www.openstreetmap.org/node/10239137798",
+                "title": "Tequila in Love",
+                "excerpt": null,
+                "retrieved_at": "2026-10-28T13:22:26.449+00:00",
+                "entity_id": "ota-7481548",
+                "claim_id": null
+              },
+              {
+                "id": "72ef9ea9-ba7e-4223-aa80-bc1c0e945e0c",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/4158505089",
+                "source_url": "https://www.openstreetmap.org/node/4158505089",
+                "title": "Restaurante A Punto",
+                "excerpt": null,
+                "retrieved_at": "2026-10-28T13:22:26.449+00:00",
+                "entity_id": "ota-7481548",
+                "claim_id": null
+              },
+              {
+                "id": "7b848f71-c03e-4014-b632-b8816482abb5",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/4180978089",
+                "source_url": "https://www.openstreetmap.org/node/4180978089",
+                "title": "Little Thai",
+                "excerpt": null,
+                "retrieved_at": "2026-10-28T13:22:26.449+00:00",
+                "entity_id": "ota-7481548",
+                "claim_id": null
+              },
+              {
+                "id": "82a7f200-2675-497d-a4dd-f638f9825eaf",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/14085006501",
+                "source_url": "https://www.openstreetmap.org/node/14085006501",
+                "title": "Zazú",
+                "excerpt": null,
+                "retrieved_at": "2026-10-28T13:22:26.449+00:00",
+                "entity_id": "ota-7481548",
+                "claim_id": null
+              },
+              {
+                "id": "a13dca02-a29e-4dfb-810b-35eac6fd6a9d",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/14085178301",
+                "source_url": "https://www.openstreetmap.org/node/14085178301",
+                "title": "Chocolatería Valor",
+                "excerpt": null,
+                "retrieved_at": "2026-10-28T13:22:26.449+00:00",
+                "entity_id": "ota-7481548",
+                "claim_id": null
+              },
+              {
+                "id": "aa43e808-0037-4ca8-bbdf-33ff930ad178",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/4179593711",
+                "source_url": "https://www.openstreetmap.org/node/4179593711",
+                "title": "Restaurante Pato Laqueado",
+                "excerpt": null,
+                "retrieved_at": "2026-10-28T13:22:26.449+00:00",
+                "entity_id": "ota-7481548",
+                "claim_id": null
+              },
+              {
+                "id": "aded281d-406e-4f53-bf23-6c8b37760a22",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/1896631980",
+                "source_url": "https://www.openstreetmap.org/node/1896631980",
+                "title": "Döner Roj Ava",
+                "excerpt": null,
+                "retrieved_at": "2026-10-28T13:22:26.449+00:00",
+                "entity_id": "ota-7481548",
+                "claim_id": null
+              },
+              {
+                "id": "b1dd97c1-4f95-467f-b723-81293ae226c7",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/8933914228",
+                "source_url": "https://www.openstreetmap.org/node/8933914228",
+                "title": "Ryukishin",
+                "excerpt": null,
+                "retrieved_at": "2026-10-28T13:22:26.449+00:00",
+                "entity_id": "ota-7481548",
+                "claim_id": null
+              },
+              {
+                "id": "bfcf2742-03b0-4bd3-8cc9-2b1342c02423",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/9312981699",
+                "source_url": "https://www.openstreetmap.org/node/9312981699",
+                "title": "The roast & beer",
+                "excerpt": null,
+                "retrieved_at": "2026-10-28T13:22:26.449+00:00",
+                "entity_id": "ota-7481548",
+                "claim_id": null
+              },
+              {
+                "id": "c2be03fd-7d88-4e07-9732-52f1266c870c",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/4718399090",
+                "source_url": "https://www.openstreetmap.org/node/4718399090",
+                "title": "Carisma Coffee",
+                "excerpt": null,
+                "retrieved_at": "2026-10-28T13:22:26.449+00:00",
+                "entity_id": "ota-7481548",
+                "claim_id": null
+              },
+              {
+                "id": "cb2bc11e-b46c-4dc2-a272-e2a5968f8590",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/4179638589",
+                "source_url": "https://www.openstreetmap.org/node/4179638589",
+                "title": "Popeyes",
+                "excerpt": null,
+                "retrieved_at": "2026-10-28T13:22:26.449+00:00",
+                "entity_id": "ota-7481548",
+                "claim_id": null
+              },
+              {
+                "id": "d91d2a25-70e3-4a18-bf2f-01f91af039e7",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/4426499792",
+                "source_url": "https://www.openstreetmap.org/node/4426499792",
+                "title": "Al Solito Posto",
+                "excerpt": null,
+                "retrieved_at": "2026-10-28T13:22:26.449+00:00",
+                "entity_id": "ota-7481548",
+                "claim_id": null
+              },
+              {
+                "id": "eff2cd9e-5219-4e26-8002-6e7bdac12927",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/4179594099",
+                "source_url": "https://www.openstreetmap.org/node/4179594099",
+                "title": "Restaurante La Pequeña Pulperia",
+                "excerpt": null,
+                "retrieved_at": "2026-10-28T13:22:26.449+00:00",
+                "entity_id": "ota-7481548",
+                "claim_id": null
+              },
+              {
+                "id": "fb417f56-f3d1-4a7c-bdae-6abb95ae8740",
+                "source_type": "osm",
+                "source_name": "OpenStreetMap",
+                "source_id": "node/4949160823",
+                "source_url": "https://www.openstreetmap.org/node/4949160823",
+                "title": "Beirut King",
+                "excerpt": null,
+                "retrieved_at": "2026-10-28T13:22:26.449+00:00",
+                "entity_id": "ota-7481548",
                 "claim_id": null
               }
             ],
             "claims": [
               {
-                "id": "da174adb-7970-4029-9eb6-5fe7082c23e9",
+                "id": "a881ebe9-fb5b-4aa1-9833-48abf6eff687",
                 "label": "Фасад на улицу, днём (07:00–19:00)",
-                "value": "57–64 дБ",
+                "value": "64–74 дБ",
                 "status": "derived",
                 "confidence": 0.4,
                 "evidence_ids": ["0900266b-4264-48f9-b77b-ad3b904ff115", "ee159ffb-c245-47de-acbc-0d7a329216d0"],
-                "calculation_id": "92a73ddc-3341-4425-bdc7-f68aea0a9d75"
+                "calculation_id": "7eb7e9db-8303-4116-ad12-ef10b0418dd5"
               },
               {
-                "id": "98b6f87a-4b0b-4873-abd5-0c7ac99dc526",
+                "id": "6b5a23d3-d9b2-4a67-84c0-ce9c177b8d43",
                 "label": "Фасад на улицу, вечером (19:00–23:00)",
-                "value": "57–64 дБ",
+                "value": "64–75 дБ",
                 "status": "derived",
                 "confidence": 0.4,
                 "evidence_ids": ["0900266b-4264-48f9-b77b-ad3b904ff115", "ee159ffb-c245-47de-acbc-0d7a329216d0"],
-                "calculation_id": "92a73ddc-3341-4425-bdc7-f68aea0a9d75"
+                "calculation_id": "7eb7e9db-8303-4116-ad12-ef10b0418dd5"
               },
               {
-                "id": "17d79374-0041-4b36-ad23-be3b7ea22bb8",
+                "id": "73ef4c33-8ba6-4463-b7a7-9859f3965ea4",
                 "label": "Фасад на улицу, ночью (23:00–07:00)",
-                "value": "55–60 дБ",
+                "value": "60–65 дБ",
                 "status": "derived",
                 "confidence": 0.5,
                 "evidence_ids": ["0900266b-4264-48f9-b77b-ad3b904ff115", "ee159ffb-c245-47de-acbc-0d7a329216d0"],
-                "calculation_id": "92a73ddc-3341-4425-bdc7-f68aea0a9d75"
+                "calculation_id": "7eb7e9db-8303-4116-ad12-ef10b0418dd5"
               },
               {
-                "id": "a0f8a0c1-114d-40d6-9bde-75ab19b5db7e",
+                "id": "70e0cce3-5d58-49ca-9269-adfc565f4c87",
                 "label": "Фасад на улицу, за сутки (Lden)",
-                "value": "61–65 дБ",
+                "value": "70–75 дБ",
                 "status": "derived",
                 "confidence": 0.5,
                 "evidence_ids": ["0900266b-4264-48f9-b77b-ad3b904ff115", "ee159ffb-c245-47de-acbc-0d7a329216d0"],
-                "calculation_id": "92a73ddc-3341-4425-bdc7-f68aea0a9d75"
+                "calculation_id": "7eb7e9db-8303-4116-ad12-ef10b0418dd5"
               },
               {
-                "id": "c249e3cf-a0c4-4f05-a793-d7b7fe9c3ab8",
+                "id": "623cbd82-fcc4-46b6-849b-c14a9bc5840f",
                 "label": "Окна во двор, днём",
-                "value": "51–52 дБ",
+                "value": "ниже 45 дБ",
                 "status": "derived",
-                "confidence": 0.4,
+                "confidence": 0.8,
                 "evidence_ids": ["0900266b-4264-48f9-b77b-ad3b904ff115", "ee159ffb-c245-47de-acbc-0d7a329216d0"],
-                "calculation_id": "92a73ddc-3341-4425-bdc7-f68aea0a9d75"
+                "calculation_id": "7eb7e9db-8303-4116-ad12-ef10b0418dd5"
               },
               {
-                "id": "c17cb6a6-59f5-4993-b855-213453f16686",
+                "id": "6aacaad8-c4ff-45c6-ab38-4aa3ccff19d0",
                 "label": "Окна во двор, вечером",
-                "value": "53–54 дБ",
+                "value": "ниже 45 дБ",
                 "status": "derived",
-                "confidence": 0.4,
+                "confidence": 0.8,
                 "evidence_ids": ["0900266b-4264-48f9-b77b-ad3b904ff115", "ee159ffb-c245-47de-acbc-0d7a329216d0"],
-                "calculation_id": "92a73ddc-3341-4425-bdc7-f68aea0a9d75"
+                "calculation_id": "7eb7e9db-8303-4116-ad12-ef10b0418dd5"
               },
               {
-                "id": "d58ae160-0acc-46e4-9ee1-0378962227d9",
+                "id": "48d3383f-5c66-4854-9369-c24b8f52fdcc",
                 "label": "Окна во двор, ночью",
-                "value": "ниже 46 дБ",
+                "value": "ниже 45 дБ",
                 "status": "derived",
-                "confidence": 0.5,
+                "confidence": 0.9,
                 "evidence_ids": ["0900266b-4264-48f9-b77b-ad3b904ff115", "ee159ffb-c245-47de-acbc-0d7a329216d0"],
-                "calculation_id": "92a73ddc-3341-4425-bdc7-f68aea0a9d75"
+                "calculation_id": "7eb7e9db-8303-4116-ad12-ef10b0418dd5"
               },
               {
-                "id": "cee1ea0b-d888-4bc0-a2bd-c7e3f341f05b",
+                "id": "00bf5f47-8688-4f00-bddf-54b42fd56b8c",
                 "label": "Окна во двор, за сутки (Lden)",
-                "value": "52–53 дБ",
+                "value": "ниже 45 дБ",
                 "status": "derived",
-                "confidence": 0.5,
+                "confidence": 0.9,
                 "evidence_ids": ["0900266b-4264-48f9-b77b-ad3b904ff115", "ee159ffb-c245-47de-acbc-0d7a329216d0"],
-                "calculation_id": "92a73ddc-3341-4425-bdc7-f68aea0a9d75"
+                "calculation_id": "7eb7e9db-8303-4116-ad12-ef10b0418dd5"
               },
               {
-                "id": "a647c6c3-1040-478c-b28e-28c9d27059ad",
+                "id": "35e41275-543b-4594-acfa-ed3ecf992a39",
                 "label": "Вклад заведений рядом, днём",
-                "value": "≈51 дБ",
-                "status": "derived",
-                "confidence": 0.6,
-                "evidence_ids": [
-                  "1138bddd-4e7b-415d-b637-0fcc78d88037",
-                  "91cef08f-aad9-4074-9067-048d58e98a0a",
-                  "b7b322c1-9e17-49d7-aa9a-0bbae744ffb9",
-                  "fe3835a0-1e8b-4a7d-9c31-0cd370fd7f09"
-                ],
-                "calculation_id": "92a73ddc-3341-4425-bdc7-f68aea0a9d75"
-              },
-              {
-                "id": "d6abdf0a-ed04-43bc-a133-41361857ec4d",
-                "label": "Вклад заведений рядом, вечером",
                 "value": "≈53 дБ",
                 "status": "derived",
                 "confidence": 0.6,
                 "evidence_ids": [
-                  "1138bddd-4e7b-415d-b637-0fcc78d88037",
-                  "91cef08f-aad9-4074-9067-048d58e98a0a",
-                  "b7b322c1-9e17-49d7-aa9a-0bbae744ffb9",
-                  "fe3835a0-1e8b-4a7d-9c31-0cd370fd7f09"
+                  "06523948-a356-44f1-b583-443408e47abd",
+                  "0bf55094-81d1-44c3-8f41-f3f5ae23b87e",
+                  "18e0159c-91a6-4d6a-a6c2-e21940c2dabf",
+                  "2b0142b4-3443-4e92-b2b4-b8f4701bfc6d",
+                  "377974be-020b-4275-aa8d-45b40194e8c1",
+                  "61ecbafb-2110-4bf6-8388-f0e8370587ce",
+                  "67a0f681-5d68-48ff-8275-c776ac446779",
+                  "72ef9ea9-ba7e-4223-aa80-bc1c0e945e0c",
+                  "7b848f71-c03e-4014-b632-b8816482abb5",
+                  "82a7f200-2675-497d-a4dd-f638f9825eaf",
+                  "a13dca02-a29e-4dfb-810b-35eac6fd6a9d",
+                  "aa43e808-0037-4ca8-bbdf-33ff930ad178",
+                  "aded281d-406e-4f53-bf23-6c8b37760a22",
+                  "b1dd97c1-4f95-467f-b723-81293ae226c7",
+                  "bfcf2742-03b0-4bd3-8cc9-2b1342c02423",
+                  "c2be03fd-7d88-4e07-9732-52f1266c870c",
+                  "cb2bc11e-b46c-4dc2-a272-e2a5968f8590",
+                  "d91d2a25-70e3-4a18-bf2f-01f91af039e7",
+                  "eff2cd9e-5219-4e26-8002-6e7bdac12927",
+                  "fb417f56-f3d1-4a7c-bdae-6abb95ae8740"
                 ],
-                "calculation_id": "92a73ddc-3341-4425-bdc7-f68aea0a9d75"
+                "calculation_id": "7eb7e9db-8303-4116-ad12-ef10b0418dd5"
               },
               {
-                "id": "01e7d89a-f376-491c-82f7-5679fe61c352",
+                "id": "0672b9a4-b91f-4dfc-a280-1ba59217f3d4",
+                "label": "Вклад заведений рядом, вечером",
+                "value": "≈55 дБ",
+                "status": "derived",
+                "confidence": 0.6,
+                "evidence_ids": [
+                  "06523948-a356-44f1-b583-443408e47abd",
+                  "0bf55094-81d1-44c3-8f41-f3f5ae23b87e",
+                  "18e0159c-91a6-4d6a-a6c2-e21940c2dabf",
+                  "2b0142b4-3443-4e92-b2b4-b8f4701bfc6d",
+                  "377974be-020b-4275-aa8d-45b40194e8c1",
+                  "61ecbafb-2110-4bf6-8388-f0e8370587ce",
+                  "67a0f681-5d68-48ff-8275-c776ac446779",
+                  "72ef9ea9-ba7e-4223-aa80-bc1c0e945e0c",
+                  "7b848f71-c03e-4014-b632-b8816482abb5",
+                  "82a7f200-2675-497d-a4dd-f638f9825eaf",
+                  "a13dca02-a29e-4dfb-810b-35eac6fd6a9d",
+                  "aa43e808-0037-4ca8-bbdf-33ff930ad178",
+                  "aded281d-406e-4f53-bf23-6c8b37760a22",
+                  "b1dd97c1-4f95-467f-b723-81293ae226c7",
+                  "bfcf2742-03b0-4bd3-8cc9-2b1342c02423",
+                  "c2be03fd-7d88-4e07-9732-52f1266c870c",
+                  "cb2bc11e-b46c-4dc2-a272-e2a5968f8590",
+                  "d91d2a25-70e3-4a18-bf2f-01f91af039e7",
+                  "eff2cd9e-5219-4e26-8002-6e7bdac12927",
+                  "fb417f56-f3d1-4a7c-bdae-6abb95ae8740"
+                ],
+                "calculation_id": "7eb7e9db-8303-4116-ad12-ef10b0418dd5"
+              },
+              {
+                "id": "c8ff8d9d-fa15-4b0e-8fa7-464438d60c3b",
+                "label": "Вклад заведений рядом, ночью",
+                "value": "≈39 дБ",
+                "status": "derived",
+                "confidence": 0.6,
+                "evidence_ids": ["67a0f681-5d68-48ff-8275-c776ac446779"],
+                "calculation_id": "7eb7e9db-8303-4116-ad12-ef10b0418dd5"
+              },
+              {
+                "id": "5e54c761-5072-4bba-a3c2-dee852c99876",
                 "label": "Карты шума EEA у фасада на улицу, за сутки (Lden)",
+                "value": "70–75 дБ",
+                "status": "derived",
+                "confidence": 0.9,
+                "evidence_ids": ["0900266b-4264-48f9-b77b-ad3b904ff115", "ee159ffb-c245-47de-acbc-0d7a329216d0"],
+                "calculation_id": "7eb7e9db-8303-4116-ad12-ef10b0418dd5"
+              },
+              {
+                "id": "2829527f-dba1-4168-880a-de2b0d8dda2a",
+                "label": "Карты шума EEA у фасада на улицу, ночью (Lnight)",
                 "value": "60–65 дБ",
                 "status": "derived",
                 "confidence": 0.9,
                 "evidence_ids": ["0900266b-4264-48f9-b77b-ad3b904ff115", "ee159ffb-c245-47de-acbc-0d7a329216d0"],
-                "calculation_id": "92a73ddc-3341-4425-bdc7-f68aea0a9d75"
+                "calculation_id": "7eb7e9db-8303-4116-ad12-ef10b0418dd5"
               },
               {
-                "id": "e4702de1-9100-42dc-8fdb-6f8155cb5903",
-                "label": "Карты шума EEA у фасада на улицу, ночью (Lnight)",
-                "value": "55–60 дБ",
+                "id": "ed37b633-3bf5-4b52-a4d9-520e0dc3e1fd",
+                "label": "Бары в 200 м",
+                "value": "1",
                 "status": "derived",
                 "confidence": 0.9,
-                "evidence_ids": ["0900266b-4264-48f9-b77b-ad3b904ff115", "ee159ffb-c245-47de-acbc-0d7a329216d0"],
-                "calculation_id": "92a73ddc-3341-4425-bdc7-f68aea0a9d75"
+                "evidence_ids": ["67a0f681-5d68-48ff-8275-c776ac446779"],
+                "calculation_id": "7f165222-18b3-4c2f-816f-2bd899597ee0"
               },
               {
-                "id": "6b6cc810-2a3f-4334-8199-2546c928e469",
+                "id": "45233306-0106-44a8-b13d-f506138beb50",
+                "label": "Ближайшее место: бар «Tequila in Love»",
+                "value": "140 м",
+                "status": "derived",
+                "confidence": 0.9,
+                "evidence_ids": ["67a0f681-5d68-48ff-8275-c776ac446779"],
+                "calculation_id": "7f165222-18b3-4c2f-816f-2bd899597ee0"
+              },
+              {
+                "id": "72891f49-df53-415b-90e8-c2f85a04bf03",
                 "label": "Рестораны в 200 м",
-                "value": "4",
+                "value": "15",
                 "status": "derived",
                 "confidence": 0.9,
                 "evidence_ids": [
-                  "1138bddd-4e7b-415d-b637-0fcc78d88037",
-                  "91cef08f-aad9-4074-9067-048d58e98a0a",
-                  "b7b322c1-9e17-49d7-aa9a-0bbae744ffb9",
-                  "fe3835a0-1e8b-4a7d-9c31-0cd370fd7f09"
+                  "0bf55094-81d1-44c3-8f41-f3f5ae23b87e",
+                  "18e0159c-91a6-4d6a-a6c2-e21940c2dabf",
+                  "2b0142b4-3443-4e92-b2b4-b8f4701bfc6d",
+                  "377974be-020b-4275-aa8d-45b40194e8c1",
+                  "61ecbafb-2110-4bf6-8388-f0e8370587ce",
+                  "72ef9ea9-ba7e-4223-aa80-bc1c0e945e0c",
+                  "7b848f71-c03e-4014-b632-b8816482abb5",
+                  "82a7f200-2675-497d-a4dd-f638f9825eaf",
+                  "aa43e808-0037-4ca8-bbdf-33ff930ad178",
+                  "b1dd97c1-4f95-467f-b723-81293ae226c7",
+                  "bfcf2742-03b0-4bd3-8cc9-2b1342c02423",
+                  "c2be03fd-7d88-4e07-9732-52f1266c870c",
+                  "d91d2a25-70e3-4a18-bf2f-01f91af039e7",
+                  "eff2cd9e-5219-4e26-8002-6e7bdac12927",
+                  "fb417f56-f3d1-4a7c-bdae-6abb95ae8740"
                 ],
-                "calculation_id": "af6336dd-b378-4dc4-be84-e0b328ec5f38"
+                "calculation_id": "7f165222-18b3-4c2f-816f-2bd899597ee0"
               },
               {
-                "id": "62ad14c2-9e9b-4f6f-a81a-171f88bddb8c",
-                "label": "Ближайшее место: ресторан «Pinares 14»",
-                "value": "40 м",
+                "id": "3279c5df-bbf0-4e51-9e21-4329f70ed8da",
+                "label": "Ближайшее место: ресторан «Taberna»",
+                "value": "50 м",
                 "status": "derived",
-                "confidence": 1,
-                "evidence_ids": ["fe3835a0-1e8b-4a7d-9c31-0cd370fd7f09"],
-                "calculation_id": "af6336dd-b378-4dc4-be84-e0b328ec5f38"
+                "confidence": 0.9,
+                "evidence_ids": ["61ecbafb-2110-4bf6-8388-f0e8370587ce"],
+                "calculation_id": "7f165222-18b3-4c2f-816f-2bd899597ee0"
+              },
+              {
+                "id": "b9a249da-a31f-4c39-aef8-44cc14dca7a6",
+                "label": "Кафе в 200 м",
+                "value": "2",
+                "status": "derived",
+                "confidence": 0.9,
+                "evidence_ids": ["06523948-a356-44f1-b583-443408e47abd", "a13dca02-a29e-4dfb-810b-35eac6fd6a9d"],
+                "calculation_id": "7f165222-18b3-4c2f-816f-2bd899597ee0"
+              },
+              {
+                "id": "1816f742-5b9e-4276-a0c1-0552383fdb97",
+                "label": "Ближайшее место: кафе «Chocolatería Valor»",
+                "value": "130 м",
+                "status": "derived",
+                "confidence": 0.9,
+                "evidence_ids": ["a13dca02-a29e-4dfb-810b-35eac6fd6a9d"],
+                "calculation_id": "7f165222-18b3-4c2f-816f-2bd899597ee0"
+              },
+              {
+                "id": "cf5d98f7-545a-4b3a-a4e5-e92e9ab6f298",
+                "label": "Фастфуд в 200 м",
+                "value": "2",
+                "status": "derived",
+                "confidence": 0.9,
+                "evidence_ids": ["aded281d-406e-4f53-bf23-6c8b37760a22", "cb2bc11e-b46c-4dc2-a272-e2a5968f8590"],
+                "calculation_id": "7f165222-18b3-4c2f-816f-2bd899597ee0"
+              },
+              {
+                "id": "884e533d-da5a-4bae-ba02-af12fc9e9aa3",
+                "label": "Ближайшее место: фастфуд «Popeyes»",
+                "value": "180 м",
+                "status": "derived",
+                "confidence": 0.9,
+                "evidence_ids": ["cb2bc11e-b46c-4dc2-a272-e2a5968f8590"],
+                "calculation_id": "7f165222-18b3-4c2f-816f-2bd899597ee0"
               }
             ],
             "calculations": [
               {
                 "name": "Оценка шума у фасада: самые громкие (улица) и самые тихие (двор) полосы карт шума EEA у контура здания, энергетическая сумма слоёв и шумных мест OpenStreetMap как точечных источников",
-                "version": "1",
+                "version": "2",
                 "inputs": [
                   {
                     "label": "Зона фасада",
-                    "value": "контур здания EUBUCCO 938f21e4dfee4849-4 и 5 м вокруг"
+                    "value": "контур здания EUBUCCO e3980d69460c403f-0 и 5 м вокруг"
                   },
                   {
                     "label": "Заведения в расчёте",
-                    "value": "ресторан «Pinares 14» — 40 м; ресторан «Vicent» — 60 м; ресторан «Ca Pepe» — 60 м; ресторан «Bar Restaurante Casa Pote» — 110 м"
+                    "value": "ресторан «Taberna» — 50 м; ресторан «Restaurante A Punto» — 50 м; ресторан «The roast & beer» — 70 м; ресторан «Ryukishin» — 80 м; ресторан «Burritos» — 100 м; ресторан «Carisma Coffee» — 100 м; ресторан «Al Solito Posto» — 110 м; ресторан «Zazú» — 120 м; кафе «Chocolatería Valor» — 130 м; кафе «La Mie Dorée» — 130 м; ресторан «Beirut King» — 140 м; ресторан «Voltereta, Bienvenido a Kioto» — 140 м; бар «Tequila in Love» — 140 м; ресторан «Little Thai» — 140 м; ресторан «Begin Huerta» — 160 м; ре"
                   },
                   {
                     "label": "Отель",
-                    "value": "ota-9096882"
+                    "value": "ota-7481548"
                   },
                   {
                     "label": "Полосы EEA у окон во двор",
-                    "value": "Дороги города: ниже 40 дБ за сутки, ниже 40 дБ ночью; Промышленность: ниже 40 дБ за сутки, ниже 40 дБ ночью; Железная дорога в городе: ниже 40 дБ за сутки, ниже 40 дБ ночью; Магистрали: ниже 40 дБ за сутки, ниже 40 дБ ночью"
+                    "value": "Дороги города: ниже 40 дБ за сутки, ниже 40 дБ ночью; Промышленность: ниже 40 дБ за сутки, ниже 40 дБ ночью; Железная дорога в городе: ниже 40 дБ за сутки, ниже 40 дБ ночью"
                   },
                   {
                     "label": "Полосы EEA у фасада на улицу",
-                    "value": "Дороги города: 60–64 дБ за сутки, 55–59 дБ ночью; Промышленность: ниже 40 дБ за сутки, ниже 40 дБ ночью; Железная дорога в городе: ниже 40 дБ за сутки, ниже 40 дБ ночью; Магистрали: 40–44 дБ за сутки, ниже 40 дБ ночью"
+                    "value": "Дороги города: 70–74 дБ за сутки, 60–64 дБ ночью; Промышленность: ниже 40 дБ за сутки, ниже 40 дБ ночью; Железная дорога в городе: ниже 40 дБ за сутки, ниже 40 дБ ночью"
                   },
                   {
                     "label": "Сумма",
@@ -319,29 +617,29 @@
                 ],
                 "assumptions": [
                   "Модель, а не измерение: полосы стратегической карты шума EEA (END, раунд 2022) и типовые уровни заведений",
-                  "Экранирование зданиями не учитывается: шум заведения доходит до фасада и двора без препятствий",
+                  "Здание отеля полностью экранирует двор от заведений (к окнам во двор они не прибавляются); другие здания между заведением и фасадом не учитываются",
                   "Уровни снаружи у стены: окна, стены и звукоизоляция номеров не учитываются",
                   "Уровни заведений — типовые для вида (терраса, открытая дверь), а не измерение конкретного места; часы работы не проверяются",
-                  "Расстояние до заведения — от точки отеля по прямой; заведения, которых нет в OpenStreetMap, не учтены",
+                  "Расстояние до заведения — по прямой от фасада (контур здания отеля по EUBUCCO; от точки отеля, если здания нет); заведения, которых нет в OpenStreetMap, не учтены",
                   "Дневной и вечерний уровни из Lden и Lnight при допущениях «вечер = день» и «день не тише ночи»"
                 ],
-                "id": "92a73ddc-3341-4425-bdc7-f68aea0a9d75"
+                "id": "7eb7e9db-8303-4116-ad12-ef10b0418dd5"
               },
               {
-                "name": "Расстояние по прямой от точки отеля до формы объекта OSM",
+                "name": "Расстояние по прямой от фасада здания отеля (контур EUBUCCO; от точки отеля, если здания нет) до формы объекта OSM",
                 "version": "1",
                 "inputs": [
                   {
                     "label": "Широта точки отеля",
-                    "value": "39.3833"
+                    "value": "39.45819"
                   },
                   {
                     "label": "Долгота точки отеля",
-                    "value": "-0.33254"
+                    "value": "-0.348223"
                   },
                   {
                     "label": "Отель",
-                    "value": "ota-9096882"
+                    "value": "ota-7481548"
                   },
                   {
                     "label": "Радиус, м",
@@ -358,19 +656,19 @@
                 ],
                 "assumptions": [
                   "Данные OpenStreetMap могут быть неполными: места нет в данных — не значит, что его нет на месте",
-                  "Расстояние по прямой до формы объекта, не путь пешком",
+                  "Расстояние по прямой от стены здания отеля до формы объекта, не путь пешком",
                   "Не более 20 мест каждой категории"
                 ],
-                "id": "af6336dd-b378-4dc4-be84-e0b328ec5f38"
+                "id": "7f165222-18b3-4c2f-816f-2bd899597ee0"
               }
             ],
             "method": {
-              "name": "Сводка данных о шуме из хранилища: оценка noise-estimate-v1 у фасада, места OpenStreetMap, отзывы гостей",
+              "name": "Сводка данных о шуме из хранилища: оценка noise-estimate-v2 у фасада, места OpenStreetMap, отзывы гостей",
               "version": "2",
               "inputs": [
                 {
                   "label": "Отель",
-                  "value": "ota-9096882"
+                  "value": "ota-7481548"
                 },
                 {
                   "label": "Слова в отзывах",
@@ -380,18 +678,18 @@
               "assumptions": [
                 "Уровни у фасада — энергетическая сумма слоёв карт шума EEA у контура здания и шумных мест OpenStreetMap",
                 "Из мест OpenStreetMap показано ближайшее каждой категории",
-                "Отзывы — не больше 5, найденные по словам о шуме и тишине"
+                "Отзывы — не больше 5, найденные по словам и по смыслу (без модели векторов — по словам), где шум или тишина названы словами"
               ]
             },
             "limitations": [
               "Модель, а не измерение: полосы стратегической карты шума EEA (END, раунд 2022) и типовые уровни заведений",
-              "Экранирование зданиями не учитывается: шум заведения доходит до фасада и двора без препятствий",
+              "Здание отеля полностью экранирует двор от заведений (к окнам во двор они не прибавляются); другие здания между заведением и фасадом не учитываются",
               "Уровни снаружи у стены: окна, стены и звукоизоляция номеров не учитываются",
               "Уровни заведений — типовые для вида (терраса, открытая дверь), а не измерение конкретного места; часы работы не проверяются",
-              "Расстояние до заведения — от точки отеля по прямой; заведения, которых нет в OpenStreetMap, не учтены",
+              "Расстояние до заведения — по прямой от фасада (контур здания отеля по EUBUCCO; от точки отеля, если здания нет); заведения, которых нет в OpenStreetMap, не учтены",
               "Дневной и вечерний уровни из Lden и Lnight при допущениях «вечер = день» и «день не тише ночи»",
               "Данные OpenStreetMap могут быть неполными: места нет в данных — не значит, что его нет на месте",
-              "Расстояние по прямой до формы объекта, не путь пешком",
+              "Расстояние по прямой от стены здания отеля до формы объекта, не путь пешком",
               "Не более 20 мест каждой категории",
               "Нет данных EEA — не значит «тихо»: карты шума не покрывают здание или ниже порога картирования",
               "Звукоизоляция окон и номеров не оценивается: уровни — снаружи здания",
@@ -401,6 +699,225 @@
           }
         }
       }
-    ]
+    ],
+    "widget": {
+      "kind": "noise",
+      "hotel": {
+        "id": "ota-7481548",
+        "name": "INNSiDE by Melia Valencia Oceanic",
+        "lat": 39.45819,
+        "lon": -0.348223
+      },
+      "noise": {
+        "sources": [
+          {
+            "source": "roadsInAgglomeration",
+            "lden": {
+              "min": 70,
+              "max": 74
+            },
+            "lnight": {
+              "min": 60,
+              "max": 64
+            }
+          },
+          {
+            "source": "industryInAgglomeration",
+            "lden": {
+              "max": 39
+            },
+            "lnight": {
+              "max": 39
+            }
+          },
+          {
+            "source": "railwaysInAgglomeration",
+            "lden": {
+              "max": 39
+            },
+            "lnight": {
+              "max": 39
+            }
+          }
+        ],
+        "yard": [
+          {
+            "source": "industryInAgglomeration",
+            "lden": {
+              "max": 39
+            },
+            "lnight": {
+              "max": 39
+            }
+          },
+          {
+            "source": "railwaysInAgglomeration",
+            "lden": {
+              "max": 39
+            },
+            "lnight": {
+              "max": 39
+            }
+          },
+          {
+            "source": "roadsInAgglomeration",
+            "lden": {
+              "max": 39
+            },
+            "lnight": {
+              "max": 39
+            }
+          }
+        ],
+        "zone": {
+          "kind": "building",
+          "buildingId": "e3980d69460c403f-0",
+          "bufferM": 5
+        },
+        "places": [
+          {
+            "category": "restaurant",
+            "name": "Taberna",
+            "distanceM": 46.3,
+            "lat": 39.4579971,
+            "lon": -0.3472677
+          },
+          {
+            "category": "restaurant",
+            "name": "Restaurante A Punto",
+            "distanceM": 52,
+            "lat": 39.4588597,
+            "lon": -0.3472912
+          },
+          {
+            "category": "restaurant",
+            "name": "The roast & beer",
+            "distanceM": 73.1,
+            "lat": 39.4591192,
+            "lon": -0.3481379
+          },
+          {
+            "category": "restaurant",
+            "name": "Ryukishin",
+            "distanceM": 77.9,
+            "lat": 39.4579226,
+            "lon": -0.3469134
+          },
+          {
+            "category": "restaurant",
+            "name": "Burritos",
+            "distanceM": 101.2,
+            "lat": 39.4580344,
+            "lon": -0.3465924
+          },
+          {
+            "category": "restaurant",
+            "name": "Carisma Coffee",
+            "distanceM": 102.9,
+            "lat": 39.4578864,
+            "lon": -0.346625
+          },
+          {
+            "category": "restaurant",
+            "name": "Al Solito Posto",
+            "distanceM": 109.4,
+            "lat": 39.4574208,
+            "lon": -0.3489205
+          },
+          {
+            "category": "restaurant",
+            "name": "Zazú",
+            "distanceM": 122.9,
+            "lat": 39.4574756,
+            "lon": -0.3491918
+          },
+          {
+            "category": "cafe",
+            "name": "Chocolatería Valor",
+            "distanceM": 131.1,
+            "lat": 39.4569982,
+            "lon": -0.3471671
+          },
+          {
+            "category": "cafe",
+            "name": "La Mie Dorée",
+            "distanceM": 133,
+            "lat": 39.457773,
+            "lon": -0.3463033
+          },
+          {
+            "category": "restaurant",
+            "name": "Beirut King",
+            "distanceM": 135.1,
+            "lat": 39.4569964,
+            "lon": -0.3485996
+          },
+          {
+            "category": "restaurant",
+            "name": "Voltereta, Bienvenido a Kioto",
+            "distanceM": 136,
+            "lat": 39.4568939,
+            "lon": -0.348231
+          },
+          {
+            "category": "bar",
+            "name": "Tequila in Love",
+            "distanceM": 141.3,
+            "lat": 39.4568298,
+            "lon": -0.3481543
+          },
+          {
+            "category": "restaurant",
+            "name": "Little Thai",
+            "distanceM": 144.3,
+            "lat": 39.4593831,
+            "lon": -0.3493047
+          },
+          {
+            "category": "restaurant",
+            "name": "Begin Huerta",
+            "distanceM": 157.1,
+            "lat": 39.4579584,
+            "lon": -0.3498757
+          },
+          {
+            "category": "restaurant",
+            "name": "Restaurante Pato Laqueado",
+            "distanceM": 161,
+            "lat": 39.4586098,
+            "lon": -0.3499839
+          },
+          {
+            "category": "restaurant",
+            "name": "Restaurante La Pequeña Pulperia",
+            "distanceM": 174,
+            "lat": 39.4594593,
+            "lon": -0.3496814
+          },
+          {
+            "category": "fast_food",
+            "name": "Popeyes",
+            "distanceM": 175,
+            "lat": 39.4581314,
+            "lon": -0.3501243
+          },
+          {
+            "category": "fast_food",
+            "name": "Döner Roj Ava",
+            "distanceM": 183.8,
+            "lat": 39.4599471,
+            "lon": -0.3490635
+          },
+          {
+            "category": "restaurant",
+            "name": "El Kiosko",
+            "distanceM": 198.8,
+            "lat": 39.4583401,
+            "lon": -0.3504283
+          }
+        ],
+        "placesCovered": ["bar", "cafe", "fast_food", "nightclub", "restaurant", "train_station", "tram"]
+      }
+    }
   }
 }

@@ -1,6 +1,6 @@
 // Loads an Ostrovok search of Valencia into Supabase: the raw hotels into `ota_hotels`, the rest of the search into
 // `ota_searches`, and the hotels as the catalogue's (`ota-<master_id>`) into `destinations` and `hotels`.
-//   npm run db:seed:valencia -- <search.json>   (Node runs the TypeScript itself; the keys come from .env.local)
+//   npm run db:seed:valencia -- <search.json>   (Node runs the TypeScript itself; the keys come from .env)
 // Upserts, so a second run leaves the same rows; touches no other city. Needs NEXT_PUBLIC_SUPABASE_URL and
 // SUPABASE_SERVICE_ROLE_KEY; prints counts, never the keys. The site sees the hotels after its catalogue cache
 // expires (an hour) or after `POST /api/revalidate`.

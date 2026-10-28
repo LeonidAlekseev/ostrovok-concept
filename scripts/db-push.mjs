@@ -1,4 +1,4 @@
-// Applies supabase/migrations to the project's database: npm run db:push (SUPABASE_DB_URL from .env.local).
+// Applies supabase/migrations to the project's database: npm run db:push (SUPABASE_DB_URL from .env).
 // The connection string goes to the CLI as an argument and is never printed.
 import { spawnSync } from 'node:child_process'
 

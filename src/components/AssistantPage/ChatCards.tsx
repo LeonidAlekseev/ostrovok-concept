@@ -827,21 +827,26 @@ function CityEditor({ brief, destinations, disabled, onChange }: ParamsProps & {
 
 function BudgetEditor({ brief, disabled, onChange }: ParamsProps & { onChange: (brief: Brief) => void }) {
   const id = useId()
-  const [value, setValue] = useState(String(brief.budget ?? ''))
+  const [value, setValue] = useState(String(brief.budget ?? brief.budgetPerNight ?? ''))
   const [error, setError] = useState('')
+  const perNight = brief.budgetPerNight !== undefined && brief.budget === undefined
   return (
     <ApplyForm
       error={error}
       disabled={disabled}
       onSubmit={() => {
         const amount = Number(value.replace(/\s/g, ''))
-        if (!value.trim()) return onChange(without(brief, 'budget'))
+        if (!value.trim()) return onChange(without(brief, 'budget', 'budgetPerNight'))
         if (!Number.isFinite(amount) || amount < 1) return setError('Введите сумму в рублях или оставьте поле пустым.')
-        onChange({ ...brief, budget: Math.round(amount) })
+        onChange(
+          perNight
+            ? { ...without(brief, 'budget'), budgetPerNight: Math.round(amount) }
+            : { ...without(brief, 'budgetPerNight'), budget: Math.round(amount) },
+        )
       }}
     >
       <label className="flex flex-col gap-1 text-sm font-medium" htmlFor={id}>
-        Бюджет на всю поездку, ₽
+        {perNight ? 'Бюджет за ночь, ₽' : 'Бюджет на всю поездку, ₽'}
         <Input
           id={id}
           inputMode="numeric"

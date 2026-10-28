@@ -8,6 +8,7 @@ import {
   type HotelFeatures,
   type ViewKind,
 } from './features'
+import { parseBudget } from './currency'
 import { addDays, formatShortRange, fromIso, nightsBetween, toIso, type IsoDate } from './dates'
 import { countRu, formatMeters, formatPrice } from './format'
 import { parseChatMap, type ChatMap } from './geo/chatMap'
@@ -48,6 +49,8 @@ export interface Brief {
   mood?: Mood
   /** Whole-stay budget, ₽. */
   budget?: number
+  /** A night's budget, ₽, while the nights are not known (`foldBrief` turns it into `budget` once they are). */
+  budgetPerNight?: number
   /** A quiet place at night: the noise map's night band (`hotel_features`). */
   quiet?: true
   /** A taller or a lower building. */
@@ -250,18 +253,9 @@ export function parseWish(input: string, destinations: readonly Destination[]): 
   if (sea) brief.seaMaxM = sea.meters
   else if (NEAR_SEA.test(text)) brief.seaMaxM = NEAR_SEA_M
 
-  // "до 70 000 ₽", "70к", "70 тыс.", "бюджет 120000" — but not "на 5 ночей" or "в 3000 м от моря".
-  for (const m of (sea ? text.replace(sea.said, ' ') : text).matchAll(
-    /(\d[\d ]*\d|\d)\s*(тыс[а-я.]*|к(?![а-яё])|₽|руб[а-я.]*|р\.)?/g,
-  )) {
-    const value = Number(m[1].replace(/ /g, ''))
-    const suffix = m[2] ?? ''
-    const amount = /^(тыс|к)/.test(suffix) ? value * 1000 : value
-    if (suffix || amount >= 3000) {
-      brief.budget = amount
-      break
-    }
-  }
+  // "до 70 000 ₽", "70к", "до 200 евро за ночь", "бюджет 120000" — but not "на 5 ночей" or "в 3000 м от моря".
+  const said = parseBudget(sea ? text.replace(sea.said, ' ') : text)
+  if (said) Object.assign(brief, said.perNight ? { budgetPerNight: said.rub } : { budget: said.rub })
   return brief
 }
 
@@ -285,6 +279,15 @@ export function foldBrief(brief: Brief, parsed: Brief, input: string, asked: Que
   }
   // A month of its own ("в декабре") replaces the named days.
   if (parsed.when !== undefined && !parsed.dates) delete next.dates
+  // A new sum replaces the old one of the other kind (a night's or the whole trip's).
+  if (parsed.budget !== undefined) delete next.budgetPerNight
+  if (parsed.budgetPerNight !== undefined && parsed.budget === undefined) delete next.budget
+  // A night's budget becomes the whole trip's once the nights are known.
+  const nights = next.dates ? nightsBetween(next.dates.checkIn, next.dates.checkOut) : next.nights
+  if (next.budgetPerNight !== undefined && nights) {
+    next.budget = next.budgetPerNight * nights
+    delete next.budgetPerNight
+  }
   // The trip's theme is set by the first message; a later "на выходные" only sets the dates.
   if (brief.vibe && brief.vibe !== 'any' && parsed.vibe === 'weekend') next.vibe = brief.vibe
   // "не важно" for the dates asked drops the named days, so the plan goes by the month.
@@ -525,6 +528,8 @@ export function makePlan(
   const nights = brief.dates
     ? nightsBetween(brief.dates.checkIn, brief.dates.checkOut)
     : Math.min(brief.nights ?? (vibe === 'weekend' ? 2 : brief.party === 'family' ? 7 : 5), MAX_NIGHTS)
+  // A night's budget without the traveller's nights goes by the plan's own.
+  const budget = brief.budget ?? (brief.budgetPerNight ? brief.budgetPerNight * nights : undefined)
   const guests = brief.guests ?? PARTY_GUESTS[brief.party && brief.party !== 'any' ? brief.party : 'couple']
   const checkIn = travelDates(brief, nights, today)
 
@@ -542,7 +547,7 @@ export function makePlan(
       hotel,
       perNight,
       total: sum,
-      fitsBudget: !brief.budget || sum <= brief.budget,
+      fitsBudget: !budget || sum <= budget,
       ...(reasons.length > 0 && { reasons }),
       ...(views.length > 0 && { views }),
     }
@@ -567,7 +572,7 @@ export function makePlan(
       const cityHotels = hotels
         .filter((h) => h.destinationId === destination.id && !exclude.has(h.id))
         .sort((a, b) => (preferCheap ? a.priceFrom - b.priceFrom : b.rating - a.rating))
-      const affordable = cityHotels.find((h) => !brief.budget || total(h.priceFrom) <= brief.budget)
+      const affordable = cityHotels.find((h) => !budget || total(h.priceFrom) <= budget)
       const cheapest = cityHotels.reduce<HotelSummary | undefined>(
         (min, h) => (!min || total(h.priceFrom) < total(min.priceFrom) ? h : min),
         undefined,
@@ -627,6 +632,7 @@ export function describeBrief(brief: Brief, destinations: readonly Destination[]
     brief.nights ? countRu(brief.nights, ['ночь', 'ночи', 'ночей']) : null,
     brief.party && brief.party !== 'any' ? PARTY_LABEL[brief.party] : null,
     brief.budget ? `до ${formatPrice(brief.budget)}` : null,
+    brief.budgetPerNight ? `до ${formatPrice(brief.budgetPerNight)} за ночь` : null,
     brief.quiet ? 'тихо ночью' : null,
     brief.height === 'high' ? 'здание повыше' : brief.height === 'low' ? 'здание пониже' : null,
     brief.view === 'any' ? 'с видом из окна' : brief.view ? `вид ${VIEW_LABEL[brief.view]}` : null,
@@ -690,7 +696,21 @@ export function normalizeBrief(
   destinations: readonly Destination[],
 ): Brief {
   const brief: Brief = {}
-  const { vibe, destinationId, when, nights, party, mood, budget, quiet, height, view, dates, datesRejected } = raw
+  const {
+    vibe,
+    destinationId,
+    when,
+    nights,
+    party,
+    mood,
+    budget,
+    budgetPerNight,
+    quiet,
+    height,
+    view,
+    dates,
+    datesRejected,
+  } = raw
   const { hotelId, seaMaxM, guests, trips, bookingId } = raw
   if (vibe === 'any' || (typeof vibe === 'string' && Object.hasOwn(VIBE_LABEL, vibe))) brief.vibe = vibe as VibeId
   if (destinations.some((d) => d.id === destinationId)) brief.destinationId = destinationId as string
@@ -704,6 +724,7 @@ export function normalizeBrief(
   if (party === 'any' || (typeof party === 'string' && Object.hasOwn(PARTY_LABEL, party))) brief.party = party as Party
   if (MOODS.includes(mood as Mood)) brief.mood = mood as Mood
   if (typeof budget === 'number' && budget >= 1) brief.budget = Math.round(budget)
+  else if (typeof budgetPerNight === 'number' && budgetPerNight >= 1) brief.budgetPerNight = Math.round(budgetPerNight)
   if (quiet === true) brief.quiet = true
   if (height === 'high' || height === 'low') brief.height = height
   if (view === 'any' || (typeof view === 'string' && Object.hasOwn(VIEW_LABEL, view))) brief.view = view as ViewKind

@@ -1,13 +1,17 @@
 // The examples of the OpenAPI document (/api/openapi.json): the real answers of a running site about the hotel
-// ota-9096882 of Valencia, with long arrays cut to a few items. Nothing is made up: rerun after the catalogue changes.
+// ota-7481548 of Valencia (the view example keeps ota-9096882, the one with three beaches), with long arrays cut to
+// a few items. Nothing is made up: rerun after the catalogue changes (the view of a floor depends on the day).
 //   npm run dev, then: npm run docs:examples [-- http://localhost:3000]
 import { mkdirSync, writeFileSync } from 'node:fs'
+import sharp from 'sharp'
 
 const base = (process.argv[2] ?? 'http://localhost:3000').replace(/\/$/, '')
 const out = new URL('../src/lib/openapi/examples/', import.meta.url)
-const HOTEL = 'ota-9096882'
+const HOTEL = 'ota-7481548'
+/** The hotel of the view example: its three nearest beaches are the example of the way to the sea. */
+const SEA_HOTEL = 'ota-9096882'
 /** The box of the map around the hotel, as the hotel page asks for it. */
-const BBOX = '-0.345,39.375,-0.32,39.39'
+const BBOX = '-0.36,39.45,-0.335,39.465'
 
 type Json = Record<string, unknown>
 
@@ -52,6 +56,21 @@ function shortMap(map: Json | null, bytes: number): Json | null {
   return { ...map, features: kept }
 }
 
+/** The first three hotels of the plan with their characteristics. */
+function shortMatches(answer: Json): Json {
+  const matches = first(answer.matches as Json[] | undefined, 3)
+  const features = answer.features as Record<string, unknown> | undefined
+  return {
+    ...answer,
+    ...(matches.length > 0 && { matches }),
+    ...(features && {
+      features: Object.fromEntries(
+        matches.flatMap((m) => (features[m.id as string] ? [[m.id, features[m.id as string]]] : [])),
+      ),
+    }),
+  }
+}
+
 function write(name: string, value: unknown) {
   const text = `${JSON.stringify(value, null, 2)}\n`
   writeFileSync(new URL(`${name}.json`, out), text)
@@ -72,7 +91,7 @@ write('hotels-destinations', {
   response: { hotels: first(city.hotels, 2).map(shortHotel) },
 })
 
-const { view } = (await call(`/api/hotels/${HOTEL}/view`)) as { view: Json }
+const { view } = (await call(`/api/hotels/${SEA_HOTEL}/view`)) as { view: Json }
 const targets = (items: Json[]) => items.map((target) => ({ ...target, line: shortLine(target.line as Json | null) }))
 write('view', {
   view: {
@@ -119,6 +138,21 @@ write('documents-search', {
   ),
 })
 
+// The words of the hotelier (demonstration data, flagged `demo`) found by their meaning besides the reviews.
+const HOTELIER_HOTEL = 'ota-7568446'
+const hotelierQuery = { q: 'вид на море', limit: 3 }
+write('documents-search-hotelier', {
+  hotel: HOTELIER_HOTEL,
+  query: hotelierQuery,
+  response: await call(
+    `/api/hotels/${HOTELIER_HOTEL}/documents/search?q=${encodeURIComponent(hotelierQuery.q)}&limit=${hotelierQuery.limit}`,
+  ),
+})
+write('hotelier-facts', {
+  hotel: HOTELIER_HOTEL,
+  response: await call(`/api/hotels/${HOTELIER_HOTEL}/hotelier/facts`),
+})
+
 const relationsQuery = { predicate: 'near', category: 'pharmacy', limit: 3 }
 write('relations', {
   query: relationsQuery,
@@ -152,21 +186,7 @@ const wishRequest = {
     nights: 4,
   },
 }
-const wish = await call('/api/assistant', wishRequest)
-const matches = first(wish.matches as Json[] | undefined, 3)
-const features = wish.features as Record<string, unknown> | undefined
-write('assistant-wish', {
-  request: wishRequest,
-  response: {
-    ...wish,
-    ...(matches.length > 0 && { matches }),
-    ...(features && {
-      features: Object.fromEntries(
-        matches.flatMap((m) => (features[m.id as string] ? [[m.id, features[m.id as string]]] : [])),
-      ),
-    }),
-  },
-})
+write('assistant-wish', { request: wishRequest, response: shortMatches(await call('/api/assistant', wishRequest)) })
 
 // The choice by the store's tools: the runs' characteristics by hotel, the first three hotels of the plan.
 const knowledgeRequest = {
@@ -179,20 +199,9 @@ const knowledgeRequest = {
   ],
   brief: { destinationId: 'valencia', quiet: true, when: 'any', party: 'couple' },
 }
-const knowledge = await call('/api/assistant', knowledgeRequest)
-const chosen = first(knowledge.matches as Json[] | undefined, 3)
-const chosenFeatures = knowledge.features as Record<string, unknown> | undefined
 write('assistant-knowledge', {
   request: knowledgeRequest,
-  response: {
-    ...knowledge,
-    ...(chosen.length > 0 && { matches: chosen }),
-    ...(chosenFeatures && {
-      features: Object.fromEntries(
-        chosen.flatMap((m) => (chosenFeatures[m.id as string] ? [[m.id, chosenFeatures[m.id as string]]] : [])),
-      ),
-    }),
-  },
+  response: shortMatches(await call('/api/assistant', knowledgeRequest)),
 })
 
 // A chat about the bookings: the browser's booking at the hotel without the personal fields, moved to other dates.
@@ -205,15 +214,54 @@ const tripsRequest = {
       createdAt: '2026-10-27T18:00:00.000Z',
       status: 'confirmed',
       hotelId: HOTEL,
-      roomId: 'room-3202',
+      roomId: 'room-3202402',
       rateId: 'rate-1',
       checkIn: '2026-11-10',
       checkOut: '2026-11-12',
       guests: { adults: 2, children: 0, rooms: 1 },
       payment: 'now',
-      total: 19200,
+      total: 29000,
       cancellation: { kind: 'free', daysBefore: 4 },
     },
   ],
 }
 write('assistant-trips', { request: tripsRequest, response: await call('/api/assistant', tripsRequest) })
+
+// The hotel's chat: the sight from the floors (the widget «Вид из отеля»), the ways on foot and by car, «до …» by
+// geocode, the characteristics of the hotel and the reviews. Each question is one request to the route.
+const hotelChat = (text: string) => ({ messages: [{ role: 'user', text }], brief: { hotelId: HOTEL } })
+
+for (const [name, text] of [
+  ['assistant-view-9', 'Виден ли Торговый центр Aqua с 9 этажа?'],
+  ['assistant-view-12', 'Видно ли закат и море с 12 этажа?'],
+  ['assistant-walk', 'Как дойти пешком до метро?'],
+  ['assistant-car', 'Как доехать на машине до аэропорта?'],
+  ['assistant-until', 'Сколько идти до Центрального рынка?'],
+  ['assistant-accessible', 'Подойдёт ли отель для мамы с коляской и есть ли номера на первом этаже?'],
+  ['assistant-hotel-reviews', 'Что пишут гости про завтрак в отзывах?'],
+] as const) {
+  const request = hotelChat(text)
+  write(name, { request, response: await call('/api/assistant', request) })
+}
+
+// The search by the description, by the photo: the photo is a catalogue photo of the hotel, 200 px wide.
+const searchBrief = { destinationId: 'valencia', when: 'any', party: 'couple' }
+const semanticRequest = {
+  messages: [{ role: 'user', text: 'Уютный отель с видом на старый город и террасой на крыше' }],
+  brief: searchBrief,
+}
+write('assistant-semantic', {
+  request: semanticRequest,
+  response: shortMatches(await call('/api/assistant', semanticRequest)),
+})
+
+const photoUrl = ((hotels[0]!.photos as Json[])[1] as Json).url as string
+const photo = Buffer.from(await (await fetch(photoUrl.replace('{size}', 'x220'))).arrayBuffer())
+const photoRequest = {
+  messages: [{ role: 'user', text: 'Найди похожие отели' }],
+  brief: searchBrief,
+  photos: [
+    `data:image/jpeg;base64,${(await sharp(photo).resize(200).jpeg({ quality: 60 }).toBuffer()).toString('base64')}`,
+  ],
+}
+write('assistant-photo', { request: photoRequest, response: shortMatches(await call('/api/assistant', photoRequest)) })

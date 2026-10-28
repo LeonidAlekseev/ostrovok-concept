@@ -1036,6 +1036,7 @@ export type Database = {
           status: string
           updated_at: string
           user_id: string
+          user_hidden_at: string | null
           user_unread: number
         }
         ComputedFields: never
@@ -1054,6 +1055,7 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string
+          user_hidden_at?: string | null
           user_unread?: number
         }
         Update: {
@@ -1071,6 +1073,7 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string
+          user_hidden_at?: string | null
           user_unread?: number
         }
         Relationships: [
@@ -1978,6 +1981,7 @@ export type Database = {
       hotel_view_eyes: { Args: { lat: number; lon: number; targets: Json }; Returns: Json }
       hotelier_conversation_read: { Args: { conversation_id: string }; Returns: undefined }
       hotelier_conversation_status: { Args: { conversation_id: string; status: string }; Returns: boolean }
+      hotelier_hide_chat: { Args: { conversation_id: string }; Returns: boolean }
       hotelier_my_chats: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -1995,6 +1999,7 @@ export type Database = {
           status: string
           updated_at: string
           user_id: string
+          user_hidden_at: string | null
           user_unread: number
         }[]
       }

@@ -61,7 +61,7 @@ export const noiseMapOperations: ApiOperation[] = [
         headers: cacheHeader,
         examples: {
           real: {
-            summary: 'ota-9096882',
+            summary: 'ota-7481548',
             description: `${countRu(noiseMapExample.map.features.length, ['кусок', 'куска', 'кусков'])} из ответа`,
             value: noiseMapExample,
           },

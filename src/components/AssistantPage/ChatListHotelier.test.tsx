@@ -24,7 +24,11 @@ const conversation = (over: Partial<HotelierConversation> = {}): HotelierConvers
   ...over,
 })
 
-function renderList(hotelier: HotelierConversation[], onChooseHotelier = vi.fn()) {
+function renderList(
+  hotelier: HotelierConversation[],
+  onChooseHotelier = vi.fn(),
+  onDeleteHotelier = vi.fn().mockResolvedValue(undefined),
+) {
   render(
     <ChatList
       chats={[]}
@@ -38,19 +42,20 @@ function renderList(hotelier: HotelierConversation[], onChooseHotelier = vi.fn()
       hotelier={hotelier}
       hotelierActive={null}
       onChooseHotelier={onChooseHotelier}
+      onDeleteHotelier={onDeleteHotelier}
     />,
   )
-  return onChooseHotelier
+  return { onChooseHotelier, onDeleteHotelier }
 }
 
 describe('ChatList: chats with hoteliers', () => {
   it('lists them under «С отельерами» and opens one by its hotel', async () => {
-    const choose = renderList([conversation()])
+    const { onChooseHotelier: choose } = renderList([conversation()])
     const section = screen.getByRole('region', { name: 'С отельерами' })
     expect(within(section).getByText('Hotel Reina')).toBeTruthy()
     expect(within(section).getByText('новое')).toBeTruthy()
     expect(screen.queryByText(/Здесь будут ваши чаты/)).toBeNull()
-    await userEvent.click(within(section).getByRole('button', { name: /Hotel Reina/ }))
+    await userEvent.click(within(section).getByRole('button', { name: /Hotel Reina.*Есть ли/ }))
     expect(choose).toHaveBeenCalledWith('ota-1')
   })
 
@@ -68,6 +73,25 @@ describe('ChatList: chats with hoteliers', () => {
     const section = screen.getByRole('region', { name: 'С отельерами' })
     expect(within(section).queryByText('Hotel Reina')).toBeNull()
     expect(within(section).getByText('Casa Mar')).toBeTruthy()
+  })
+})
+
+describe('ChatList: actions of a chat with a hotelier', () => {
+  it('has «Поделиться» and «Удалить» in its menu, like Эвал’s chats', async () => {
+    renderList([conversation()])
+    await userEvent.click(screen.getByRole('button', { name: 'Действия с чатом «Hotel Reina»' }))
+    expect(await screen.findByRole('menuitem', { name: 'Поделиться' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Удалить' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Переименовать' })).toBeNull()
+  })
+
+  it('«Удалить» asks first, then hides the chat', async () => {
+    const { onDeleteHotelier } = renderList([conversation()])
+    await userEvent.click(screen.getByRole('button', { name: 'Действия с чатом «Hotel Reina»' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Удалить' }))
+    expect(onDeleteHotelier).not.toHaveBeenCalled()
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Удалить' }))
+    expect(onDeleteHotelier).toHaveBeenCalledWith(expect.objectContaining({ id: 'c1' }))
   })
 })
 

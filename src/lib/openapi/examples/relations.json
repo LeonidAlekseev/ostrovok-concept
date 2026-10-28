@@ -5,27 +5,27 @@
     "limit": 3
   },
   "response": {
-    "hotelId": "ota-9096882",
+    "hotelId": "ota-7481548",
     "relations": [
       {
-        "id": "e47a88f0-beeb-4a9b-a0c4-0f6be2271889",
+        "id": "8bf108ee-f7f7-4052-a674-06e23f584320",
         "predicate": "near",
         "confidence": 1,
         "object": {
           "kind": "osm_place",
-          "ref": "node/2477521752",
+          "ref": "node/1712713244",
           "name": null,
-          "lat": 39.383047,
-          "lon": -0.3332363,
+          "lat": 39.4587397,
+          "lon": -0.346228,
           "categories": ["pharmacy"]
         },
         "claim": {
-          "id": "0a00dc88-8f9b-4c08-9bb2-1dde74bcc009",
+          "id": "87017d6c-024d-4551-8ddd-ec903203d1ce",
           "property": "nearby.distance",
-          "sourceKey": "node/2477521752",
+          "sourceKey": "node/1712713244",
           "value": {
             "kind": "number",
-            "value": 66.2
+            "value": 182.2
           },
           "unit": "m",
           "status": "derived",
@@ -42,12 +42,12 @@
           "validTo": null,
           "limitations": [],
           "calculation": {
-            "id": "c46c2ab6-4473-4524-a2f5-36337d18738a",
+            "id": "13c40de9-2ddf-45fe-8b4f-cb517bf4aa92",
             "method": "osm_places_near: расстояние по прямой от точки отеля до формы объекта OSM; место Островка — его расстояние со страницы",
             "version": "nearby-1",
             "inputs": {
-              "lat": 39.3833,
-              "lon": -0.33254,
+              "lat": 39.45819,
+              "lon": -0.348223,
               "covered": [
                 "beach",
                 "bus_stop",
@@ -59,7 +59,7 @@
                 "train_station",
                 "tram"
               ],
-              "hotel_id": "ota-9096882"
+              "hotel_id": "ota-7481548"
             },
             "parameters": {
               "radius_m": 1000,
@@ -86,33 +86,243 @@
           },
           "evidence": [
             {
-              "id": "da6660b7-37f0-4274-af26-46a5c67b125d",
+              "id": "37b5b6c5-1db5-4548-ba8b-29bed834c20b",
               "role": "input",
               "type": "osm",
-              "title": "node/2477521752",
+              "title": "node/1712713244",
               "provider": "OpenStreetMap",
-              "externalId": "node/2477521752",
-              "url": "https://www.openstreetmap.org/node/2477521752",
-              "retrievedAt": "2026-10-26T19:30:00.378+00:00",
+              "externalId": "node/1712713244",
+              "url": "https://www.openstreetmap.org/node/1712713244",
+              "retrievedAt": "2026-10-28T13:22:26.449+00:00",
               "excerpt": null,
               "datasetId": null
             }
           ]
         },
         "evidence": {
-          "id": "da6660b7-37f0-4274-af26-46a5c67b125d",
+          "id": "37b5b6c5-1db5-4548-ba8b-29bed834c20b",
           "role": null,
           "type": "osm",
-          "title": "node/2477521752",
+          "title": "node/1712713244",
           "provider": "OpenStreetMap",
-          "externalId": "node/2477521752",
-          "url": "https://www.openstreetmap.org/node/2477521752",
-          "retrievedAt": "2026-10-26T19:30:00.378+00:00",
+          "externalId": "node/1712713244",
+          "url": "https://www.openstreetmap.org/node/1712713244",
+          "retrievedAt": "2026-10-28T13:22:26.449+00:00",
+          "excerpt": null,
+          "datasetId": null
+        }
+      },
+      {
+        "id": "d8e72d68-4844-493a-b41a-db30a4748e48",
+        "predicate": "near",
+        "confidence": 1,
+        "object": {
+          "kind": "osm_place",
+          "ref": "way/1282494250",
+          "name": "Farmacia Aqua",
+          "lat": 39.4562992,
+          "lon": -0.3464204,
+          "categories": ["pharmacy"]
+        },
+        "claim": {
+          "id": "3d223a85-0e87-4589-80aa-0ffc717d9cdb",
+          "property": "nearby.distance",
+          "sourceKey": "way/1282494250",
+          "value": {
+            "kind": "number",
+            "value": 261
+          },
+          "unit": "m",
+          "status": "derived",
+          "confidence": 1,
+          "method": {
+            "categories": ["pharmacy"],
+            "confidence": {
+              "rule": "osm_distance",
+              "policy": "confidence-1"
+            }
+          },
+          "observedAt": null,
+          "validFrom": null,
+          "validTo": null,
+          "limitations": [],
+          "calculation": {
+            "id": "13c40de9-2ddf-45fe-8b4f-cb517bf4aa92",
+            "method": "osm_places_near: расстояние по прямой от точки отеля до формы объекта OSM; место Островка — его расстояние со страницы",
+            "version": "nearby-1",
+            "inputs": {
+              "lat": 39.45819,
+              "lon": -0.348223,
+              "covered": [
+                "beach",
+                "bus_stop",
+                "hospital",
+                "metro",
+                "park",
+                "pharmacy",
+                "supermarket",
+                "train_station",
+                "tram"
+              ],
+              "hotel_id": "ota-7481548"
+            },
+            "parameters": {
+              "radius_m": 1000,
+              "categories": [
+                "pharmacy",
+                "supermarket",
+                "hospital",
+                "bus_stop",
+                "tram",
+                "metro",
+                "train_station",
+                "beach",
+                "park"
+              ],
+              "per_category": 5
+            },
+            "limitations": [
+              "Кэш OSM ограничен тем, что загружено: места нет в кэше — не значит, что его нет на месте",
+              "Расстояние по прямой до формы объекта, не путь пешком",
+              "Не более 5 ближайших мест каждой категории",
+              "Место OSM, которое есть и на странице Островка, записано как место Островка"
+            ],
+            "computedAt": "2026-10-27T17:08:44.835+00:00"
+          },
+          "evidence": [
+            {
+              "id": "dc23f426-104c-4b5a-9fb7-6e9fa802d29c",
+              "role": "input",
+              "type": "osm",
+              "title": "Farmacia Aqua",
+              "provider": "OpenStreetMap",
+              "externalId": "way/1282494250",
+              "url": "https://www.openstreetmap.org/way/1282494250",
+              "retrievedAt": "2026-10-28T13:22:26.449+00:00",
+              "excerpt": null,
+              "datasetId": null
+            }
+          ]
+        },
+        "evidence": {
+          "id": "dc23f426-104c-4b5a-9fb7-6e9fa802d29c",
+          "role": null,
+          "type": "osm",
+          "title": "Farmacia Aqua",
+          "provider": "OpenStreetMap",
+          "externalId": "way/1282494250",
+          "url": "https://www.openstreetmap.org/way/1282494250",
+          "retrievedAt": "2026-10-28T13:22:26.449+00:00",
+          "excerpt": null,
+          "datasetId": null
+        }
+      },
+      {
+        "id": "021a9e20-99af-4169-956a-3a82528322ea",
+        "predicate": "near",
+        "confidence": 1,
+        "object": {
+          "kind": "osm_place",
+          "ref": "node/10314636971",
+          "name": "Farmacia Genovés",
+          "lat": 39.4597792,
+          "lon": -0.3511517,
+          "categories": ["pharmacy"]
+        },
+        "claim": {
+          "id": "8040cea7-8d4b-4082-b47a-692d1fd08684",
+          "property": "nearby.distance",
+          "sourceKey": "node/10314636971",
+          "value": {
+            "kind": "number",
+            "value": 307.7
+          },
+          "unit": "m",
+          "status": "derived",
+          "confidence": 1,
+          "method": {
+            "categories": ["pharmacy"],
+            "confidence": {
+              "rule": "osm_distance",
+              "policy": "confidence-1"
+            }
+          },
+          "observedAt": null,
+          "validFrom": null,
+          "validTo": null,
+          "limitations": [],
+          "calculation": {
+            "id": "13c40de9-2ddf-45fe-8b4f-cb517bf4aa92",
+            "method": "osm_places_near: расстояние по прямой от точки отеля до формы объекта OSM; место Островка — его расстояние со страницы",
+            "version": "nearby-1",
+            "inputs": {
+              "lat": 39.45819,
+              "lon": -0.348223,
+              "covered": [
+                "beach",
+                "bus_stop",
+                "hospital",
+                "metro",
+                "park",
+                "pharmacy",
+                "supermarket",
+                "train_station",
+                "tram"
+              ],
+              "hotel_id": "ota-7481548"
+            },
+            "parameters": {
+              "radius_m": 1000,
+              "categories": [
+                "pharmacy",
+                "supermarket",
+                "hospital",
+                "bus_stop",
+                "tram",
+                "metro",
+                "train_station",
+                "beach",
+                "park"
+              ],
+              "per_category": 5
+            },
+            "limitations": [
+              "Кэш OSM ограничен тем, что загружено: места нет в кэше — не значит, что его нет на месте",
+              "Расстояние по прямой до формы объекта, не путь пешком",
+              "Не более 5 ближайших мест каждой категории",
+              "Место OSM, которое есть и на странице Островка, записано как место Островка"
+            ],
+            "computedAt": "2026-10-27T17:08:44.835+00:00"
+          },
+          "evidence": [
+            {
+              "id": "93ed4b63-2b74-4ccb-9251-fa3295fe3e5a",
+              "role": "input",
+              "type": "osm",
+              "title": "Farmacia Genovés",
+              "provider": "OpenStreetMap",
+              "externalId": "node/10314636971",
+              "url": "https://www.openstreetmap.org/node/10314636971",
+              "retrievedAt": "2026-10-28T13:22:26.449+00:00",
+              "excerpt": null,
+              "datasetId": null
+            }
+          ]
+        },
+        "evidence": {
+          "id": "93ed4b63-2b74-4ccb-9251-fa3295fe3e5a",
+          "role": null,
+          "type": "osm",
+          "title": "Farmacia Genovés",
+          "provider": "OpenStreetMap",
+          "externalId": "node/10314636971",
+          "url": "https://www.openstreetmap.org/node/10314636971",
+          "retrievedAt": "2026-10-28T13:22:26.449+00:00",
           "excerpt": null,
           "datasetId": null
         }
       }
     ],
-    "truncated": false
+    "truncated": true
   }
 }

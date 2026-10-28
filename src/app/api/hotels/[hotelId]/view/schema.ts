@@ -130,7 +130,8 @@ export const viewOperations: ApiOperation[] = [
     summary: 'Вид из отеля',
     description:
       'Линии взгляда над зданиями EUBUCCO для всех этажей: лучи горизонта, берег моря, достопримечательности. Для страницы отеля (`HotelView`); итог с этажа считается на клиенте без новых запросов.',
-    parameters: [hotelIdParameter],
+    // The way to the sea: the hotel with its three nearest beaches.
+    parameters: [{ ...hotelIdParameter, example: 'ota-9096882' }],
     responses: {
       200: {
         description: 'Вид или `null`',
