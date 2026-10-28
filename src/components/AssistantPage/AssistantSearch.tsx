@@ -333,7 +333,7 @@ export function AssistantSearch({ newHotels, onChoose }: Props) {
               <InputGroupTextarea
                 ref={inputRef}
                 id={inputId}
-                className="max-h-[min(9.5rem,30dvh)] min-h-[2.6em] self-center overflow-y-auto p-0 py-2 text-base leading-[1.4] field-sizing-content placeholder:text-(--decor-assistant-text-2)"
+                className="max-h-[min(9.5rem,30dvh)] self-center overflow-y-auto p-0 py-2 text-base leading-[1.4] field-sizing-content placeholder:text-(--decor-assistant-text-2)"
                 rows={1}
                 value={text}
                 enterKeyHint="send"

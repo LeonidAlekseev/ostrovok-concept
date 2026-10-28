@@ -43,7 +43,7 @@ export function HotelPage({ hotel, details, noise }: Props) {
         <HotelAssistantProvider hotel={hotel}>
           <MobileTopBar hotel={hotel} />
           <div className="mx-auto flex w-full max-w-(--page-max) flex-1 flex-col px-(--page-x) pt-[clamp(16px,4vw,28px)] lg:pb-12">
-            <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-8 xl:grid-cols-[minmax(0,1fr)_23rem]">
+            <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-8 xl:grid-cols-[minmax(0,1fr)_29rem]">
               <div className="flex min-w-0 flex-col gap-6">
                 <HotelHeader hotel={hotel} />
                 <Gallery hotel={hotel} />
