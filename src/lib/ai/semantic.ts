@@ -59,7 +59,7 @@ function forgetVector(query: string, vector: Promise<number[]>) {
 }
 
 /** The shared request has its own limit: a search that gives up does not cancel the vector for the others. */
-function queryVector(apiKey: string, query: string): Promise<number[]> {
+export function queryVector(apiKey: string, query: string): Promise<number[]> {
   const cached = queryVectors.get(query)
   if (cached) return cached
   const vector = embed({
@@ -74,6 +74,23 @@ function queryVector(apiKey: string, query: string): Promise<number[]> {
   if (queryVectors.size >= QUERY_CACHE) queryVectors.delete(queryVectors.keys().next().value!)
   queryVectors.set(query, vector)
   return vector
+}
+
+/** The query's vector for the meaning part of a hybrid search waits this long at most. */
+export const HYBRID_VECTOR_MS = 4000
+
+/**
+ * The query's vector for the meaning part of a hybrid search (`hotel_chunks_hybrid`); `null` without the key, on a
+ * failure or later than `timeoutMs`: the search is by the words alone then.
+ */
+export async function queryVectorOrNull(query: string, timeoutMs = HYBRID_VECTOR_MS): Promise<number[] | null> {
+  const key = await getSecret(NVIDIA_KEY).catch(() => undefined)
+  if (!key) return null
+  let timer: ReturnType<typeof setTimeout> | undefined
+  return Promise.race([
+    queryVector(key, query.slice(0, MAX_SEMANTIC_QUERY)).catch(() => null),
+    new Promise<null>((resolve) => (timer = setTimeout(() => resolve(null), timeoutMs))),
+  ]).finally(() => clearTimeout(timer))
 }
 
 /** Waits for `promise`, but rejects as soon as `signal` aborts; the promise itself is left running. */

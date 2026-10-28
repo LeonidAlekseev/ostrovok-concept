@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 import { buttonVariants } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useHotels } from '@/hooks/useHotels'
@@ -8,6 +10,7 @@ import { useBookings } from '@/hooks/useStore'
 import { todayIso } from '@/lib/dates'
 import { tripsIn, type TripTab } from '@/lib/trips'
 import { TripCard } from './TripCard'
+import { TripsAssistant } from './TripsAssistant'
 import { pageClass, TripsGate } from './TripsGate'
 
 const TABS: { value: TripTab; label: string; empty: string }[] = [
@@ -19,12 +22,20 @@ const TABS: { value: TripTab; label: string; empty: string }[] = [
 function Trips() {
   const bookings = useBookings()
   const today = todayIso()
+  // Just booked: the checkout opens the trips with the new booking first and marked.
+  const freshId = useSearchParams().get('new')
+  const fresh = bookings.find((b) => b.id === freshId)
   // The hotels of all the bookings in one request; the cards wait for it rather than flash «Отель».
   const loaded = useHotels({ ids: [...new Set(bookings.map((b) => b.hotelId))] })
   const hotelOf = (id: string) => (loaded.status === 'done' ? loaded.hotels.find((h) => h.id === id) : undefined)
   return (
     <>
       <h1 className="text-title font-bold tracking-[-0.02em]">Мои поездки</h1>
+      {fresh && (
+        <p role="status" className="rounded-lg bg-success-soft p-3 font-semibold text-success-foreground">
+          Бронирование {fresh.id} подтверждено
+        </p>
+      )}
       {loaded.status === 'error' && <p role="alert">{loaded.message}: показываем поездки без фото.</p>}
       <Tabs defaultValue="upcoming">
         <TabsList className="mb-4 flex w-full gap-1 border-b border-border">
@@ -39,7 +50,8 @@ function Trips() {
           ))}
         </TabsList>
         {TABS.map(({ value, empty }) => {
-          const list = tripsIn(bookings, value, today)
+          const sorted = tripsIn(bookings, value, today)
+          const list = fresh && sorted.includes(fresh) ? [fresh, ...sorted.filter((b) => b !== fresh)] : sorted
           return (
             <TabsContent key={value} value={value}>
               {list.length === 0 ? (
@@ -59,7 +71,13 @@ function Trips() {
               ) : (
                 <ul className="flex flex-col gap-3">
                   {list.map((booking) => (
-                    <TripCard key={booking.id} booking={booking} hotel={hotelOf(booking.hotelId)} tab={value} />
+                    <TripCard
+                      key={booking.id}
+                      booking={booking}
+                      hotel={hotelOf(booking.hotelId)}
+                      tab={value}
+                      highlight={booking === fresh}
+                    />
                   ))}
                 </ul>
               )}
@@ -70,6 +88,7 @@ function Trips() {
       <p className="text-sm text-muted-foreground">
         Бронирования демонстрационные: они не привязаны к аккаунту и показываются все, что сделаны в этом браузере.
       </p>
+      <TripsAssistant />
     </>
   )
 }
@@ -79,7 +98,9 @@ export function TripsPage() {
   return (
     <main className={pageClass}>
       <TripsGate next="/trips">
-        <Trips />
+        <Suspense fallback={<p className="text-muted-foreground">Загружаем поездки…</p>}>
+          <Trips />
+        </Suspense>
       </TripsGate>
     </main>
   )

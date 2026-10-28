@@ -6,6 +6,7 @@ import { cacheHeader, component, sameType, type ApiOperation } from '@/lib/opena
 import { hotelIdParameter } from '../../schema'
 import { polygonSchema } from '../view-map/schema'
 import noiseMapExample from '@/lib/openapi/examples/noise-map.json'
+import { NOISE_ESTIMATE_DOC } from '../noiseEstimateDoc'
 
 /** `GET /api/hotels/{hotelId}/noise-map`: the EEA noise around the hotel, GeoJSON. */
 
@@ -51,7 +52,7 @@ export const noiseMapOperations: ApiOperation[] = [
     operationId: 'getHotelNoiseMap',
     tags: ['Гео отеля'],
     summary: 'Шум вокруг отеля',
-    description: 'Карта «Шум и окружение» (`NoiseMap`): контуры шума EEA, GeoJSON.',
+    description: `Карта «Шум и окружение» (\`NoiseMap\`): контуры шума EEA, GeoJSON. Уровни у фасада отеля — в утверждениях \`noise.estimate.*\` (\`GET /api/hotels/{hotelId}/claims?property=noise.estimate.\`).\n\n${NOISE_ESTIMATE_DOC}`,
     parameters: [hotelIdParameter],
     responses: {
       200: {

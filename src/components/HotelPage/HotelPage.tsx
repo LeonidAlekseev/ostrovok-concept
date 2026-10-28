@@ -6,6 +6,7 @@ import { AboutHotel, HotelAmenities } from './AboutHotel'
 import { BookingCard } from './BookingCard'
 import { Gallery } from './Gallery'
 import { HotelAssistant, HotelAssistantProvider } from './HotelAssistant'
+import { HotelierFacts } from './HotelierFacts'
 import { HotelHeader } from './HotelHeader'
 import { HotelLocation, LocationCard } from './HotelLocation'
 import { HotelNoise } from './HotelNoise'
@@ -62,10 +63,11 @@ export function HotelPage({ hotel, details, noise }: Props) {
                   <HotelAmenities hotel={hotel} details={details} />
                   {hasGuestReviews(hotel, details) && <HotelRating hotel={hotel} details={details} />}
                   <HotelLocation hotel={hotel} details={details} />
-                  {noise && <HotelNoise hotel={hotel} noise={noise} building={details?.building} />}
+                  {noise && <HotelNoise hotel={hotel} noise={noise} />}
                   {details && (
                     <HotelView hotel={hotel} building={details.building} roomFloors={details.facts.roomFloors} />
                   )}
+                  <HotelierFacts hotel={hotel} />
                   <HotelRules hotel={hotel} details={details} />
                 </div>
               </div>

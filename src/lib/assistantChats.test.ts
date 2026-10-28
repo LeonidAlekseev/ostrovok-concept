@@ -8,6 +8,7 @@ import {
   hotelChatOf,
   lastPhotoMessage,
   loadGuestChats,
+  mergeServerMessage,
   newChat,
   parseChat,
   parseChats,
@@ -16,6 +17,7 @@ import {
   type ChatMessage,
 } from './assistantChats'
 import { DIALOG_KEY } from './assistantDialog'
+import { RUN_ID, groupedResult, sampleResult } from '@/test/toolResult'
 
 afterEach(() => {
   window.localStorage.clear()
@@ -232,5 +234,94 @@ describe('the photos of a message', () => {
     expect(saved[0].messages[0].data.attachments).toEqual([{ preview, width: 320, height: 240 }])
     expect(saved[1].messages[0].data.attachments).toEqual([{ width: 320, height: 240 }])
     expect(saved[1].messages[0].text).toBe('вот')
+  })
+})
+
+// assistant-search, Requirement: Восстановление блоков инструментов
+describe('the runs of the steps in the saved chats', () => {
+  const step = { agent: 'features', title: 'Анализ шума', params: 'карты шума EEA', result: 'Ночью 55–59 дБ' }
+  const chatWith = (data: unknown): unknown => ({
+    ...newChat('2026-10-27T10:00:00.000Z'),
+    messages: [{ ...message('agent', ''), data }],
+  })
+
+  it('keeps the run with its sources after a reload (Scenario: Перезагрузка)', () => {
+    const run = { id: RUN_ID, result: sampleResult }
+    const chat = chatWith({ step: { ...step, run } }) as Chat
+    saveGuestChats([chat])
+    expect(loadGuestChats()[0].messages[0].data.step).toEqual({ ...step, run })
+  })
+
+  it('keeps the characteristics by hotel of a tool of the choice after a reload', () => {
+    const run = { id: RUN_ID, result: groupedResult }
+    saveGuestChats([chatWith({ step: { ...step, run } }) as Chat])
+    expect(loadGuestChats()[0].messages[0].data.step?.run?.result.groups).toEqual(groupedResult.groups)
+  })
+
+  it('shows an older step without a run as before, and drops a run off the contract only', () => {
+    expect(parseChat(chatWith({ step }))!.messages[0].data.step).toEqual(step)
+    const broken = { id: RUN_ID, result: { ...sampleResult, claims: 'много' } }
+    expect(parseChat(chatWith({ step: { ...step, run: broken } }))!.messages[0].data.step).toEqual(step)
+  })
+})
+
+// hotelier-knowledge, Requirement: Ответ отельера в чате Эвала
+describe('mergeServerMessage', () => {
+  const run = (status: 'pending' | 'success', answer?: string) => ({
+    id: '00000000-0000-4000-8000-0000000001a1',
+    result: {
+      status,
+      summary: answer ?? 'Ждёт',
+      data: { request_id: 'r1', question: 'Балкон?', ...(answer && { answer, knowledge: 'done' }) },
+      evidence: [],
+      claims: [],
+      calculations: [],
+      method: null,
+      limitations: [],
+      error: null,
+    },
+  })
+  const step = (status: 'pending' | 'success', answer?: string): ChatMessage => ({
+    id: 'step',
+    role: 'agent',
+    status: 'done',
+    text: '',
+    data: { step: { agent: 'hotelier', title: 'Запрос отельеру', run: run(status, answer) } },
+    createdAt: '2026-10-28T10:00:00Z',
+  })
+  const chat = (): Chat => ({ ...newChat('2026-10-28T09:00:00Z'), messages: [step('pending')] })
+
+  it('adds the hotelier’s answer, unread when the traveller is elsewhere', () => {
+    const owner: ChatMessage = {
+      id: 'o',
+      role: 'owner',
+      status: 'done',
+      text: 'Да',
+      data: {},
+      createdAt: '2026-10-28T11:00:00Z',
+    }
+    expect(mergeServerMessage(chat(), owner, false)).toMatchObject({
+      unread: true,
+      messages: [{ id: 'step' }, { id: 'o' }],
+    })
+    expect(mergeServerMessage(chat(), owner, true).unread).toBe(false)
+  })
+
+  it('finishes the waiting step, and leaves every other echo as it is', () => {
+    const before = chat()
+    const after = mergeServerMessage(before, step('success', 'Да'), true)
+    expect(after.messages[0].data.step?.run?.result.status).toBe('success')
+    // An older echo of the browser's own save does not undo the answer.
+    expect(mergeServerMessage(after, step('pending'), true)).toBe(after)
+    // A message of the browser's own is not the server's to add.
+    const user: ChatMessage = {
+      id: 'u',
+      role: 'user',
+      status: 'done',
+      text: 'x',
+      data: {},
+      createdAt: '2026-10-28T12:00:00Z',
+    }
+    expect(mergeServerMessage(before, user, true)).toBe(before)
   })
 })

@@ -21,14 +21,24 @@ vi.mock('./ViewMap', () => ({
     buildings,
     blockers,
     hotelBuilding,
+    targets,
   }: {
     bearing: number
     buildings: { features: unknown[] } | null
     blockers: string[]
     hotelBuilding: string | null
+    targets: { name: string; verdict: string; line: boolean }[]
   }) => (
     <div data-testid="view-map">
       {bearing} {buildings?.features.length ?? 'none'} [{[...new Set(blockers)].join(',')}] {hotelBuilding}
+      <ul>
+        {targets.map((t) => (
+          <li key={t.name}>
+            {t.name}: {t.verdict}
+            {t.line ? ' (линия)' : ''}
+          </li>
+        ))}
+      </ul>
     </div>
   ),
 }))
@@ -133,7 +143,7 @@ describe('HotelView', () => {
     render(<HotelView hotel={hotel} building={building} roomFloors={null} />)
     expect(screen.getByRole('heading', { level: 2, name: 'Вид из отеля' })).toBeTruthy()
     const window = screen.getByRole('region', { name: 'Положение окна' })
-    expect(within(window).getByText('здание 12 этажей, ≈ 36 м (по оценке EUBUCCO)')).toBeTruthy()
+    expect(within(window).getByText('здание 12 этажей, ≈ 36 м')).toBeTruthy()
     expect(within(window).getByText('окно 12-го этажа, ≈ 34,5 м над землёй')).toBeTruthy()
     expect(floorSlider().getAttribute('aria-valuenow')).toBe('12')
     const sea = screen.getByRole('region', { name: 'Море' })
@@ -145,11 +155,9 @@ describe('HotelView', () => {
     expect(within(landmarks).getByText('Torres de Serranos')).toBeTruthy()
     expect(within(landmarks).getByText('не видно ни с одного этажа')).toBeTruthy()
     expect(within(landmarks).getByText('видно со всех этажей')).toBeTruthy()
-    expect(
-      within(landmarks).getByText('С 12-го этажа — закрыто зданием ≈ 45 м (по оценке EUBUCCO) в 40 м от отеля'),
-    ).toBeTruthy()
+    expect(within(landmarks).getByText('С 12-го этажа — закрыто зданием ≈ 45 м в 40 м от отеля')).toBeTruthy()
     // The sun's ray of the west is closed: its building is in the way.
-    await waitFor(() => expect(screen.getByTestId('view-map').textContent).toBe('90 3 [b1] own'))
+    await waitFor(() => expect(screen.getByTestId('view-map').textContent).toMatch(/^90 3 \[b1\] own/))
     expect(fetchMock).toHaveBeenCalledWith('/api/hotels/ota-1/view', expect.anything())
     expect(screen.getByRole('link', { name: 'EUBUCCO v0.2' })).toBeTruthy()
   })
@@ -160,9 +168,7 @@ describe('HotelView', () => {
     await waitFor(() => expect(within(sea).getByText('С 12-го этажа — видно')).toBeTruthy())
     fireEvent.change(floorSlider(), { target: { value: '3' } })
     expect(screen.getByText('окно 3-го этажа, ≈ 7,5 м над землёй')).toBeTruthy()
-    expect(
-      within(sea).getByText('С 3-го этажа — закрыто зданием ≈ 40 м (по оценке EUBUCCO) в 800 м от отеля'),
-    ).toBeTruthy()
+    expect(within(sea).getByText('С 3-го этажа — закрыто зданием ≈ 40 м в 800 м от отеля')).toBeTruthy()
     expect(within(sea).getByText('С 3-го этажа море видно в 0 из 1 направления на берег.')).toBeTruthy()
     // The reach of a target is the same from any floor.
     expect(within(sea).getByText('видно с 9-го этажа')).toBeTruthy()
@@ -191,6 +197,26 @@ describe('HotelView', () => {
     expect(within(window).getByText(/с 12-го этажа: 0 из 15/)).toBeTruthy()
     // Torres de Serranos is north: its building in the way is coloured on the map.
     expect(screen.getByTestId('view-map').textContent).toMatch(/\[.*b1.*\]/)
+  })
+
+  it('gives the map a dot for the sea and every landmark, a line only on the shown side', async () => {
+    render(<HotelView hotel={hotel} building={building} roomFloors={null} />)
+    await waitFor(() => expect(screen.getByText('Окно на 12-м этаже на восток')).toBeTruthy())
+    const map = screen.getByTestId('view-map')
+    // East: lines to the sea's point and La Lonja (75°); Torres de Serranos (north) has a dot only.
+    expect(
+      within(map)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(['Берег моря: видно (линия)', 'Ла-Лонха: видно (линия)', 'Torres de Serranos: закрыто'])
+    await userEvent.click(
+      within(screen.getByRole('region', { name: 'Положение окна' })).getByRole('button', { name: 'С' }),
+    )
+    expect(
+      within(map)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(['Берег моря: видно', 'Ла-Лонха: видно', 'Torres de Serranos: закрыто (линия)'])
   })
 
   it('tells the sunset and the sunrise of the date and from which floor the sun is seen', async () => {

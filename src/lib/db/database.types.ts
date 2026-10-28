@@ -107,6 +107,171 @@ export type Database = {
           },
         ]
       }
+      calculations: {
+        Row: {
+          computed_at: string
+          id: string
+          inputs: NonNullable<Json>
+          key: string
+          limitations: string[]
+          method: string
+          parameters: NonNullable<Json>
+          updated_at: string
+          version: string
+        }
+        ComputedFields: never
+        Insert: {
+          computed_at?: string
+          id?: string
+          inputs?: NonNullable<Json>
+          key: string
+          limitations?: string[]
+          method: string
+          parameters?: NonNullable<Json>
+          updated_at?: string
+          version: string
+        }
+        Update: {
+          computed_at?: string
+          id?: string
+          inputs?: NonNullable<Json>
+          key?: string
+          limitations?: string[]
+          method?: string
+          parameters?: NonNullable<Json>
+          updated_at?: string
+          version?: string
+        }
+        Relationships: []
+      }
+      claim_evidence: {
+        Row: {
+          claim_id: string
+          created_at: string
+          evidence_id: string
+          role: string | null
+        }
+        ComputedFields: never
+        Insert: {
+          claim_id: string
+          created_at?: string
+          evidence_id: string
+          role?: string | null
+        }
+        Update: {
+          claim_id?: string
+          created_at?: string
+          evidence_id?: string
+          role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'claim_evidence_claim_id_fkey'
+            columns: ['claim_id']
+            isOneToOne: false
+            referencedRelation: 'claims'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'claim_evidence_evidence_id_fkey'
+            columns: ['evidence_id']
+            isOneToOne: false
+            referencedRelation: 'evidence'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      claims: {
+        Row: {
+          calculation_id: string | null
+          confidence: number | null
+          created_at: string
+          entity_id: string
+          epistemic_status: string
+          id: string
+          is_demo: boolean
+          limitations: string[]
+          method: NonNullable<Json>
+          observed_at: string | null
+          property: string
+          source_key: string
+          unit: string | null
+          updated_at: string
+          valid_from: string | null
+          valid_to: string | null
+          value_boolean: boolean | null
+          value_json: Json | null
+          value_max: number | null
+          value_min: number | null
+          value_numeric: number | null
+          value_text: string | null
+        }
+        ComputedFields: never
+        Insert: {
+          calculation_id?: string | null
+          confidence?: number | null
+          created_at?: string
+          entity_id: string
+          epistemic_status: string
+          id?: string
+          is_demo?: boolean
+          limitations?: string[]
+          method?: NonNullable<Json>
+          observed_at?: string | null
+          property: string
+          source_key?: string
+          unit?: string | null
+          updated_at?: string
+          valid_from?: string | null
+          valid_to?: string | null
+          value_boolean?: boolean | null
+          value_json?: Json | null
+          value_max?: number | null
+          value_min?: number | null
+          value_numeric?: number | null
+          value_text?: string | null
+        }
+        Update: {
+          calculation_id?: string | null
+          confidence?: number | null
+          created_at?: string
+          entity_id?: string
+          epistemic_status?: string
+          id?: string
+          is_demo?: boolean
+          limitations?: string[]
+          method?: NonNullable<Json>
+          observed_at?: string | null
+          property?: string
+          source_key?: string
+          unit?: string | null
+          updated_at?: string
+          valid_from?: string | null
+          valid_to?: string | null
+          value_boolean?: boolean | null
+          value_json?: Json | null
+          value_max?: number | null
+          value_min?: number | null
+          value_numeric?: number | null
+          value_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'claims_calculation_id_fkey'
+            columns: ['calculation_id']
+            isOneToOne: false
+            referencedRelation: 'calculations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'claims_entity_id_fkey'
+            columns: ['entity_id']
+            isOneToOne: false
+            referencedRelation: 'entities'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       destinations: {
         Row: {
           data: NonNullable<Json>
@@ -128,6 +293,116 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      document_chunks: {
+        Row: {
+          content_hash: string | null
+          created_at: string
+          document_id: string
+          embedding: unknown
+          fts: unknown
+          id: string
+          metadata: NonNullable<Json>
+          ord: number
+          text: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          content_hash?: string | null
+          created_at?: string
+          document_id: string
+          embedding?: unknown
+          fts?: never
+          id?: string
+          metadata?: NonNullable<Json>
+          ord: number
+          text: string
+          updated_at?: string
+        }
+        Update: {
+          content_hash?: string | null
+          created_at?: string
+          document_id?: string
+          embedding?: unknown
+          fts?: never
+          id?: string
+          metadata?: NonNullable<Json>
+          ord?: number
+          text?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'document_chunks_document_id_fkey'
+            columns: ['document_id']
+            isOneToOne: false
+            referencedRelation: 'documents'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          created_at: string
+          entity_id: string | null
+          evidence_id: string
+          hotel_id: string | null
+          id: string
+          kind: string
+          language: string | null
+          metadata: NonNullable<Json>
+          text: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          entity_id?: string | null
+          evidence_id: string
+          hotel_id?: string | null
+          id?: string
+          kind: string
+          language?: string | null
+          metadata?: NonNullable<Json>
+          text: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string | null
+          evidence_id?: string
+          hotel_id?: string | null
+          id?: string
+          kind?: string
+          language?: string | null
+          metadata?: NonNullable<Json>
+          text?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'documents_entity_id_fkey'
+            columns: ['entity_id']
+            isOneToOne: false
+            referencedRelation: 'entities'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'documents_evidence_id_fkey'
+            columns: ['evidence_id']
+            isOneToOne: true
+            referencedRelation: 'evidence'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'documents_hotel_id_fkey'
+            columns: ['hotel_id']
+            isOneToOne: false
+            referencedRelation: 'hotels'
+            referencedColumns: ['id']
+          },
+        ]
       }
       embeddings: {
         Row: {
@@ -167,6 +442,102 @@ export type Database = {
             columns: ['destination_id']
             isOneToOne: false
             referencedRelation: 'destinations'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      entities: {
+        Row: {
+          created_at: string
+          hotel_id: string | null
+          id: string
+          kind: string
+          name: string | null
+          ref: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          hotel_id?: string | null
+          id?: string
+          kind: string
+          name?: string | null
+          ref: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          hotel_id?: string | null
+          id?: string
+          kind?: string
+          name?: string | null
+          ref?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'entities_hotel_id_fkey'
+            columns: ['hotel_id']
+            isOneToOne: false
+            referencedRelation: 'hotels'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      evidence: {
+        Row: {
+          created_at: string
+          dataset_id: string | null
+          excerpt: string | null
+          external_id: string | null
+          id: string
+          is_demo: boolean
+          metadata: NonNullable<Json>
+          provider: string
+          retrieved_at: string | null
+          title: string
+          type: string
+          updated_at: string
+          url: string | null
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          dataset_id?: string | null
+          excerpt?: string | null
+          external_id?: string | null
+          id?: string
+          is_demo?: boolean
+          metadata?: NonNullable<Json>
+          provider: string
+          retrieved_at?: string | null
+          title: string
+          type: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          created_at?: string
+          dataset_id?: string | null
+          excerpt?: string | null
+          external_id?: string | null
+          id?: string
+          is_demo?: boolean
+          metadata?: NonNullable<Json>
+          provider?: string
+          retrieved_at?: string | null
+          title?: string
+          type?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'evidence_dataset_id_fkey'
+            columns: ['dataset_id']
+            isOneToOne: false
+            referencedRelation: 'geo_datasets'
             referencedColumns: ['id']
           },
         ]
@@ -433,7 +804,17 @@ export type Database = {
           lnight_min: number | null
           lnight_source: string | null
           noise_dataset: string | null
+          noise_method: string | null
+          noise_zone: string | null
+          street_lday_max: number | null
+          street_lday_min: number | null
+          street_lnight_max: number | null
+          street_lnight_min: number | null
           updated_at: string
+          yard_lday_max: number | null
+          yard_lday_min: number | null
+          yard_lnight_max: number | null
+          yard_lnight_min: number | null
         }
         ComputedFields: never
         Insert: {
@@ -456,7 +837,17 @@ export type Database = {
           lnight_min?: number | null
           lnight_source?: string | null
           noise_dataset?: string | null
+          noise_method?: string | null
+          noise_zone?: string | null
+          street_lday_max?: number | null
+          street_lday_min?: number | null
+          street_lnight_max?: number | null
+          street_lnight_min?: number | null
           updated_at?: string
+          yard_lday_max?: number | null
+          yard_lday_min?: number | null
+          yard_lnight_max?: number | null
+          yard_lnight_min?: number | null
         }
         Update: {
           building_dataset?: string | null
@@ -478,7 +869,17 @@ export type Database = {
           lnight_min?: number | null
           lnight_source?: string | null
           noise_dataset?: string | null
+          noise_method?: string | null
+          noise_zone?: string | null
+          street_lday_max?: number | null
+          street_lday_min?: number | null
+          street_lnight_max?: number | null
+          street_lnight_min?: number | null
           updated_at?: string
+          yard_lday_max?: number | null
+          yard_lday_min?: number | null
+          yard_lnight_max?: number | null
+          yard_lnight_min?: number | null
         }
         Relationships: [
           {
@@ -575,6 +976,313 @@ export type Database = {
             isOneToOne: false
             referencedRelation: 'ota_hotels'
             referencedColumns: ['master_id']
+          },
+        ]
+      }
+      hotelier_conversations: {
+        Row: {
+          created_at: string
+          hotel_id: string
+          hotelier_unread: number
+          id: string
+          is_demo: boolean
+          kind: string
+          last_message_at: string
+          last_message_text: string
+          last_sender: string | null
+          origin_chat_id: string | null
+          origin_tool_run_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          user_unread: number
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          hotel_id: string
+          hotelier_unread?: number
+          id?: string
+          is_demo?: boolean
+          kind?: string
+          last_message_at?: string
+          last_message_text?: string
+          last_sender?: string | null
+          origin_chat_id?: string | null
+          origin_tool_run_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          user_unread?: number
+        }
+        Update: {
+          created_at?: string
+          hotel_id?: string
+          hotelier_unread?: number
+          id?: string
+          is_demo?: boolean
+          kind?: string
+          last_message_at?: string
+          last_message_text?: string
+          last_sender?: string | null
+          origin_chat_id?: string | null
+          origin_tool_run_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          user_unread?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'hotelier_conversations_hotel_id_fkey'
+            columns: ['hotel_id']
+            isOneToOne: false
+            referencedRelation: 'hotels'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'hotelier_conversations_origin_chat_id_user_id_fkey'
+            columns: ['origin_chat_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'assistant_chats'
+            referencedColumns: ['id', 'user_id']
+          },
+          {
+            foreignKeyName: 'hotelier_conversations_origin_tool_run_id_user_id_fkey'
+            columns: ['origin_tool_run_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'tool_runs'
+            referencedColumns: ['id', 'user_id']
+          },
+        ]
+      }
+      hotelier_hotel_access: {
+        Row: {
+          created_at: string
+          hotel_id: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          hotel_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hotel_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'hotelier_hotel_access_hotel_id_fkey'
+            columns: ['hotel_id']
+            isOneToOne: false
+            referencedRelation: 'hotels'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'hotelier_hotel_access_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'hotelier_profiles'
+            referencedColumns: ['user_id']
+          },
+        ]
+      }
+      hotelier_messages: {
+        Row: {
+          author_id: string | null
+          conversation_id: string
+          created_at: string
+          data: NonNullable<Json>
+          id: string
+          is_demo: boolean
+          knowledge_revoked_at: string | null
+          read_at: string | null
+          request_id: string | null
+          sender: string
+          shareable: boolean
+          text: string
+        }
+        ComputedFields: never
+        Insert: {
+          author_id?: string | null
+          conversation_id: string
+          created_at?: string
+          data?: NonNullable<Json>
+          id?: string
+          is_demo?: boolean
+          knowledge_revoked_at?: string | null
+          read_at?: string | null
+          request_id?: string | null
+          sender: string
+          shareable?: boolean
+          text: string
+        }
+        Update: {
+          author_id?: string | null
+          conversation_id?: string
+          created_at?: string
+          data?: NonNullable<Json>
+          id?: string
+          is_demo?: boolean
+          knowledge_revoked_at?: string | null
+          read_at?: string | null
+          request_id?: string | null
+          sender?: string
+          shareable?: boolean
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'hotelier_messages_conversation_id_fkey'
+            columns: ['conversation_id']
+            isOneToOne: false
+            referencedRelation: 'hotelier_conversations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'hotelier_messages_request_id_fkey'
+            columns: ['request_id']
+            isOneToOne: false
+            referencedRelation: 'hotelier_requests'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      hotelier_profiles: {
+        Row: {
+          all_hotels: boolean
+          created_at: string
+          display_name: string
+          is_demo: boolean
+          updated_at: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          all_hotels?: boolean
+          created_at?: string
+          display_name?: string
+          is_demo?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          all_hotels?: boolean
+          created_at?: string
+          display_name?: string
+          is_demo?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      hotelier_requests: {
+        Row: {
+          answer_message_id: string | null
+          answered_at: string | null
+          characteristic_keys: string[]
+          context_summary: string | null
+          conversation_id: string
+          created_at: string
+          dedupe_key: string
+          expires_at: string | null
+          hotel_id: string
+          id: string
+          knowledge_status: string
+          origin_chat_id: string | null
+          origin_tool_run_id: string | null
+          question: string
+          room_entity_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          answer_message_id?: string | null
+          answered_at?: string | null
+          characteristic_keys?: string[]
+          context_summary?: string | null
+          conversation_id: string
+          created_at?: string
+          dedupe_key: string
+          expires_at?: string | null
+          hotel_id: string
+          id?: string
+          knowledge_status?: string
+          origin_chat_id?: string | null
+          origin_tool_run_id?: string | null
+          question: string
+          room_entity_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          answer_message_id?: string | null
+          answered_at?: string | null
+          characteristic_keys?: string[]
+          context_summary?: string | null
+          conversation_id?: string
+          created_at?: string
+          dedupe_key?: string
+          expires_at?: string | null
+          hotel_id?: string
+          id?: string
+          knowledge_status?: string
+          origin_chat_id?: string | null
+          origin_tool_run_id?: string | null
+          question?: string
+          room_entity_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'hotelier_requests_answer_message_id_fkey'
+            columns: ['answer_message_id']
+            isOneToOne: false
+            referencedRelation: 'hotelier_messages'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'hotelier_requests_conversation_id_user_id_fkey'
+            columns: ['conversation_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'hotelier_conversations'
+            referencedColumns: ['id', 'user_id']
+          },
+          {
+            foreignKeyName: 'hotelier_requests_hotel_id_fkey'
+            columns: ['hotel_id']
+            isOneToOne: false
+            referencedRelation: 'hotels'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'hotelier_requests_origin_chat_id_user_id_fkey'
+            columns: ['origin_chat_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'assistant_chats'
+            referencedColumns: ['id', 'user_id']
+          },
+          {
+            foreignKeyName: 'hotelier_requests_origin_tool_run_id_user_id_fkey'
+            columns: ['origin_tool_run_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'tool_runs'
+            referencedColumns: ['id', 'user_id']
+          },
+          {
+            foreignKeyName: 'hotelier_requests_room_entity_id_fkey'
+            columns: ['room_entity_id']
+            isOneToOne: false
+            referencedRelation: 'entities'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -951,6 +1659,166 @@ export type Database = {
         }
         Relationships: []
       }
+      relations: {
+        Row: {
+          claim_id: string | null
+          confidence: number | null
+          created_at: string
+          evidence_id: string | null
+          id: string
+          object_id: string
+          predicate: string
+          subject_id: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          claim_id?: string | null
+          confidence?: number | null
+          created_at?: string
+          evidence_id?: string | null
+          id?: string
+          object_id: string
+          predicate: string
+          subject_id: string
+          updated_at?: string
+        }
+        Update: {
+          claim_id?: string | null
+          confidence?: number | null
+          created_at?: string
+          evidence_id?: string | null
+          id?: string
+          object_id?: string
+          predicate?: string
+          subject_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'relations_claim_id_fkey'
+            columns: ['claim_id']
+            isOneToOne: false
+            referencedRelation: 'claims'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'relations_evidence_id_fkey'
+            columns: ['evidence_id']
+            isOneToOne: false
+            referencedRelation: 'evidence'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'relations_object_id_fkey'
+            columns: ['object_id']
+            isOneToOne: false
+            referencedRelation: 'entities'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'relations_subject_id_fkey'
+            columns: ['subject_id']
+            isOneToOne: false
+            referencedRelation: 'entities'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      tool_run_evidence: {
+        Row: {
+          evidence_id: string
+          tool_run_id: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          evidence_id: string
+          tool_run_id: string
+          user_id?: string
+        }
+        Update: {
+          evidence_id?: string
+          tool_run_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'tool_run_evidence_evidence_id_fkey'
+            columns: ['evidence_id']
+            isOneToOne: false
+            referencedRelation: 'evidence'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'tool_run_evidence_tool_run_id_user_id_fkey'
+            columns: ['tool_run_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'tool_runs'
+            referencedColumns: ['id', 'user_id']
+          },
+        ]
+      }
+      tool_runs: {
+        Row: {
+          chat_id: string
+          completed_at: string | null
+          error: Json | null
+          id: string
+          input_summary: string
+          message_id: string | null
+          result_data: Json | null
+          result_summary: string
+          resume: Json | null
+          started_at: string
+          status: string
+          tool_name: string
+          updated_at: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          chat_id: string
+          completed_at?: string | null
+          error?: Json | null
+          id?: string
+          input_summary?: string
+          message_id?: string | null
+          result_data?: Json | null
+          result_summary?: string
+          resume?: Json | null
+          started_at?: string
+          status?: string
+          tool_name: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          chat_id?: string
+          completed_at?: string | null
+          error?: Json | null
+          id?: string
+          input_summary?: string
+          message_id?: string | null
+          result_data?: Json | null
+          result_summary?: string
+          resume?: Json | null
+          started_at?: string
+          status?: string
+          tool_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'tool_runs_chat_id_user_id_fkey'
+            columns: ['chat_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'assistant_chats'
+            referencedColumns: ['id', 'user_id']
+          },
+        ]
+      }
     }
     Views: {
       hotel_room_views_named: {
@@ -1003,6 +1871,7 @@ export type Database = {
       }
     }
     Functions: {
+      answer_hotelier_request: { Args: { message_id: string; request_id: string }; Returns: string[] }
       assistant_chat_share: {
         Args: { share_id: string }
         Returns: {
@@ -1012,9 +1881,55 @@ export type Database = {
           title: string
         }[]
       }
+      create_hotelier_request: {
+        Args: {
+          characteristic_keys?: string[]
+          context_summary?: string
+          conversation_id?: string
+          hotel_id: string
+          origin_chat_id?: string
+          origin_tool_run_id?: string
+          question: string
+          room_ref?: string
+        }
+        Returns: {
+          conversation: string
+          request: string
+          reused: boolean
+        }[]
+      }
+      hotel_chunks_hybrid: {
+        Args: { hotel_id: string; max_rows?: number; query: string; query_embedding?: unknown }
+        Returns: {
+          chunk_id: string
+          document_id: string
+          evidence_id: string
+          fts_place: number
+          kind: string
+          metadata: Json
+          ord: number
+          rank: number
+          text: string
+          vector_place: number
+        }[]
+      }
+      hotel_chunks_search: {
+        Args: { hotel_id: string; max_rows?: number; query: string }
+        Returns: {
+          chunk_id: string
+          document_id: string
+          evidence_id: string
+          kind: string
+          metadata: Json
+          ord: number
+          rank: number
+          text: string
+        }[]
+      }
       hotel_geo: { Args: { lat: number; lon: number }; Returns: Json }
       hotel_geo_features: { Args: { lat: number; lon: number; radius_m?: number }; Returns: Json }
       hotel_noise_day: { Args: { lat: number; lon: number; radius_m?: number }; Returns: Json }
+      hotel_noise_facade: { Args: { lat: number; lon: number }; Returns: Json }
       hotel_noise_map: { Args: { lat: number; lon: number; radius_m?: number }; Returns: Json }
       hotel_noise_map_refresh: { Args: { lat: number; lon: number; radius_m?: number }; Returns: number }
       hotel_noise_maps_prune: { Args: { radius_m?: number }; Returns: number }
@@ -1027,7 +1942,12 @@ export type Database = {
         }[]
       }
       hotel_view_eyes: { Args: { lat: number; lon: number; targets: Json }; Returns: Json }
+      hotelier_conversation_read: { Args: { conversation_id: string }; Returns: undefined }
+      hotelier_conversation_status: { Args: { conversation_id: string; status: string }; Returns: boolean }
       hotels_outside_noise: { Args: Record<PropertyKey, never>; Returns: string[] }
+      is_hotelier: { Args: Record<PropertyKey, never>; Returns: boolean }
+      is_hotelier_conversation: { Args: { conversation_id: string }; Returns: boolean }
+      is_hotelier_of: { Args: { hotel_id: string }; Returns: boolean }
       match_embeddings: {
         Args: { destination_ids?: string[]; match_count?: number; match_kind: string; query_embedding: unknown }
         Returns: {

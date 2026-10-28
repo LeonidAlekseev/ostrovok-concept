@@ -10,13 +10,33 @@ import { loadHotelFeatures } from '@/lib/db/features'
 import type { HotelFeatures } from '@/lib/features'
 import { nextQuestion } from '@/lib/assistant'
 import { getHotel } from '@/lib/catalogGenerator'
+import { runNoiseTool } from '@/lib/ai/noiseTool'
+import { runOwner } from '@/lib/db/toolRuns'
+import { loadLevelIndex, loadNearIndex } from '@/lib/db/knowledge'
+import { errorResult, toolResultSchema } from '@/lib/toolResult'
+import { sampleResult } from '@/test/toolResult'
+import { addDays, todayIso } from '@/lib/dates'
+import { stayTotal } from '@/lib/offer'
 import { POST } from './route'
 
-vi.mock('@/lib/ai/model', () => ({ getTextModels: vi.fn(), getVisionModels: vi.fn() }))
+vi.mock('@/lib/ai/model', () => ({ getTextModels: vi.fn(), getVisionModels: vi.fn(), REMARK_MODEL_ID: 'remark' }))
 vi.mock('@/lib/ai/semantic', () => ({ SEMANTIC_TIMEOUT_MS: 8000, semanticSearch: vi.fn() }))
 vi.mock('@/lib/db/catalog', () => import('@/test/catalog'))
 vi.mock('@/lib/db/features', () => ({ loadHotelFeatures: vi.fn() }))
+vi.mock('@/lib/db/knowledge', () => ({
+  loadLevelIndex: vi.fn(async () => null),
+  loadNearIndex: vi.fn(async () => null),
+  loadClaimsByIds: vi.fn(async () => []),
+}))
 vi.mock('@/lib/ai/geoTurn', () => ({ geoTurn: vi.fn() }))
+vi.mock('@/lib/ai/noiseTool', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/ai/noiseTool')>()
+  return { ...actual, runNoiseTool: vi.fn(actual.runNoiseTool) }
+})
+vi.mock('@/lib/db/toolRuns', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/db/toolRuns')>()
+  return { ...actual, runOwner: vi.fn(async () => null) }
+})
 
 const usage = {
   inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
@@ -408,7 +428,8 @@ describe('POST /api/assistant: the semantic search', () => {
     const body = await (
       await post({
         messages: [
-          { role: 'user', text: 'тихий хостел с быстрым Wi‑Fi' },
+          // No «тихо»: the tools of the store would keep their own time out of the search's.
+          { role: 'user', text: 'хостел с быстрым Wi‑Fi' },
           { role: 'assistant', text: 'Куда?' },
           { role: 'user', text: 'в Прагу' },
         ],
@@ -673,9 +694,61 @@ describe('POST /api/assistant: a question about a hotel', () => {
     setModel(undefined)
     const body = await (await aboutHotel('Шумно ли рядом с отелем ночью?')).json()
     expect(geoTurn).not.toHaveBeenCalled()
-    expect(body).toMatchObject({ reply: 'Сейчас не могу ответить: данных о шуме у этого отеля нет.', source: 'rules' })
+    expect(body).toMatchObject({
+      reply: 'Сейчас не могу ответить: данных о шуме у этого отеля нет. Это не значит, что там тихо.',
+      source: 'rules',
+    })
     await aboutHotel('Есть ли рядом бар?')
     expect(geoTurn).toHaveBeenCalledTimes(1)
+  })
+
+  // assistant-search, Requirement: Инструмент «Анализ шума»
+  it('runs «Анализ шума» on a noise question: its step carries the run with the sources', async () => {
+    setModel(undefined)
+    vi.mocked(runNoiseTool).mockResolvedValueOnce(sampleResult)
+    const body = await (await aboutHotel('Тут шумно ночью?')).json()
+    expect(runNoiseTool).toHaveBeenCalledWith(hotelId)
+    expect(body.steps).toEqual([
+      {
+        agent: 'features',
+        title: 'Анализ шума',
+        params: 'оценка шума у фасада (карты шума EEA и места OpenStreetMap), отзывы гостей',
+        status: 'done',
+        result: sampleResult.summary,
+        run: { id: expect.stringMatching(/^[0-9a-f-]{36}$/), result: sampleResult },
+      },
+    ])
+    // The answer goes by the tool's characteristics.
+    expect(body.reply).toContain('Ночью (Lnight): дороги города: 55–59 дБ')
+  })
+
+  it('gives a hotel with no data a run with no sources, said so (Scenario: Источников нет)', async () => {
+    setModel(undefined)
+    const body = await (await aboutHotel('Здесь тихо?')).json()
+    const [step] = body.steps
+    expect(toolResultSchema.safeParse(step.run.result).success).toBe(true)
+    expect(step.run.result).toMatchObject({ status: 'success', evidence: [], claims: [] })
+  })
+
+  it('marks the step failed when the tool fails, and still answers (Scenario: Ошибка инструмента)', async () => {
+    setModel(undefined)
+    vi.mocked(runNoiseTool).mockResolvedValueOnce(errorResult('store_unavailable', 'Хранилище недоступно'))
+    const body = await (await aboutHotel('Шумно ли тут?')).json()
+    expect(body.steps[0]).toMatchObject({ status: 'failed', run: { result: { status: 'error' } } })
+    expect(body.reply).toBe('Сейчас не могу ответить: данные о шуме не прочитались.')
+  })
+
+  it('asks for the owner of the runs with the chat and the pending message, not on other questions', async () => {
+    setModel(undefined)
+    const chatId = '7d1f0a52-3b8e-4c1d-9a6f-0e2b4c6d8f10'
+    const messageId = '8e2a1b63-4c9f-4d2e-8b7a-1f3c5d7e9a21'
+    const body = { messages: [{ role: 'user', text: 'Шумно ли ночью?' }], brief: { hotelId }, chatId, messageId }
+    expect((await post(body)).status).toBe(200)
+    expect(runOwner).toHaveBeenCalledWith(chatId, messageId)
+    vi.mocked(runOwner).mockClear()
+    await aboutHotel('Есть ли парковка?')
+    expect(runOwner).not.toHaveBeenCalled()
+    expect((await post({ ...body, chatId: 'not-a-uuid' })).status).toBe(400)
   })
 
   it('says the models are down when none chose the geo calls', async () => {
@@ -688,6 +761,48 @@ describe('POST /api/assistant: a question about a hotel', () => {
     })
     const body = await (await aboutHotel('Есть ли рядом бар?')).json()
     expect(body).toMatchObject({ source: 'rules', modelsDown: true })
+  })
+
+  // hotelier-knowledge, Requirement: Запрос отельеру
+  it('runs «Запрос отельеру» when the model asks it: the run waits, the answer stays the model’s', async () => {
+    const model = new MockLanguageModelV4({
+      doGenerate: {
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify({
+              answer: 'В данных этого нет — спрошу отельера, ответ придёт в блок «Запрос отельеру».',
+              unverified: null,
+              ask_hotelier: {
+                question: 'Есть ли балкон в номерах Deluxe?',
+                characteristic_keys: ['room.balcony', 'bad'],
+              },
+            }),
+          },
+        ],
+        finishReason: { unified: 'stop' as const, raw: undefined },
+        usage,
+        warnings: [],
+      },
+    })
+    setModel(model)
+    const body = await (await aboutHotel('Есть ли балкон в номере Deluxe?')).json()
+    expect(body.reply).toBe('В данных этого нет — спрошу отельера, ответ придёт в блок «Запрос отельеру».')
+    const step = body.steps.at(-1)
+    expect(step).toMatchObject({ agent: 'hotelier', title: 'Запрос отельеру', params: 'Балкон в номере' })
+    // A guest's question is not left for the hotelier: the block asks to sign in.
+    expect(step.run.result).toMatchObject({ status: 'error', error: { code: 'sign_in_required' } })
+    // The model's facts tell it what the hotelier said and that it does not confirm free rooms or prices.
+    const instructions = JSON.stringify(model.doGenerateCalls[0].prompt)
+    expect(instructions).toContain('ask_hotelier')
+    expect(instructions).toContain('Никогда не подтверждай сам наличие свободных номеров')
+  })
+
+  it('asks the hotelier by the rules when the traveller asks it in words and no model answered', async () => {
+    setModel(undefined)
+    const body = await (await aboutHotel('Уточните у отеля, есть ли балкон?')).json()
+    expect(body.reply).toContain('Спросил отельера')
+    expect(body.steps.at(-1)).toMatchObject({ agent: 'hotelier', params: 'Балкон в номере' })
   })
 
   it('treats an id the catalogue does not know as a chat like any other', async () => {
@@ -1083,5 +1198,189 @@ describe('POST /api/assistant: «близко к морю»', () => {
       brief: november,
     })
     expect(response.status).toBe(400)
+  })
+})
+
+// assistant-search, Requirements: Подбор отелей инструментами хранилища, Выбор инструментов хранилища
+describe('POST /api/assistant: the choice by the tools of the store', () => {
+  const complete = { destinationId: 'lisbon', when: 9, party: 'solo' }
+  const lisbon = async () => (await import('@/test/catalog')).loadCityHotels(['lisbon'])
+  const wish = 'Найди отель, чтобы рядом была аптека и было тихо ночью'
+  beforeEach(() => {
+    vi.mocked(loadLevelIndex).mockResolvedValue(null)
+    vi.mocked(loadNearIndex).mockResolvedValue(null)
+  })
+  /** The store of the tests: a quiet hotel with a pharmacy near, a loud one, the rest without data. */
+  async function store() {
+    const [a, b, c] = await lisbon()
+    vi.mocked(loadLevelIndex).mockResolvedValue([
+      { hotelId: a.id, property: 'noise.estimate.street.lnight', min: 45, max: 49, value: null },
+      { hotelId: b.id, property: 'noise.estimate.street.lnight', min: 60, max: 64, value: null },
+      { hotelId: c.id, property: 'noise.estimate.street.lnight', min: null, max: 39, value: null },
+    ])
+    vi.mocked(loadNearIndex).mockResolvedValue([
+      { hotelId: a.id, claimId: 'c-a', distanceM: 180, name: 'Farmacia', kind: 'osm_place' },
+      { hotelId: c.id, claimId: 'c-c', distanceM: 900, name: null, kind: 'osm_place' },
+    ])
+    return [a, b, c]
+  }
+
+  // Scenario: Без модели правила выбирают те же инструменты
+  it('chooses the hotels by the rules without a model, each call a step with its run', async () => {
+    setModel(undefined)
+    const [a] = await store()
+    const body = await (await ask(wish, complete)).json()
+    expect(body.steps.map((s: { title: string; params?: string }) => [s.title, s.params])).toEqual([
+      ['Подбираю отели по вашему описанию', 'Лиссабон'],
+      ['Отели по характеристикам', 'ночью тише 50 дБ'],
+      ['Места рядом', 'аптека в 500 м'],
+      ['Отзывы', 'тема: шум и тишина'],
+    ])
+    for (const step of body.steps.slice(1)) expect(toolResultSchema.safeParse(step.run.result).success).toBe(true)
+    expect(body.matches.map((h: { id: string }) => h.id)).toEqual([a.id])
+    expect(body.findings).toMatch(/^Подобрал по данным \(ночью тише 50 дБ, аптека в 500 м\):\n1\. /)
+    expect(body.source).toBe('rules')
+  })
+
+  // Scenario: Модель выбирает вызовы инструментов
+  it('runs the calls the model chose, with its parameters', async () => {
+    const model = new MockLanguageModelV4({
+      doGenerate: async ({ tools }) =>
+        tools?.length
+          ? {
+              content: [
+                {
+                  type: 'tool-call' as const,
+                  toolCallId: 'c1',
+                  toolName: 'nearbyPlaces',
+                  input: JSON.stringify({ category: 'pharmacy', radiusM: 1000 }),
+                },
+              ],
+              finishReason: { unified: 'tool-calls' as const, raw: undefined },
+              usage,
+              warnings: [],
+            }
+          : answer({}),
+    })
+    setModel(model)
+    const [a, , c] = await store()
+    const body = await (await ask('Отель, чтобы рядом была аптека', complete)).json()
+    expect(body.steps.slice(1).map((s: { params?: string }) => s.params)).toEqual(['аптека в 1 км'])
+    expect(body.matches.map((h: { id: string }) => h.id)).toEqual([a.id, c.id])
+  })
+
+  it('writes each run for a signed-in user’s chat', async () => {
+    setModel(undefined)
+    await store()
+    // The user's client: the rows of `tool_runs` it writes.
+    const rows: { tool_name?: string; status?: string }[] = []
+    const client = {
+      from: () => ({
+        insert: async (row: { tool_name?: string; status?: string }) => (rows.push(row), { error: null }),
+        update: (row: { status?: string }) => ({ eq: async () => (rows.push(row), { error: null }) }),
+      }),
+    }
+    vi.mocked(runOwner).mockResolvedValueOnce({
+      client: client as never,
+      userId: 'u1',
+      chatId: 'chat-1',
+      messageId: null,
+    })
+    await post({
+      messages: [{ role: 'user', text: wish }],
+      brief: complete,
+      chatId: '0b0c7a1e-6f2b-4c3d-8e9f-0a1b2c3d4e5f',
+    })
+    expect(rows.filter((r) => r.status === 'running').map((r) => r.tool_name)).toEqual([
+      'hotels_by_features',
+      'nearby_places',
+      'hotel_reviews',
+    ])
+    expect(rows.filter((r) => r.status === 'success' || r.status === 'error')).toHaveLength(3)
+  })
+
+  // Scenario: Хранилище не прочиталось
+  it('ranks the quiet by the hotels’ features as before when the store cannot be read', async () => {
+    setModel(undefined)
+    const [a, b] = await lisbon()
+    vi.mocked(loadHotelFeatures).mockResolvedValue(
+      new Map([
+        [a.id, { views: [], lnight: { min: 60, max: 64 } }],
+        [b.id, { views: [], lnight: { max: 39 } }],
+      ]),
+    )
+    const body = await (await ask('тихий отель', complete)).json()
+    expect(body.findings).toBe('Данные хранилища не прочитались (ночью тише 50 дБ) — по ним не подбирал.')
+    expect(body.steps.at(-1)).toMatchObject({ title: 'Проверяю данные о шуме', status: 'done' })
+    expect(body.matches.map((h: { id: string }) => h.id).slice(0, 2)).toEqual([b.id, a.id])
+  })
+})
+
+// trips-assistant: the bookings come with the request, checked by the schema; the change is a proposal
+describe('POST /api/assistant: a chat about the bookings', () => {
+  const lantern = getHotel('prague-old-town-lantern')!
+  const rate = lantern.rooms[0].rates[0]
+  const checkIn = addDays(todayIso(), 20)
+  const checkOut = addDays(checkIn, 2)
+  const trip = {
+    id: 'OS-TRIP01',
+    createdAt: '2026-10-20T10:00:00.000Z',
+    status: 'confirmed',
+    hotelId: lantern.id,
+    roomId: lantern.rooms[0].id,
+    rateId: rate.id,
+    checkIn,
+    checkOut,
+    guests: { adults: 2, children: 0, rooms: 1 },
+    payment: 'at-hotel',
+    total: stayTotal(rate.pricePerNight, checkIn, checkOut, 1),
+    cancellation: rate.cancellation,
+  }
+  const askTrips = (text: string, bookings: unknown[] = [trip]) =>
+    post({ messages: [{ role: 'user', text }], brief: { trips: true }, bookings })
+
+  it('proposes the new dates of the booking with the price of its rate', async () => {
+    setModel(undefined)
+    const newIn = addDays(checkIn, 7)
+    const newOut = addDays(newIn, 3)
+    const [d1, m1] = [Number(newIn.slice(8)), Number(newIn.slice(5, 7))]
+    const [d2, m2] = [Number(newOut.slice(8)), Number(newOut.slice(5, 7))]
+    const response = await askTrips(`Перенеси на ${d1}.${m1}–${d2}.${m2}`)
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body.change).toEqual({
+      bookingId: 'OS-TRIP01',
+      from: { checkIn, checkOut, total: trip.total },
+      checkIn: newIn,
+      checkOut: newOut,
+      total: stayTotal(rate.pricePerNight, newIn, newOut, 1),
+      cancellation: expect.any(Object),
+    })
+    expect(body.steps[0]).toMatchObject({ agent: 'trips', title: 'Пересчёт при смене дат' })
+    expect(toolResultSchema.safeParse(body.steps[0].run.result).success).toBe(true)
+  })
+
+  it('answers about the booking from its data', async () => {
+    setModel(undefined)
+    const body = await (await askTrips('Какие условия отмены?')).json()
+    expect(body).toMatchObject({ source: 'rules', brief: { trips: true } })
+    expect(body.reply).toContain(lantern.name)
+    expect(body.change).toBeUndefined()
+  })
+
+  it('refuses bookings off the schema', async () => {
+    expect((await askTrips('Что с бронью?', [{ ...trip, id: 'nope' }])).status).toBe(400)
+    expect((await askTrips('Что с бронью?', [{ ...trip, total: -5 }])).status).toBe(400)
+    expect((await askTrips('Что с бронью?', [{ ...trip, checkIn: '10 ноября' }])).status).toBe(400)
+  })
+
+  it('reads no personal fields of a booking', async () => {
+    setModel(undefined)
+    const body = await (
+      await askTrips('Какие у меня поездки?', [
+        { ...trip, roomGuests: [{ firstName: 'Анна', lastName: 'Петрова' }], contact: { email: 'a@b.co', phone: '1' } },
+      ])
+    ).json()
+    expect(JSON.stringify(body)).not.toMatch(/Анна|a@b\.co/)
   })
 })

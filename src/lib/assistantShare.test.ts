@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { storageBucket } from '@/test/storageBucket'
+import { RUN_ID, sampleResult } from '@/test/toolResult'
 import { newChat, type Chat, type ChatMessage } from './assistantChats'
 import {
   SHARED_PHOTO_BUCKET,
@@ -179,6 +180,18 @@ describe('a shared chat', () => {
     expect(await loadSharedChat(none as never, 'not-an-id')).toBeNull()
     expect(isShareId('not-an-id')).toBe(false)
     expect(none.rpc).toHaveBeenCalledTimes(1)
+  })
+
+  // assistant-search, Requirement: Восстановление блоков инструментов
+  it('carries the tools’ results with their sources, so the link opens the block (Scenario: Снимок с источниками)', async () => {
+    const step = { agent: 'features', title: 'Анализ шума', run: { id: RUN_ID, result: sampleResult } }
+    const shared: Chat = { ...chat, messages: [...chat.messages.slice(0, 3), message('agent', '', { data: { step } })] }
+    const snapshot = snapshotOf(shared)
+    expect(snapshot.messages.at(-1)!.data.step).toEqual(step)
+    const id = '0b0c7a1e-6f2b-4b5e-9a37-0c6f1b2d3e4f'
+    const row = { id, title: 'Тихий отель', snapshot: JSON.parse(JSON.stringify(snapshot)), created_at: '2026-10-24' }
+    const loaded = await loadSharedChat(client({ data: [row], error: null }) as never, id)
+    expect(loaded!.messages.at(-1)!.data.step).toEqual(step)
   })
 })
 

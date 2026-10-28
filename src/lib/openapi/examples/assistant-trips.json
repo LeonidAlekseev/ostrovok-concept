@@ -1,0 +1,210 @@
+{
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "text": "Перенеси бронь на 20–23 ноября"
+      }
+    ],
+    "brief": {
+      "trips": true,
+      "bookingId": "OS-7K2Q9Z"
+    },
+    "bookings": [
+      {
+        "id": "OS-7K2Q9Z",
+        "createdAt": "2026-10-27T18:00:00.000Z",
+        "status": "confirmed",
+        "hotelId": "ota-9096882",
+        "roomId": "room-3202",
+        "rateId": "rate-1",
+        "checkIn": "2026-11-10",
+        "checkOut": "2026-11-12",
+        "guests": {
+          "adults": 2,
+          "children": 0,
+          "rooms": 1
+        },
+        "payment": "now",
+        "total": 19200,
+        "cancellation": {
+          "kind": "free",
+          "daysBefore": 4
+        }
+      }
+    ]
+  },
+  "response": {
+    "brief": {
+      "trips": true,
+      "bookingId": "OS-7K2Q9Z"
+    },
+    "reply": "Могу перенести OS-7K2Q9Z на 20 – 23 нояб. 2026 г., 3 ночи. Новая цена — 31 800 ₽ (сейчас 19 200 ₽, доплата 12 600 ₽). Бесплатная отмена до 16 ноября. Даты изменятся, только когда вы нажмёте «Подтвердить».",
+    "source": "model",
+    "steps": [
+      {
+        "agent": "trips",
+        "title": "Пересчёт при смене дат",
+        "params": "OS-7K2Q9Z: 20 – 23 нояб. 2026 г., 3 ночи",
+        "status": "done",
+        "result": "OS-7K2Q9Z: 20 – 23 нояб. 2026 г., 3 ночи — 31 800 ₽",
+        "run": {
+          "id": "d359ff7d-bb83-4ca2-b35b-4c1fe1757b03",
+          "result": {
+            "status": "success",
+            "summary": "OS-7K2Q9Z: 20 – 23 нояб. 2026 г., 3 ночи — 31 800 ₽",
+            "data": {
+              "change": {
+                "bookingId": "OS-7K2Q9Z",
+                "from": {
+                  "checkIn": "2026-11-10",
+                  "checkOut": "2026-11-12",
+                  "total": 19200
+                },
+                "checkIn": "2026-11-20",
+                "checkOut": "2026-11-23",
+                "total": 31800,
+                "cancellation": {
+                  "kind": "free",
+                  "daysBefore": 4
+                }
+              }
+            },
+            "evidence": [
+              {
+                "id": "OS-7K2Q9Z:rate",
+                "source_type": "ota_page",
+                "source_name": "Островок",
+                "source_id": "ota-9096882",
+                "source_url": null,
+                "title": "You & Co. Saler Beach Boutique Hotel: Номер Standard, тариф",
+                "excerpt": null,
+                "retrieved_at": null,
+                "entity_id": "ota-9096882",
+                "claim_id": null
+              }
+            ],
+            "claims": [
+              {
+                "id": "OS-7K2Q9Z:was",
+                "label": "Сейчас",
+                "value": "10 – 12 нояб. 2026 г., 2 ночи, 19 200 ₽",
+                "status": "reported",
+                "confidence": null,
+                "evidence_ids": [],
+                "calculation_id": null
+              },
+              {
+                "id": "OS-7K2Q9Z:dates",
+                "label": "Новые даты",
+                "value": "20 – 23 нояб. 2026 г., 3 ночи",
+                "status": "reported",
+                "confidence": null,
+                "evidence_ids": [],
+                "calculation_id": null
+              },
+              {
+                "id": "OS-7K2Q9Z:total",
+                "label": "Новая цена",
+                "value": "31 800 ₽",
+                "status": "derived",
+                "confidence": null,
+                "evidence_ids": ["OS-7K2Q9Z:rate"],
+                "calculation_id": "OS-7K2Q9Z:price"
+              },
+              {
+                "id": "OS-7K2Q9Z:difference",
+                "label": "Разница",
+                "value": "доплата 12 600 ₽",
+                "status": "derived",
+                "confidence": null,
+                "evidence_ids": ["OS-7K2Q9Z:rate"],
+                "calculation_id": "OS-7K2Q9Z:price"
+              },
+              {
+                "id": "OS-7K2Q9Z:cancellation",
+                "label": "Условия отмены",
+                "value": "Бесплатная отмена до 16 ноября",
+                "status": "derived",
+                "confidence": null,
+                "evidence_ids": ["OS-7K2Q9Z:rate"],
+                "calculation_id": "OS-7K2Q9Z:terms"
+              }
+            ],
+            "calculations": [
+              {
+                "name": "Цена проживания, как при бронировании",
+                "version": "1",
+                "inputs": [
+                  {
+                    "label": "Цена ночи тарифа (вс–чт)",
+                    "value": "9 600 ₽"
+                  },
+                  {
+                    "label": "Цена ночи пт и сб",
+                    "value": "11 100 ₽"
+                  },
+                  {
+                    "label": "Ночей вс–чт",
+                    "value": "1"
+                  },
+                  {
+                    "label": "Ночей пт и сб",
+                    "value": "2"
+                  },
+                  {
+                    "label": "Номеров",
+                    "value": "1"
+                  }
+                ],
+                "assumptions": [
+                  "Ночи пятницы и субботы на 15% дороже, с округлением вверх до 100 ₽",
+                  "Цена тарифа — из каталога сейчас, как в форме бронирования"
+                ],
+                "id": "OS-7K2Q9Z:price"
+              },
+              {
+                "name": "Условия отмены на новые даты",
+                "version": "1",
+                "inputs": [
+                  {
+                    "label": "Условия тарифа",
+                    "value": "Бесплатная отмена за 4 дня до заезда"
+                  },
+                  {
+                    "label": "Новый заезд",
+                    "value": "пятница, 20 ноября 2026 г."
+                  }
+                ],
+                "assumptions": ["Если срок бесплатной отмены на новые даты уже прошёл, тариф становится невозвратным"],
+                "id": "OS-7K2Q9Z:terms"
+              }
+            ],
+            "method": null,
+            "limitations": [
+              "Данные брони — из этого браузера: сервер их не хранит и не сверяет с отелем",
+              "Наличие номеров на новые даты не проверяется",
+              "Даты меняются только после «Подтвердить»"
+            ],
+            "error": null
+          }
+        }
+      }
+    ],
+    "change": {
+      "bookingId": "OS-7K2Q9Z",
+      "from": {
+        "checkIn": "2026-11-10",
+        "checkOut": "2026-11-12",
+        "total": 19200
+      },
+      "checkIn": "2026-11-20",
+      "checkOut": "2026-11-23",
+      "total": 31800,
+      "cancellation": {
+        "kind": "free",
+        "daysBefore": 4
+      }
+    }
+  }
+}

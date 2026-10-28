@@ -5,7 +5,6 @@ import {
   askAssistant,
   HOTEL_UNAVAILABLE,
   briefWithStay,
-  describeBrief,
   makePlan,
   mergeBrief,
   MODELS_DOWN,
@@ -30,8 +29,10 @@ import {
   dialogOf,
   lastPhotoMessage,
   loadGuestChats,
+  mergeServerMessage,
   newChat,
   newId,
+  parseMessage,
   saveGuestChats,
   shownHotels,
   type Chat,
@@ -55,9 +56,13 @@ import type { PhotoUrl } from './ChatPhotos'
 import { savedParams } from '@/lib/sessionMemory'
 import type { HotelSummary } from '@/lib/catalog'
 import { todayIso } from '@/lib/dates'
-import { isHotelGeoQuestion, isHotelViewQuestion } from '@/lib/noise'
+import { isHotelGeoQuestion, isHotelViewQuestion, isNoiseQuestion } from '@/lib/noise'
 import type { OptimizedPhoto } from '@/lib/imageOptimize'
 import { getBrowserClient } from '@/lib/supabase/client'
+import { channelName, join, rowOf } from '@/lib/supabase/realtime'
+import type { Tables } from '@/lib/db/database.types'
+import { bookingsStore, findBooking, saveBooking } from '@/lib/storage'
+import { MAX_BOOKINGS, applyDateChange, tripBooking } from '@/lib/trips'
 
 /** The shortest pause before the assistant replies, so the answer reads as a reply rather than an echo. */
 export const THINK_MS = 650
@@ -77,6 +82,26 @@ const SEARCH_STEP = { agent: 'search', title: 'Подбираю отели по 
 /** The step shown while a question about the places near the hotel is answered: the geo steps come with the answer. */
 const GEO_STEP = { agent: 'geo', title: 'Проверяю места рядом с отелем' } as const
 const VIEW_STEP = { agent: 'geo', title: 'Проверяю, что видно из окна' } as const
+/** The step of the tool «Анализ шума» while it runs: its block with the sources comes with the answer. */
+const NOISE_STEP = { agent: 'features', title: 'Анализ шума' } as const
+/** The step of a chat about the bookings while they are read: the blocks of its tools come with the answer. */
+const TRIPS_STEP = { agent: 'trips', title: 'Смотрю бронирования' } as const
+/** How long a turn of a signed-in user waits for its chat to be saved: the server records the tools' runs in it. */
+const SAVE_WAIT_MS = 3000
+
+/**
+ * The steps of the answer in the feed: a step of a tool's run (`run.id`) already there is updated in place, so a run is
+ * one block whatever comes of it; the others are added.
+ */
+export function mergeSteps(messages: readonly ChatMessage[], steps: readonly ChatMessage[]): ChatMessage[] {
+  const byRun = new Map(steps.flatMap((m) => (m.data.step?.run ? [[m.data.step.run.id, m] as const] : [])))
+  const kept = messages.map((m) => {
+    const run = m.data.step?.run && byRun.get(m.data.step.run.id)
+    return run ? { ...run, id: m.id, createdAt: m.createdAt } : m
+  })
+  const there = new Set(messages.flatMap((m) => m.data.step?.run?.id ?? []))
+  return [...kept, ...steps.filter((m) => !(m.data.step?.run && there.has(m.data.step.run.id)))]
+}
 
 /** Eval's answer: the next question with what it has understood, or the plan once nothing is left to ask. */
 export function compose(
@@ -87,12 +112,22 @@ export function compose(
   exclude?: ReadonlySet<string>,
   /**
    * The chat's brief before the answer: what the answer saved is shown in a card of its own («Сохранил в память
-   * сессии»), so the text does not repeat «Записал: …».
+   * сессии»), so the text does not repeat it.
    */
   before?: Brief,
 ): { brief: Brief; question: Question | null; text: string; data: ChatMessage['data'] } {
   const { brief, reply: remark, matches, features, missing = [], photo } = response
   const today = todayIso()
+  // A chat about the bookings: the answer and the change of the dates it proposes, to be confirmed.
+  if (brief.trips) {
+    const { change } = response
+    return {
+      brief,
+      question: null,
+      text: remark ?? HOTEL_UNAVAILABLE,
+      data: change ? { change: { proposal: change, state: 'proposed' } } : {},
+    }
+  }
   // A chat about a hotel: the answer is the text, the model's general knowledge goes apart; no questions, no plan.
   if (brief.hotelId) {
     const { unverified, map } = response
@@ -133,10 +168,9 @@ export function compose(
   }
   const question = nextQuestion(brief, today, destinations)
   const saved = before !== undefined && savedParams(before, brief, destinations).length > 0
-  const understood = saved ? '' : describeBrief(brief, destinations)
   if (question) {
-    // The model's remark fills in only when nothing is understood yet, so answers keep "Записал: …".
-    const lead = saved ? '' : understood ? `Записал: ${understood}.` : remark
+    // What was understood is in the memory card; the model's remark leads only when nothing new was saved.
+    const lead = saved ? '' : remark
     const text = lead ? `${lead} ${question.text}` : question.text
     return { brief, question, text: seen ? `${seen} ${text}` : text, data: {} }
   }
@@ -145,9 +179,15 @@ export function compose(
   const plan = makePlan(brief, today, destinations, newHotels, matches, features, exclude, strict)
   // Nothing within the conditions: Эвал offers to change the parameters the search went by.
   if (strict && plan.options.length === 0)
-    return { brief, question, text: [seen, NOT_FOUND].filter(Boolean).join(' '), data: { notFound: brief } }
+    return {
+      brief,
+      question,
+      text: [seen, NOT_FOUND].filter(Boolean).join(' '),
+      data: { notFound: brief },
+    }
   const note = missingNote(missing, planCities(brief, today, destinations))
-  const text = [seen, understood && `Записал: ${understood}.`, note].filter(Boolean).join(' ')
+  // The answer of the tools of the store, with the hotels and the data they were chosen by, leads the plan.
+  const text = [seen, response.findings, note].filter(Boolean).join(' ')
   return { brief, question, text, data: { plan } }
 }
 
@@ -156,6 +196,12 @@ export interface HotelContext {
   id: string
   name: string
   dates?: StayDates
+}
+
+/** «Мои поездки» or a booking's page: the chat the traveller starts is about the bookings, or that booking. */
+export interface TripsContext {
+  trips: true
+  bookingId?: string
 }
 
 export interface Chats {
@@ -173,6 +219,11 @@ export interface Chats {
   send: (text: string, options?: { more?: boolean; photos?: readonly OptimizedPhoto[] }) => void
   /** Asks the failed answer again. */
   retry: (chatId: string, messageId: string) => void
+  /**
+   * «Подтвердить» of a proposed change of a booking's dates: the booking of this browser gets the new dates, price
+   * and cancellation terms, unless it changed since the change was counted — then the proposal is outdated.
+   */
+  confirmChange: (chatId: string, messageId: string) => void
   rename: (chatId: string, title: string) => void
   /** Deletes the chat with its messages, here and in the account. */
   remove: (chatId: string) => void
@@ -201,9 +252,11 @@ export function useChats(
   newHotels: readonly HotelSummary[],
   /** The chat of the address (`/assistant/<id>`); `null` or an id not in the list is a new, empty chat. */
   activeId: string | null,
-  /** On a hotel's page: the chat the traveller starts is about the hotel. */
-  hotel?: HotelContext,
+  /** On a hotel's page the chat the traveller starts is about the hotel; on the trips' pages, about the bookings. */
+  scope?: HotelContext | TripsContext,
 ): Chats {
+  const hotel = scope && !('trips' in scope) ? scope : undefined
+  const trips = scope && 'trips' in scope ? scope : undefined
   const session = useSession()
   const [mode, setMode] = useState<Mode>({ kind: 'loading' })
   const [chats, setChats] = useState<Chat[]>([])
@@ -281,6 +334,39 @@ export function useChats(
       pending.clear()
     }
   }, [])
+
+  // What the server adds to the chats later — the hotelier's answer, the finished «Запрос отельеру» — comes by Realtime.
+  const remoteUser = mode.kind === 'remote' ? mode.userId : null
+  useEffect(() => {
+    const client = getBrowserClient()
+    if (!client || !remoteUser) return
+    const channel = client
+      .channel(channelName('assistant-messages'))
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'assistant_messages', filter: `user_id=eq.${remoteUser}` },
+        (payload) => {
+          const row = rowOf<Tables<'assistant_messages'>>(payload)
+          const message =
+            row &&
+            parseMessage({
+              id: row.id,
+              role: row.role,
+              status: row.status,
+              text: row.text,
+              data: row.data,
+              createdAt: row.created_at,
+            })
+          if (!row || !message) return
+          setChats((list) =>
+            list.map((chat) =>
+              chat.id === row.chat_id ? mergeServerMessage(chat, message, activeRef.current === chat.id) : chat,
+            ),
+          )
+        },
+      )
+    return join(client, channel)
+  }, [remoteUser])
 
   // Saves what changed: the whole list for a guest, the changed chats for a signed-in user, in order.
   useEffect(() => {
@@ -370,7 +456,10 @@ export function useChats(
       const controller = new AbortController()
       inflight.current.set(chatId, controller)
 
-      const history = dialogOf({ ...chat, messages: chat.messages.filter((m) => m.createdAt < pending.createdAt) })
+      const history = dialogOf({
+        ...chat,
+        messages: chat.messages.filter((m) => m.createdAt < pending.createdAt),
+      })
       const input = history.at(-1)?.text ?? ''
       // The question about photos is not a part of the brief.
       const question = chat.question?.id === 'photo' ? null : (chat.question?.id ?? null)
@@ -383,13 +472,17 @@ export function useChats(
         !found &&
         !chat.brief.hotelId &&
         !nextQuestion(rerun ? chat.brief : mergeBrief(chat.brief, input, question, destinations), today)
-      const waitStep = planDue
-        ? SEARCH_STEP
-        : chat.brief.hotelId && isHotelViewQuestion(input)
-          ? VIEW_STEP
-          : chat.brief.hotelId && isHotelGeoQuestion(input)
-            ? GEO_STEP
-            : null
+      const waitStep = chat.brief.trips
+        ? TRIPS_STEP
+        : planDue
+          ? SEARCH_STEP
+          : chat.brief.hotelId && isHotelViewQuestion(input)
+            ? VIEW_STEP
+            : chat.brief.hotelId && isHotelGeoQuestion(input)
+              ? GEO_STEP
+              : chat.brief.hotelId && isNoiseQuestion(input)
+                ? NOISE_STEP
+                : null
       const stepId = newId()
       update(chatId, (c) => ({
         ...c,
@@ -414,10 +507,21 @@ export function useChats(
       try {
         // Only the photos in Storage are waited for: the turn is already marked in flight, so no other one starts.
         const sent = found instanceof Promise ? await found : found
+        // A signed-in user's chat is saved first (a little while at most): the server writes the tools' runs in it.
+        const remote = modeRef.current.kind === 'remote'
+        if (remote) await Promise.race([queue.current, delay(SAVE_WAIT_MS)])
         if (controller.signal.aborted) return
         const ask = () =>
           askAssistant(
-            { messages: history, brief: chat.brief, ...(sent && { photos: sent }), ...(rerun && { rerun }) },
+            {
+              messages: history,
+              brief: chat.brief,
+              ...(sent && { photos: sent }),
+              ...(rerun && { rerun }),
+              ...(remote && { chatId, messageId: pendingId }),
+              // The bookings of this browser as they are now, without the personal fields.
+              ...(chat.brief.trips && { bookings: bookingsStore.get().slice(0, MAX_BOOKINGS).map(tripBooking) }),
+            },
             rerun ? null : question,
             destinations,
             controller.signal,
@@ -486,6 +590,7 @@ export function useChats(
             title: step.title,
             ...(step.params && { params: step.params }),
             ...(step.result && { result: step.result }),
+            ...(step.run && { run: step.run }),
           },
         },
         createdAt: later(pending.createdAt, i - steps.length),
@@ -504,14 +609,23 @@ export function useChats(
           ]
         : []
       const messages = [
-        ...chat.messages.filter((m) => !(m.role === 'agent' && m.status === 'pending')),
+        ...mergeSteps(
+          chat.messages.filter((m) => !(m.role === 'agent' && m.status === 'pending')),
+          stepMessages,
+        ),
         ...memoryMessages,
-        ...stepMessages,
         ...down,
       ]
         .map((m) => (m.id === pendingId ? { ...m, status: 'done' as const, text, data } : m))
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-      return { ...chat, brief: next, question, messages, unread: activeRef.current !== chatId, updatedAt: now }
+      return {
+        ...chat,
+        brief: next,
+        question,
+        messages,
+        unread: activeRef.current !== chatId,
+        updatedAt: now,
+      }
     })
   }
 
@@ -569,13 +683,21 @@ export function useChats(
       data: {},
       createdAt: later(now, ANSWER_GAP_MS),
     }
-    // A chat about a hotel is named after it, and the page's dates go to the next answer.
+    // A chat about a hotel is named after it, and the page's dates go to the next answer; a chat of the trips' pages
+    // is about the bookings.
     const about = hotel && (!current.brief.hotelId || current.brief.hotelId === hotel.id)
+    const ownTrips = trips && current.messages.length === 0
+    const title = ownTrips
+      ? chatTitle(trips.bookingId ? `Бронирование ${trips.bookingId}` : 'Мои поездки')
+      : about && hotel
+        ? chatTitle(hotel.name)
+        : chatTitle(text || PHOTO_TEXT)
     const chat: Chat = {
       ...current,
-      title: current.title || (about && hotel ? chatTitle(hotel.name) : chatTitle(text || PHOTO_TEXT)),
-      brief:
-        about && hotel
+      title: current.title || title,
+      brief: ownTrips
+        ? { trips: true, ...(trips.bookingId && { bookingId: trips.bookingId }) }
+        : about && hotel
           ? { ...current.brief, hotelId: hotel.id, ...(hotel.dates && briefWithStay(hotel.dates)) }
           : current.brief,
       messages: [...current.messages, user, pending],
@@ -614,6 +736,23 @@ export function useChats(
     update(chatId, (chat) => ({
       ...chat,
       messages: chat.messages.map((m) => (m.id === messageId ? { ...m, status: 'pending', text: '' } : m)),
+    }))
+  }
+
+  const confirmChange = (chatId: string, messageId: string) => {
+    const message = chatsRef.current.find((c) => c.id === chatId)?.messages.find((m) => m.id === messageId)
+    const change = message?.data.change
+    if (!change || change.state !== 'proposed') return
+    const booking = findBooking(bookingsStore.get(), change.proposal.bookingId)
+    const next = booking && applyDateChange(booking, change.proposal, todayIso())
+    if (next) saveBooking(next)
+    const state = next ? 'applied' : 'outdated'
+    update(chatId, (chat) => ({
+      ...chat,
+      messages: chat.messages.map((m) =>
+        m.id === messageId && m.data.change ? { ...m, data: { ...m.data, change: { ...m.data.change, state } } } : m,
+      ),
+      updatedAt: new Date().toISOString(),
     }))
   }
 
@@ -700,6 +839,7 @@ export function useChats(
     signedIn: mode.kind === 'remote',
     send,
     retry,
+    confirmChange,
     rename,
     remove,
     setBrief,

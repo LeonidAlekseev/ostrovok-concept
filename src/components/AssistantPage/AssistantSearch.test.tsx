@@ -221,6 +221,7 @@ describe('AssistantSearch composer and feed', () => {
 
     await user.type(input(), 'к морю{Enter}')
     expect(within(log()).getByLabelText('Эвал думает')).toBeTruthy()
+    expect(within(log()).getByLabelText('Эвал думает').querySelector('[data-testid=working-loader]')).toBeTruthy()
     await user.type(input(), 'ещё')
     expect(screen.getByRole('button', { name: 'Отправить' }).hasAttribute('disabled')).toBe(true)
 
@@ -328,7 +329,10 @@ describe('AssistantSearch steps of the agents', () => {
 
   it('names the criteria without data instead of guessing (Scenario: Нет данных)', async () => {
     fetchMock.mockResolvedValue(
-      answer({ brief: { destinationId: 'prague', when: 9, party: 'solo', quiet: true }, missing: ['quiet'] }),
+      answer({
+        brief: { destinationId: 'prague', when: 9, party: 'solo', quiet: true },
+        missing: ['quiet'],
+      }),
     )
     const { user } = renderAssistant()
 
@@ -344,7 +348,9 @@ describe('AssistantSearch steps of the agents', () => {
       answer({
         brief: { destinationId: 'lisbon', when: 9, party: 'solo', quiet: true, height: 'high' },
         matches: [lisbon],
-        features: { [lisbon.id]: { floors: 12, heightM: 38, lnight: { min: 45, max: 49 }, views: [] } },
+        features: {
+          [lisbon.id]: { floors: 12, heightM: 38, lnight: { min: 45, max: 49 }, views: [] },
+        },
       }),
     )
     const { user } = renderAssistant()
@@ -384,7 +390,9 @@ describe('AssistantSearch plan', () => {
     const { user } = { user: userEvent.setup(), ...render(view()) }
     await user.type(input(), 'Лиссабон в октябре, один{Enter}')
     expect(await within(log()).findByText('Атмосфера поездки', {})).toBeTruthy()
-    await waitFor(async () => expect(await lisbonHotelLinks()).not.toHaveLength(0), { timeout: 8000 })
+    await waitFor(async () => expect(await lisbonHotelLinks()).not.toHaveLength(0), {
+      timeout: 8000,
+    })
     expect(failed).toBe(true)
   })
 })
@@ -497,7 +505,9 @@ describe('AssistantSearch after a reload', () => {
       unmount()
       render(view())
 
-      const chats = within(chatList()).getAllByRole('button', { name: /^(?!Действия).*(?:к морю|тихий отель)/ })
+      const chats = within(chatList()).getAllByRole('button', {
+        name: /^(?!Действия).*(?:к морю|тихий отель)/,
+      })
       expect(chats.map((c) => c.textContent)).toEqual([
         expect.stringContaining('тихий отель'),
         expect.stringContaining('к морю'),
@@ -698,7 +708,14 @@ describe('AssistantSearch memory of the session', () => {
   it(
     'offers the parameters when nothing is found, and looks again after one is changed (Scenario: Расширить расстояние)',
     async () => {
-      const brief = { vibe: 'sea', destinationId: 'lisbon', dates: november, when: 10, nights: 5, party: 'solo' }
+      const brief = {
+        vibe: 'sea',
+        destinationId: 'lisbon',
+        dates: november,
+        when: 10,
+        nights: 5,
+        party: 'solo',
+      }
       const lisbon = hotels.filter((h) => h.destinationId === 'lisbon').slice(0, 2)
       fetchMock
         .mockResolvedValueOnce(
@@ -748,7 +765,10 @@ describe('AssistantSearch memory of the session', () => {
       // The session's memory is updated, and the search goes again by the brief, without a message of the traveller.
       expect(await inLog('Расстояние до моря: до 1 км')).toBeTruthy()
       await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
-      expect(bodyOf(1)).toMatchObject({ rerun: true, brief: { seaMaxM: 1000, destinationId: 'lisbon' } })
+      expect(bodyOf(1)).toMatchObject({
+        rerun: true,
+        brief: { seaMaxM: 1000, destinationId: 'lisbon' },
+      })
       expect(bodyOf(1).messages.at(-1).role).toBe('assistant')
       // The hotel within the new distance, and no new message of the traveller.
       expect(await within(log()).findByText(/до моря 640 м/)).toBeTruthy()

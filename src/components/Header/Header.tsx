@@ -1,13 +1,15 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useSession } from '@/hooks/useStore'
+import { isHotelier } from '@/lib/hotelierChatRemote'
 import { signOut } from '@/lib/session'
+import { getBrowserClient } from '@/lib/supabase/client'
 import { cn } from 'cn'
 
 // The header's look follows the page content, not the pathname: `usePathname()` is not reliable in the server
@@ -20,9 +22,6 @@ const iconButton =
 const panelClass =
   'w-[min(300px,calc(100vw-2*var(--page-x)))] gap-0 p-4.5 shadow-(--shadow-popover) animate-in fade-in slide-in-from-top-1 animation-duration-180 ease-out'
 
-const panelTitleClass = 'm-0 mb-1.5 text-base font-[650]'
-const panelTextClass = 'm-0 mb-3.5 text-sm leading-[1.45] text-muted-foreground'
-
 const menuItemClass =
   'block w-full rounded-md p-3 text-left font-[550] text-foreground no-underline hover:bg-muted hover:text-primary'
 
@@ -33,13 +32,31 @@ const links = [
   { href: '/favorites', label: 'Избранное' },
 ]
 
+/** «Панель отельера» for a hotelier's account: asked of the database when the menu opens. */
+function HotelierLink({ email, onClick }: { email: string; onClick: () => void }) {
+  const [hotelier, setHotelier] = useState<{ email: string; is: boolean } | null>(null)
+  useEffect(() => {
+    const client = getBrowserClient()
+    if (!client) return
+    let current = true
+    isHotelier(client)
+      .then((is) => current && setHotelier({ email, is }))
+      .catch(() => undefined)
+    return () => {
+      current = false
+    }
+  }, [email])
+  if (!hotelier?.is || hotelier.email !== email) return null
+  return (
+    <Link className={cn(menuItemClass, 'mb-2')} href="/hotelier" onClick={onClick}>
+      Панель отельера
+    </Link>
+  )
+}
+
 export function Header() {
   const [open, setOpen] = useState(false)
-  const [notifications, setNotifications] = useState(false)
-  const close = useCallback(() => {
-    setOpen(false)
-    setNotifications(false)
-  }, [])
+  const close = useCallback(() => setOpen(false), [])
   const session = useSession()
 
   // On /search the header follows the results page width on 3xl screens, and its logo and icons align with the search card.
@@ -64,13 +81,7 @@ export function Header() {
             О!бъективно
           </a>
 
-          <Popover
-            open={open}
-            onOpenChange={(next) => {
-              setOpen(next)
-              setNotifications(false)
-            }}
-          >
+          <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger
               render={
                 <Button
@@ -98,31 +109,6 @@ export function Header() {
                     </li>
                   ))}
                   <li>
-                    <button
-                      type="button"
-                      className={menuItemClass}
-                      aria-expanded={notifications}
-                      aria-controls="header-notifications"
-                      onClick={() => setNotifications((shown) => !shown)}
-                    >
-                      Уведомления
-                    </button>
-                    {notifications && (
-                      <div id="header-notifications" className="px-3 pb-2">
-                        <p className={panelTitleClass}>Новых уведомлений нет</p>
-                        <p className={panelTextClass}>Здесь появятся изменения цен и статусы бронирований.</p>
-                        <Button className="w-full" onClick={() => setNotifications(false)}>
-                          Понятно
-                        </Button>
-                      </div>
-                    )}
-                  </li>
-                  <li>
-                    <Link className={menuItemClass} href="/help" onClick={close}>
-                      Поддержка
-                    </Link>
-                  </li>
-                  <li>
                     <Link className={menuItemClass} href="/api/docs" onClick={close}>
                       API
                     </Link>
@@ -140,6 +126,7 @@ export function Header() {
                 <section aria-label="Аккаунт" className="-mx-1.5 mt-3 border-t px-1.5 pt-3">
                   <p className="m-0 truncate px-1.5 font-[650]">{session.name}</p>
                   <p className="m-0 mb-2 truncate px-1.5 text-sm text-muted-foreground">{session.email}</p>
+                  <HotelierLink email={session.email} onClick={close} />
                   <Button
                     variant="outline"
                     className="w-full"

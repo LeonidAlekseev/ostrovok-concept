@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { loadNoiseMap, noiseMapOf, placesOf, sourcesOf } from './noise'
+import { loadNoiseMap, noiseMapOf, placesOf } from './noise'
 
 /** The answers of the database's functions by name, and the names asked. */
 const db = vi.hoisted(() => ({
@@ -27,24 +27,6 @@ beforeEach(() => {
 })
 
 // hotel-page, Requirement: Шум и окружение настоящего отеля
-describe('sourcesOf', () => {
-  it('folds the rows of hotel_geo into the layers with their Lden and Lnight', () => {
-    expect(
-      sourcesOf([
-        { source: 'industryInAgglomeration', indicator: 'Lden', db_min: null, db_max: 39 },
-        { source: 'roadsInAgglomeration', indicator: 'Lden', db_min: 60, db_max: 64 },
-        { source: 'roadsInAgglomeration', indicator: 'Lnight', db_min: 50, db_max: 54 },
-        { source: 'majorRoadsIncludingAgglomeration', indicator: 'Lden', db_min: 75, db_max: null },
-        { source: 'broken', indicator: 'Lday', db_min: 60, db_max: 64 },
-      ]),
-    ).toEqual([
-      { source: 'majorRoadsIncludingAgglomeration', lden: { min: 75 } },
-      { source: 'roadsInAgglomeration', lden: { min: 60, max: 64 }, lnight: { min: 50, max: 54 } },
-      { source: 'industryInAgglomeration', lden: { max: 39 } },
-    ])
-  })
-})
-
 describe('noiseMapOf', () => {
   const geometry = { type: 'Polygon', coordinates: [] }
   const band = (source: string, indicator: string, db_min: number | null, db_max: number | null) => ({
@@ -149,7 +131,7 @@ describe('placesOf', () => {
     distance_m,
   })
 
-  it('lists the loud places nearest first, each once', () => {
+  it('lists the loud places nearest first, each once under the first of its categories (a bar that serves food is a bar)', () => {
     expect(
       placesOf({
         covered: ['bar', 'restaurant', 'pharmacy'],
@@ -162,7 +144,7 @@ describe('placesOf', () => {
     ).toEqual({
       places: [
         { category: 'bar', name: 'Homenaje', distanceM: 92, lat: 39.47, lon: -0.376 },
-        { category: 'restaurant', name: 'Sereno', distanceM: 120, lat: 39.47, lon: -0.376 },
+        { category: 'bar', name: 'Sereno', distanceM: 120, lat: 39.47, lon: -0.376 },
       ],
       placesCovered: ['bar', 'restaurant'],
     })

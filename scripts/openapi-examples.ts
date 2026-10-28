@@ -92,11 +92,49 @@ write('view-map', { map: shortMap(viewMap.map as Json | null, 6000) })
 const noiseMap = await call(`/api/hotels/${HOTEL}/noise-map`)
 write('noise-map', { map: shortMap(noiseMap.map as Json | null, 8000) })
 
+const claimsQuery = { property: 'noise.lnight.', limit: 4 }
+write('claims', {
+  query: claimsQuery,
+  response: await call(`/api/hotels/${HOTEL}/claims?property=${claimsQuery.property}&limit=${claimsQuery.limit}`),
+})
+
+// The estimate at the facade of a hotel whose point lies in no contour of the roads, the street at its door 70 dB.
+const ESTIMATE_HOTEL = 'ota-9741622'
+const estimateQuery = { property: 'noise.estimate.street.', limit: 4 }
+write('claims-estimate', {
+  hotel: ESTIMATE_HOTEL,
+  query: estimateQuery,
+  response: await call(
+    `/api/hotels/${ESTIMATE_HOTEL}/claims?property=${estimateQuery.property}&limit=${estimateQuery.limit}`,
+  ),
+})
+
+// A hotel with reviews about noise; the stemmer keeps «шум» and «шумно» apart, so the query lists both.
+const REVIEWS_HOTEL = 'ota-7857547'
+const searchQuery = { q: 'шумно or шум', limit: 3 }
+write('documents-search', {
+  query: searchQuery,
+  response: await call(
+    `/api/hotels/${REVIEWS_HOTEL}/documents/search?q=${encodeURIComponent(searchQuery.q)}&limit=${searchQuery.limit}`,
+  ),
+})
+
+const relationsQuery = { predicate: 'near', category: 'pharmacy', limit: 3 }
+write('relations', {
+  query: relationsQuery,
+  response: await call(
+    `/api/hotels/${HOTEL}/relations?predicate=${relationsQuery.predicate}&category=${relationsQuery.category}&limit=${relationsQuery.limit}`,
+  ),
+})
+
 const geoRequest = {
   messages: [{ role: 'user', text: 'Где рядом аптека и как до неё дойти?' }],
   brief: { hotelId: HOTEL },
 }
 write('assistant-geo', { request: geoRequest, response: await call('/api/assistant', geoRequest) })
+
+const noiseRequest = { messages: [{ role: 'user', text: 'Тут шумно ночью?' }], brief: { hotelId: HOTEL } }
+write('assistant-noise', { request: noiseRequest, response: await call('/api/assistant', noiseRequest) })
 
 const wishRequest = {
   messages: [
@@ -129,3 +167,53 @@ write('assistant-wish', {
     }),
   },
 })
+
+// The choice by the store's tools: the runs' characteristics by hotel, the first three hotels of the plan.
+const knowledgeRequest = {
+  messages: [
+    { role: 'user', text: 'Найди отель в Валенсии, чтобы рядом была аптека и было тихо ночью' },
+    { role: 'assistant', text: 'Когда планируете поехать?' },
+    { role: 'user', text: 'Не важно' },
+    { role: 'assistant', text: 'С кем едете?' },
+    { role: 'user', text: 'Вдвоём' },
+  ],
+  brief: { destinationId: 'valencia', quiet: true, when: 'any', party: 'couple' },
+}
+const knowledge = await call('/api/assistant', knowledgeRequest)
+const chosen = first(knowledge.matches as Json[] | undefined, 3)
+const chosenFeatures = knowledge.features as Record<string, unknown> | undefined
+write('assistant-knowledge', {
+  request: knowledgeRequest,
+  response: {
+    ...knowledge,
+    ...(chosen.length > 0 && { matches: chosen }),
+    ...(chosenFeatures && {
+      features: Object.fromEntries(
+        chosen.flatMap((m) => (chosenFeatures[m.id as string] ? [[m.id, chosenFeatures[m.id as string]]] : [])),
+      ),
+    }),
+  },
+})
+
+// A chat about the bookings: the browser's booking at the hotel without the personal fields, moved to other dates.
+const tripsRequest = {
+  messages: [{ role: 'user', text: 'Перенеси бронь на 20–23 ноября' }],
+  brief: { trips: true, bookingId: 'OS-7K2Q9Z' },
+  bookings: [
+    {
+      id: 'OS-7K2Q9Z',
+      createdAt: '2026-10-27T18:00:00.000Z',
+      status: 'confirmed',
+      hotelId: HOTEL,
+      roomId: 'room-3202',
+      rateId: 'rate-1',
+      checkIn: '2026-11-10',
+      checkOut: '2026-11-12',
+      guests: { adults: 2, children: 0, rooms: 1 },
+      payment: 'now',
+      total: 19200,
+      cancellation: { kind: 'free', daysBefore: 4 },
+    },
+  ],
+}
+write('assistant-trips', { request: tripsRequest, response: await call('/api/assistant', tripsRequest) })

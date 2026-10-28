@@ -2,40 +2,41 @@
 
 import { useState } from 'react'
 import dynamic from 'next/dynamic'
-import { Building2, Car, Factory, Moon, Plane, Sun, Sunset, TrainFront, type LucideIcon } from 'lucide-react'
+import { Car, Factory, Moon, Plane, Sun, Sunset, TrainFront, type LucideIcon } from 'lucide-react'
 import { cn } from 'cn'
 import { MapUnavailable } from '@/components/MapUnavailable/MapUnavailable'
 import type { Hotel } from '@/lib/catalog'
 import type { NoiseMap as NoiseMapData } from '@/lib/db/noise'
-import { bandLabel, type NoiseBand } from '@/lib/features'
+import { bandLabel } from '@/lib/features'
 import { countRu } from '@/lib/format'
-import { distanceLabel, type HotelBuilding } from '@/lib/hotelDetails'
+import { distanceLabel } from '@/lib/hotelDetails'
 import {
-  CURVE_NOTE,
-  dayCurve,
-  dayEstimate,
+  dayColorLevel,
   dayLabel,
   EEA_NOISE_URL,
-  hasEeaNoise,
   LEGEND_STEPS,
   loudestSource,
   NO_EEA,
   NOISE_COLORS,
+  NOISE_ESTIMATE_NOTES,
   NOISE_MAP_LABEL,
   NOISE_MAP_RADIUS_M,
-  NOISE_UNKNOWN_COLOR,
   noiseColor,
+  noiseEstimate,
   noiseSourceLabel,
   NOISY_CATEGORIES,
   NOISY_GROUPS,
   NOISY_LABEL,
   NOISY_RADIUS_M,
-  QUIET_SOURCE,
+  venuesLine,
   whoLine,
   type HotelNoise as HotelNoiseData,
-  type NoiseIndicator,
+  type LevelRange,
+  type NoiseEstimate,
   type NoiseMapIndicator,
   type NoisyPlace,
+  type SideLevels,
+  type SourceNoise,
 } from '@/lib/noise'
 import { useHotelJson } from './useHotelJson'
 
@@ -56,9 +57,6 @@ const SOURCE_ICON: Readonly<Record<string, LucideIcon>> = {
   majorAirportsIncludingAgglomeration: Plane,
 }
 
-/** EEA's bands at the hotel's point. */
-const BAND_LABEL: Record<NoiseIndicator, string> = { Lden: 'За сутки', Lnight: 'Ночью' }
-
 /** The legend's title of the map's mode. */
 const MAP_TITLE: Record<NoiseMapIndicator, string> = {
   Lday: 'Днём, дБ (оценка по Lden и Lnight)',
@@ -68,23 +66,10 @@ const MAP_TITLE: Record<NoiseMapIndicator, string> = {
 /** The places of OSM shown in the list. */
 const PLACES_SHOWN = 6
 
-/** A day piece on the map whose two bands fit no day level. */
-const isUnknown = (f: NoiseMapData['features'][number]) =>
-  f.properties.indicator === 'Lday' && f.properties.level === null && f.properties.source !== QUIET_SOURCE
-
 /**
- * The legend of the map: the colours of the bands, the quiet below 40 dB first, each under its lower bound, the grey of
- * the day pieces without an estimate when there are any, and the dots of the loud places shown.
+ * The legend of the map: the colours of the bands, the quiet below 40 dB first, each under its lower bound, and the dots of the loud places shown.
  */
-function Legend({
-  indicator,
-  places,
-  unknown,
-}: {
-  indicator: NoiseMapIndicator
-  places: readonly NoisyPlace[]
-  unknown: boolean
-}) {
+function Legend({ indicator, places }: { indicator: NoiseMapIndicator; places: readonly NoisyPlace[] }) {
   const groups = NOISY_GROUPS.filter((g) => places.some((p) => g.categories.includes(p.category)))
   return (
     <div className="flex flex-col gap-1.5 rounded-xl bg-card p-2.5 text-xs text-foreground shadow-sm sm:bg-white/90 sm:dark:bg-card/90">
@@ -114,15 +99,6 @@ function Legend({
           ))}
         </ul>
       )}
-      {indicator === 'Lday' && (
-        <span className="text-[0.625rem] text-muted-foreground">Цвет — середина оценки дня</span>
-      )}
-      {unknown && (
-        <span className="flex items-center gap-1.5 text-[0.625rem] text-muted-foreground">
-          <span className="h-2 w-7 shrink-0" style={{ backgroundColor: NOISE_UNKNOWN_COLOR }} aria-hidden />
-          Серым — полосы Lden и Lnight не сходятся, оценки нет
-        </span>
-      )}
       <span className="text-[0.625rem] text-muted-foreground">
         Без цвета — нет контура EEA или дальше {NOISE_MAP_RADIUS_M} м от отеля
       </span>
@@ -140,11 +116,7 @@ function NoiseMapCard({ hotel, noise }: { hotel: Hotel; noise: HotelNoiseData })
     <div className="flex flex-col gap-2 sm:relative">
       {!failed && (
         <div className="flex flex-wrap items-start justify-between gap-2 sm:pointer-events-none sm:absolute sm:inset-x-2 sm:top-2 sm:z-1">
-          <Legend
-            indicator={indicator}
-            places={noise.places}
-            unknown={indicator === 'Lday' && Boolean(contours?.features.some(isUnknown))}
-          />
+          <Legend indicator={indicator} places={noise.places} />
           <div
             role="group"
             aria-label="Показатель шума"
@@ -184,128 +156,82 @@ function NoiseMapCard({ hotel, noise }: { hotel: Hotel; noise: HotelNoiseData })
   )
 }
 
-function Band({ band }: { band: NoiseBand }) {
+/** A level's range with the colour of its middle, or «нет оценки». */
+function Level({ range }: { range: LevelRange | null }) {
+  if (!range) return <span className="text-muted-foreground">нет оценки</span>
   return (
-    <span className="flex items-center gap-2">
+    <span className="flex items-center gap-1.5">
       <span
-        className="size-3 shrink-0 rounded-full"
-        style={{ backgroundColor: noiseColor(band.min ?? 0) }}
+        className="size-2.5 shrink-0 rounded-full"
+        style={{ backgroundColor: noiseColor(dayColorLevel(range)) }}
         aria-hidden
       />
-      {bandLabel(band)}
+      {dayLabel(range)}
     </span>
   )
 }
 
-/** The loudest bands, the WHO lines and the day, evening and night tiles. */
-function LevelCard({ noise }: { noise: HotelNoiseData }) {
-  const lden = loudestSource(noise, 'Lden')
-  const lnight = loudestSource(noise, 'Lnight')
-  const day = lden && dayEstimate(lden.lden, lden.lnight)
-  const tiles = [
-    { icon: Sun, label: 'День', value: day ? dayLabel(day) : 'нет оценки', note: '07–19, оценка' },
-    { icon: Sunset, label: 'Вечер', value: day ? dayLabel(day) : 'нет оценки', note: '19–23, как днём' },
-    { icon: Moon, label: 'Ночь', value: lnight ? bandLabel(lnight.lnight!) : 'нет данных', note: '23–07, EEA' },
-  ]
-  const rows = [
-    ...(lden ? [{ indicator: 'Lden' as const, source: lden, band: lden.lden! }] : []),
-    ...(lnight ? [{ indicator: 'Lnight' as const, source: lnight, band: lnight.lnight! }] : []),
-  ]
+const PERIODS: { key: keyof SideLevels; icon: LucideIcon; label: string; note: string }[] = [
+  { key: 'lday', icon: Sun, label: 'День', note: '07–19' },
+  { key: 'levening', icon: Sunset, label: 'Вечер', note: '19–23' },
+  { key: 'lnight', icon: Moon, label: 'Ночь', note: '23–07' },
+]
+
+function SideTiles({ title, side }: { title: string; side: SideLevels }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <h4 className="font-semibold">{title}</h4>
+      <ul className="grid grid-cols-3 gap-2">
+        {PERIODS.map(({ key, icon: Icon, label, note }) => (
+          <li key={key} className="flex flex-col gap-0.5 rounded-xl bg-secondary p-2.5">
+            <span className="flex items-center gap-1.5 text-sm">
+              <Icon className="size-4 text-muted-foreground" aria-hidden />
+              {label}
+            </span>
+            <b>
+              <Level range={side[key]} />
+            </b>
+            <span className="text-xs text-muted-foreground">{note}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** The estimate at the facade to the street and to the yard by period, the WHO line and the places' share. */
+function LevelCard({ noise, estimate }: { noise: HotelNoiseData; estimate: NoiseEstimate }) {
+  const night = loudestSource(noise, 'Lnight')
+  const who = night && whoLine(night, 'Lnight')
+  const venues = venuesLine(estimate.venues)
   return (
     <section aria-labelledby="noise-level-title" className={card}>
       <h3 id="noise-level-title" className="text-lg font-bold">
         Уровень шума у отеля
       </h3>
-      <dl className="flex flex-col gap-2">
-        {rows.map(({ indicator, source, band }) => {
-          const who = whoLine(source, indicator)
-          return (
-            <div key={indicator} className="flex flex-col gap-0.5">
-              <dt className="text-sm text-muted-foreground">
-                {BAND_LABEL[indicator]} ({indicator})
-              </dt>
-              <dd className="flex flex-col">
-                <b className="text-xl">
-                  <Band band={band} />
-                </b>
-                <span className="text-sm text-muted-foreground">
-                  {noiseSourceLabel(source.source)}
-                  {who && `; ${who}`}
-                </span>
-              </dd>
-            </div>
-          )
-        })}
-      </dl>
-      <ul className="grid grid-cols-3 gap-2">
-        {tiles.map(({ icon: Icon, label, value, note }) => (
-          <li key={label} className="flex flex-col gap-0.5 rounded-xl bg-secondary p-2.5">
-            <span className="flex items-center gap-1.5 text-sm">
-              <Icon className="size-4 text-muted-foreground" aria-hidden />
-              {label}
-            </span>
-            <b>{value}</b>
-            <span className="text-xs text-muted-foreground">{note}</span>
+      <p className="text-sm text-muted-foreground">Оценка снаружи у стены здания, дБ.</p>
+      <SideTiles title="Фасад на улицу" side={estimate.street} />
+      <SideTiles title="Окна во двор" side={estimate.yard} />
+      <ul className="flex flex-col gap-1 text-sm text-muted-foreground">
+        {night && (
+          <li>
+            Ночью у фасада по карте EEA: {bandLabel(night.lnight!)},{' '}
+            {noiseSourceLabel(night.source).toLocaleLowerCase('ru')}
+            {who && `; ${who}`}.
           </li>
-        ))}
+        )}
+        {venues && (
+          <li>
+            Заведения рядом ({countRu(estimate.counted.length, ['место', 'места', 'мест'])} в {NOISY_RADIUS_M} м) дают{' '}
+            {venues}.
+          </li>
+        )}
       </ul>
-      <p className="text-xs text-muted-foreground">
-        EEA даёт полосу в 5 дБ, а не точное значение; метода расчёта и погрешности в наборе нет.
-      </p>
     </section>
   )
 }
 
-const hourLabel = (halfHour: number) =>
-  `${String(Math.floor(halfHour / 2)).padStart(2, '0')}:${halfHour % 2 ? '30' : '00'}`
-
-/** The 24 hours of `dayCurve` as bars, coloured by level. */
-function DayCurveCard({ noise }: { noise: HotelNoiseData }) {
-  const curve = dayCurve(noise)
-  const floor = 30
-  const top = Math.max(80, ...(curve?.levels ?? []))
-  return (
-    <section aria-labelledby="noise-day-title" className={card}>
-      <h3 id="noise-day-title" className="text-lg font-bold">
-        Шум в течение суток
-      </h3>
-      {curve ? (
-        <>
-          <div
-            role="img"
-            aria-label={`Оценка по часам: ночью около ${Math.round(curve.night)} дБ, днём и вечером около ${Math.round(curve.day)} дБ`}
-            className="flex h-20 items-end gap-px"
-          >
-            {curve.levels.map((level, i) => (
-              <span
-                key={i}
-                title={`${hourLabel(i)} ≈ ${Math.round(level)} дБ`}
-                className="flex-1 rounded-t-sm"
-                style={{ height: `${((level - floor) / (top - floor)) * 100}%`, backgroundColor: noiseColor(level) }}
-              />
-            ))}
-          </div>
-          <div className="flex justify-between text-xs text-muted-foreground" aria-hidden>
-            {['00:00', '06:00', '12:00', '18:00', '24:00'].map((label) => (
-              <span key={label}>{label}</span>
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Иллюстрация, а не измерение. Ночь — середина полосы Lnight; день вычислен из Lden и Lnight по формуле
-            директивы ЕС 2002/49/EC при допущении, что вечером так же шумно, как днём (и днём не тише, чем ночью);
-            переходы около 07:00 и 23:00 сглажены. {CURVE_NOTE}
-          </p>
-        </>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          График не строим: для оценки нужны закрытые полосы Lden и Lnight одного источника, а у отеля их нет.
-        </p>
-      )}
-    </section>
-  )
-}
-
-/** The EEA layers at the point and the loud places of OSM nearby. */
+/** The EEA layers at the facade and the loud places of OSM nearby. */
 function SourcesCard({ noise }: { noise: HotelNoiseData }) {
   const places = noise.places.slice(0, PLACES_SHOWN)
   return (
@@ -314,26 +240,30 @@ function SourcesCard({ noise }: { noise: HotelNoiseData }) {
         Источники шума
       </h3>
       {noise.sources.length > 0 ? (
-        <ul aria-label="Карты шума EEA" className="flex flex-col gap-2.5">
+        <ul aria-label="Карты шума EEA у фасада" className="flex flex-col gap-2.5">
           {noise.sources.map((s) => {
             const Icon = SOURCE_ICON[s.source] ?? Car
+            const yard = noise.yard.find((y) => y.source === s.source)
+            const bands = (layer: SourceNoise) =>
+              [layer.lden && `${bandLabel(layer.lden)} за сутки`, layer.lnight && `${bandLabel(layer.lnight)} ночью`]
+                .filter(Boolean)
+                .join(' · ')
             return (
               <li key={s.source} className="flex gap-3">
                 <Icon className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
                 <span className="flex flex-col">
                   <span className="font-semibold">{noiseSourceLabel(s.source)}</span>
-                  <span className="text-sm text-muted-foreground">
-                    {[s.lden && `${bandLabel(s.lden)} за сутки`, s.lnight && `${bandLabel(s.lnight)} ночью`]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </span>
+                  <span className="text-sm text-muted-foreground">На улицу: {bands(s)}</span>
+                  {yard && bands(yard) !== bands(s) && (
+                    <span className="text-sm text-muted-foreground">Во двор: {bands(yard)}</span>
+                  )}
                 </span>
               </li>
             )
           })}
         </ul>
       ) : (
-        <p className="text-sm text-muted-foreground">Карты шума EEA у отеля данных не дают.</p>
+        <p className="text-sm text-muted-foreground">Карты шума EEA у здания отеля данных не дают.</p>
       )}
       <h4 className="font-semibold">Шумные места рядом, до {NOISY_RADIUS_M} м</h4>
       {places.length > 0 ? (
@@ -354,7 +284,7 @@ function SourcesCard({ noise }: { noise: HotelNoiseData }) {
       ) : (
         <p className="text-sm text-muted-foreground">
           {noise.placesCovered.length === NOISY_CATEGORIES.length
-            ? 'Баров, клубов, ресторанов и остановок рядом по OpenStreetMap нет.'
+            ? 'Баров, клубов, ресторанов, кафе и остановок рядом по OpenStreetMap нет.'
             : 'Нет данных OpenStreetMap о местах рядом.'}
         </p>
       )}
@@ -367,103 +297,63 @@ function SourcesCard({ noise }: { noise: HotelNoiseData }) {
   )
 }
 
-/** The building at the hotel's point (EUBUCCO); a model's estimate is marked. None for a doubtful one. */
-function BuildingCard({ building }: { building: HotelBuilding }) {
-  const floorsApprox = building.estimated ? '≈' : ''
-  const heightApprox = building.heightEstimated || building.estimated ? '≈' : ''
-  const estimated = building.estimated || building.heightEstimated
-  return (
-    <section aria-labelledby="noise-building-title" className={card}>
-      <h3 id="noise-building-title" className="text-lg font-bold">
-        Здание отеля
-      </h3>
-      <p className="flex gap-3">
-        <Building2 className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
-        <span className="flex flex-col">
-          <b>
-            {[
-              building.floors && `${floorsApprox}${countRu(building.floors, ['этаж', 'этажа', 'этажей'])}`,
-              building.heightM && `${heightApprox}${Math.round(building.heightM)} м`,
-            ]
-              .filter(Boolean)
-              .join(', ')}
-          </b>
-          <span className="text-sm text-muted-foreground">
-            EUBUCCO{estimated ? `, ${building.estimated ? '' : 'высота '}по оценке модели` : ''}.
-          </span>
-        </span>
-      </p>
-    </section>
-  )
-}
+const link = 'text-primary hover:underline'
 
-function DataCard({ building }: { building: boolean }) {
+/** How the estimate is computed, the sources last. */
+function MethodCard() {
   return (
-    <section aria-labelledby="noise-data-title" className={card}>
-      <h3 id="noise-data-title" className="text-lg font-bold">
-        Источники данных
-      </h3>
-      <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-muted-foreground">
+    <details className={cn(card, 'gap-2 md:col-span-2')}>
+      <summary className="cursor-pointer font-semibold">Как мы считаем</summary>
+      <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm text-muted-foreground">
+        {NOISE_ESTIMATE_NOTES.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
         <li>
-          <a href={EEA_NOISE_URL} target="_blank" rel="noopener" className="text-primary hover:underline">
+          Источники:{' '}
+          <a href={EEA_NOISE_URL} target="_blank" rel="noopener" className={link}>
             Карты шума EEA
           </a>{' '}
-          по директиве 2002/49/EC, раунд 2022: полосы Lden и Lnight
-        </li>
-        <li>
-          Места рядом —{' '}
-          <a
-            href="https://www.openstreetmap.org/copyright"
-            target="_blank"
-            rel="noopener"
-            className="text-primary hover:underline"
-          >
+          по директиве 2002/49/EC, раунд 2022: полосы Lden и Lnight;{' '}
+          <a href="https://eubucco.com/data/download/v0.2" target="_blank" rel="noopener" className={link}>
+            EUBUCCO v0.2
+          </a>{' '}
+          (контур здания отеля); места рядом —{' '}
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener" className={link}>
             © OpenStreetMap
           </a>
+          ; рекомендации ВОЗ по шуму для Европейского региона, 2018.
         </li>
-        {building && <li>Здание — EUBUCCO v0.2</li>}
-        <li>Рекомендации ВОЗ по шуму для Европейского региона, 2018</li>
       </ul>
-    </section>
+    </details>
   )
 }
 
 /**
- * «Шум и окружение» of a real hotel: the EEA contours around it on the map, the bands at its point with the day
- * estimate, the hours of a day, the sources (EEA's layers and OSM's loud places), the building and the data's sources.
- * A hotel outside EEA's maps says «нет данных EEA», never «тихо».
+ * «Шум и окружение» of a real hotel: the EEA contours around it on the map, the estimate of noise-estimate-v1 at the
+ * facade to the street and to the yard, the sources (EEA's layers at the facade and OSM's loud places) and how it is
+ * computed. A hotel outside EEA's maps says «нет данных EEA», never «тихо».
  */
-export function HotelNoise({
-  hotel,
-  noise,
-  building,
-}: {
-  hotel: Hotel
-  noise: HotelNoiseData
-  building?: HotelBuilding | null
-}) {
-  const eea = hasEeaNoise(noise)
+export function HotelNoise({ hotel, noise }: { hotel: Hotel; noise: HotelNoiseData }) {
+  const estimate = noiseEstimate(noise)
   return (
     <section id="noise" tabIndex={-1} aria-labelledby="noise-title" className="flex flex-col gap-4 outline-none">
       <div className="flex flex-col gap-1">
         <h2 id="noise-title" className="text-heading font-bold">
           Шум и окружение
         </h2>
-        <p className="text-muted-foreground">По картам шума EEA и местам OpenStreetMap вокруг отеля.</p>
+        <p className="text-muted-foreground">
+          Оценка у фасада отеля по картам шума EEA и заведениям OpenStreetMap вокруг.
+        </p>
       </div>
       <NoiseMapCard hotel={hotel} noise={noise} />
       <div className="grid gap-4 md:grid-cols-2">
-        {eea ? (
-          <>
-            <LevelCard noise={noise} />
-            <DayCurveCard noise={noise} />
-          </>
+        {estimate ? (
+          <LevelCard noise={noise} estimate={estimate} />
         ) : (
-          <p className={cn(card, 'md:col-span-2')}>{NO_EEA}. Это не значит, что здесь тихо.</p>
+          <p className={card}>{NO_EEA}. Это не значит, что здесь тихо.</p>
         )}
         <SourcesCard noise={noise} />
-        {building && (building.floors || building.heightM) ? <BuildingCard building={building} /> : null}
-        <DataCard building={Boolean(building)} />
+        <MethodCard />
       </div>
     </section>
   )

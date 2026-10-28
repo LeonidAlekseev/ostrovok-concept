@@ -38,7 +38,15 @@ const bodyOf = (call: number) => JSON.parse(fetchMock.mock.calls[call][1]?.body 
 
 const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString()
 const message = (role: ChatMessage['role'], text: string, createdAt: string, extra: Partial<ChatMessage> = {}) =>
-  ({ id: crypto.randomUUID(), role, status: 'done', text, data: {}, createdAt, ...extra }) satisfies ChatMessage
+  ({
+    id: crypto.randomUUID(),
+    role,
+    status: 'done',
+    text,
+    data: {},
+    createdAt,
+    ...extra,
+  }) satisfies ChatMessage
 
 const chatOf = (title: string, minutes: number, texts: string[], extra: Partial<Chat> = {}): Chat => ({
   ...newChat(minutesAgo(minutes)),
@@ -400,7 +408,12 @@ describe('the feed', () => {
     ['done', 'Инструмент, готово:', 'нашёл 3 отеля'],
     ['failed', 'Инструмент, не удалось:', 'нет ответа'],
   ] as const)('shows a %s step as a card of the call with its parameters and status', (status, label, result) => {
-    const step = { agent: 'search' as const, title: 'Подбираю отели', params: 'Лиссабон', result }
+    const step = {
+      agent: 'search' as const,
+      title: 'Подбираю отели',
+      params: 'Лиссабон',
+      result,
+    }
     const chat = chatOf('Лиссабон', 5, ['Лиссабон вдвоём'])
     chat.messages.push(message('agent', '', minutesAgo(4), { status, data: { step } }))
     renderWith([chat])
@@ -411,7 +424,7 @@ describe('the feed', () => {
     expect(card.className).toMatch(/\bbg-muted\b/)
   })
 
-  it('shows a step at work as a row with the three dots: «Ищу подходящие варианты…» for the search', () => {
+  it('shows a step at work as a row with a spinning loader: «Ищу подходящие варианты…» for the search', () => {
     const chat = chatOf('Лиссабон', 5, ['Лиссабон вдвоём'])
     chat.messages.push(
       message('agent', '', minutesAgo(4), {
@@ -426,6 +439,12 @@ describe('the feed', () => {
     renderWith([chat])
     expect(within(log()).getByRole('status', { name: 'Ищу подходящие варианты…' })).toBeTruthy()
     expect(within(log()).getByRole('status', { name: 'Проверяю места рядом с отелем…' })).toBeTruthy()
+    const rows = within(log()).getAllByRole('status')
+    for (const row of rows) {
+      const loader = row.querySelector('[data-testid=working-loader]')!
+      expect(loader.getAttribute('class')).toContain('motion-safe:animate-spin')
+    }
+    expect(log().querySelector('.lucide-waves, .lucide-eye, .lucide-map-pin')).toBeNull()
   })
 })
 
@@ -531,7 +550,9 @@ describe('a chat about a hotel', () => {
     await within(log()).findByText('В данных мест рядом нет.')
     await user.type(screen.getByLabelText('Опишите поездку'), 'Есть ли парковка?{Enter}')
     expect(await within(log()).findByText('Да: парковка.')).toBeTruthy()
-    expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string).brief).toMatchObject({ hotelId: hotel.id })
+    expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string).brief).toMatchObject({
+      hotelId: hotel.id,
+    })
     expect(chatId()).toBe(chat.id)
     expect(within(log()).queryAllByRole('article')).toHaveLength(0)
     expect(screen.queryByRole('list', { name: 'Быстрые ответы' })).toBeNull()

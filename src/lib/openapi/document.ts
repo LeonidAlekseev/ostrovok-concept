@@ -1,8 +1,14 @@
 import { z } from 'zod'
 import { assistantOperations } from '@/app/api/assistant/schema'
+import { claimsOperations } from '@/app/api/hotels/[hotelId]/claims/schema'
+import { searchOperations } from '@/app/api/hotels/[hotelId]/documents/search/schema'
+import { relationsOperations } from '@/app/api/hotels/[hotelId]/relations/schema'
 import { noiseMapOperations } from '@/app/api/hotels/[hotelId]/noise-map/schema'
 import { viewMapOperations } from '@/app/api/hotels/[hotelId]/view-map/schema'
 import { viewOperations } from '@/app/api/hotels/[hotelId]/view/schema'
+import { hotelierOperations } from '@/app/api/hotelier/schema'
+import { hotelierHotelsOperations } from '@/app/api/hotelier/hotels/schema'
+import { hotelierFactsOperations } from '@/app/api/hotels/[hotelId]/hotelier/facts/schema'
 import { hotelsOperations } from '@/app/api/hotels/schema'
 import { openApiOperations } from '@/app/api/openapi.json/schema'
 import { supabaseOpenApiOperations } from '@/app/api/openapi/supabase.json/schema'
@@ -21,7 +27,13 @@ export const API_OPERATIONS: readonly ApiOperation[] = [
   ...viewOperations,
   ...viewMapOperations,
   ...noiseMapOperations,
+  ...claimsOperations,
+  ...searchOperations,
+  ...hotelierFactsOperations,
+  ...hotelierHotelsOperations,
+  ...relationsOperations,
   ...assistantOperations,
+  ...hotelierOperations,
   ...revalidateOperations,
   ...openApiOperations,
   ...supabaseOpenApiOperations,
@@ -30,7 +42,12 @@ export const API_OPERATIONS: readonly ApiOperation[] = [
 const TAGS = [
   { name: 'Отели', description: 'Каталог: отели по id, городам и рамке карты' },
   { name: 'Гео отеля', description: 'Вид из окон, здания и шум вокруг настоящего отеля Валенсии' },
+  {
+    name: 'Знания об отеле',
+    description: 'Хранилище знаний: утверждения с источниками, поиск по отзывам, связи с местами',
+  },
   { name: 'Эвал', description: 'Ассистент: диалог, подбор отелей, вопросы об отеле с картой' },
+  { name: 'Чат с отельером', description: 'Путешественник пишет отелю, отельер отвечает; нужна сессия' },
   { name: 'Служебные', description: 'Для скриптов: нужен секрет' },
   { name: 'Документация', description: 'Документы OpenAPI этой страницы' },
 ]
@@ -120,6 +137,12 @@ export function apiDocument() {
     components: {
       schemas: componentSchemas(),
       securitySchemes: {
+        session: {
+          type: 'apiKey',
+          in: 'cookie',
+          name: 'sb-<project>-auth-token',
+          description: 'Сессия Supabase Auth в cookie браузера: вход на сайте.',
+        },
         serviceRole: {
           type: 'http',
           scheme: 'bearer',

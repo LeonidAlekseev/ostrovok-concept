@@ -1,16 +1,19 @@
 'use client'
 
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Map as MapLibreMap,
   Marker,
+  Popup,
   type ExpressionSpecification,
   type FilterSpecification,
   type GeoJSONSource,
 } from 'maplibre-gl'
 import { cn } from 'cn'
 import type { ViewMap as ViewMapData } from '@/lib/db/view'
+import { distanceLabel } from '@/lib/hotelDetails'
 import { pointAt, SIDE_HALF_WIDTH_DEG, VIEW_MAP_RADIUS_M, type Tone } from '@/lib/view'
 import {
   ATTRIBUTION_CLASS,
@@ -34,6 +37,9 @@ import {
 const ZOOM = 16
 const PITCH = 55
 
+/** The room round the dots when the map fits them, of their span. */
+const FIT_ROOM = 0.3
+
 /** The fan of the chosen side and the sun's line, m. */
 const SECTOR_M = 450
 const SUN_M = 700
@@ -51,9 +57,17 @@ const buildingColor = (blockers: readonly string[], hotel: string | null): Expre
 ]
 
 export interface MapTarget {
+  name: string
+  /** «Музей», «достопримечательность», … */
+  category: string
   lat: number
   lon: number
+  distanceM: number
   tone: Tone
+  /** The verdict from the chosen floor in words («видно», «закрыто», …). */
+  verdict: string
+  /** A line runs to it: it is on the shown side. */
+  line: boolean
 }
 
 const empty = { type: 'FeatureCollection' as const, features: [] }
@@ -76,7 +90,8 @@ function sector(center: { lat: number; lon: number }, bearing: number): Data {
 /**
  * The buildings of EUBUCCO around the hotel standing by their heights (OpenFreeMap's own 3D buildings beyond them), the
  * hotel's and the ones in the way from the chosen floor coloured, the fan of the chosen side with the map turned to it,
- * the lines to the places coloured by the tone of their verdict from the floor and the sun's lines at the sunset and the sunrise.
+ * the lines to the places coloured by the tone of their verdict from the floor, a dot at the end of each opening its
+ * name, kind, distance and verdict when hovered or pressed, and the sun's lines at the sunset and the sunrise.
  * `onFail` when the map cannot load (no WebGL, no tiles).
  */
 export default function ViewMap({
@@ -85,7 +100,7 @@ export default function ViewMap({
   bearing,
   sunsetAzimuth,
   sunriseAzimuth,
-  targets,
+  targets: given,
   blockers,
   hotelBuilding,
   onFail,
@@ -104,10 +119,19 @@ export default function ViewMap({
   const [map, setMap] = useState<MapLibreMap | null>(null)
   /** The style's own 3D buildings (OSM's heights) and their filters. */
   const styleBuildings = useRef<{ id: string; filter: FilterSpecification | undefined }[]>([])
+  // The targets by value: the dots and the fit stay while the list is the same.
+  const targetsKey = JSON.stringify(given)
+  const targets = useMemo(() => JSON.parse(targetsKey) as MapTarget[], [targetsKey])
   const fail = useRef(onFail)
   useEffect(() => {
     fail.current = onFail
   })
+  // One element per target, made once a list: MapLibre moves it, React renders the dot into it.
+  const elements = useMemo(() => targets.map(() => document.createElement('div')), [targets])
+  const [popupElement] = useState(() => document.createElement('div'))
+  const [selected, setSelected] = useState<number | null>(null)
+  const [hovered, setHovered] = useState<number | null>(null)
+  const popupId = useId()
 
   const containerRef = useCallback(
     (container: HTMLDivElement | null) => {
@@ -215,28 +239,41 @@ export default function ViewMap({
     map.setPaintProperty('view-buildings', 'fill-extrusion-color', buildingColor(blockers, hotelBuilding))
   }, [map, blockers, hotelBuilding])
 
-  // The chosen side faces up.
+  // The chosen side faces up, the hotel and all the dots in view under the legend.
   useEffect(() => {
     if (!map) return
     map.getSource<GeoJSONSource>('view-sector')?.setData(sector(center, bearing))
-    map.easeTo({ bearing, duration: 600 })
-  }, [map, center, bearing])
+    const lons = [center.lon, ...targets.map((t) => t.lon)]
+    const lats = [center.lat, ...targets.map((t) => t.lat)]
+    // The tilt widens what stands near the bottom and the fit does not know it: the box has some room.
+    const [west, east, south, north] = [Math.min(...lons), Math.max(...lons), Math.min(...lats), Math.max(...lats)]
+    const room = FIT_ROOM * Math.max(east - west, north - south, 0.002)
+    map.fitBounds(
+      [
+        [west - room, south - room],
+        [east + room, north + room],
+      ],
+      { bearing, padding: { top: 110, bottom: 40, left: 40, right: 40 }, maxZoom: ZOOM, duration: 600 },
+    )
+  }, [map, center, bearing, targets])
 
   useEffect(() => {
     if (!map) return
     map.getSource<GeoJSONSource>('view-lines')?.setData({
       type: 'FeatureCollection',
-      features: targets.map((t) => ({
-        type: 'Feature',
-        properties: { color: TONE_COLOR[t.tone] },
-        geometry: {
-          type: 'LineString',
-          coordinates: [
-            [center.lon, center.lat],
-            [t.lon, t.lat],
-          ],
-        },
-      })),
+      features: targets
+        .filter((t) => t.line)
+        .map((t) => ({
+          type: 'Feature',
+          properties: { color: TONE_COLOR[t.tone] },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [center.lon, center.lat],
+              [t.lon, t.lat],
+            ],
+          },
+        })),
     })
   }, [map, center, targets])
 
@@ -268,5 +305,89 @@ export default function ViewMap({
     })
   }, [map, center, sunsetAzimuth, sunriseAzimuth])
 
-  return <div ref={containerRef} className={cn('size-full', ATTRIBUTION_CLASS)} />
+  useEffect(() => {
+    if (!map) return
+    const markers = elements.map((element, i) =>
+      new Marker({ element, anchor: 'center' }).setLngLat([targets[i].lon, targets[i].lat]).addTo(map),
+    )
+    return () => markers.forEach((marker) => marker.remove())
+  }, [map, elements, targets])
+
+  // The target pressed stays open; one hovered shows while the pointer is on it.
+  const openIndex = selected ?? hovered
+  const shown = openIndex === null ? undefined : targets[openIndex]
+  useEffect(() => {
+    if (!map || !shown) return
+    const popup = new Popup({
+      offset: 14,
+      maxWidth: '15rem',
+      closeButton: false,
+      closeOnClick: false,
+      focusAfterOpen: false,
+      // The tip lets the pointer through to the map; MapLibre's unlayered styles beat Tailwind's layers, hence `!`.
+      className: 'pointer-events-none! [&_.maplibregl-popup-content]:rounded-xl! [&_.maplibregl-popup-content]:py-2!',
+    })
+      .setDOMContent(popupElement)
+      .setLngLat([shown.lon, shown.lat])
+      .addTo(map)
+    return () => {
+      popup.remove()
+    }
+  }, [map, shown, popupElement])
+
+  // A press on the map elsewhere closes the pressed popup.
+  useEffect(() => {
+    if (!map || selected === null) return
+    const close = () => setSelected(null)
+    map.on('click', close)
+    return () => {
+      map.off('click', close)
+    }
+  }, [map, selected])
+
+  return (
+    <div
+      ref={containerRef}
+      className={cn('size-full', ATTRIBUTION_CLASS)}
+      role="region"
+      aria-label="Карта вида из отеля"
+    >
+      {map &&
+        targets.map((target, i) => {
+          const element = elements[i]
+          if (!element) return null
+          return createPortal(
+            <button
+              type="button"
+              aria-label={`${target.name}, ${target.category}: ${target.verdict}`}
+              aria-expanded={selected === i}
+              aria-describedby={openIndex === i ? popupId : undefined}
+              onClick={(e) => {
+                // The map's own click, which closes the popup, comes after React's: it is not the map's.
+                e.stopPropagation()
+                setSelected((now) => (now === i ? null : i))
+              }}
+              onPointerEnter={(e) => e.pointerType === 'mouse' && setHovered(i)}
+              onPointerLeave={() => setHovered(null)}
+              onKeyDown={(e) => e.key === 'Escape' && setSelected(null)}
+              className="relative block size-5 rounded-full border-2 border-white shadow-sm before:absolute before:-inset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              style={{ backgroundColor: TONE_COLOR[target.tone] }}
+            />,
+            element,
+            `${i}-${target.lat}-${target.lon}`,
+          )
+        })}
+      {shown &&
+        createPortal(
+          <span id={popupId} className="flex flex-col font-sans text-sm text-foreground">
+            <b className="font-semibold">{shown.name}</b>
+            <span className="text-muted-foreground">
+              {shown.category} · {distanceLabel(shown.distanceM)} от отеля
+            </span>
+            <span className="text-muted-foreground">Из окна: {shown.verdict}</span>
+          </span>,
+          popupElement,
+        )}
+    </div>
+  )
 }

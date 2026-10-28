@@ -128,8 +128,15 @@ describe('demo account', () => {
     render(<AuthPage mode="login" />)
     await user.click(screen.getByRole('button', { name: 'Войти в демо-аккаунт' }))
     await waitFor(() => expect(nav.replace).toHaveBeenCalledWith('/trips'))
-    expect(demo.signInDemo).toHaveBeenCalledWith('/trips')
+    expect(demo.signInDemo).toHaveBeenCalledWith('/trips', 'traveller')
     expect(demo.reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('signs in to the demo hotelier next to the traveller', async () => {
+    const user = userEvent.setup()
+    render(<AuthPage mode="login" />)
+    await user.click(screen.getByRole('button', { name: 'Демо отельер' }))
+    await waitFor(() => expect(demo.signInDemo).toHaveBeenCalledWith(null, 'hotelier'))
   })
 
   it('goes back under the dialog without `next`', async () => {

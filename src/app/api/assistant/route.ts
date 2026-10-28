@@ -7,7 +7,16 @@ import { getTextModels, getVisionModels } from '@/lib/ai/model'
 import { APICallError } from 'ai'
 import { allowRequest, allowVisionRequest, clientIp } from '@/lib/ai/rateLimit'
 import { SEMANTIC_TIMEOUT_MS, semanticSearch } from '@/lib/ai/semantic'
-import { MATCHES, runTurn, type TurnContext } from '@/lib/ai/turn'
+import { MATCHES, featuresStep, runTurn, type TurnContext } from '@/lib/ai/turn'
+import {
+  KNOWLEDGE_PLAN_MS,
+  knowledgeTurn,
+  planKnowledge,
+  rulesKnowledge,
+  type KnowledgeDeps,
+} from '@/lib/ai/knowledgeTurn'
+import { runFeaturesTool, runNearTool, runReviewsTool, type Candidate } from '@/lib/ai/knowledgeTools'
+import { loadLevelIndex, loadNearIndex } from '@/lib/db/knowledge'
 import { MODEL_TIMEOUT_MS, understandWish } from '@/lib/ai/understand'
 import {
   INTENT_TIMEOUT_MS,
@@ -26,6 +35,7 @@ import {
   mergeBrief,
   nextQuestion,
   normalizeBrief,
+  planCities,
   type AssistantRequest,
   type AssistantResponse,
   type Brief,
@@ -33,11 +43,18 @@ import {
 } from '@/lib/assistant'
 import type { HotelSummary } from '@/lib/catalog'
 import type { Destination } from '@/data/destinations'
-import { loadDestinations, loadHotel, loadHotelSummaries } from '@/lib/db/catalog'
+import { loadDestinations, loadHotel, loadHotels, loadHotelSummaries } from '@/lib/db/catalog'
+import { bookingTurn } from '@/lib/ai/bookingTurn'
 import { loadHotelFeatures } from '@/lib/db/features'
 import { loadHotelDetails } from '@/lib/db/hotelDetails'
 import { loadHotelNoise } from '@/lib/db/noise'
-import { isHotelGeoQuestion, isHotelViewQuestion } from '@/lib/noise'
+import { recordRun, runOwner } from '@/lib/db/toolRuns'
+import { NOISE_TOOL, NOISE_TOOL_PARAMS, NOISE_TOOL_TITLE, runNoiseTool } from '@/lib/ai/noiseTool'
+import { ASK_HOTELIER_TITLE, ASK_HOTELIER_TOOL, runAskHotelier } from '@/lib/ai/hotelierTool'
+import { loadHotelierClaims } from '@/lib/db/claims'
+import { asksHotelier, characteristicLabel, questionKeys, type HotelierKey } from '@/lib/hotelierFacts'
+import { isHotelGeoQuestion, isHotelViewQuestion, isNoiseQuestion } from '@/lib/noise'
+import type { ToolRun } from '@/lib/toolResult'
 import { todayIso, type IsoDate } from '@/lib/dates'
 import type { Hotel } from '@/lib/catalog'
 import { assistantRequestSchema } from './schema'
@@ -77,21 +94,107 @@ const textDeadline = (deadline: number) => Math.min(Date.now() + MODEL_TIMEOUT_M
  * meaning, then their building, noise and views when the traveller asked of them. Nothing found keeps the plan on
  * the rules; the steps go to the answer for the feed. A search that failed twice sets `modelsDown`.
  */
-async function planTurn(context: Omit<TurnContext, 'summaries' | 'features'>): Promise<Partial<AssistantResponse>> {
+async function planTurn(
+  context: Omit<TurnContext, 'summaries' | 'features'>,
+  { messages, chatId, messageId }: Pick<WishContext, 'messages' | 'chatId' | 'messageId'>,
+): Promise<Partial<AssistantResponse>> {
   if (nextQuestion(context.brief, context.today)) return {}
   let summaries: Promise<HotelSummary[]> | undefined
+  const loadSummaries = () => (summaries ??= loadHotelSummaries().catch(() => []))
+  // The wish asks of the noise, a place near or the reviews: the model chooses the tools of the store while the
+  // search runs, and the search leaves them their time.
+  const rules = rulesKnowledge(context.wish, context.brief)
+  const knowledge = rules.length > 0
+  const models = knowledge ? await getTextModels() : undefined
+  const plan = knowledge
+    ? planKnowledge(messages, rules, {
+        models,
+        deadline: Math.min(Date.now() + KNOWLEDGE_PLAN_MS, context.deadline - KNOWLEDGE_TIME_MS),
+        signal: context.signal,
+        onError: (id, error) => warn(`${id} did not choose the knowledge calls`, error),
+      })
+    : null
+  const owner = knowledge ? runOwner(chatId, messageId) : null
   const { state, steps } = await runTurn({
     ...context,
-    summaries: () => (summaries ??= loadHotelSummaries().catch(() => [])),
+    deadline: knowledge ? context.deadline - KNOWLEDGE_TIME_MS : context.deadline,
+    knowledge,
+    summaries: loadSummaries,
     features: loadHotelFeatures,
   })
+  let findings: string | undefined
+  let modelsDown = state.semanticDown === true
+  if (plan && owner) {
+    const all = await loadSummaries()
+    const candidates = knowledgeCandidates(all, state, planCities(context.brief, context.today, context.destinations))
+    const outcome = await knowledgeTurn(plan, candidates, {
+      wish: context.wish,
+      owner,
+      models,
+      deadline: context.deadline,
+      signal: context.signal,
+      deps: KNOWLEDGE_DEPS,
+      onError: (id, error) => warn(`${id} gave no remark over the knowledge`, error),
+    })
+    steps.push(...outcome.steps)
+    findings = outcome.text
+    modelsDown ||= outcome.modelsDown === true
+    if (outcome.chosen.length === 0 && context.brief.quiet) {
+      // The store chose none: the quiet goes by the hotels' features as before, its step after the tools'.
+      const fallback = await runTurn({ ...context, summaries: loadSummaries, features: loadHotelFeatures }, [
+        featuresStep,
+      ])
+      steps.push(...fallback.steps)
+      Object.assign(state, fallback.state)
+    }
+    if (outcome.chosen.length > 0) {
+      const byId = new Map(all.map((h) => [h.id, h]))
+      state.matches = outcome.chosen.flatMap((id) => byId.get(id) ?? [])
+      const features = await loadHotelFeatures().catch(() => null)
+      state.features = Object.fromEntries(
+        outcome.chosen.flatMap((id) => (features?.has(id) ? [[id, features.get(id)!]] : [])),
+      )
+    }
+  }
   return {
     ...(state.matches?.length && { matches: state.matches }),
     ...(state.features && Object.keys(state.features).length > 0 && { features: state.features }),
     ...(state.missing?.length && { missing: state.missing }),
-    ...(state.semanticDown && { modelsDown: true as const }),
+    ...(modelsDown && { modelsDown: true as const }),
+    ...(findings && { findings }),
     steps,
   }
+}
+
+/** The answer's time the tools of the store keep for themselves after the earlier steps. */
+const KNOWLEDGE_TIME_MS = 4000
+
+/** The store's reads and the runs of the tools, as the route does them. */
+const KNOWLEDGE_DEPS: KnowledgeDeps = {
+  levels: loadLevelIndex,
+  near: loadNearIndex,
+  runFeatures: runFeaturesTool,
+  runNear: runNearTool,
+  runReviews: runReviewsTool,
+  record: recordRun,
+}
+
+/**
+ * The hotels the tools of the store choose among: those the features step kept (by the sea, the views), else every
+ * hotel of the plan's cities; the search by meaning's first, then the best rated.
+ */
+function knowledgeCandidates(
+  all: readonly HotelSummary[],
+  state: { ranked?: string[]; semantic?: string[] },
+  cities: readonly Destination[],
+): Candidate[] {
+  const ids = new Set(cities.map((d) => d.id))
+  const kept = state.ranked && new Set(state.ranked)
+  const semantic = new Map((state.semantic ?? []).map((id, i) => [id, i]))
+  return all
+    .filter((h) => ids.has(h.destinationId) && (!kept || kept.has(h.id)))
+    .sort((a, b) => (semantic.get(a.id) ?? Infinity) - (semantic.get(b.id) ?? Infinity) || b.rating - a.rating)
+    .map((h) => ({ id: h.id, name: h.name }))
 }
 
 /**
@@ -101,6 +204,9 @@ async function planTurn(context: Omit<TurnContext, 'summaries' | 'features'>): P
  * tools, the answer tells what they found — the Ostrovok places of the hotel first, OpenStreetMap besides — with the
  * steps' lines and the map; a hotel with neither data is answered as before. A question about the view from the
  * windows («видно ли море») is the view steps' (src/lib/ai/viewTurn.ts): the lines of sight over EUBUCCO's buildings.
+ * A question about the noise runs the tool «Анализ шума» (src/lib/ai/noiseTool.ts) first: the answer goes by its
+ * result, and its step carries the run with the sources for the block of the feed; a signed-in user's run is written
+ * to `tool_runs` (src/lib/db/toolRuns.ts).
  */
 async function hotelTurn(
   hotel: Hotel,
@@ -109,15 +215,32 @@ async function hotelTurn(
     messages,
     signal,
     deadline,
-  }: { brief: Brief; messages: AssistantRequest['messages']; signal: AbortSignal; deadline: number },
+    chatId,
+    messageId,
+  }: {
+    brief: Brief
+    messages: AssistantRequest['messages']
+    signal: AbortSignal
+    deadline: number
+    chatId?: string
+    messageId?: string
+  },
 ): Promise<Response> {
   const next: Brief = { ...brief, hotelId: hotel.id, destinationId: hotel.destinationId }
-  const [models, details, noise] = await Promise.all([
+  const text = messages[messages.length - 1].text
+  const [models, details, noise, hotelier, noiseRun] = await Promise.all([
     getTextModels(),
     loadHotelDetails(hotel.id),
     loadHotelNoise(hotel),
+    loadHotelierClaims(hotel.id).then((claims) => claims ?? []),
+    isNoiseQuestion(text)
+      ? runOwner(chatId, messageId).then((owner) =>
+          recordRun(owner, NOISE_TOOL, `${hotel.name} (${hotel.id})`, () => runNoiseTool(hotel.id)),
+        )
+      : null,
   ])
-  const text = messages[messages.length - 1].text
+  const steps = noiseRun ? { steps: [noiseStep(noiseRun)] } : {}
+  const noiseTool = noiseRun?.result
   const geo = isHotelViewQuestion(text)
     ? await viewTurn(hotel, messages, {
         deadline,
@@ -151,7 +274,15 @@ async function hotelTurn(
     const result = await firstAnswer(
       models,
       (model, timeout) =>
-        answerWithModel(model, { messages }, hotel, { dates: brief.dates, features, details, noise, signal: timeout }),
+        answerWithModel(model, { messages }, hotel, {
+          dates: brief.dates,
+          features,
+          details,
+          noise,
+          noiseTool,
+          hotelier,
+          signal: timeout,
+        }),
       {
         deadline: textDeadline(deadline),
         signal,
@@ -159,25 +290,81 @@ async function hotelTurn(
       },
     )
     if (result.ok) {
-      const { answer, unverified } = result.value
+      const { answer, unverified, askHotelier } = result.value
+      // The model asks the hotelier; the rules do when the traveller asks it in words and the model did not.
+      const ask = askHotelier ?? ruleAsk(text)
+      const asked = ask && (await askStep(hotel, ask, chatId, messageId))
       return Response.json({
         brief: next,
-        reply: answer,
+        reply: asked && !askHotelier ? `${answer}\n\n${ASKED_REPLY}` : answer,
         ...(unverified && { unverified }),
         source: 'model',
+        ...withSteps(steps, asked),
       } satisfies AssistantResponse)
     }
     down = result.failed.length > 0
     console.warn('assistant: no model answered a hotel question, using the rules')
   }
-  const { answer } = ruleAnswer(messages[messages.length - 1].text, hotel, brief.dates, details, noise)
+  const { answer } = ruleAnswer(text, hotel, brief.dates, details, noise, noiseTool)
+  const ask = ruleAsk(text)
+  const asked = ask && (await askStep(hotel, ask, chatId, messageId))
   return Response.json({
     brief: next,
-    reply: answer,
+    reply: asked ? `${answer}\n\n${ASKED_REPLY}` : answer,
     source: 'rules',
     ...(down && { modelsDown: true }),
+    ...withSteps(steps, asked),
   } satisfies AssistantResponse)
 }
+
+/** What Эвал adds when it asked the hotelier by the rules: the model says it in its own answer. */
+const ASKED_REPLY = 'Спросил отельера: ответ придёт в блок «Запрос отельеру».'
+
+/** The rules' call of «Запрос отельеру»: the traveller asks in words to ask the hotel («уточните у отеля»). */
+const ruleAsk = (text: string): { question: string; keys: HotelierKey[] } | undefined =>
+  asksHotelier(text) ? { question: text.trim().slice(0, 300), keys: questionKeys(text) } : undefined
+
+/**
+ * Runs «Запрос отельеру» for the signed-in traveller's chat: its run waits in `tool_runs` (`pending`), linked to the
+ * request, and nothing is held open; a guest's run is an error asking to sign in.
+ */
+async function askStep(
+  hotel: Hotel,
+  { question, keys }: { question: string; keys: HotelierKey[] },
+  chatId?: string,
+  messageId?: string,
+): Promise<TurnStep> {
+  const owner = await runOwner(chatId, messageId)
+  const run = await recordRun(owner, ASK_HOTELIER_TOOL, `${hotel.name} (${hotel.id})`, (runId) =>
+    runAskHotelier(
+      owner?.client ?? null,
+      { hotelId: hotel.id, question, characteristicKeys: keys },
+      { hotelName: hotel.name, chatId: owner?.chatId ?? null, runId },
+    ),
+  )
+  return {
+    agent: 'hotelier',
+    title: ASK_HOTELIER_TITLE,
+    params: keys.length > 0 ? keys.map(characteristicLabel).join(', ') : hotel.name,
+    status: run.result.status === 'error' ? 'failed' : 'done',
+    result: run.result.summary.slice(0, 300),
+    run,
+  }
+}
+
+/** The steps of the answer with the step of «Запрос отельеру» after them. */
+const withSteps = (steps: { steps?: TurnStep[] }, asked: TurnStep | undefined) =>
+  asked ? { steps: [...(steps.steps ?? []), asked] } : steps
+
+/** The step of «Анализ шума» with its run: the block of the feed. */
+const noiseStep = (run: ToolRun): TurnStep => ({
+  agent: 'features',
+  title: NOISE_TOOL_TITLE,
+  params: NOISE_TOOL_PARAMS,
+  status: run.result.status === 'error' ? 'failed' : 'done',
+  result: run.result.summary.slice(0, 300),
+  run,
+})
 
 interface WishContext {
   messages: AssistantRequest['messages']
@@ -186,6 +373,9 @@ interface WishContext {
   destinations: readonly Destination[]
   deadline: number
   signal: AbortSignal
+  /** The signed-in user's chat and message: the runs of the tools are written to it. */
+  chatId?: string
+  messageId?: string
 }
 
 /**
@@ -193,7 +383,8 @@ interface WishContext {
  * them answered in 9 s — with the rules, so the dialog goes on either way, and Эвал says the models are down. Once the brief is complete, runs the steps
  * of the turn (`planTurn`) for the hotels (`matches`), their features and the steps' lines.
  */
-async function wishTurn({ messages, brief, today, destinations, deadline, signal }: WishContext) {
+async function wishTurn(context: WishContext) {
+  const { messages, brief, today, destinations, deadline, signal } = context
   const input = messages[messages.length - 1].text
   // The question the client showed is the one the brief still lacks.
   const asked = nextQuestion(brief, today)?.id ?? null
@@ -201,7 +392,7 @@ async function wishTurn({ messages, brief, today, destinations, deadline, signal
     .filter((m) => m.role === 'user')
     .map((m) => m.text)
     .join('. ')
-  const found = (next: Brief) => planTurn({ brief: next, wish, today, destinations, deadline, signal })
+  const found = (next: Brief) => planTurn({ brief: next, wish, today, destinations, deadline, signal }, context)
 
   const models = await getTextModels()
   let down = false
@@ -232,7 +423,8 @@ async function wishTurn({ messages, brief, today, destinations, deadline, signal
  * The parameters were changed by hand after «ничего не нашёл»: the hotels by the brief as it is, nothing of the
  * dialog is read again (the newest message would take back what was changed). The wish's words still lead the search.
  */
-async function rerunTurn({ messages, brief, today, destinations, deadline, signal }: WishContext) {
+async function rerunTurn(context: WishContext) {
+  const { messages, brief, today, destinations, deadline, signal } = context
   const wish = messages
     .filter((m) => m.role === 'user')
     .map((m) => m.text)
@@ -240,7 +432,7 @@ async function rerunTurn({ messages, brief, today, destinations, deadline, signa
   return {
     brief,
     source: 'rules',
-    ...(await planTurn({ brief, wish, today, destinations, deadline, signal })),
+    ...(await planTurn({ brief, wish, today, destinations, deadline, signal }, context)),
   } satisfies AssistantResponse
 }
 
@@ -379,8 +571,8 @@ async function photoTurn(photos: readonly string[], ip: string, context: WishCon
 }
 
 /**
- * The traveller's newest message: about the chat's hotel (`hotelTurn`), with photos (`photoTurn`) or a wish
- * (`wishTurn`).
+ * The traveller's newest message: about the bookings (`bookingTurn`), about the chat's hotel (`hotelTurn`), with
+ * photos (`photoTurn`) or a wish (`wishTurn`).
  */
 export async function POST(request: Request) {
   const ip = clientIp(request)
@@ -394,11 +586,39 @@ export async function POST(request: Request) {
   if (!destinations) return apiError(503, 'Catalog unavailable')
   const brief = normalizeBrief(parsedBody.data.brief, destinations)
   const today = todayIso()
+  const { chatId, messageId } = parsedBody.data
+  // A chat about the bookings answers from the bookings of the request; the server keeps none of them.
+  if (brief.trips) {
+    const models = await getTextModels()
+    return Response.json(
+      await bookingTurn(
+        { messages, brief, bookings: parsedBody.data.bookings ?? [], today, deadline, signal: request.signal },
+        {
+          hotels: loadHotels,
+          models,
+          record: recordRun,
+          owner: () => runOwner(chatId, messageId),
+          onError: (id, error) => warn(`${id} failed on a question about the bookings`, error),
+        },
+      ),
+    )
+  }
   // A chat about a hotel answers about it; an id the catalogue does not know is a chat like any other.
   const hotel = brief.hotelId ? await loadHotel(brief.hotelId).catch(() => undefined) : undefined
   if (brief.hotelId && !hotel) delete brief.hotelId
-  if (hotel) return hotelTurn(hotel, { brief, messages, signal: request.signal, deadline })
-  const context: WishContext = { messages, brief, today, destinations, deadline, signal: request.signal }
+  if (hotel) {
+    return hotelTurn(hotel, { brief, messages, signal: request.signal, deadline, chatId, messageId })
+  }
+  const context: WishContext = {
+    messages,
+    brief,
+    today,
+    destinations,
+    deadline,
+    signal: request.signal,
+    chatId,
+    messageId,
+  }
   if (rerun) return Response.json(await rerunTurn(context))
   return Response.json(photos.length > 0 ? await photoTurn(photos, ip, context) : await wishTurn(context))
 }

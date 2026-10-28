@@ -113,8 +113,6 @@ describe('Header', () => {
       ['Искать вручную', '/search'],
       ['Мои поездки', '/trips'],
       ['Избранное', '/favorites'],
-      ['Уведомления', null],
-      ['Поддержка', '/help'],
       ['API', '/api/docs'],
       ['Войти', '/login'],
     ])
@@ -122,7 +120,18 @@ describe('Header', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Меню' })).toBeNull())
   })
 
-  // site-header, Requirement: Уведомления и меню разделов, Scenario: Документация API
+  // site-header, Requirement: Меню разделов, Scenario: Без уведомлений и поддержки
+  it('has no «Уведомления» and no «Поддержка» in the menu, but keeps «Мои поездки» and «API»', async () => {
+    const user = setup()
+    await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
+    const nav = screen.getByRole('navigation', { name: 'Основное меню' })
+    expect(within(nav).queryByText('Уведомления')).toBeNull()
+    expect(within(nav).queryByText('Поддержка')).toBeNull()
+    expect(within(nav).getByRole('link', { name: 'Мои поездки' }).getAttribute('href')).toBe('/trips')
+    expect(within(nav).getByRole('link', { name: 'API' }).getAttribute('href')).toBe('/api/docs')
+  })
+
+  // site-header, Requirement: Меню разделов, Scenario: Документация API
   it.each(['production', 'preview', 'development'])('links the API docs in %s', async (env) => {
     vi.stubEnv('APP_ENV', env)
     vi.resetModules()
@@ -134,18 +143,6 @@ describe('Header', () => {
     await user.click(screen.getByRole('link', { name: 'API' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Меню' })).toBeNull())
     vi.unstubAllEnvs()
-  })
-
-  it('shows the notifications inside the menu, and "Понятно" folds them', async () => {
-    const user = setup()
-    await user.click(screen.getByRole('button', { name: 'Открыть меню' }))
-    const item = screen.getByRole('button', { name: 'Уведомления' })
-    expect(item.getAttribute('aria-expanded')).toBe('false')
-    await user.click(item)
-    expect(item.getAttribute('aria-expanded')).toBe('true')
-    expect(screen.getByRole('dialog', { name: 'Меню' }).textContent).toContain('Новых уведомлений нет')
-    await user.click(screen.getByRole('button', { name: 'Понятно' }))
-    expect(screen.queryByText('Новых уведомлений нет')).toBeNull()
   })
 
   it('offers a guest «Войти» in the menu, without an account block', async () => {

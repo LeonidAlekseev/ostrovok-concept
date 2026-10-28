@@ -37,6 +37,7 @@ import {
   sunsetOf,
   sunsetRange,
   targetReach,
+  VERDICT_LABEL,
   VERDICT_TONE,
   verdictText,
   VIEW_ASSUMPTIONS,
@@ -130,7 +131,7 @@ const fromFloorTitle = (floor: number) => {
   return `${from.charAt(0).toLocaleUpperCase('ru')}${from.slice(1)} этажа`
 }
 
-/** «Со 2-го этажа — закрыто зданием ≈ 17,2 м (по оценке EUBUCCO) в 80 м от отеля». */
+/** «Со 2-го этажа — закрыто зданием ≈ 17,2 м в 80 м от отеля». */
 const floorLine = (line: SightLine | null | undefined, floor: number, eyeM: number, angle = 0) =>
   `${fromFloorTitle(floor)} — ${verdictText(line, eyeM, angle)}`
 
@@ -241,11 +242,28 @@ export function HotelView({
   )
   const inView = landmarks.filter(({ target }) => inSide(target.bearing, shownSide))
   const summary = ready ? sideSummary(ready.rays, shownSide, eyeM) : null
-  const mapTargets = [...(sideSea?.point ? [sideSea.point] : []), ...inView.map(({ target }) => target)].map((t) => ({
-    lat: t.lat,
-    lon: t.lon,
-    tone: VERDICT_TONE[lineVerdict(t.line, eyeM)],
-  }))
+  // A dot for the sea and every landmark of the list, on any side; the line only for the ones of the shown side.
+  const sidePoint = sideSea?.point
+  const dots = [
+    ...new Set([
+      ...(sea?.point ? [sea.point] : []),
+      ...(sidePoint ? [sidePoint] : []),
+      ...landmarks.map((l) => l.target),
+    ]),
+  ]
+  const mapTargets = dots.map((t) => {
+    const verdict = lineVerdict(t.line, eyeM)
+    return {
+      name: t.name,
+      category: t.category,
+      lat: t.lat,
+      lon: t.lon,
+      distanceM: t.distanceM,
+      tone: VERDICT_TONE[verdict],
+      verdict: VERDICT_LABEL[verdict],
+      line: t === sidePoint || inView.some(({ target }) => target === t),
+    }
+  })
   const blockers = [
     ...sunBlockers(sunsetSun?.ray, eyeM),
     ...sunBlockers(sunriseSun?.ray, eyeM),
@@ -261,8 +279,7 @@ export function HotelView({
           Вид из отеля
         </h2>
         <p className="text-muted-foreground">
-          С какого этажа видно море, закат, восход и места рядом — по высотам зданий EUBUCCO и линии взгляда над
-          крышами.
+          С какого этажа видно море, закат, восход и места рядом — по высотам зданий и линии взгляда над крышами.
         </p>
       </div>
 

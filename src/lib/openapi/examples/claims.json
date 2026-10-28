@@ -1,0 +1,192 @@
+{
+  "query": {
+    "property": "noise.lnight.",
+    "limit": 4
+  },
+  "response": {
+    "hotelId": "ota-9096882",
+    "property": "noise.lnight.",
+    "claims": [
+      {
+        "id": "89aeaa5f-d080-4be7-98b0-b52bee3a561a",
+        "property": "noise.lnight.industryInAgglomeration",
+        "sourceKey": "",
+        "value": {
+          "kind": "range",
+          "min": null,
+          "max": 39
+        },
+        "unit": "dB",
+        "status": "reported",
+        "confidence": 0.9,
+        "method": {
+          "layer": "industryInAgglomeration",
+          "category": "LnightLowerThan40",
+          "indicator": "Lnight",
+          "confidence": {
+            "rule": "eea_band",
+            "policy": "confidence-1"
+          }
+        },
+        "observedAt": null,
+        "validFrom": null,
+        "validTo": null,
+        "limitations": [
+          "Модельная стратегическая карта шума EEA (END, раунд 2022), не измерение у окна",
+          "Полоса 5 дБ, а не уровень",
+          "Нижняя полоса открыта: ниже 40 дБ карта уровни не различает"
+        ],
+        "calculation": null,
+        "evidence": [
+          {
+            "id": "ee159ffb-c245-47de-acbc-0d7a329216d0",
+            "role": "source",
+            "type": "dataset",
+            "title": "EEA noise contours, Environmental Noise Directive, round 2022 v01_r00",
+            "provider": "EEA",
+            "externalId": "eea-noise-end2022-v01_r00",
+            "url": "https://sdi.eea.europa.eu/datastore/public?path=/eea_v_3035_1_k_noise-contours-end2022_p_2026_v01_r00",
+            "retrievedAt": "2026-10-26T18:06:03.471+00:00",
+            "excerpt": null,
+            "datasetId": "eea-noise-end2022-v01_r00"
+          }
+        ]
+      },
+      {
+        "id": "19e5fb7f-dea5-4a77-9343-8aeda8dfee9e",
+        "property": "noise.lnight.majorRoadsIncludingAgglomeration",
+        "sourceKey": "",
+        "value": {
+          "kind": "range",
+          "min": null,
+          "max": 39
+        },
+        "unit": "dB",
+        "status": "reported",
+        "confidence": 0.9,
+        "method": {
+          "layer": "majorRoadsIncludingAgglomeration",
+          "category": "LnightLowerThan40",
+          "indicator": "Lnight",
+          "confidence": {
+            "rule": "eea_band",
+            "policy": "confidence-1"
+          }
+        },
+        "observedAt": null,
+        "validFrom": null,
+        "validTo": null,
+        "limitations": [
+          "Модельная стратегическая карта шума EEA (END, раунд 2022), не измерение у окна",
+          "Полоса 5 дБ, а не уровень",
+          "Нижняя полоса открыта: ниже 40 дБ карта уровни не различает"
+        ],
+        "calculation": null,
+        "evidence": [
+          {
+            "id": "ee159ffb-c245-47de-acbc-0d7a329216d0",
+            "role": "source",
+            "type": "dataset",
+            "title": "EEA noise contours, Environmental Noise Directive, round 2022 v01_r00",
+            "provider": "EEA",
+            "externalId": "eea-noise-end2022-v01_r00",
+            "url": "https://sdi.eea.europa.eu/datastore/public?path=/eea_v_3035_1_k_noise-contours-end2022_p_2026_v01_r00",
+            "retrievedAt": "2026-10-26T18:06:03.471+00:00",
+            "excerpt": null,
+            "datasetId": "eea-noise-end2022-v01_r00"
+          }
+        ]
+      },
+      {
+        "id": "2f4a1493-f951-4bee-8e4b-9025fbf440f7",
+        "property": "noise.lnight.railwaysInAgglomeration",
+        "sourceKey": "",
+        "value": {
+          "kind": "range",
+          "min": null,
+          "max": 39
+        },
+        "unit": "dB",
+        "status": "reported",
+        "confidence": 0.9,
+        "method": {
+          "layer": "railwaysInAgglomeration",
+          "category": "LnightLowerThan40",
+          "indicator": "Lnight",
+          "confidence": {
+            "rule": "eea_band",
+            "policy": "confidence-1"
+          }
+        },
+        "observedAt": null,
+        "validFrom": null,
+        "validTo": null,
+        "limitations": [
+          "Модельная стратегическая карта шума EEA (END, раунд 2022), не измерение у окна",
+          "Полоса 5 дБ, а не уровень",
+          "Нижняя полоса открыта: ниже 40 дБ карта уровни не различает"
+        ],
+        "calculation": null,
+        "evidence": [
+          {
+            "id": "ee159ffb-c245-47de-acbc-0d7a329216d0",
+            "role": "source",
+            "type": "dataset",
+            "title": "EEA noise contours, Environmental Noise Directive, round 2022 v01_r00",
+            "provider": "EEA",
+            "externalId": "eea-noise-end2022-v01_r00",
+            "url": "https://sdi.eea.europa.eu/datastore/public?path=/eea_v_3035_1_k_noise-contours-end2022_p_2026_v01_r00",
+            "retrievedAt": "2026-10-26T18:06:03.471+00:00",
+            "excerpt": null,
+            "datasetId": "eea-noise-end2022-v01_r00"
+          }
+        ]
+      },
+      {
+        "id": "6fb7a521-feb4-45b7-b740-4b8ea11f97e5",
+        "property": "noise.lnight.roadsInAgglomeration",
+        "sourceKey": "",
+        "value": {
+          "kind": "range",
+          "min": 55,
+          "max": 59
+        },
+        "unit": "dB",
+        "status": "reported",
+        "confidence": 0.9,
+        "method": {
+          "layer": "roadsInAgglomeration",
+          "category": "Lnight5559",
+          "indicator": "Lnight",
+          "confidence": {
+            "rule": "eea_band",
+            "policy": "confidence-1"
+          }
+        },
+        "observedAt": null,
+        "validFrom": null,
+        "validTo": null,
+        "limitations": [
+          "Модельная стратегическая карта шума EEA (END, раунд 2022), не измерение у окна",
+          "Полоса 5 дБ, а не уровень"
+        ],
+        "calculation": null,
+        "evidence": [
+          {
+            "id": "ee159ffb-c245-47de-acbc-0d7a329216d0",
+            "role": "source",
+            "type": "dataset",
+            "title": "EEA noise contours, Environmental Noise Directive, round 2022 v01_r00",
+            "provider": "EEA",
+            "externalId": "eea-noise-end2022-v01_r00",
+            "url": "https://sdi.eea.europa.eu/datastore/public?path=/eea_v_3035_1_k_noise-contours-end2022_p_2026_v01_r00",
+            "retrievedAt": "2026-10-26T18:06:03.471+00:00",
+            "excerpt": null,
+            "datasetId": "eea-noise-end2022-v01_r00"
+          }
+        ]
+      }
+    ],
+    "truncated": false
+  }
+}

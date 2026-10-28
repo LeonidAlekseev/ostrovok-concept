@@ -145,7 +145,7 @@ export function factLines(facts: HotelFacts, building: HotelBuilding | null): st
     facts.rooms && countRu(facts.rooms, ['номер', 'номера', 'номеров']),
     facts.roomFloors && `Номера занимают ${countRu(facts.roomFloors, ['этаж', 'этажа', 'этажей'])} (по данным отеля)`,
     building?.floors &&
-      `В здании ${countRu(building.floors, ['этаж', 'этажа', 'этажей'])} (EUBUCCO${building.estimated ? ', оценка' : ''})`,
+      `В здании ${building.estimated ? '≈' : ''}${countRu(building.floors, ['этаж', 'этажа', 'этажей'])}`,
     facts.yearBuilt && `Год постройки: ${facts.yearBuilt}`,
     facts.yearRenovated && `Год реновации: ${facts.yearRenovated}`,
     facts.electricity,

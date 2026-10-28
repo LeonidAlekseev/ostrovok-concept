@@ -33,6 +33,11 @@ export interface TurnContext {
   signal: AbortSignal
   summaries: () => Promise<HotelSummary[]>
   features: () => Promise<ReadonlyMap<string, HotelFeatures>>
+  /**
+   * The tools of the store choose by the noise after these steps (src/lib/ai/knowledgeTurn.ts): the features step
+   * leaves the quiet to them.
+   */
+  knowledge?: boolean
 }
 
 /** What the steps found, handed from one to the next. */
@@ -42,6 +47,8 @@ export interface TurnState {
   /** The search by meaning's order of hotel ids. */
   semantic?: string[]
   features?: Record<string, HotelFeatures>
+  /** Every hotel of the plan's cities the features step kept, best first: the tools of the store choose among them. */
+  ranked?: string[]
   missing?: Criterion[]
   /** The search by meaning failed, its retry too: the rules picked the hotels and the answer says the models are down. */
   semanticDown?: true
@@ -132,15 +139,19 @@ const criteriaTitle = (criteria: readonly Criterion[]) =>
  * The hotels of the plan's cities that have the data the traveller asked for, best first. When none has it for all
  * the criteria, the last ones are let go one by one; the criteria no hotel has data for are `missing`.
  */
+/** The brief the features step goes by: without the quiet when the tools of the store choose by it. */
+const featureBrief = ({ brief, knowledge }: Pick<TurnContext, 'brief' | 'knowledge'>): Brief =>
+  knowledge ? { ...brief, quiet: undefined } : brief
+
 export const featuresStep: Step = {
   agent: 'features',
-  title: ({ brief }) => {
-    const criteria = criteriaOf(brief)
+  title: (context) => {
+    const criteria = criteriaOf(featureBrief(context))
     return criteria.length ? criteriaTitle(criteria) : null
   },
-  params: ({ brief }) => criteriaParam(brief),
+  params: (context) => criteriaParam(featureBrief(context)),
   async run(context, state) {
-    const { brief } = context
+    const brief = featureBrief(context)
     const cities = new Set(planCities(brief, context.today, context.destinations).map((d) => d.id))
     const [summaries, features] = await Promise.all([context.summaries(), context.features()])
     const inCities = summaries.filter((h) => cities.has(h.destinationId))
@@ -166,6 +177,7 @@ export const featuresStep: Step = {
     if (ranked.length === 0)
       return criteria.includes('sea') ? `ни одного ближе ${formatMeters(wish.seaMaxM!)} к морю` : 'нет данных'
     const byId = new Map(inCities.map((h) => [h.id, h]))
+    state.ranked = ranked
     state.matches = ranked.slice(0, MATCHES).map((id) => byId.get(id)!)
     state.features = Object.fromEntries(
       state.matches.flatMap((h) => (features.has(h.id) ? [[h.id, features.get(h.id)!]] : [])),

@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { destinations } from '../../data/destinations'
 import { newHotels } from '../../lib/catalogGenerator'
-import { useChats } from './useChats'
+import { compose, useChats } from './useChats'
 
 const fetchMock = vi.fn<typeof fetch>()
 const answer = () => Response.json({ source: 'model', brief: { vibe: 'sea' } })
@@ -23,7 +23,9 @@ afterEach(() => {
 })
 
 const ready = async (id: string | null) => {
-  const hook = renderHook(({ id }) => useChats(destinations, newHotels, id), { initialProps: { id } })
+  const hook = renderHook(({ id }) => useChats(destinations, newHotels, id), {
+    initialProps: { id },
+  })
   await waitFor(() => expect(hook.result.current.ready).toBe(true))
   return hook
 }
@@ -59,5 +61,33 @@ describe('useChats: one answer per message', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(result.current.chats[0].messages.filter((m) => m.role === 'assistant')).toHaveLength(1)
+  })
+})
+
+// assistant-search, Requirement: Память сессии
+describe('compose: the text does not repeat what the memory card shows', () => {
+  const valencia = destinations.find((d) => d.name === 'Валенсия')!
+
+  it('has no «Записал» in the question, the plan or the remark', () => {
+    const brief = { destinationId: valencia.id, vibe: 'sea' as const }
+    const asked = compose({ source: 'model', brief }, destinations, newHotels, undefined, {})
+    expect(asked.text).not.toContain('Записал')
+    const remarked = compose({ source: 'model', brief: {}, reply: 'Привет!' }, destinations, newHotels, undefined, {})
+    expect(remarked.text).toContain('Привет!')
+    expect(remarked.text).not.toContain('Записал')
+    const same = compose({ source: 'model', brief }, destinations, newHotels, undefined, brief)
+    expect(same.text).not.toContain('Записал')
+  })
+})
+
+// assistant-search, Requirement: Аргументированный ответ по данным инструментов
+describe('compose: the answer of the tools of the store leads the plan', () => {
+  it('shows the findings before the hotels of the plan', () => {
+    const brief = { destinationId: 'valencia', when: 'any' as const, party: 'couple' as const, quiet: true as const }
+    const findings =
+      'Подобрал по данным (ночью тише 50 дБ):\n1. Hotel Quiet: ночью — ниже 40 дБ (EEA, уверенность 90 %).'
+    const { text, data } = compose({ source: 'model', brief, findings }, destinations, newHotels, undefined, brief)
+    expect(text).toBe(findings)
+    expect(data.plan).toBeTruthy()
   })
 })

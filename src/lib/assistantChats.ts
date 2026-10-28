@@ -10,6 +10,8 @@ import {
 import { clearDialog, isBrief, isPlan, isQuestion, loadDialog } from './assistantDialog'
 import { parseChatMap, type ChatMap } from './geo/chatMap'
 import { parseParams, type SessionParam } from './sessionMemory'
+import { parseToolRun, type ToolRun } from './toolResult'
+import { parseDateChange, type DateChange, type DateChangeState } from './trips'
 
 /**
  * The chats with Эвал. A message has a role, a status and structured data, so the feed holds the steps of Эвал's
@@ -29,6 +31,11 @@ export interface AgentStep {
   /** What it was called with, briefly in Russian. */
   params?: string
   result?: string
+  /**
+   * A tool of the contract (src/lib/toolResult.ts): its run with the sources and data, kept in the message so the
+   * block opens after a reload and in a shared snapshot. An older step has none and shows as before.
+   */
+  run?: ToolRun
 }
 
 /**
@@ -68,6 +75,13 @@ export interface MessageData {
   notFound?: Brief
   /** An answer to the parameters changed by hand: the route picks by the brief, the dialog is not read again. */
   rerun?: true
+  /**
+   * A chat about the bookings: the change of a booking's dates Эвал proposed and what came of it — applied in the
+   * browser only with «Подтвердить».
+   */
+  change?: { proposal: DateChange; state: DateChangeState }
+  /** The demo hotelier's answer or a message of the demo data: shown marked «демо». */
+  demo?: true
 }
 
 export interface ChatMessage {
@@ -125,6 +139,13 @@ export const isPending = (chat: Chat) => chat.messages.some((m) => m.status === 
 export const shownHotels = (chat: Chat): Set<string> =>
   new Set(chat.messages.flatMap((m) => m.data.plan?.options.flatMap((o) => (o.hotel ? [o.hotel.id] : [])) ?? []))
 
+/**
+ * The newest chat about the bookings the trips page continues: the one opened on the booking `bookingId`, or the one of
+ * all the trips without it.
+ */
+export const tripsChatOf = (chats: readonly Chat[], bookingId?: string): Chat | undefined =>
+  chats.filter((c) => c.brief.trips && c.brief.bookingId === bookingId && c.messages.length > 0).sort(byRecent)[0]
+
 /** The newest chat about the hotel (`brief.hotelId`), the one its page continues. */
 export const hotelChatOf = (chats: readonly Chat[], hotelId: string): Chat | undefined =>
   chats.filter((c) => c.brief.hotelId === hotelId && c.messages.length > 0).sort(byRecent)[0]
@@ -166,6 +187,18 @@ const isStep = (value: unknown): value is AgentStep =>
   (value.params === undefined || isString(value.params)) &&
   (value.result === undefined || isString(value.result))
 
+/** The known parts of a step; a run off the contract is dropped and the step shows as an older one. */
+function stepOf(value: AgentStep): AgentStep {
+  const run = parseToolRun(value.run)
+  return {
+    agent: value.agent,
+    title: value.title,
+    ...(value.params !== undefined && { params: value.params }),
+    ...(value.result !== undefined && { result: value.result }),
+    ...(run && { run }),
+  }
+}
+
 const isSize = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= 10_000
 /** The only pictures a message shows: its own data URL and the links of Supabase Storage. */
@@ -196,14 +229,24 @@ export function parseData(value: unknown): MessageData | null {
   return {
     ...(attachments.length > 0 && { attachments }),
     ...(value.plan !== undefined && { plan: value.plan as Plan }),
-    ...(value.step !== undefined && { step: value.step as AgentStep }),
+    ...(value.step !== undefined && { step: stepOf(value.step as AgentStep) }),
     ...(value.more === true && { more: true as const }),
     ...(isString(value.unverified) && value.unverified && { unverified: value.unverified }),
     ...(parseChatMap(value.map) && { map: parseChatMap(value.map) }),
     ...(parseParams(value.memory) && { memory: parseParams(value.memory) }),
     ...(isBrief(value.notFound) && { notFound: value.notFound }),
     ...(value.rerun === true && { rerun: true as const }),
+    ...(parseChange(value.change) && { change: parseChange(value.change) }),
+    ...(value.demo === true && { demo: true as const }),
   }
+}
+
+const CHANGE_STATES: readonly DateChangeState[] = ['proposed', 'applied', 'outdated']
+
+function parseChange(value: unknown): MessageData['change'] {
+  if (!isObject(value) || !CHANGE_STATES.includes(value.state as DateChangeState)) return undefined
+  const proposal = parseDateChange(value.proposal)
+  return proposal && { proposal, state: value.state as DateChangeState }
 }
 
 export function parseMessage(value: unknown): ChatMessage | null {
@@ -219,6 +262,29 @@ export function parseMessage(value: unknown): ChatMessage | null {
     data,
     createdAt: value.createdAt,
   }
+}
+
+/** The step's run is still open: «Запрос отельеру» waits for the hotelier or for the characteristics of the answer. */
+const openRun = (message: ChatMessage) => {
+  const result = message.data.step?.run?.result
+  return result?.status === 'pending' || result?.data?.knowledge === 'queued'
+}
+
+/**
+ * A message the server wrote into the chat later, by Realtime: the hotelier's answer (`owner`) joins the feed, and the
+ * step of «Запрос отельеру» still waiting takes its finished run. Anything else — an echo of the browser's own save,
+ * which may be older than what the browser has — leaves the chat as it is (the same object). `active`: the traveller
+ * is in this chat, so a new answer is not unread.
+ */
+export function mergeServerMessage(chat: Chat, message: ChatMessage, active: boolean): Chat {
+  const old = chat.messages.find((m) => m.id === message.id)
+  if (!old) {
+    if (message.role !== 'owner') return chat
+    const messages = [...chat.messages, message].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    return { ...chat, messages, unread: chat.unread || !active, updatedAt: message.createdAt }
+  }
+  if (!openRun(old) || !message.data.step?.run || JSON.stringify(old.data) === JSON.stringify(message.data)) return chat
+  return { ...chat, messages: chat.messages.map((m) => (m.id === message.id ? { ...m, data: message.data } : m)) }
 }
 
 export function parseChat(value: unknown): Chat | null {

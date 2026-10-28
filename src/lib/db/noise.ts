@@ -9,50 +9,22 @@ import {
   QUIET_SOURCE,
   dayColorLevel,
   dayEstimate,
-  louderSource,
+  facadeOf,
+  noisyRank,
   type HotelNoise,
   type NoiseMapIndicator,
   type NoisyCategory,
-  type SourceNoise,
 } from '@/lib/noise'
 import { anonClient, catalogCached, readOrNull, warnShort, type AnonClient, type HotelPoint } from './anon'
 
 /**
- * «Шум и окружение» of a real hotel for its page and for Эвал (`HotelNoise`): the EEA bands at its point by layer
- * (`hotel_geo`) and the loud places of the OSM cache around it (`osm_places_near`), and the noise around it for the
+ * «Шум и окружение» of a real hotel for its page and for Эвал (`HotelNoise`): the EEA bands at its facade by layer
+ * (`hotel_noise_facade`) and the loud places of the OSM cache around it (`osm_places_near`), and the noise around it for the
  * map: the day estimate of the pieces of `hotel_noise_day`, the Lnight contours of `hotel_geo_features` and the quiet of
  * `hotel_noise_quiet`, computed ahead into `hotel_noise_maps` (`hotel_noise_map`) and computed now only for a point
  * without one. Read with the anon key and cached with the catalogue; a synthetic hotel, a database without the
  * functions or a failure read as `null`, and the page and Эвал say they do not know.
  */
-
-/** A row of `hotel_geo().noise`. */
-const geoBand = z.object({
-  source: z.string(),
-  indicator: z.enum(['Lden', 'Lnight']),
-  db_min: z.number().nullable(),
-  db_max: z.number().nullable(),
-})
-const hotelGeo = z.object({ noise: z.array(z.unknown()) })
-
-const bandOf = (row: z.infer<typeof geoBand>): NoiseBand => ({
-  ...(row.db_min !== null && { min: row.db_min }),
-  ...(row.db_max !== null && { max: row.db_max }),
-})
-
-/** The layers of `hotel_geo().noise`, each with its Lden and Lnight band, the louder first (`louderSource`). */
-export function sourcesOf(rows: readonly unknown[]): SourceNoise[] {
-  const bySource = new Map<string, SourceNoise>()
-  for (const value of rows) {
-    const parsed = geoBand.safeParse(value)
-    if (!parsed.success || (parsed.data.db_min === null && parsed.data.db_max === null)) continue
-    const row = parsed.data
-    const source = bySource.get(row.source) ?? { source: row.source }
-    source[row.indicator === 'Lden' ? 'lden' : 'lnight'] = bandOf(row)
-    bySource.set(row.source, source)
-  }
-  return [...bySource.values()].sort(louderSource)
-}
 
 const NOISY = new Set<string>(NOISY_CATEGORIES)
 
@@ -69,7 +41,7 @@ const nearAnswer = z.object({ covered: z.array(z.string()), places: z.array(z.un
 
 /**
  * The loud places of an `osm_places_near` answer, nearest first; a place of several categories is listed once, under
- * the first it was found for. None, with no category covered, for an answer it cannot read.
+ * the first of them in `NOISY_CATEGORIES` (a bar that serves food is a bar). None, with no category covered, for an answer it cannot read.
  */
 export function placesOf(answer: unknown): Pick<HotelNoise, 'places' | 'placesCovered'> {
   const parsed = nearAnswer.safeParse(answer)
@@ -80,7 +52,7 @@ export function placesOf(answer: unknown): Pick<HotelNoise, 'places' | 'placesCo
       const place = nearPlace.safeParse(value)
       return place.success && NOISY.has(place.data.category) ? [place.data] : []
     })
-    .sort((a, b) => a.distance_m - b.distance_m)
+    .sort((a, b) => a.distance_m - b.distance_m || noisyRank(a.category) - noisyRank(b.category))
     .filter((p) => {
       const key = `${p.osm_type}/${p.osm_id}`
       return !seen.has(key) && Boolean(seen.add(key))
@@ -96,11 +68,11 @@ export function placesOf(answer: unknown): Pick<HotelNoise, 'places' | 'placesCo
 }
 
 const readNoise = catalogCached(
-  ['hotel-noise'],
+  ['hotel-noise', 'facade'],
   async (_hotelId: string, lat: number, lon: number): Promise<HotelNoise> => {
     const db = anonClient()
-    const [geo, near] = await Promise.all([
-      db.rpc('hotel_geo', { lat, lon }),
+    const [facade, near] = await Promise.all([
+      db.rpc('hotel_noise_facade', { lat, lon }),
       db.rpc('osm_places_near', {
         lat,
         lon,
@@ -109,9 +81,9 @@ const readNoise = catalogCached(
         per_category: NOISY_PER_CATEGORY,
       }),
     ])
-    if (geo.error) throw geo.error
+    if (facade.error) throw facade.error
     // Without the places the bands still stand: the page says it has no data of OSM.
-    return { sources: sourcesOf(hotelGeo.parse(geo.data).noise), ...placesOf(near.error ? null : near.data) }
+    return { ...facadeOf(facade.data), ...placesOf(near.error ? null : near.data) }
   },
 )
 

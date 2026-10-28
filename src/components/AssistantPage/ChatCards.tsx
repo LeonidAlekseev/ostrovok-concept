@@ -5,7 +5,9 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
+  Clock,
   Eye,
+  Loader2,
   MapPin,
   Minus,
   Moon,
@@ -18,6 +20,8 @@ import {
   X,
 } from 'lucide-react'
 import { cn } from 'cn'
+import { Badge } from '@/components/ui/badge'
+import { DemoBadge } from '../DemoBadge'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
@@ -25,10 +29,22 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Trace, TraceIcon, TraceLine, TraceTitle } from '@/components/ui/trace'
 import type { Destination } from '@/data/destinations'
 import { GUEST_LIMITS, VIBE_LABEL, briefWithStay, stayDates, type Brief, type VibeId } from '../../lib/assistant'
-import type { AgentStep } from '../../lib/assistantChats'
-import type { IsoDate } from '../../lib/dates'
+import type { AgentStep, MessageData } from '../../lib/assistantChats'
+import { characteristicLabel } from '../../lib/hotelierFacts'
+import { requestViewOf, type HotelierRequestView } from '../../lib/hotelierRequest'
+import { useLiveRun } from './useLiveRun'
+import { cancellationLabel } from '../../lib/booking'
+import {
+  EPISTEMIC_LABEL,
+  isSafeUrl,
+  type ToolClaim,
+  type ToolEvidence,
+  type ToolResult,
+  type ToolRun,
+} from '../../lib/toolResult'
+import { formatDateRange, nightsBetween, type IsoDate } from '../../lib/dates'
 import { VIEW_LABEL, type ViewKind } from '../../lib/features'
-import { formatMeters } from '../../lib/format'
+import { countRu, formatMeters, formatPrice } from '../../lib/format'
 import type { Guests } from '../../lib/search'
 import { briefGuestsOf, paramLine, sessionParams, type ParamKey, type SessionParam } from '../../lib/sessionMemory'
 
@@ -88,6 +104,68 @@ export function MemoryCard({ params }: { params: readonly SessionParam[] }) {
   )
 }
 
+const stay = (checkIn: IsoDate, checkOut: IsoDate) =>
+  `${formatDateRange(checkIn, checkOut)}, ${countRu(nightsBetween(checkIn, checkOut), ['ночь', 'ночи', 'ночей'])}`
+
+/**
+ * The change of a booking's dates Эвал proposed: the dates and the price now and after, the cancellation terms, and
+ * «Подтвердить» — nothing changes without it. Applied, it says so; a booking changed since then makes it outdated. A
+ * shared chat shows it without the button (`onConfirm` absent).
+ */
+export function DateChangeCard({
+  change: { proposal, state },
+  onConfirm,
+}: {
+  change: NonNullable<MessageData['change']>
+  onConfirm?: () => void
+}) {
+  const difference = proposal.total - proposal.from.total
+  const rows: [string, string][] = [
+    ['Сейчас', `${stay(proposal.from.checkIn, proposal.from.checkOut)} · ${formatPrice(proposal.from.total)}`],
+    ['Новые даты', stay(proposal.checkIn, proposal.checkOut)],
+    [
+      'Новая цена',
+      `${formatPrice(proposal.total)}${difference === 0 ? '' : difference > 0 ? ` (доплата ${formatPrice(difference)})` : ` (меньше на ${formatPrice(-difference)})`}`,
+    ],
+    ['Отмена', cancellationLabel(proposal.cancellation, proposal.checkIn, { short: true })],
+  ]
+  return (
+    <section
+      aria-label={`Перенос бронирования ${proposal.bookingId}`}
+      className="flex w-full max-w-md flex-col gap-3 rounded-[18px] border bg-card p-3.5"
+    >
+      <h3 className="flex items-center gap-2 font-semibold">
+        <CalendarDays className="size-5 text-primary" aria-hidden />
+        Перенос бронирования {proposal.bookingId}
+      </h3>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
+        {rows.map(([term, value]) => (
+          <div key={term} className="contents">
+            <dt className={greyMutedText}>{term}</dt>
+            <dd className="font-medium">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      {state === 'applied' ? (
+        <p role="status" className="flex items-center gap-1.5 font-semibold text-success-foreground">
+          <Check className="size-4" strokeWidth={2.5} aria-hidden />
+          Даты изменены
+        </p>
+      ) : state === 'outdated' ? (
+        <p role="status" className={greyMutedText}>
+          Бронирование изменилось после расчёта — попросите Эвала посчитать заново.
+        </p>
+      ) : (
+        onConfirm && (
+          <Button className="w-fit" onClick={onConfirm}>
+            Подтвердить
+          </Button>
+        )
+      )}
+    </section>
+  )
+}
+
 /** A tool Эвал called: what it did with what, and what came of it; a cross when it failed. */
 export function ToolCard({ step, failed }: { step: AgentStep; failed?: boolean }) {
   const detail = [step.params, step.result].filter(Boolean).join(' · ')
@@ -102,16 +180,280 @@ export function ToolCard({ step, failed }: { step: AgentStep; failed?: boolean }
   )
 }
 
-/** «Ищу подходящие варианты…» with the three dots: Эвал is at work. */
+const RUN_STATUS: Record<ToolResult['status'], string> = {
+  running: 'Выполняется',
+  pending: 'Ждёт ответа',
+  success: 'Готово',
+  error: 'Ошибка',
+}
+
+const SOURCE_TYPE: Record<ToolEvidence['source_type'], string> = {
+  dataset: 'Набор данных',
+  osm: 'Объект OpenStreetMap',
+  review: 'Отзыв гостя',
+  ota_page: 'Страница Островка',
+  calculation: 'Расчёт',
+  hotelier: 'Ответ отельера',
+}
+
+/** «26 октября 2026 г.»; nothing for a date that does not read. */
+function dateLabel(iso: string | null): string | null {
+  const time = iso ? Date.parse(iso) : NaN
+  return Number.isNaN(time)
+    ? null
+    : new Date(time).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+/** A heading of a part of «Источники и данные». */
+function RunSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-1.5">
+      <h4 className="text-sm font-semibold text-foreground">{title}</h4>
+      {children}
+    </section>
+  )
+}
+
+/** A source of the run: its provider and title (a link only to http(s)), its id, date and the words used. */
+function SourceItem({ source }: { source: ToolEvidence }) {
+  const date = dateLabel(source.retrieved_at)
+  const meta = [
+    SOURCE_TYPE[source.source_type],
+    source.source_id && `ID: ${source.source_id}`,
+    date && `получено ${date}`,
+  ].filter(Boolean)
+  return (
+    <li className="flex flex-col gap-0.5 rounded-xl bg-card px-3 py-2 text-sm/[1.35]">
+      <span className="font-semibold text-foreground">
+        {source.source_name}
+        {source.demo && <DemoBadge className="ml-1.5" />}
+      </span>
+      {source.source_url && isSafeUrl(source.source_url) ? (
+        <a
+          href={source.source_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="break-words text-primary underline underline-offset-2"
+        >
+          {source.title}
+        </a>
+      ) : (
+        <span className="break-words text-foreground">{source.title}</span>
+      )}
+      <span className="text-muted-foreground">{meta.join(' · ')}</span>
+      {source.excerpt && (
+        <blockquote className="mt-1 border-l-2 border-border pl-2 break-words whitespace-pre-line text-foreground">
+          {source.excerpt}
+        </blockquote>
+      )}
+    </li>
+  )
+}
+
+/** A characteristic of a run: its value, how it is known, the confidence when it has a basis, its sources. */
+function ClaimItem({ claim, names }: { claim: ToolClaim; names: ReadonlyMap<string, string> }) {
+  const sources = [...new Set(claim.evidence_ids.flatMap((id) => names.get(id) ?? []))]
+  const origin = [
+    EPISTEMIC_LABEL[claim.status],
+    claim.confidence !== null && `уверенность ${Math.round(claim.confidence * 100)} %`,
+    sources.length > 0 && `источник: ${sources.join(', ')}`,
+  ].filter(Boolean)
+  return (
+    <li className="text-sm/[1.35]">
+      <span className="text-foreground">
+        {claim.label}: <span className="font-semibold">{claim.value}</span>
+        {claim.demo && <DemoBadge className="ml-1.5" />}
+      </span>
+      <span className={`block ${greyMutedText}`}>{origin.join(' · ')}</span>
+    </li>
+  )
+}
+
+/** The hotels of a run shown before «Показать все». */
+const GROUPS_SHOWN = 3
+
+/** The characteristics by hotel: each with its verdict; a long list opens with a button. */
+function RunGroups({ result, names }: { result: ToolResult; names: ReadonlyMap<string, string> }) {
+  const [all, setAll] = useState(false)
+  const groups = result.groups ?? []
+  const claims = new Map(result.claims.map((c) => [c.id, c]))
+  const shown = all ? groups : groups.slice(0, GROUPS_SHOWN)
+  return (
+    <RunSection title="По отелям">
+      <ul className="flex flex-col gap-2">
+        {shown.map((group) => (
+          <li key={group.id} className="flex flex-col gap-1 rounded-xl bg-card px-3 py-2" data-group={group.id}>
+            <span className="text-sm/[1.35] font-semibold text-foreground">{group.title}</span>
+            {group.note && <span className={`text-sm/[1.35] ${greyMutedText}`}>{group.note}</span>}
+            {group.claim_ids.length > 0 && (
+              <ul className="flex flex-col gap-1.5">
+                {group.claim_ids.flatMap((id) => {
+                  const claim = claims.get(id)
+                  return claim ? [<ClaimItem key={id} claim={claim} names={names} />] : []
+                })}
+              </ul>
+            )}
+          </li>
+        ))}
+      </ul>
+      {groups.length > GROUPS_SHOWN && (
+        <button
+          type="button"
+          onClick={() => setAll((v) => !v)}
+          className="w-fit rounded-md py-1 text-sm font-semibold text-primary focus-visible:outline-3 focus-visible:outline-ring"
+        >
+          {all ? 'Свернуть' : `Показать все (${groups.length})`}
+        </button>
+      )}
+    </RunSection>
+  )
+}
+
+/** «Источники и данные» of a run: the characteristics with their origin, the calculations, the sources, the limits. */
+function RunDetails({ result }: { result: ToolResult }) {
+  const names = new Map(result.evidence.map((e) => [e.id, e.source_name]))
+  const grouped = new Set((result.groups ?? []).flatMap((g) => g.claim_ids))
+  const loose = result.claims.filter((c) => !grouped.has(c.id))
+  return (
+    <div className="flex flex-col gap-3 pt-2">
+      {result.error && <p className="text-sm/[1.35] text-destructive">{result.error.message}</p>}
+      {(result.groups?.length ?? 0) > 0 && <RunGroups result={result} names={names} />}
+      {loose.length > 0 && (
+        <RunSection title="Полученные характеристики">
+          <ul className="flex flex-col gap-1.5">
+            {loose.map((claim) => (
+              <ClaimItem key={claim.id} claim={claim} names={names} />
+            ))}
+          </ul>
+        </RunSection>
+      )}
+      {result.calculations.length > 0 && (
+        <RunSection title="Расчёты">
+          <ul className="flex flex-col gap-2">
+            {result.calculations.map((calculation) => (
+              <li key={calculation.id} className="flex flex-col gap-0.5 text-sm/[1.35]">
+                <span className="text-foreground">
+                  {calculation.name} <span className={greyMutedText}>(версия {calculation.version})</span>
+                </span>
+                {calculation.inputs.length > 0 && (
+                  <span className={greyMutedText}>
+                    Входные данные: {calculation.inputs.map((i) => `${i.label} — ${i.value}`).join('; ')}
+                  </span>
+                )}
+                {calculation.assumptions.length > 0 && (
+                  <span className={greyMutedText}>Допущения: {calculation.assumptions.join('; ')}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </RunSection>
+      )}
+      <RunSection title="Источники">
+        {result.evidence.length > 0 ? (
+          <ul className="flex flex-col gap-1.5">
+            {result.evidence.map((source) => (
+              <SourceItem key={source.id} source={source} />
+            ))}
+          </ul>
+        ) : (
+          <p className={`text-sm/[1.35] ${greyMutedText}`}>Источников нет: инструмент не нашёл данных с источником.</p>
+        )}
+      </RunSection>
+      {result.method && (
+        <RunSection title="Метод">
+          <p className="text-sm/[1.35] text-foreground">
+            {result.method.name} <span className={greyMutedText}>(версия {result.method.version})</span>
+          </p>
+          {result.method.inputs.length > 0 && (
+            <p className={`text-sm/[1.35] ${greyMutedText}`}>
+              Входные данные: {result.method.inputs.map((i) => `${i.label} — ${i.value}`).join('; ')}
+            </p>
+          )}
+          {result.method.assumptions.length > 0 && (
+            <p className={`text-sm/[1.35] ${greyMutedText}`}>Допущения: {result.method.assumptions.join('; ')}</p>
+          )}
+        </RunSection>
+      )}
+      {result.limitations.length > 0 && (
+        <RunSection title="Ограничения">
+          <ul className={`list-disc pl-5 text-sm/[1.35] ${greyMutedText}`}>
+            {result.limitations.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </RunSection>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The block of a tool's run: what it does, its status and short result, and «Источники и данные» that opens in place.
+ * Each block keeps its own state; nothing of the model's reasoning, no JSON and no names of functions are shown.
+ */
+export function ToolRunCard({ step, run: saved }: { step: AgentStep; run: ToolRun }) {
+  const [open, setOpen] = useState(false)
+  // A run of «Запрос отельеру» is read again while it waits: the hotelier's answer finishes it later.
+  const run = useLiveRun(saved)
+  const { result } = run
+  const status = result.status
+  const request = requestViewOf(result)
+  if (request) return <HotelierRequestCard step={step} run={run} request={request} />
+  return (
+    <div
+      className={cn(cardClass, 'flex w-full flex-col sm:w-[min(100%,36rem)]')}
+      data-run={run.id}
+      data-run-status={status}
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className={cn(circleClass, 'grid flex-none place-items-center', status === 'error' && 'text-destructive')}
+        >
+          {status === 'running' ? (
+            <Loader2 className="motion-safe:animate-spin" aria-hidden />
+          ) : status === 'pending' ? (
+            <Clock aria-hidden />
+          ) : status === 'error' ? (
+            <X strokeWidth={2.5} aria-hidden />
+          ) : (
+            <Check strokeWidth={2.5} aria-hidden />
+          )}
+        </span>
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-[15px]/[1.3] font-semibold text-foreground">{step.title}</span>
+          {step.params && <span className={`text-sm/[1.35] ${greyMutedText}`}>{step.params}</span>}
+          <span
+            className={cn('text-sm/[1.35] font-semibold', status === 'error' ? 'text-destructive' : 'text-foreground')}
+          >
+            {RUN_STATUS[status]}
+          </span>
+          {result.summary && <span className="text-sm/[1.35] text-foreground">{result.summary}</span>}
+        </span>
+      </div>
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <CollapsibleTrigger
+          className="mt-2 flex w-full items-center justify-between gap-2 rounded-md py-1 text-sm font-semibold text-primary focus-visible:outline-3 focus-visible:outline-ring"
+          aria-label={`Источники и данные: ${step.title}`}
+        >
+          Источники и данные
+          <ChevronDown className={cn('size-4 flex-none transition-transform', open && 'rotate-180')} aria-hidden />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <RunDetails result={result} />
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
+  )
+}
+
+/** «Ищу подходящие варианты…» with a spinning loader: Эвал is at work. */
 export function WorkingRow({
   text,
   label = text,
-  icon: Icon = Waves,
 }: {
   text: string
   /** What a screen reader hears. */
   label?: string
-  icon?: ComponentType<{ className?: string }>
 }) {
   return (
     <div
@@ -120,19 +462,10 @@ export function WorkingRow({
       className="flex w-[min(100%,22rem)] items-center gap-3 rounded-[18px] bg-muted py-2 pr-4 pl-2"
     >
       <span className="grid size-9 flex-none place-items-center rounded-full bg-card text-muted-foreground" aria-hidden>
-        <Icon className="size-5" />
+        <Loader2 className="size-5 motion-safe:animate-spin" data-testid="working-loader" />
       </span>
       <span className={`min-w-0 flex-1 truncate text-sm ${greyMutedText}`} aria-hidden>
         {text}
-      </span>
-      <span className="flex flex-none gap-1" aria-hidden>
-        {[0, 1, 2].map((i) => (
-          <span
-            key={i}
-            className="size-1.5 rounded-full bg-muted-foreground/70 motion-safe:animate-pulse"
-            style={{ animationDelay: `${i * 200}ms` }}
-          />
-        ))}
       </span>
     </div>
   )
@@ -534,8 +867,16 @@ function ParamEditor({ param, ...props }: ParamsProps & { param: SessionParam; o
         <Choices
           disabled={disabled}
           options={[
-            { label: 'спокойно', active: brief.mood === 'calm', apply: () => onChange({ ...brief, mood: 'calm' }) },
-            { label: 'активно', active: brief.mood === 'active', apply: () => onChange({ ...brief, mood: 'active' }) },
+            {
+              label: 'спокойно',
+              active: brief.mood === 'calm',
+              apply: () => onChange({ ...brief, mood: 'calm' }),
+            },
+            {
+              label: 'активно',
+              active: brief.mood === 'active',
+              apply: () => onChange({ ...brief, mood: 'active' }),
+            },
             removal('mood'),
           ]}
         />
@@ -547,8 +888,16 @@ function ParamEditor({ param, ...props }: ParamsProps & { param: SessionParam; o
         <Choices
           disabled={disabled}
           options={[
-            { label: 'повыше', active: brief.height === 'high', apply: () => onChange({ ...brief, height: 'high' }) },
-            { label: 'пониже', active: brief.height === 'low', apply: () => onChange({ ...brief, height: 'low' }) },
+            {
+              label: 'повыше',
+              active: brief.height === 'high',
+              apply: () => onChange({ ...brief, height: 'high' }),
+            },
+            {
+              label: 'пониже',
+              active: brief.height === 'low',
+              apply: () => onChange({ ...brief, height: 'low' }),
+            },
             removal('height'),
           ]}
         />
@@ -568,4 +917,106 @@ function ParamEditor({ param, ...props }: ParamsProps & { param: SessionParam; o
         />
       )
   }
+}
+
+/** «Источники и данные» of a run that opens in place: the AI assistant's answer in the chat with the hotel shows it too. */
+export function RunSources({ result, label }: { result: ToolResult; label: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger
+        className="mt-1 flex w-full items-center justify-between gap-2 rounded-md py-1 text-sm font-semibold text-primary focus-visible:outline-3 focus-visible:outline-ring"
+        aria-label={label}
+      >
+        Источники
+        <ChevronDown className={cn('size-4 flex-none transition-transform', open && 'rotate-180')} aria-hidden />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <RunDetails result={result} />
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
+const REQUEST_STATUS: Record<HotelierRequestView['status'], string> = {
+  pending: 'Ждёт ответа отельера',
+  answered: 'Отельер ответил',
+}
+
+/**
+ * The block «Запрос отельеру»: the hotel, the question and the characteristics asked; once the hotelier answered, the
+ * same block shows the answer and the characteristics taken from it with their source. It comes of the run in
+ * `tool_runs`, never of the model's words.
+ */
+function HotelierRequestCard({ step, run, request }: { step: AgentStep; run: ToolRun; request: HotelierRequestView }) {
+  const [open, setOpen] = useState(false)
+  const { result } = run
+  const answered = request.status === 'answered'
+  return (
+    <section
+      aria-label={step.title}
+      className={cn(cardClass, 'flex w-full flex-col gap-2 sm:w-[min(100%,36rem)]')}
+      data-run={run.id}
+      data-run-status={result.status}
+      data-request={request.requestId}
+    >
+      <div className="flex items-start gap-3">
+        <span className={cn(circleClass, 'grid flex-none place-items-center')}>
+          {answered ? <Check strokeWidth={2.5} aria-hidden /> : <Clock aria-hidden />}
+        </span>
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-[15px]/[1.3] font-semibold text-foreground">{step.title}</span>
+          {request.hotelName && <span className={`text-sm/[1.35] ${greyMutedText}`}>{request.hotelName}</span>}
+          <span className="text-sm/[1.35] font-semibold text-foreground" role="status">
+            {REQUEST_STATUS[request.status]}
+          </span>
+        </span>
+      </div>
+      <p className="text-sm/[1.4] text-foreground">
+        <span className={greyMutedText}>Вопрос: </span>
+        {request.question}
+      </p>
+      {request.keys.length > 0 && (
+        <ul className="flex flex-wrap gap-1" aria-label="Запрашиваемые характеристики">
+          {request.keys.map((key) => (
+            <li key={key}>
+              <Badge className="bg-card font-normal">{characteristicLabel(key)}</Badge>
+            </li>
+          ))}
+        </ul>
+      )}
+      {request.answer && (
+        <blockquote className="rounded-xl bg-card px-3 py-2 text-sm/[1.4] whitespace-pre-line break-words">
+          <span className="block text-xs font-semibold text-muted-foreground">Ответ отельера</span>
+          {request.answer}
+        </blockquote>
+      )}
+      {request.knowledge === 'queued' && (
+        <p className={`text-sm/[1.35] ${greyMutedText}`}>Сохраняю характеристики из ответа…</p>
+      )}
+      {answered && result.claims.length > 0 && (
+        <ul className="flex flex-col gap-1.5" aria-label="Извлечённые характеристики">
+          {result.claims.map((claim) => (
+            <ClaimItem
+              key={claim.id}
+              claim={claim}
+              names={new Map(result.evidence.map((e) => [e.id, e.source_name]))}
+            />
+          ))}
+        </ul>
+      )}
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <CollapsibleTrigger
+          className="flex w-full items-center justify-between gap-2 rounded-md py-1 text-sm font-semibold text-primary focus-visible:outline-3 focus-visible:outline-ring"
+          aria-label={`Источники и данные: ${step.title}`}
+        >
+          Источники и данные
+          <ChevronDown className={cn('size-4 flex-none transition-transform', open && 'rotate-180')} aria-hidden />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <RunDetails result={result} />
+        </CollapsibleContent>
+      </Collapsible>
+    </section>
+  )
 }
