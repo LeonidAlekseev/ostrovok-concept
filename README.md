@@ -19,7 +19,7 @@ npm run format:check
 
 Для `npm run dev` и `npm run build` нужны `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 (сборка читает каталог из базы и без них останавливается). Остальные имена — в `.env.example`; значения достаёт
-`npm run secrets:reveal` (создаёт `.env.local`, см. «Ключи API»). Для ИИ-ответов нужен `NVIDIA_API_KEY`, без него
+`npm run secrets:reveal` (создаёт `.env.local`, см. «Ключи API»). Для ИИ-ответов нужен `NVIDIA_API_KEY` (и `GIGACHAT_AUTH_KEY` для первой текстовой модели), без них
 помощник отвечает по правилам. Тесты и lint ключей не требуют.
 
 CI (GitHub Actions, `.github/workflows/ci.yml`) на каждый PR и push в `dev` и `main` запускает
@@ -285,13 +285,25 @@ npm run db:city-places -- --city València \
 
 ### Модели
 
-Все модели — через API NVIDIA (build.nvidia.com) с одним ключом `NVIDIA_API_KEY` (см. «Ключи API»); лимит ключа —
-40 запросов в минуту, дневного лимита нет. Общий запрос и ошибки — `src/lib/ai/nvidia.ts`.
+Эмбеддинги, реранк, фото и запасные текстовые модели — через API NVIDIA (build.nvidia.com) с одним ключом `NVIDIA_API_KEY`
+(см. «Ключи API»); лимит ключа — 40 запросов в минуту, дневного лимита нет. Общий запрос и ошибки — `src/lib/ai/nvidia.ts`.
+Первая текстовая модель — GigaChat Ultra (Сбер, ключ `GIGACHAT_AUTH_KEY`).
 
-- **Текстовые задачи** (помощник, `src/lib/ai/model.ts`, `understand.ts`) — цепочка `nvidia/nemotron-3.5-lightning-30b-a3b`
-  → `nvidia/nemotron-3.5-bolt-e4b` → `minimaxai/minimax-m3.1-flash`: следующая модель отвечает, если предыдущая
-  не уложилась в свой срок или ошиблась. Все — через OpenAI-совместимый `https://integrate.api.nvidia.com/v1` (`@ai-sdk/openai-compatible`). Рассуждения
-  выключены (`reasoning: 'none'` → `reasoning_effort: none`): иначе модель тратит на них время и токены ответа.
+- **Текстовые задачи** (помощник, `src/lib/ai/model.ts`, `understand.ts`) — цепочка `gigachat/GigaChat-3-Ultra` (4,5 с)
+  → `nvidia/nemotron-3.5-lightning-30b-a3b` → `nvidia/nemotron-3.5-bolt-e4b` → `minimaxai/minimax-m3.1-flash`: следующая модель
+  отвечает, если предыдущая не уложилась в свой срок, вернула 429, 5xx или ответ не по схеме. Без `GIGACHAT_AUTH_KEY`
+  цепочка начинается с `lightning`. Модели NVIDIA — через OpenAI-совместимый `https://integrate.api.nvidia.com/v1`
+  (`@ai-sdk/openai-compatible`). Рассуждения выключены (`reasoning: 'none'` → `reasoning_effort: none`): иначе модель тратит
+  на них время и токены ответа.
+- **GigaChat** (`src/lib/ai/gigachat.ts`) — `https://api.giga.chat/v1`, модель `GigaChat-3-Ultra` (имя из `GET /v1/models`;
+  «Ultra 3.5» в списке нет). Ключ авторизации `GIGACHAT_AUTH_KEY` (Basic, значение из личного кабинета Studio) меняется на токен
+  `POST https://ngw.devices.sberbank.ru:9443/api/v2/oauth` (`scope=GIGACHAT_API_PERS`, `RqUID` на каждый запрос); токен живёт
+  30 мин, кешируется в процессе и обновляется за минуту до конца и после 401. Сертификаты Сбера подписаны НУЦ Минцифры:
+  корневой `config/certs/russian_trusted_root_ca.pem` (публичный, с gu-st.ru) подключается только к запросам GigaChat через
+  свой `undici` Agent, `NODE_EXTRA_CA_CERTS` не нужен, проверка TLS нигде не отключается. Модель не знает `tools`,
+  `response_format: json_schema` и `reasoning_effort` (422): адаптер `fetch` превращает инструменты и схему `Output.object` в
+  `functions`/`function_call` и обратно, `reasoning_effort` убирает. Ответ не по схеме, 429 и 5xx отдают запрос следующей
+  модели. Цена и лимиты зависят от тарифа ключа в личном кабинете GigaChat; здесь они не проверялись.
 - **Эмбеддинги** — `nvidia/nemotron-3.5-embed-1b` (`/v1/embeddings`, `input_type` query/passage, `truncate: END`).
   Свой адаптер в `src/lib/ai/embedding.ts`: провайдер AI SDK не передаёт `input_type`.
 - **Реранк** — `nvidia/nemotron-3.5-rerank-8b`

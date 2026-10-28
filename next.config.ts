@@ -6,7 +6,8 @@ const nextConfig: NextConfig = {
   // Inlined into the client bundle; see src/lib/env.ts. A local build takes APP_ENV of its shell.
   env: { APP_ENV: process.env.VERCEL_ENV ?? process.env.APP_ENV ?? '' },
   // src/lib/secrets.ts decrypts the API keys at runtime; the file is read by path, so tracing needs a hint.
-  outputFileTracingIncludes: { '/*': ['./.env.local.secret'] },
+  // src/lib/ai/gigachat.ts reads the Russian Trusted Root CA the same way.
+  outputFileTracingIncludes: { '/*': ['./.env.local.secret', './config/certs/russian_trusted_root_ca.pem'] },
   turbopack: {
     rules: {
       // Keeps Turbopack from copying every maplibre-gl/dist .mjs into the build; see the loader.

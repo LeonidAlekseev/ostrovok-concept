@@ -1,7 +1,7 @@
 import { generateText } from 'ai'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getSecret } from '../secrets'
-import { REMARK_MODEL_ID, TEXT_CHAIN, VISION_CHAIN, getTextModels, getVisionModels } from './model'
+import { NVIDIA_TEXT_CHAIN, REMARK_MODEL_ID, TEXT_CHAIN, VISION_CHAIN, getTextModels, getVisionModels } from './model'
 
 vi.mock('../secrets', () => ({ getSecret: vi.fn() }))
 
@@ -12,36 +12,48 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+const keys = (given: Record<string, string>) =>
+  vi.mocked(getSecret).mockImplementation(async (name: string) => given[name])
+
 // semantic-search, Requirement: Модели через API NVIDIA
 describe('getTextModels', () => {
   it('has the model of the geo remarks in the text chain', () => {
     expect(TEXT_CHAIN.map((m) => m.id)).toContain(REMARK_MODEL_ID)
   })
 
-  it('gives no models without NVIDIA_API_KEY, so the rules answer', async () => {
-    vi.mocked(getSecret).mockResolvedValue(undefined)
+  it('gives no models without both keys, so the rules answer', async () => {
+    keys({})
     expect(await getTextModels()).toBeUndefined()
     expect(getSecret).toHaveBeenCalledWith('NVIDIA_API_KEY')
+    expect(getSecret).toHaveBeenCalledWith('GIGACHAT_AUTH_KEY')
   })
 
-  it('gives the text chain of the NVIDIA API in order, each with its own time, within the 9 s', async () => {
-    vi.mocked(getSecret).mockResolvedValue('test-key')
+  it('gives GigaChat Ultra first, then the NVIDIA models in order, each with its own time, within the 9 s', async () => {
+    keys({ NVIDIA_API_KEY: 'test-key', GIGACHAT_AUTH_KEY: 'giga-key' })
     const models = await getTextModels()
     expect(models?.map((m) => m.id)).toEqual([
+      'gigachat/GigaChat-3-Ultra',
       'nvidia/nemotron-3.5-lightning-30b-a3b',
       'nvidia/nemotron-3.5-bolt-e4b',
       'minimaxai/minimax-m3.1-flash',
     ])
     models?.forEach((m, i) => {
-      expect(m.model).toMatchObject({ modelId: TEXT_CHAIN[i].id, provider: 'nvidia.chat' })
+      expect(m.model).toMatchObject({
+        modelId: TEXT_CHAIN[i].id.replace(/^gigachat\//, ''),
+        provider: i === 0 ? 'gigachat.chat' : 'nvidia.chat',
+      })
       expect(m.timeoutMs).toBeLessThanOrEqual(9000)
     })
   })
 
-  it('gives lightning 3.5 s, the main model of the text chain', async () => {
-    vi.mocked(getSecret).mockResolvedValue('test-key')
-    const models = await getTextModels()
-    expect(models?.[0]).toMatchObject({ id: 'nvidia/nemotron-3.5-lightning-30b-a3b', timeoutMs: 3500 })
+  it('gives only the NVIDIA models without GIGACHAT_AUTH_KEY', async () => {
+    keys({ NVIDIA_API_KEY: 'test-key' })
+    expect((await getTextModels())?.map((m) => m.id)).toEqual(NVIDIA_TEXT_CHAIN.map((m) => m.id))
+  })
+
+  it('gives only GigaChat without NVIDIA_API_KEY', async () => {
+    keys({ GIGACHAT_AUTH_KEY: 'giga-key' })
+    expect((await getTextModels())?.map((m) => m.id)).toEqual(['gigachat/GigaChat-3-Ultra'])
   })
 })
 
