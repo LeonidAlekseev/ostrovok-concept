@@ -35,3 +35,15 @@ export const serviceClient = () =>
   createClient<Database>(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
     auth: { persistSession: false, autoRefreshToken: false },
   })
+
+/** The id of the account with `email`: the admin API finds users by pages only. `null` when there is none. */
+export async function userIdByEmail(client: ReturnType<typeof serviceClient>, email: string): Promise<string | null> {
+  const PAGE = 1000
+  for (let page = 1; ; page += 1) {
+    const { data, error } = await client.auth.admin.listUsers({ page, perPage: PAGE })
+    if (error) throw new Error(`users: ${error.message}`)
+    const user = data.users.find((u) => u.email?.toLowerCase() === email.toLowerCase())
+    if (user) return user.id
+    if (data.users.length < PAGE) return null
+  }
+}

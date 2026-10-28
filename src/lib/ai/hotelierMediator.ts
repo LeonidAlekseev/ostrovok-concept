@@ -12,7 +12,13 @@ import {
 import type { Json } from '../db/database.types'
 import { loadHotelDetails } from '../db/hotelDetails'
 import { dedupeKey, serviceClient } from '../db/hotelierKnowledge'
-import { hotelierClaimLine, hotelierToolClaim, hotelierToolEvidence } from '../hotelierClaims'
+import {
+  conflictingIds,
+  hotelierClaimLine,
+  hotelierNotes,
+  hotelierToolClaim,
+  hotelierToolEvidence,
+} from '../hotelierClaims'
 import { needsHotelier, questionKeys } from '../hotelierFacts'
 import type { ToolEvidence, ToolResult } from '../toolResult'
 import { firstAnswer } from './chain'
@@ -57,6 +63,7 @@ const quoted = (text: string) =>
     .trim()
 
 function prompt(facts: string, claims: readonly HotelClaim[], chunks: readonly KnowledgeChunk[]) {
+  const conflicts = conflictingIds(claims)
   return [
     'Ты AI-помощник отеля в чате гостя с отелем. Ты не отельер и не говоришь от его имени.',
     'Ответь сам (decision: answer) ТОЛЬКО если ответ прямо есть в данных ниже и они не противоречат друг другу. Иначе — escalate: вопрос уйдёт отельеру.',
@@ -69,7 +76,7 @@ function prompt(facts: string, claims: readonly HotelClaim[], chunks: readonly K
     facts,
     '',
     'Сведения отельера:',
-    ...(claims.length ? claims.map((c, i) => `[C${i + 1}] ${hotelierClaimLine(c)}`) : ['нет']),
+    ...(claims.length ? claims.map((c, i) => `[C${i + 1}] ${hotelierClaimLine(c, conflicts.has(c.id))}`) : ['нет']),
     '',
     'Фрагменты отзывов и сведений об отеле между <<<ДАННЫЕ и ДАННЫЕ>>>:',
     '<<<ДАННЫЕ',
@@ -117,16 +124,7 @@ export const cited = <T>(ids: readonly string[], prefix: 'C' | 'D', rows: readon
   })
 
 /** Two current answers of the hotelier about one characteristic that say different things. */
-export function contradicts(claims: readonly HotelClaim[]): boolean {
-  const values = new Map<string, string>()
-  for (const claim of claims) {
-    const key = `${claim.property}:${String(claim.method.room ?? '')}`
-    const value = JSON.stringify(claim.value)
-    if (values.has(key) && values.get(key) !== value) return true
-    values.set(key, value)
-  }
-  return false
-}
+export const contradicts = (claims: readonly HotelClaim[]) => conflictingIds(claims).size > 0
 
 /** The answer's block: the hotelier's claims and the documents it used, with their sources from the store. */
 async function sourcesResult(
@@ -240,7 +238,9 @@ export async function mediate(conversationId: string, messageId: string): Promis
       }
     }
 
-    const answer = decision?.decision === 'answer' ? decision.answer.trim().slice(0, 900) : ''
+    const answered = decision?.decision === 'answer' ? decision.answer.trim().slice(0, 900) : ''
+    const answer =
+      answered && [answered, ...hotelierNotes(answered, cited(decision?.claim_ids ?? [], 'C', claims))].join(' ')
     const usedClaims = decision ? cited(decision.claim_ids, 'C', claims) : []
     const usedChunks = decision ? cited(decision.chunk_ids, 'D', chunks) : []
     // An answer with no source it can show is no answer: the hotelier gets the question.

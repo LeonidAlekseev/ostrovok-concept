@@ -38,10 +38,34 @@ export function hotelierClaimLabel(claim: Pick<HotelClaim, 'property' | 'method'
   return `${key ? characteristicLabel(key) : claim.property}${room ? ` (${room})` : ''}`
 }
 
-/** The line of the model's facts: «Балкон в номере (Deluxe): да, на 4–5 этажах — по словам отельера, 28 октября». */
-export function hotelierClaimLine(claim: HotelClaim): string {
+/**
+ * The line of the model's facts: «Балкон в номере (Deluxe): да — по словам отельера, 28 октября», with [демо] for the
+ * demonstration data and [противоречие] for an answer another answer contradicts.
+ */
+export function hotelierClaimLine(claim: HotelClaim, conflict = false): string {
   const when = claim.observedAt ? `, ${dayFormat.format(new Date(claim.observedAt))}` : ''
-  return `${hotelierClaimLabel(claim)}: ${claimValueText(claim)} — по словам отельера${when}${claim.demo ? ' [демо]' : ''}`
+  const marks = `${claim.demo ? ' [демо]' : ''}${conflict ? ' [противоречие]' : ''}`
+  return `${hotelierClaimLabel(claim)}: ${claimValueText(claim)} — по словам отельера${when}${marks}`
+}
+
+/** «демо», as the answers name the demonstration data. */
+const DEMO_WORD = /(?<!\p{L})демо/iu
+
+/**
+ * What an answer that used the hotelier's characteristics must say whatever the model wrote: that they are the demo's
+ * when they are, and that the hotelier's answers contradict each other when they do. Nothing when the answer does not
+ * speak of the hotelier.
+ */
+export function hotelierNotes(answer: string, claims: readonly HotelClaim[]): string[] {
+  if (claims.length === 0 || !/отельер/iu.test(answer)) return []
+  return [
+    claims.some((c) => c.demo) &&
+      !DEMO_WORD.test(answer) &&
+      'Сведения отельера здесь — демонстрационные (демо), не настоящий ответ отеля.',
+    conflictingIds(claims).size > 0 &&
+      !/расход|противореч/iu.test(answer) &&
+      'Ответы отельера об этом расходятся: уточните у отеля перед бронированием.',
+  ].filter((line): line is string => Boolean(line))
 }
 
 /** A hotelier's claim of the store for a block: its source is the answer it came from. */
@@ -73,4 +97,22 @@ export function hotelierToolEvidence(claim: HotelClaim): ToolEvidence[] {
     claim_id: claim.id,
     ...(e.demo && { demo: true }),
   }))
+}
+
+/**
+ * The hotelier's current answers that contradict each other: two claims of one characteristic and room with different
+ * values. The ids of all of them.
+ */
+export function conflictingIds(
+  claims: readonly Pick<HotelClaim, 'id' | 'property' | 'method' | 'value'>[],
+): Set<string> {
+  const groups = new Map<string, Pick<HotelClaim, 'id' | 'value'>[]>()
+  for (const claim of claims) {
+    const key = `${claim.property}:${claimRoom(claim)?.toLocaleLowerCase('ru') ?? ''}`
+    groups.set(key, [...(groups.get(key) ?? []), claim])
+  }
+  const ids = new Set<string>()
+  for (const group of groups.values())
+    if (new Set(group.map((c) => JSON.stringify(c.value))).size > 1) for (const c of group) ids.add(c.id)
+  return ids
 }

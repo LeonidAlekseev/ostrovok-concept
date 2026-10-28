@@ -12,6 +12,7 @@ import { MAX_MESSAGE_LENGTH } from '@/lib/assistant'
 import { isPending, newId, type Chat, type ChatMessage } from '@/lib/assistantChats'
 import { useDestinations } from '../Catalog/useDestinations'
 import { ToolRunCard } from '../AssistantPage/ChatCards'
+import { DemoBadge } from '../DemoBadge'
 import { Feed } from '../AssistantPage/ChatFeed'
 import { MapMessage } from '../AssistantPage/MapMessage'
 import { useChats, type Chats, type HotelContext, type TripsContext } from '../AssistantPage/useChats'
@@ -42,7 +43,10 @@ function Bubble({ message, onRetry }: { message: ChatMessage; onRetry: () => voi
   if (role === 'owner')
     return (
       <div className="flex max-w-[92%] flex-col items-start gap-0.5 self-start">
-        <span className="px-1 text-xs font-semibold text-muted-foreground">Отельер</span>
+        <span className="px-1 text-xs font-semibold text-muted-foreground">
+          Отельер
+          {data.demo && <DemoBadge className="ml-1.5" />}
+        </span>
         <p className="rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-sm/[1.4] whitespace-pre-wrap">{text}</p>
       </div>
     )

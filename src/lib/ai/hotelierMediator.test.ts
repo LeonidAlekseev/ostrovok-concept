@@ -119,7 +119,8 @@ describe('the hotel’s AI assistant', () => {
     expect(message.value).toMatchObject({
       sender: 'ai_assistant',
       author_id: null,
-      text: 'По словам отельера, в номерах Deluxe есть балкон.',
+      // The demo's are said to be the demo's, whatever the model wrote.
+      text: 'По словам отельера, в номерах Deluxe есть балкон. Сведения отельера здесь — демонстрационные (демо), не настоящий ответ отеля.',
       data: {
         run: {
           result: {

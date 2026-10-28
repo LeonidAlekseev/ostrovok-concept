@@ -45,6 +45,7 @@ const conversation = (id: string, extra: Partial<HotelierConversation> = {}): Ho
   lastSender: 'user',
   userUnread: 0,
   hotelierUnread: 1,
+  demo: false,
   createdAt: '2026-10-28T10:00:00Z',
   ...extra,
 })
@@ -56,6 +57,7 @@ const message = (id: string, sender: HotelierMessage['sender'], text: string): H
   requestId: null,
   shareable: false,
   knowledgeRevokedAt: null,
+  demo: false,
   readAt: null,
   createdAt: `2026-10-28T10:0${id.length}:00Z`,
 })

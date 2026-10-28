@@ -70,6 +70,8 @@ export interface HotelierConversation {
   lastSender: HotelierSender | null
   userUnread: number
   hotelierUnread: number
+  /** Demonstration: the demo hotelier answers, or the demo data made it. */
+  demo: boolean
   createdAt: string
 }
 
@@ -82,6 +84,8 @@ export interface HotelierMessage {
   shareable: boolean
   /** The hotelier withdrew the answer's knowledge. */
   knowledgeRevokedAt: string | null
+  /** Demonstration: the demo hotelier's answer or a message of the demo data, marked «демо». */
+  demo: boolean
   readAt: string | null
   createdAt: string
   /** The AI assistant's answer: the sources it used, from the store. */
@@ -122,6 +126,7 @@ export const conversationOf = (row: ConversationRow): HotelierConversation => ({
   lastSender: row.last_sender ? oneOf(HOTELIER_SENDERS, row.last_sender, 'user') : null,
   userUnread: row.user_unread,
   hotelierUnread: row.hotelier_unread,
+  demo: row.is_demo === true,
   createdAt: row.created_at,
 })
 
@@ -137,6 +142,7 @@ export function messageOf(row: MessageRow): HotelierMessage {
     requestId: row.request_id,
     shareable: row.shareable,
     knowledgeRevokedAt: row.knowledge_revoked_at ?? null,
+    demo: row.is_demo === true,
     readAt: row.read_at,
     createdAt: row.created_at,
     ...(run && { run }),

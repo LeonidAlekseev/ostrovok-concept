@@ -25,6 +25,7 @@ import type { ChatMessage } from '../../lib/assistantChats'
 import { formatDateRange, type IsoDate } from '../../lib/dates'
 import { formatPrice, guestsLabel } from '../../lib/format'
 import { HotelTile } from '../HotelTile/HotelTile'
+import { DemoBadge } from '../DemoBadge'
 import { DateChangeCard, MemoryCard, SessionParamsCard, ToolCard, ToolRunCard, WorkingRow } from './ChatCards'
 import { MessagePhotos, type PhotoUrl } from './ChatPhotos'
 import { MapMessage } from './MapMessage'
@@ -230,7 +231,12 @@ function MessageItem({ message, photoUrl, onChoose, onRetry, actions, params, on
   return (
     <Message>
       <MessageContent className="gap-1">
-        {role === 'owner' && <MessageHeader className="px-0">Отельер</MessageHeader>}
+        {role === 'owner' && (
+          <MessageHeader className="px-0">
+            Отельер
+            {data.demo && <DemoBadge className="ml-1.5" />}
+          </MessageHeader>
+        )}
         {data.notFound && params ? (
           // «Ничего не нашёл»: the words and the parameters of the session in one bubble.
           <Bubble variant="muted" className={`${agentBubble} w-full sm:w-[min(100%,36rem)]`}>

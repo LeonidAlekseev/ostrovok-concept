@@ -21,6 +21,7 @@ import {
   type HotelierConversation,
   type InboxFilter,
 } from '@/lib/hotelierChat'
+import { DemoBadge } from '../DemoBadge'
 import { ConversationView } from './ConversationView'
 import { useInbox } from './useInbox'
 
@@ -52,7 +53,8 @@ function Row({
   now: Date
   onOpen: () => void
 }) {
-  const { hotelName, hotelId, kind, status, lastMessageAt, lastMessageText, lastSender, hotelierUnread } = conversation
+  const { hotelName, hotelId, kind, status, lastMessageAt, lastMessageText, lastSender, hotelierUnread, demo } =
+    conversation
   return (
     <li>
       <button
@@ -76,6 +78,7 @@ function Row({
         </span>
         <span className="flex flex-wrap items-center gap-1.5">
           <Badge>{KIND_LABEL[kind]}</Badge>
+          {demo && <DemoBadge />}
           <Badge
             variant={status === 'resolved' ? 'success' : status === 'waiting_hotelier' ? 'destructive' : 'secondary'}
           >

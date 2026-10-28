@@ -14,8 +14,9 @@ values
   ('00000000-0000-4000-8000-0000000000b2', 'authenticated', 'authenticated', 'req-b@example.test'),
   ('00000000-0000-4000-8000-0000000000e1', 'authenticated', 'authenticated', 'req-h@example.test'),
   ('00000000-0000-4000-8000-0000000000e2', 'authenticated', 'authenticated', 'req-h2@example.test');
-insert into public.hotelier_profiles (user_id, all_hotels)
-values ('00000000-0000-4000-8000-0000000000e1', true), ('00000000-0000-4000-8000-0000000000e2', false);
+-- H is the demo hotelier: their answer is demonstration.
+insert into public.hotelier_profiles (user_id, all_hotels, is_demo)
+values ('00000000-0000-4000-8000-0000000000e1', true, true), ('00000000-0000-4000-8000-0000000000e2', false, false);
 insert into public.assistant_chats (id, user_id)
 values ('00000000-0000-4000-8000-00000000c0a1', '00000000-0000-4000-8000-0000000000a1');
 
@@ -158,6 +159,24 @@ begin
   end if;
   if not (select unread from public.assistant_chats where id = '00000000-0000-4000-8000-00000000c0a1') then
     raise exception 'the chat is not unread';
+  end if;
+  -- The demo hotelier's answer is marked demonstration: the message, the conversation, the run and the chat's message.
+  if not (select m.is_demo and c.is_demo from public.hotelier_messages m
+      join public.hotelier_conversations c on c.id = m.conversation_id
+      where m.id = '00000000-0000-4000-8000-0000000003e1') then
+    raise exception 'the demo answer is not marked';
+  end if;
+  if (select result_data -> 'data' ->> 'demo' from public.tool_runs where id = '00000000-0000-4000-8000-0000000001a1')
+    <> 'true' or not exists (
+      select 1 from public.assistant_messages
+      where chat_id = '00000000-0000-4000-8000-00000000c0a1' and role = 'owner' and data ->> 'demo' = 'true'
+    ) then
+    raise exception 'the chat does not say the answer is demonstration';
+  end if;
+  -- The traveller's own question is not.
+  if (select is_demo from public.hotelier_messages where sender = 'ai_assistant'
+      and conversation_id = (select conversation from req_made)) then
+    raise exception 'the assistant''s question is marked demonstration';
   end if;
 end $$;
 

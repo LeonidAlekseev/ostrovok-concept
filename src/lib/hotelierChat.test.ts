@@ -18,6 +18,7 @@ const message = (id: string, createdAt: string): HotelierMessage => ({
   requestId: null,
   shareable: false,
   knowledgeRevokedAt: null,
+  demo: false,
   readAt: null,
   createdAt,
 })
@@ -34,6 +35,7 @@ const conversation = (id: string, lastMessageAt: string, extra: Partial<Hotelier
     lastSender: null,
     userUnread: 0,
     hotelierUnread: 0,
+    demo: false,
     createdAt: lastMessageAt,
     ...extra,
   }) satisfies HotelierConversation
@@ -83,6 +85,7 @@ describe('the chat with the hotelier', () => {
       last_sender: 'hotelier',
       user_unread: 1,
       hotelier_unread: 0,
+      is_demo: false,
       created_at: 't',
       updated_at: 't',
       hotel: { name: 'Hotel A' },

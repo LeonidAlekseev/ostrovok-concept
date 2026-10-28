@@ -90,13 +90,27 @@ export async function sendTravellerMessage(
   return { ok: true, value: { conversation: chat.value, message: messageOf(data) } }
 }
 
-/** The hotelier's answer in a conversation of their hotel: RLS refuses anyone else. */
+/**
+ * The hotelier's answer in a conversation of their hotel: RLS refuses anyone else. Without `requestId` it answers the
+ * conversation's only open request, if there is one.
+ */
 export async function sendHotelierMessage(
   client: Client,
   userId: string,
   conversationId: string,
   { text, shareable, requestId }: { text: string; shareable: boolean; requestId?: string },
 ): Promise<ChatResult<HotelierMessage>> {
+  // An answer without its request answers the conversation's only open one: the panel may send before it read it.
+  let request = requestId ?? null
+  if (!request) {
+    const { data: open } = await client
+      .from('hotelier_requests')
+      .select('id')
+      .eq('conversation_id', conversationId)
+      .eq('status', 'pending')
+      .limit(2)
+    if (open?.length === 1) request = open[0].id
+  }
   const { data, error } = await client
     .from('hotelier_messages')
     .insert({
@@ -105,7 +119,7 @@ export async function sendHotelierMessage(
       author_id: userId,
       text,
       shareable,
-      request_id: requestId ?? null,
+      request_id: request,
     })
     .select('*')
     .single()

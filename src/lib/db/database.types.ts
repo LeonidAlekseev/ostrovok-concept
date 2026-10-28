@@ -985,6 +985,7 @@ export type Database = {
           hotel_id: string
           hotelier_unread: number
           id: string
+          is_demo: boolean
           kind: string
           last_message_at: string
           last_message_text: string
@@ -1002,6 +1003,7 @@ export type Database = {
           hotel_id: string
           hotelier_unread?: number
           id?: string
+          is_demo?: boolean
           kind?: string
           last_message_at?: string
           last_message_text?: string
@@ -1018,6 +1020,7 @@ export type Database = {
           hotel_id?: string
           hotelier_unread?: number
           id?: string
+          is_demo?: boolean
           kind?: string
           last_message_at?: string
           last_message_text?: string
@@ -1094,6 +1097,7 @@ export type Database = {
           created_at: string
           data: NonNullable<Json>
           id: string
+          is_demo: boolean
           knowledge_revoked_at: string | null
           read_at: string | null
           request_id: string | null
@@ -1108,6 +1112,7 @@ export type Database = {
           created_at?: string
           data?: NonNullable<Json>
           id?: string
+          is_demo?: boolean
           knowledge_revoked_at?: string | null
           read_at?: string | null
           request_id?: string | null
@@ -1121,6 +1126,7 @@ export type Database = {
           created_at?: string
           data?: NonNullable<Json>
           id?: string
+          is_demo?: boolean
           knowledge_revoked_at?: string | null
           read_at?: string | null
           request_id?: string | null
