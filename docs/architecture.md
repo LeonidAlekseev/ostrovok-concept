@@ -2,6 +2,66 @@
 
 Стили, глобус, состояние в браузере и изображения. Инструменты Эвала — в [tools.md](tools.md).
 
+## Система целиком
+
+```mermaid
+flowchart LR
+  B["Браузер<br/>React, MapLibre, Supabase JS"]
+  subgraph N["Next.js (Vercel или Docker)"]
+    P["Страницы и proxy.ts<br/>(сессия в cookie)"]
+    R["Маршруты src/app/api<br/>assistant, hotels/*, hotelier/*,<br/>openapi, revalidate; /health"]
+  end
+  subgraph S["Supabase"]
+    PG[("Postgres<br/>PostGIS · pgvector · RLS")]
+    AU["Auth"]
+    ST["Storage<br/>вложения чата"]
+  end
+  subgraph M["Модели"]
+    G["GigaChat<br/>(первая текстовая)"]
+    NV["NVIDIA API<br/>текст · эмбеддинги · реранк · фото"]
+  end
+  subgraph X["Внешние API"]
+    OV["Overpass"]
+    NO["Nominatim"]
+    OS["OSRM (маршруты)"]
+    TI["OpenFreeMap (тайлы)"]
+  end
+  B -->|страницы| P
+  B -->|fetch /api/*| R
+  B -->|вход, Realtime, чаты| AU
+  B -->|данные под RLS| PG
+  B --> ST
+  B --> TI
+  P --> PG
+  R --> PG
+  R --> G
+  R --> NV
+  R --> OV
+  R --> NO
+  R --> OS
+```
+
+Сервер ходит в Supabase анонимным ключом (данные каталога и функции `security definer`) и ключом service role
+(запись знаний отельера, обновление после ответа); ключи моделей и service role в браузер не попадают
+([«Ключи API»](secrets.md#ключи-api)). Путь запроса Эвала и устройство поиска — в [«Знаниях и поиске»](retrieval.md).
+
+```mermaid
+sequenceDiagram
+  participant B as Браузер
+  participant R as POST /api/assistant
+  participant L as Текстовые модели
+  participant K as Поиск и знания
+  participant DB as Supabase
+  B->>R: сообщения, бриф, фото
+  R->>L: понять пожелание (бриф)
+  L-->>R: бриф
+  R->>K: searchStep, featuresStep, инструменты
+  K->>DB: match_embeddings, claims, hotel_chunks_hybrid
+  DB-->>K: отели, утверждения, фрагменты
+  K-->>R: отели, блоки с источниками
+  R-->>B: ответ, шаги, карта
+```
+
 ## Стили
 
 Tailwind CSS v4 (через `@tailwindcss/postcss`, `postcss.config.mjs`) и shadcn/ui, своих CSS-модулей нет.
