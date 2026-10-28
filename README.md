@@ -25,7 +25,7 @@ docker compose up --build
 1. Одна строка `AGE_SECRET_KEY=AGE-SECRET-KEY-1…` — закрытый ключ приложения. Остальные переменные приложение и сборка
    расшифруют сами из `secrets.app.env.age`.
 2. Все переменные из `.env.example` со значениями. Организаторы берут их из `secrets.env.age`
-   (`age -d -i <свой ключ> secrets.env.age > .env`).
+   (`age -d -i <свой ключ> -o .env secrets.env.age`).
 
 Пошагово для Docker Desktop (Windows, macOS) — [docs/docker.md](docs/docker.md).
 
@@ -51,8 +51,18 @@ docker compose up --build
 | `DEMO_HOTELIER_EMAIL`, `DEMO_HOTELIER_PASSWORD` | пусто             | демо-отельер (то же)                                                                 |
 | `PORT`, `HOSTNAME`                              | `8080`, `0.0.0.0` | порт и адрес сервера в контейнере (заданы в `Dockerfile`)                            |
 
-Значения хранятся в репозитории только зашифрованными ([age](https://github.com/FiloSottile/age)): `secrets.env.age`
-(для организаторов) и `secrets.app.env.age` (для приложения). `.env` в `.gitignore`. Подробности — [docs/secrets.md](docs/secrets.md).
+**Ключи для организаторов — `secrets.env.age` в корне репозитория.** Это зашифрованный `.env` со всеми переменными
+таблицы выше. Он зашифрован только публичным ключом организаторов
+`age1932fu7f70rwyfhaxflyfszz4gf6avxwc95wc0yjwm6zns9tspycqpgdnc0`, прочитать его можно только их закрытым ключом:
+
+```bash
+age -d -i <закрытый ключ организаторов> -o .env secrets.env.age
+docker compose up --build
+```
+
+Второй файл, `secrets.app.env.age`, зашифрован ключом приложения (`AGE_SECRET_KEY`) для Vercel и Docker. Открытый
+`.env` в git не попадает: он в `.gitignore`, а `git ls-files .env` ничего не выводит. Подробности —
+[docs/secrets.md](docs/secrets.md).
 
 ### Почему база внешняя
 
