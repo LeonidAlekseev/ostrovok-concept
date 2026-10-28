@@ -4,6 +4,7 @@ import type { ViewFocus, ViewPlace } from '@/lib/chatWidget'
 import type { ViewMap as ViewMapData } from '@/lib/db/view'
 import {
   blockersAt,
+  bearingDeg,
   eyeOf,
   inSide,
   lineVerdict,
@@ -68,7 +69,13 @@ export function useViewScene(
   const sunrise = date ? sunriseOf(date, hotel.lat, hotel.lon) : null
   const sea = ready ? seaReach(ready) : null
   const focusBearing =
-    focus === 'sunset' ? sunset?.azimuth : focus === 'sunrise' ? sunrise?.azimuth : focus && sea?.point?.bearing
+    focus === 'sunset'
+      ? sunset?.azimuth
+      : focus === 'sunrise'
+        ? sunrise?.azimuth
+        : focus
+          ? sea?.point?.bearing
+          : places[0] && bearingDeg(hotel, places[0])
   // The side the page opens on is the openest from the top floor: it does not jump with the slider.
   const shownSide =
     side ??
