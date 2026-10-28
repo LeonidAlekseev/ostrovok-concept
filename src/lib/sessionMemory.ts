@@ -95,7 +95,13 @@ export function sessionParams(brief: Brief, destinations: readonly Destination[]
   add('city', 'Город', destinations.find((d) => d.id === brief.destinationId)?.name)
   add('vibe', 'Тема', brief.vibe && brief.vibe !== 'any' && VIBE_LABEL[brief.vibe])
   add('mood', 'Настроение', brief.mood && (brief.mood === 'calm' ? 'спокойно' : 'активно'))
-  add('budget', 'Бюджет', brief.budget && `до ${formatPrice(brief.budget)}`)
+  add(
+    'budget',
+    'Бюджет',
+    brief.budget
+      ? `до ${formatPrice(brief.budget)}`
+      : brief.budgetPerNight && `до ${formatPrice(brief.budgetPerNight)} за ночь`,
+  )
   add('sea', 'Расстояние до моря', brief.seaMaxM && `до ${formatMeters(brief.seaMaxM)}`)
   add('quiet', 'Тишина', brief.quiet && 'тихо ночью')
   add('height', 'Здание', brief.height && (brief.height === 'high' ? 'повыше' : 'пониже'))

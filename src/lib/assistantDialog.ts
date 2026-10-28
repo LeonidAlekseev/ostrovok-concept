@@ -35,6 +35,7 @@ export const isBrief = (value: unknown): value is Brief =>
   (value.party === undefined || isString(value.party)) &&
   (value.mood === undefined || isString(value.mood)) &&
   (value.budget === undefined || isNumber(value.budget)) &&
+  (value.budgetPerNight === undefined || isNumber(value.budgetPerNight)) &&
   (value.quiet === undefined || value.quiet === true) &&
   (value.height === undefined || isString(value.height)) &&
   (value.view === undefined || isString(value.view)) &&

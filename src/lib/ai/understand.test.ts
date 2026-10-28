@@ -182,3 +182,34 @@ describe('understandWish: the phrase set', () => {
     if (want.budget) expect(parsed.budget).toBe(want.budget)
   })
 })
+
+describe('understandWish: the budget and the theme', () => {
+  const phrase =
+    'Найди в Валенсии отель, где на фото номер с большой ванной и балконом, 20-23 ноября, вдвоём, до 200 евро за ночь'
+
+  it('turns euros per night into rubles itself, and does not guess the sea', async () => {
+    const { parsed } = await read(phrase, {
+      destinationId: 'valencia',
+      vibe: 'sea',
+      checkIn: '2026-11-20',
+      checkOut: '2026-11-23',
+      party: 'couple',
+      budget: 2_000_000,
+      budgetCurrency: 'rub',
+    })
+    expect(parsed.budgetPerNight).toBe(18_000)
+    expect(parsed.budget).toBeUndefined()
+    expect(parsed.vibe).toBeUndefined()
+    expect(parsed.destinationId).toBe('valencia')
+  })
+
+  it('takes the amount and the currency the model read when the rules see no sum', async () => {
+    const { parsed } = await read('отель в Валенсии, двести евро за ночь', {
+      destinationId: 'valencia',
+      budget: 200,
+      budgetCurrency: 'eur',
+      budgetPer: 'night',
+    })
+    expect(parsed.budgetPerNight).toBe(18_000)
+  })
+})
