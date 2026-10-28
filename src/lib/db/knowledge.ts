@@ -162,7 +162,7 @@ const levelRow = z.object({
   entity: z.object({ ref: z.string() }),
 })
 
-/** The properties of the index: the night and the day at the facade to the street (noise-estimate-v1), the height. */
+/** The properties of the index: the night and the day at the facade to the street (noise-estimate-v2), the height. */
 export const LEVEL_PROPERTIES =
   'property.eq.noise.estimate.street.lnight,property.eq.noise.estimate.street.lday,property.eq.building.height'
 

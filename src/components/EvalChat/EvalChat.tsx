@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { createContext, use, useEffect, useId, useState, type FormEvent, type ReactNode } from 'react'
+import { createContext, use, useId, useState, type FormEvent, type ReactNode } from 'react'
 import { RotateCcw, SendHorizontal, TriangleAlert } from 'lucide-react'
 import { cn } from 'cn'
 import { Badge } from '@/components/ui/badge'
@@ -107,12 +107,9 @@ export function EvalChatProvider({
   const [draftId] = useState(newId)
   const [continued, setContinued] = useState<string | null>(null)
   const chats = useChats(destinations, NO_HOTELS, continued ?? draftId, scope)
-  // The chat the traveller had here before is continued.
+  // The chat the traveller had here before is continued: set while rendering, so no render shows the empty draft first.
   const before = previous(chats.chats)?.id
-  useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- the chat follows the page's newest one once the chats are read
-    if (before) setContinued(before)
-  }, [before])
+  if (before && before !== continued) setContinued(before)
   return <EvalChatContext value={chats}>{children}</EvalChatContext>
 }
 

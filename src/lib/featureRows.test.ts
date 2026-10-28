@@ -21,7 +21,7 @@ const geo = {
   noise: [],
 }
 
-/** The facade of the hotel: the roads to the street, the estimate of noise-estimate-v1 from them and a bar. */
+/** The facade of the hotel: the roads to the street, the estimate of noise-estimate-v2 from them and a bar. */
 const sources: HotelNoise['sources'] = [
   { source: 'roadsInAgglomeration', lden: { min: 65, max: 69 }, lnight: { max: 39 } },
   { source: 'industryInAgglomeration', lden: { max: 39 } },
@@ -60,7 +60,7 @@ describe('featureRow', () => {
       floors_lower: null,
       floors_upper: null,
       noise_dataset: 'eea-noise-end2022-v01_r00',
-      noise_method: 'noise-estimate-v1',
+      noise_method: 'noise-estimate-v2',
       noise_zone: 'building',
       street_lday_min: round(estimate.street.lday!.min),
       street_lday_max: round(estimate.street.lday!.max),
@@ -71,8 +71,9 @@ describe('featureRow', () => {
       yard_lnight_min: round(estimate.yard.lnight!.min),
       yard_lnight_max: round(estimate.yard.lnight!.max),
     })
-    // The bar at 40 m is the only sound of the yard by night: 62 − 20·lg(4) ≈ 50 dB, over the roads below 40 dB.
-    expect(round(estimate.yard.lnight!.min)).toBe(50)
+    // The yard is the roads below 40 dB alone: the building screens the bar at 40 m from it.
+    expect(round(estimate.yard.lnight!.min)).toBeNull()
+    expect(round(estimate.yard.lnight!.max)).toBe(40)
   })
 
   it('a floor bound of 0 is kept, a negative or missing one is not', () => {
@@ -166,5 +167,16 @@ describe('diffRows', () => {
     expect(diffRows([{ ...before, height_m: 25.799999 }], [before], (r) => r.hotel_id).upsert).toEqual([])
     expect(diffRows([before], [after], (r) => r.hotel_id).upsert).toEqual([after])
     expect(diffRows(rows, rows.slice(0, 1), key).remove).toEqual(rows.slice(1))
+  })
+
+  it('compares jsonb deeply: the order of keys does not rewrite, a changed value does', () => {
+    const row = (value: unknown) => [{ id: 'a', data: value }]
+    const id = (r: { id: string }) => r.id
+    const a = { x: 1, y: [{ p: 1, q: 2 }], z: null }
+    expect(diffRows(row(a), row({ z: null, y: [{ q: 2, p: 1 }], x: 1 }), id).upsert).toEqual([])
+    expect(diffRows(row(a), row({ ...a, y: [{ p: 1, q: 3 }] }), id).upsert).toHaveLength(1)
+    expect(diffRows(row(a), row({ ...a, y: [] }), id).upsert).toHaveLength(1)
+    expect(diffRows(row(a), row({ x: 1, y: a.y }), id).upsert).toHaveLength(1)
+    expect(diffRows(row(null), row({}), id).upsert).toHaveLength(1)
   })
 })

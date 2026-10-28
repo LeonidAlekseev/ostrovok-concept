@@ -63,7 +63,7 @@ const estimateCalculation = {
   id: '33333333-3333-4333-8333-333333333333',
   method:
     'Оценка шума у фасада: самые громкие (улица) и самые тихие (двор) полосы карт шума EEA у контура здания, энергетическая сумма слоёв и шумных мест OpenStreetMap как точечных источников',
-  version: 'noise-estimate-v1',
+  version: 'noise-estimate-v2',
   inputs: {
     zone: { kind: 'building', building_id: '21adf97303954791-16', buffer_m: 5 },
     street_bands: { roadsInAgglomeration: { lden: { min: 70, max: 74 }, lnight: { min: 65, max: 69 } } },
@@ -190,7 +190,7 @@ describe('the noise tool', () => {
     expect(estimate).toEqual({
       id: estimateCalculation.id,
       name: estimateCalculation.method,
-      version: '1',
+      version: '2',
       inputs: [
         { label: 'Зона фасада', value: 'контур здания EUBUCCO 21adf97303954791-16 и 5 м вокруг' },
         { label: 'Полосы EEA у фасада на улицу', value: 'Дороги города: 70–74 дБ за сутки, 65–69 дБ ночью' },

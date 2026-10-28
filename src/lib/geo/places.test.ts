@@ -300,6 +300,26 @@ describe('the geocoding', () => {
     ])
   })
 
+  // assistant-geo, Requirement: Словарь русских названий мест
+  it('asks for the official name of a place named in Russian', async () => {
+    const { store } = memoryStore()
+    store.named.mockResolvedValue(ok([]))
+    const search = vi.fn(async () => ok([market]))
+    await geocode('Города искусств и наук', { store, search, budget })
+    expect(store.named.mock.calls.map(([name]) => name)).toEqual([
+      'Города искусств и наук',
+      'Ciutat de les Arts i les Ciències',
+    ])
+    expect(search).toHaveBeenCalledWith('Ciutat de les Arts i les Ciències')
+  })
+
+  it('leaves a name it has no entry for as it is', async () => {
+    const { store } = memoryStore()
+    const search = vi.fn(async () => ok([market]))
+    await geocode('Музей хамона', { store, search, budget })
+    expect(search).toHaveBeenCalledWith('Музей хамона')
+  })
+
   it('passes on what Nominatim could not find', async () => {
     const { store } = memoryStore()
     const result = await geocode('Atlantis', { store, search: async () => notFound('нет'), budget })

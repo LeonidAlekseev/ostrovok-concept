@@ -370,7 +370,7 @@ function MethodCard({ className = 'md:col-span-2' }: { className?: string }) {
 }
 
 /**
- * «Шум и окружение» of a real hotel: the EEA contours around it on the map, the estimate of noise-estimate-v1 at the
+ * «Шум и окружение» of a real hotel: the EEA contours around it on the map, the estimate of noise-estimate-v2 at the
  * facade to the street and to the yard, the sources (EEA's layers at the facade and OSM's loud places) and how it is
  * computed. A hotel outside EEA's maps says «нет данных EEA», never «тихо».
  */

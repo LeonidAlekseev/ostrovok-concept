@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next'
+import { mergedHotelRedirects } from './src/lib/ota/merged'
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -14,6 +15,8 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  // The old links of the Ostrovok duplicates folded into one hotel; see src/lib/ota/merged.ts.
+  redirects: async () => mergedHotelRedirects(),
   async headers() {
     return [
       {

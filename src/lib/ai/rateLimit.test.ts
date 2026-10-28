@@ -124,6 +124,16 @@ describe('the limit of the requests', () => {
     expect(supabase.createClient).not.toHaveBeenCalled()
   })
 
+  it('counts the questions about a hotel apart from the requests (Scenario: Подбор исчерпал лимит)', async () => {
+    config.isSupabaseConfigured = false
+    const { allowRequest, allowHotelRequest, RATE_LIMIT, HOTEL_RATE_LIMIT } = await rateLimit()
+    const now = Date.now()
+    for (let i = 0; i < RATE_LIMIT; i++) expect(await allowRequest('192.0.2.23', now)).toBe(true)
+    expect(await allowRequest('192.0.2.23', now)).toBe(false)
+    for (let i = 0; i < HOTEL_RATE_LIMIT; i++) expect(await allowHotelRequest('192.0.2.23', now)).toBe(true)
+    expect(await allowHotelRequest('192.0.2.23', now)).toBe(false)
+  })
+
   it('is counted in memory when the shared counter fails or does not answer in time', async () => {
     const rpc = vi.fn(() => ({
       abortSignal: async () => {

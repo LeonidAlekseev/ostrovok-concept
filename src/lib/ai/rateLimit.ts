@@ -1,11 +1,10 @@
 import 'server-only'
 import { createHash } from 'node:crypto'
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type { Database } from '@/lib/db/database.types'
-import { getSecret } from '@/lib/secrets'
-import { isSupabaseConfigured, supabaseUrl } from '@/lib/supabase/config'
+import { serviceClient } from '@/lib/db/serviceClient'
 
 export const RATE_LIMIT = 20
+/** The questions of a chat about a hotel a minute: a limit of their own, so they do not take the search's requests. */
+export const HOTEL_RATE_LIMIT = 20
 /** The photos of the chat a minute: the model that sees them is the heavy one, and the key allows 40 requests. */
 export const VISION_RATE_LIMIT = 20
 export const RATE_WINDOW_MS = 60_000
@@ -17,6 +16,7 @@ type Hits = Map<string, { count: number; resetAt: number }>
 /** Requests per IP in the current window; kept in the process memory, so each server instance counts its own. */
 const hits: Hits = new Map()
 const visionHits: Hits = new Map()
+const hotelHits: Hits = new Map()
 
 function allow(counter: Hits, limit: number, ip: string, now: number): boolean {
   if (counter.size > 10_000) for (const [key, hit] of counter) if (hit.resetAt <= now) counter.delete(key)
@@ -30,7 +30,7 @@ function allow(counter: Hits, limit: number, ip: string, now: number): boolean {
 }
 
 /** The key of the shared counter: the kind of the limit and a hash of the IP, so the counter keeps no address. */
-function sharedKey(kind: 'request' | 'vision', ip: string): string {
+function sharedKey(kind: 'request' | 'vision' | 'hotel', ip: string): string {
   return `${kind}:${createHash('sha256').update(ip).digest('hex').slice(0, 32)}`
 }
 
@@ -42,17 +42,12 @@ export async function allowRequest(ip: string, now = Date.now()): Promise<boolea
   return (await allowShared(sharedKey('request', ip), RATE_LIMIT).catch(() => null)) ?? allow(hits, RATE_LIMIT, ip, now)
 }
 
-let counterClient: Promise<SupabaseClient<Database> | null> | undefined
-
-/** The client of the shared counter, with the service role key; `null` without Supabase or the key. */
-function sharedCounter() {
-  counterClient ??= (async () => {
-    const key = isSupabaseConfigured ? await getSecret('SUPABASE_SERVICE_ROLE_KEY').catch(() => undefined) : undefined
-    return key
-      ? createClient<Database>(supabaseUrl, key, { auth: { persistSession: false, autoRefreshToken: false } })
-      : null
-  })()
-  return counterClient
+/** The same count for the questions of a chat about a hotel, apart from `allowRequest`'s. */
+export async function allowHotelRequest(ip: string, now = Date.now()): Promise<boolean> {
+  return (
+    (await allowShared(sharedKey('hotel', ip), HOTEL_RATE_LIMIT).catch(() => null)) ??
+    allow(hotelHits, HOTEL_RATE_LIMIT, ip, now)
+  )
 }
 
 /**
@@ -61,7 +56,7 @@ function sharedCounter() {
  * no answer in time), and the instance counts in its memory instead.
  */
 async function allowShared(key: string, limit: number): Promise<boolean | null> {
-  const client = await sharedCounter()
+  const client = await serviceClient()
   if (!client) return null
   const { data, error } = await client
     .rpc('rate_limit_hit', { hit_key: key, hit_limit: limit, window_seconds: RATE_WINDOW_MS / 1000 })

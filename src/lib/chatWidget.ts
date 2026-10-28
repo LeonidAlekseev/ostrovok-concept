@@ -5,7 +5,7 @@ import type { Tone } from './view'
 /**
  * The widget of Эвал's answer in a hotel's chat: the block of the hotel page the question is about, in the feed.
  * - `noise` — «Шум и окружение»: the noise map by day and by night and the estimate at the facade to the street and to
- *   the yard (noise-estimate-v1) with its sources; the data are the ones the answer was told from.
+ *   the yard (noise-estimate-v2) with its sources; the data are the ones the answer was told from.
  * - `view` — «Вид из отеля»: the map of the lines of sight from the floor asked (the top one when none is), turned to
  *   the side of what is asked, with the verdicts; the lines themselves are read from the page's route
  *   (`GET /api/hotels/<id>/view`), the places the answer looked up besides the page's are in `places`.

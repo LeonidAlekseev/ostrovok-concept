@@ -19,7 +19,7 @@ import { anonClient, catalogCached, readOrNull, warnShort, type AnonClient, type
 
 /**
  * «Шум и окружение» of a real hotel for its page and for Эвал (`HotelNoise`): the EEA bands at its facade by layer
- * (`hotel_noise_facade`) and the loud places of the OSM cache around it (`osm_places_near`), and the noise around it for the
+ * (`hotel_noise_facade`) and the loud places of the OSM cache around it (`osm_places_near_facade`), and the noise around it for the
  * map: the day estimate of the pieces of `hotel_noise_day`, the Lnight contours of `hotel_geo_features` and the quiet of
  * `hotel_noise_quiet`, computed ahead into `hotel_noise_maps` (`hotel_noise_map`) and computed now only for a point
  * without one. Read with the anon key and cached with the catalogue; a synthetic hotel, a database without the
@@ -40,7 +40,7 @@ const nearPlace = z.object({
 const nearAnswer = z.object({ covered: z.array(z.string()), places: z.array(z.unknown()) })
 
 /**
- * The loud places of an `osm_places_near` answer, nearest first; a place of several categories is listed once, under
+ * The loud places of an `osm_places_near_facade` answer, nearest first; a place of several categories is listed once, under
  * the first of them in `NOISY_CATEGORIES` (a bar that serves food is a bar). None, with no category covered, for an answer it cannot read.
  */
 export function placesOf(answer: unknown): Pick<HotelNoise, 'places' | 'placesCovered'> {
@@ -73,7 +73,7 @@ const readNoise = catalogCached(
     const db = anonClient()
     const [facade, near] = await Promise.all([
       db.rpc('hotel_noise_facade', { lat, lon }),
-      db.rpc('osm_places_near', {
+      db.rpc('osm_places_near_facade', {
         lat,
         lon,
         radius_m: NOISY_RADIUS_M,

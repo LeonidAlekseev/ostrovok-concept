@@ -1,11 +1,11 @@
 // Derives the hotels' features for Эвал: the building at each real hotel (`public.hotel_geo`) and the noise at its facade
-// (`public.hotel_noise_facade` and the estimate of noise-estimate-v1 with the loud OSM places), with
+// (`public.hotel_noise_facade` and the estimate of noise-estimate-v2 with the loud OSM places), with
 // their provenance (the datasets, the sources and the bounds of the height and the floors), into
 // `hotel_features`, the views of its room groups, one per `room_group_id` (the names of `ota_hotels.static_vm.room_groups`) into
 // `hotel_room_views`, and the noise map around each hotel computed ahead into `hotel_noise_maps` (the day pieces, the
 // quiet and the Lnight contours: too slow to compute on every request, see 20261027210000_hotel_noise_maps.sql).
 // And the store of claims (src/lib/claimRows.ts, scripts/lib/claims-store.ts): EEA's bands at each hotel and the day
-// estimate from them, the estimate of noise-estimate-v1 at the facade (`noise.estimate.*`), the loud OSM places within 200 m, the pharmacies, shops, hospitals, stops, beaches and parks
+// estimate from them, the estimate of noise-estimate-v2 at the facade (`noise.estimate.*`), the loud OSM places within 200 m, the pharmacies, shops, hospitals, stops, beaches and parks
 // within 1 km (Ostrovok's places first), the nearest building of EUBUCCO, the facts of the hotels' pages (the year built, the
 // rooms), the views the names of the room types tell of, the guests' reviews and their words about
 // noise and quiet, each with its evidence, calculation and the confidence of src/lib/confidence.ts. Copies no raw data: only the derived values and the reference to the source. Run it after every reload of the
@@ -50,7 +50,7 @@ const dryRun = options['dry-run']
 
 const PAGE = 1000
 const BATCH = 200
-/** Hotels at a time, three calls each (`hotel_geo` and two `osm_places_near`): eight outlast the 8 s statement timeout. */
+/** Hotels at a time, three calls each (`hotel_geo` and two of the places): eight outlast the 8 s statement timeout. */
 const PARALLEL = 4
 /**
  * Noise maps computed at a time: one. Each intersects the EEA polygons for a second or so (2.1 s at most alone, 220
@@ -143,7 +143,7 @@ for (let i = 0; i < hotels.length; i += PARALLEL) {
       const [geo, facade, places, everyday] = await Promise.all([
         supabase.rpc('hotel_geo', { lat: hotel.lat, lon: hotel.lon }),
         supabase.rpc('hotel_noise_facade', { lat: hotel.lat, lon: hotel.lon }),
-        supabase.rpc('osm_places_near', {
+        supabase.rpc('osm_places_near_facade', {
           lat: hotel.lat,
           lon: hotel.lon,
           radius_m: near.radiusM,
@@ -160,7 +160,7 @@ for (let i = 0; i < hotels.length; i += PARALLEL) {
       ])
       if (geo.error) throw new Error(`hotel_geo: ${geo.error.message}`)
       if (facade.error) throw new Error(`hotel_noise_facade: ${facade.error.message}`)
-      if (places.error) throw new Error(`osm_places_near: ${places.error.message}`)
+      if (places.error) throw new Error(`osm_places_near_facade: ${places.error.message}`)
       if (everyday.error) throw new Error(`osm_places_near: ${everyday.error.message}`)
       const data = (geo.data ?? {}) as HotelGeo & { noise?: unknown }
       const { bands, estimate } = estimateOf(facade.data, places.data)
