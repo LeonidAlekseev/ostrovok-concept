@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { tileHotel } from '../lib/catalog'
 import { newHotels } from '../lib/catalogGenerator'
 import { PERSONAS, personaHotels } from '../lib/personas'
-import { allHotels } from '../test/catalog'
+import { valenciaHotels } from '../test/catalog'
 import { HomePage } from './HomePage'
 
 // The globe needs a canvas, which jsdom does not have; the tests check the sections.
@@ -13,7 +13,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
 const selections = PERSONAS.map((persona) => ({
   persona,
-  hotels: personaHotels(allHotels(), persona).map(tileHotel),
+  hotels: personaHotels(valenciaHotels(), persona).map(tileHotel),
 }))
 
 // home-page, Requirement: Состав и порядок секций

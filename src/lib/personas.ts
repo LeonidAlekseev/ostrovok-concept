@@ -12,7 +12,10 @@ export const PERSONA_LABEL: Record<Persona, string> = {
 }
 
 /** Hotels of one persona's selection. */
-export const PERSONA_HOTELS = 6
+export const PERSONA_HOTELS = 3
+
+/** The only city of the selections: the one whose catalogue is real. */
+export const PERSONA_CITY = 'valencia'
 
 /** Which hotels suit a persona, and which of them come first. */
 const RULES: Record<Persona, { fits: (h: Hotel) => boolean; order: (a: Hotel, b: Hotel) => number }> = {
@@ -23,18 +26,13 @@ const RULES: Record<Persona, { fits: (h: Hotel) => boolean; order: (a: Hotel, b:
 }
 
 /**
- * The persona's selection: the hotels that suit it in its order, one a city, up to `PERSONA_HOTELS`;
+ * The persona's selection: the hotels of `PERSONA_CITY` that suit it in its order, up to `PERSONA_HOTELS`;
  * ties keep the catalogue order, so the same catalogue gives the same selection.
  */
 export function personaHotels(hotels: readonly Hotel[], persona: Persona): Hotel[] {
   const { fits, order } = RULES[persona]
-  const cities = new Set<string>()
-  const picks: Hotel[] = []
-  for (const hotel of hotels.filter(fits).toSorted(order)) {
-    if (picks.length >= PERSONA_HOTELS) break
-    if (cities.has(hotel.destinationId)) continue
-    cities.add(hotel.destinationId)
-    picks.push(hotel)
-  }
-  return picks
+  return hotels
+    .filter((h) => h.destinationId === PERSONA_CITY && fits(h))
+    .toSorted(order)
+    .slice(0, PERSONA_HOTELS)
 }
