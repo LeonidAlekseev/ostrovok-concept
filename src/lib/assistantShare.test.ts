@@ -6,6 +6,7 @@ import {
   SHARED_PHOTO_BUCKET,
   SHARE_ERROR,
   UNSHARE_ERROR,
+  deleteChatShares,
   deleteShare,
   isShareId,
   loadSharedChat,
@@ -70,6 +71,7 @@ describe('a shared chat', () => {
     // The id of the snapshot is made in the browser: its photos are copied under it first.
     expect(c.insert).toHaveBeenCalledWith({
       id: expect.stringMatching(UUID),
+      chat_id: chat.id,
       title: 'Тихий отель',
       snapshot: snapshotOf(chat),
     })
@@ -250,5 +252,37 @@ describe('deleting a shared chat', () => {
     const { c } = owner()
     await deleteShare(c as never, 'not-an-id')
     expect(c.from).not.toHaveBeenCalled()
+  })
+})
+
+describe('deleteChatShares', () => {
+  it('deletes every snapshot of the chat with its photos (Scenario: Удаление чата со снимком)', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const ids = ['0b0c7a1e-6f2b-4b5e-9a37-0c6f1b2d3e4f', '1b0c7a1e-6f2b-4b5e-9a37-0c6f1b2d3e4f']
+    const chatEq = vi.fn(async () => ({ data: ids.map((id) => ({ id })), error: null }))
+    const deletedEq = vi.fn(async () => ({ error: null }))
+    const bucket = {
+      list: vi.fn(async () => ({ data: [], error: null })),
+      remove: vi.fn(async () => ({ error: null })),
+    }
+    const c = {
+      from: vi.fn(() => ({
+        select: () => ({ eq: chatEq, then: (f: (v: unknown) => unknown) => f({ data: [], error: null }) }),
+        delete: () => ({ eq: deletedEq }),
+      })),
+      auth: { getSession: async () => ({ data: { session: { user: { id: 'u1' } } } }) },
+      storage: { from: vi.fn(() => bucket) },
+    }
+    await deleteChatShares(c as never, 'chat-1')
+    expect(chatEq).toHaveBeenCalledWith('chat_id', 'chat-1')
+    expect(deletedEq.mock.calls.map((a) => (a as unknown[])[1])).toEqual(ids)
+    warn.mockRestore()
+  })
+
+  it('throws when the snapshots are not read', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const c = { from: () => ({ select: () => ({ eq: async () => ({ data: null, error: { message: 'denied' } }) }) }) }
+    await expect(deleteChatShares(c as never, 'chat-1')).rejects.toThrow(UNSHARE_ERROR)
+    warn.mockRestore()
   })
 })

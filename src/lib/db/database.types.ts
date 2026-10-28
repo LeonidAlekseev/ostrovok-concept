@@ -5,6 +5,7 @@ export type Database = {
     Tables: {
       assistant_chat_shares: {
         Row: {
+          chat_id: string | null
           created_at: string
           id: string
           snapshot: NonNullable<Json>
@@ -13,6 +14,7 @@ export type Database = {
         }
         ComputedFields: never
         Insert: {
+          chat_id?: string | null
           created_at?: string
           id?: string
           snapshot: NonNullable<Json>
@@ -20,6 +22,7 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          chat_id?: string | null
           created_at?: string
           id?: string
           snapshot?: NonNullable<Json>

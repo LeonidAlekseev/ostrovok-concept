@@ -14,7 +14,7 @@ export { SHARED_PHOTO_BUCKET }
  * user shares, with their session (RLS: their own rows); anyone reads one snapshot by id through the
  * `assistant_chat_share` function. Until the migration is applied, sharing fails with `SHARE_ERROR`. The photos of
  * the chat are copied to the public bucket `SHARED_PHOTO_BUCKET` under the snapshot's id, so anyone with the link
- * sees them; deleting the chat leaves them, deleting the snapshot (`deleteShare`) removes them (src/lib/sharedPhotos.ts).
+ * sees them; deleting the snapshot (`deleteShare`) removes them, and deleting the chat deletes its snapshots (`deleteChatShares`) (src/lib/sharedPhotos.ts).
  */
 
 type Client = SupabaseClient<Database>
@@ -116,7 +116,12 @@ export async function shareChat(client: Client, chat: Chat): Promise<string> {
   const { snapshot, copied } = await sharePhotos(client, id, snapshotOf(chat))
   const { data, error } = await client
     .from('assistant_chat_shares')
-    .insert({ id, title: snapshot.title.slice(0, 200), snapshot: snapshot as unknown as NonNullable<Json> })
+    .insert({
+      id,
+      chat_id: chat.id,
+      title: snapshot.title.slice(0, 200),
+      snapshot: snapshot as unknown as NonNullable<Json>,
+    })
     .select('id')
     .single()
   if (error || !data) {
@@ -154,6 +159,19 @@ export async function deleteShare(client: Client, id: string): Promise<void> {
         return []
       })
   await removePhotos(client, [...new Set([...paths, ...orphans])])
+}
+
+/**
+ * Deletes the snapshots made of the chat, each with its photos. Throws on the first failure: the caller tells it and
+ * goes on with the chat's own deletion.
+ */
+export async function deleteChatShares(client: Client, chatId: string): Promise<void> {
+  const { data, error } = await client.from('assistant_chat_shares').select('id').eq('chat_id', chatId)
+  if (error) {
+    console.warn(`assistant_chat_shares: ${error.message.slice(0, 200)}`)
+    throw new Error(UNSHARE_ERROR)
+  }
+  for (const { id } of data ?? []) await deleteShare(client, id)
 }
 
 /** The shared chat of the id; `null` for an unknown or malformed id, or when the snapshots are unavailable. */

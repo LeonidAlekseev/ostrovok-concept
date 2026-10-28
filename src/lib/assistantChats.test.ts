@@ -6,6 +6,7 @@ import {
   chatTitle,
   dialogOf,
   hotelChatOf,
+  isPending,
   lastPhotoMessage,
   loadGuestChats,
   mergeServerMessage,
@@ -328,5 +329,46 @@ describe('mergeServerMessage', () => {
       createdAt: '2026-10-28T12:00:00Z',
     }
     expect(mergeServerMessage(before, user, true)).toBe(before)
+  })
+})
+
+// assistant-search, Requirement: История чатов
+describe('a step left pending by a lost write', () => {
+  const orphan = () => [
+    message('user', 'Привет'),
+    message('agent', '', { status: 'pending', data: { step: { agent: 'trips', title: 'Смотрю бронирования' } } }),
+    message('assistant', 'Готово'),
+  ]
+
+  it('does not make the chat wait (Scenario: Осиротевший шаг)', () => {
+    expect(isPending(chatWith('2026-10-28T10:00:00Z', ...orphan()))).toBe(false)
+  })
+
+  it('still waits for a pending answer', () => {
+    const chat = chatWith(
+      '2026-10-28T10:00:00Z',
+      message('user', 'Привет'),
+      message('assistant', '', { status: 'pending' }),
+    )
+    expect(isPending(chat)).toBe(true)
+  })
+
+  it('reads as a failed step when the chat is loaded', () => {
+    const chat = parseChat(JSON.parse(JSON.stringify(chatWith('2026-10-28T10:00:00Z', ...orphan()))))
+    expect(chat?.messages.map((m) => m.status)).toEqual(['done', 'failed', 'done'])
+  })
+
+  it('stays pending while the answer is pending', () => {
+    const waiting = chatWith(
+      '2026-10-28T10:00:00Z',
+      message('user', 'Привет'),
+      message('agent', '', { status: 'pending', data: { step: { agent: 'trips', title: 'Смотрю' } } }),
+      message('assistant', '', { status: 'pending' }),
+    )
+    expect(parseChat(JSON.parse(JSON.stringify(waiting)))?.messages.map((m) => m.status)).toEqual([
+      'done',
+      'pending',
+      'pending',
+    ])
   })
 })
