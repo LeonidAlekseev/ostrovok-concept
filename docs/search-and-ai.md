@@ -1,6 +1,6 @@
 # Поиск и ИИ
 
-Режимы поиска, поиск по смыслу, провайдер и модели NVIDIA.
+Режимы поиска, поиск по смыслу, провайдеры и модели (GigaChat, NVIDIA).
 
 ## Режимы поиска
 
@@ -11,7 +11,7 @@
   атмосферу поездки и предлагает три варианта; выбранный открывает страницу результатов `/search`
   с его городом, датами и гостями (`src/lib/assistant.ts`). Сообщение читает языковая модель через `POST /api/assistant`
   (Vercel AI SDK, `src/lib/ai/`; см. [«Модели»](#модели)).
-  Без `NVIDIA_API_KEY`, при ошибке, лимите (20 запросов в минуту с IP) или через 9 с — прежние правила по ключевым
+  Без ключей моделей, при ошибке, лимите (20 запросов в минуту с IP) или через 9 с — прежние правила по ключевым
   словам, без сообщения об ошибке. Сообщение — до 500 символов, история — до 20 сообщений. Когда все вопросы заданы,
   отели плана подбирает поиск по смыслу по всем словам путешественника в городах плана («тихий хостел с быстрым
   Wi‑Fi в Праге» — хостелы Праги); ответ с ним — до 15 с, клиент ждёт 16.
@@ -41,13 +41,25 @@
 
 ### Модели
 
-Все модели — через API NVIDIA (build.nvidia.com) с одним ключом `NVIDIA_API_KEY` (см. [«Ключи API»](secrets.md#ключи-api)); лимит ключа —
-40 запросов в минуту, дневного лимита нет. Общий запрос и ошибки — `src/lib/ai/nvidia.ts`.
+Эмбеддинги, реранк, фото и запасные текстовые модели — через API NVIDIA (build.nvidia.com) с одним ключом `NVIDIA_API_KEY`
+(см. [«Ключи API»](secrets.md#ключи-api)); лимит ключа — 40 запросов в минуту, дневного лимита нет. Общий запрос и ошибки —
+`src/lib/ai/nvidia.ts`. Первая текстовая модель — GigaChat Ultra (Сбер, ключ `GIGACHAT_AUTH_KEY`).
 
-- **Текстовые задачи** (помощник, `src/lib/ai/model.ts`, `understand.ts`) — цепочка `nvidia/nemotron-3.5-lightning-30b-a3b`
-  → `nvidia/nemotron-3.5-bolt-e4b` → `minimaxai/minimax-m3.1-flash`: следующая модель отвечает, если предыдущая
-  не уложилась в свой срок или ошиблась. Все — через OpenAI-совместимый `https://integrate.api.nvidia.com/v1` (`@ai-sdk/openai-compatible`). Рассуждения
-  выключены (`reasoning: 'none'` → `reasoning_effort: none`): иначе модель тратит на них время и токены ответа.
+- **Текстовые задачи** (помощник, `src/lib/ai/model.ts`, `understand.ts`) — цепочка `gigachat/GigaChat-3-Ultra` (4,5 с)
+  → `nvidia/nemotron-3.5-lightning-30b-a3b` → `nvidia/nemotron-3.5-bolt-e4b` → `minimaxai/minimax-m3.1-flash`: следующая модель
+  отвечает, если предыдущая не уложилась в свой срок, вернула 429, 5xx или ответ не по схеме. Без `GIGACHAT_AUTH_KEY`
+  цепочка начинается с `lightning`. Модели NVIDIA — через OpenAI-совместимый `https://integrate.api.nvidia.com/v1`
+  (`@ai-sdk/openai-compatible`). Рассуждения выключены (`reasoning: 'none'` → `reasoning_effort: none`): иначе модель тратит
+  на них время и токены ответа.
+- **GigaChat** (`src/lib/ai/gigachat.ts`) — `https://api.giga.chat/v1`, модель `GigaChat-3-Ultra` (имя из `GET /v1/models`;
+  «Ultra 3.5» в списке нет). Ключ `GIGACHAT_AUTH_KEY` (Basic) меняется на токен
+  `POST https://ngw.devices.sberbank.ru:9443/api/v2/oauth` (`scope=GIGACHAT_API_PERS`, `RqUID` на каждый запрос); токен живёт
+  30 мин, кешируется в процессе и обновляется за минуту до конца и после 401. Корневой сертификат НУЦ Минцифры
+  `certs/russian_trusted_root_ca.pem` (см. [«TLS»](docker.md#tls-сертификат-нуц-минцифры-gigachat)) подключается к запросам
+  GigaChat через свой `undici` Agent и работает без `NODE_EXTRA_CA_CERTS`; проверка TLS остальных запросов не меняется.
+  Модель не знает `tools`, `response_format: json_schema` и `reasoning_effort` (422): адаптер `fetch` превращает инструменты и
+  схему `Output.object` в `functions`/`function_call` и обратно, `reasoning_effort` убирает. Ответ не по схеме, 429 и 5xx
+  отдают запрос следующей модели. Цена и лимиты зависят от тарифа ключа в личном кабинете GigaChat; здесь не проверялись.
 - **Эмбеддинги** — `nvidia/nemotron-3.5-embed-1b` (`/v1/embeddings`, `input_type` query/passage, `truncate: END`).
   Свой адаптер в `src/lib/ai/embedding.ts`: провайдер AI SDK не передаёт `input_type`.
 - **Реранк** — `nvidia/nemotron-3.5-rerank-8b`

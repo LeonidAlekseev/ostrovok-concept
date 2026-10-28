@@ -34,7 +34,7 @@ docker compose up --build
 **Ресурсы.** Контейнер приложения (Next.js standalone, Node 24): около 1 CPU и 512 МБ RAM; образ ≈ TODO_IMAGE_SIZE. Сборка:
 2 CPU и 4 ГБ RAM, 3 ГБ диска, нужна сеть (каталог пререндерится из Supabase). Платформа `linux/amd64`.
 
-**Зависимости.** Docker с Compose v2. Внешние сервисы: облачный Supabase (Postgres, Auth, Storage) и NVIDIA API. Версии пакетов — `package-lock.json`.
+**Зависимости.** Docker с Compose v2. Внешние сервисы: облачный Supabase (Postgres, Auth, Storage), GigaChat и NVIDIA API. Версии пакетов — `package-lock.json`.
 
 **Переменные** (`.env`, подписи и источники — в `.env.example`):
 
@@ -99,15 +99,15 @@ GoTrue и Storage для входа и фото. Поэтому данные н�
 
 ## LLM
 
-Провайдер — **NVIDIA API** (build.nvidia.com, OpenAI-совместимый `https://integrate.api.nvidia.com/v1`), один ключ `NVIDIA_API_KEY`, лимит 40 запросов в минуту.
+Текст отвечает **GigaChat Ultra** (`GigaChat-3-Ultra`, Сбер, ключ `GIGACHAT_AUTH_KEY`), остальное и запасные текстовые модели — **NVIDIA API** (build.nvidia.com, ключ `NVIDIA_API_KEY`, лимит 40 запросов в минуту).
 
-| Задача                                | Модель                                                                                                    |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Текст (помощник, понимание пожелания) | `nvidia/nemotron-3.5-lightning-30b-a3b` → `nvidia/nemotron-3.5-bolt-e4b` → `minimaxai/minimax-m3.1-flash` |
-| Фото в чате                           | `nvidia/nemotron-3.5-super-vl-120b-a12b` → `minimaxai/minimax-m3.1-flash`                                 |
-| Эмбеддинги текста                     | `nvidia/nemotron-3.5-embed-1b`                                                                            |
-| Реранк                                | `nvidia/nemotron-3.5-rerank-8b`                                                                           |
-| Эмбеддинги фото                       | `nvidia/llama-nemotron-embed-vl-1b-v2`                                                                    |
+| Задача                                | Модель                                                                                                                                  |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Текст (помощник, понимание пожелания) | `gigachat/GigaChat-3-Ultra` → `nvidia/nemotron-3.5-lightning-30b-a3b` → `nvidia/nemotron-3.5-bolt-e4b` → `minimaxai/minimax-m3.1-flash` |
+| Фото в чате                           | `nvidia/nemotron-3.5-super-vl-120b-a12b` → `minimaxai/minimax-m3.1-flash`                                                               |
+| Эмбеддинги текста                     | `nvidia/nemotron-3.5-embed-1b`                                                                                                          |
+| Реранк                                | `nvidia/nemotron-3.5-rerank-8b`                                                                                                         |
+| Эмбеддинги фото                       | `nvidia/llama-nemotron-embed-vl-1b-v2`                                                                                                  |
 
 Цепочка `→`: следующая модель отвечает, если предыдущая не уложилась в срок или ошиблась. Без ключа или при сбое Эвал отвечает по правилам. Подробности — [docs/search-and-ai.md](docs/search-and-ai.md).
 
