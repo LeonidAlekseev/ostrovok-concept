@@ -185,10 +185,16 @@ describe('the view steps of a hotel question', () => {
       '• Море (берег в 4,4 км, азимут 110° (восток)): видно с 9-го этажа (ниже — возможно, закрыто: здание ≈ 40 м в 800 м от отеля может быть выше — до 43 м).',
     )
     expect(outcome.summary).toContain('Гость о виде (Анна): «Из окна видно море»')
-    expect(outcome.map?.points.map((p) => [p.label, p.category])).toEqual([
-      ['Hotel Turia', undefined],
-      ['Берег моря', 'море · видно с 9-го этажа'],
-    ])
+    // The map of the page's view comes as the widget: the lines are its own data, nothing looked up besides.
+    expect(outcome.map).toBeUndefined()
+    expect(outcome.widget).toEqual({
+      kind: 'view',
+      hotel,
+      floor: null,
+      date: '2026-06-21',
+      focus: ['sea'],
+      places: [],
+    })
   })
 
   it('checks the sunset of the date for every floor and from the floor asked', async () => {
@@ -198,6 +204,7 @@ describe('the view steps of a hotel question', () => {
       '• Закат 21 июня в 21:32, азимут 302° (северо-запад): не видно ни с одного этажа; с 3-го этажа — закрыто зданием ≈ 45 м в 300 м от отеля',
     )
     expect(outcome.summary).toContain('проверены этажи с 1-го по 12-й, отдельно — 3-й')
+    expect(outcome.widget).toMatchObject({ floor: 3, focus: ['sunset'] })
   })
 
   it('checks the sunrise when asked', async () => {
@@ -239,6 +246,12 @@ describe('the view steps of a hotel question', () => {
       /• «Hospital Clínico» \(больница, .*\): не видно ни с одного этажа — закрыто зданием ≈ 45 м/,
     )
     expect(outcome.steps.at(-1)).toMatchObject({ title: 'Проверяю, видно ли из окна: «Hospital Clínico»' })
+    // The place looked up is a dot of the widget with its verdict from the top floor and the buildings in the way.
+    expect(outcome.widget).toMatchObject({
+      focus: [],
+      places: [{ name: 'Hospital Clínico', lat: 39.48, lon: -0.37, tone: 'closed', verdict: 'закрыто' }],
+    })
+    expect(outcome.widget?.kind === 'view' && outcome.widget.places[0].blockers.length).toBeGreaterThan(0)
     const osm = await viewTurn(hotel, ask('Видна ли больница?'), options({ details: details({ nearby: [] }) }))
     expect(osm.steps.map((s) => s.title)).toContain('Ищу рядом с отелем: больница')
     expect(osm.summary).toContain('«Hospital La Fe»')

@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getHotel } from '@/lib/catalogGenerator'
 import type { HotelNoise as HotelNoiseData, NoiseMapIndicator } from '@/lib/noise'
-import { HotelNoise } from './HotelNoise'
+import { noiseWidget } from '@/lib/chatWidget'
+import { HotelNoise, NoiseAnswer } from './HotelNoise'
 import { HotelPage } from './HotelPage'
 
 vi.mock('next/navigation', () => ({
@@ -181,5 +182,20 @@ describe('HotelNoise', () => {
     render(<HotelPage hotel={hotel} />)
     expect(screen.queryByRole('heading', { level: 2, name: 'Шум и окружение' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Шум' })).toBeNull()
+  })
+})
+
+// assistant-geo, Requirement: Виджеты карт в ответе Эвала
+describe('NoiseAnswer', () => {
+  it('shows the noise map by day and by night with the estimate, the sources and the method', async () => {
+    render(<NoiseAnswer widget={noiseWidget(hotel, loud)} />)
+    const level = screen.getByRole('region', { name: 'Уровень шума у отеля' })
+    expect(within(level).getByRole('heading', { name: 'Окна во двор' })).toBeTruthy()
+    expect(within(level).getByText('55–60 дБ')).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Источники шума' })).toBeTruthy()
+    expect(screen.getByText('Как мы считаем')).toBeTruthy()
+    await waitFor(() => expect(screen.getByTestId('noise-map').textContent).toMatch('Lday 2'))
+    await userEvent.click(screen.getByRole('button', { name: 'Ночью' }))
+    expect(screen.getByTestId('noise-map').textContent).toMatch('Lnight')
   })
 })

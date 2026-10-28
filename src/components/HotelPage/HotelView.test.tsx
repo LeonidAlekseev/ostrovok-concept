@@ -5,7 +5,8 @@ import { getHotel } from '@/lib/catalogGenerator'
 import type { HotelDetails } from '@/lib/hotelDetails'
 import { RAY_BEARINGS, type HotelView as HotelViewData, type LineBlocker, type SightLine } from '@/lib/view'
 import { HotelPage } from './HotelPage'
-import { HotelView, LANDMARKS_SHOWN } from './HotelView'
+import type { ViewWidget } from '@/lib/chatWidget'
+import { HotelView, LANDMARKS_SHOWN, ViewAnswer } from './HotelView'
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
@@ -300,3 +301,54 @@ const emptyDetails: Omit<HotelDetails, 'building'> = {
   nearby: [],
   viewQuotes: [],
 }
+
+// assistant-geo, Requirement: Виджет вида в ответе Эвала
+describe('ViewAnswer', () => {
+  const widget = (over: Partial<ViewWidget> = {}): ViewWidget => ({
+    kind: 'view',
+    hotel: { id: hotel.id, name: hotel.name, lat: hotel.lat, lon: hotel.lon },
+    floor: 3,
+    date: '2026-06-21',
+    focus: ['sunset'],
+    places: [],
+    ...over,
+  })
+
+  it('turns the map to the sunset and tells it from the floor asked, with the page’s data', async () => {
+    render(<ViewAnswer widget={widget()} />)
+    const summary = await screen.findByRole('list', { name: 'Итог' })
+    expect(within(summary).getByText(/^Закат 21 июня в /)).toBeTruthy()
+    expect(within(summary).getByText(/^С 3-го этажа — /)).toBeTruthy()
+    expect(within(summary).queryByText(/^Море/)).toBeNull()
+    // The sunset of June is in the north-west: the map faces 315°.
+    await waitFor(() => expect(screen.getByTestId('view-map').textContent).toMatch(/^315 3 /))
+    expect(fetchMock).toHaveBeenCalledWith('/api/hotels/ota-1/view', expect.anything())
+    expect(screen.getByText('Как мы считаем')).toBeTruthy()
+  })
+
+  it('faces the sea when asked, the top floor when none is, and draws the places looked up', async () => {
+    const place = {
+      name: 'Hospital Clínico',
+      category: 'больница',
+      lat: 39.48,
+      lon: -0.37,
+      distanceM: 1200,
+      tone: 'closed' as const,
+      verdict: 'закрыто',
+      blockers: ['h1'],
+    }
+    render(<ViewAnswer widget={widget({ floor: null, focus: ['sea'], places: [place] })} />)
+    const summary = await screen.findByRole('list', { name: 'Итог' })
+    expect(within(summary).getByText('Море, берег в 4,4 км')).toBeTruthy()
+    expect(within(summary).getByText('С 12-го этажа — видно')).toBeTruthy()
+    const map = screen.getByTestId('view-map')
+    await waitFor(() => expect(map.textContent).toMatch(/^90 3 \[[^\]]*h1\]/))
+    expect(within(map).getByText('Hospital Clínico: закрыто (линия)')).toBeTruthy()
+  })
+
+  it('says there is no map without the page’s data: the answer’s text stays', async () => {
+    fetchMock.mockImplementation(async () => Response.json({ view: null, map: null }))
+    render(<ViewAnswer widget={widget()} />)
+    expect(await screen.findByText('Карты вида нет: линии взгляда не загрузились.')).toBeTruthy()
+  })
+})

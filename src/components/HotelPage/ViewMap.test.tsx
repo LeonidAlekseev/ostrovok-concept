@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { HOTEL_MAP_ZOOM } from './hotelMap'
 import ViewMap, { type MapTarget } from './ViewMap'
 
 // jsdom has no WebGL: a stand-in map that puts markers and popups into its container.
@@ -10,7 +11,7 @@ const mapMock = vi.hoisted(() => ({
   hidden: [] as string[],
   data: {} as Record<string, unknown>,
   rotation: [] as string[],
-  fit: [] as { bounds: unknown; options: unknown }[],
+  eased: [] as Record<string, unknown>[],
 }))
 vi.mock('maplibre-gl', () => {
   type Handler = () => void
@@ -56,9 +57,8 @@ vi.mock('maplibre-gl', () => {
     off() {
       return this
     }
-    easeTo() {}
-    fitBounds(bounds: unknown, options: unknown) {
-      mapMock.fit.push({ bounds, options })
+    easeTo(options: Record<string, unknown>) {
+      mapMock.eased.push(options)
     }
     setFilter() {}
     setPaintProperty() {}
@@ -160,13 +160,12 @@ describe('ViewMap', () => {
     ).toBe('rgb(220, 38, 38)')
   })
 
-  it('fits the hotel and every dot, a far one without a line too', async () => {
+  it('opens round the hotel at the noise map’s zoom, a far dot beyond the edge', async () => {
     renderMap()
     await within(screen.getByRole('region', { name: 'Карта вида из отеля' })).findAllByRole('button')
-    await waitFor(() => expect(mapMock.fit.length).toBeGreaterThan(0))
-    // The dots span 0.0099° × 0.0065° of the hotel; the box has 30 % of the larger span round them.
-    const [[west, south], [east, north]] = mapMock.fit.at(-1)!.bounds as [[number, number], [number, number]]
-    expect([west, south, east, north].map((n) => Math.round(n * 1e4) / 1e4)).toEqual([-0.3829, 39.4705, -0.367, 39.483])
+    await waitFor(() => expect(mapMock.eased.length).toBeGreaterThan(0))
+    expect(mapMock.options.at(-1)).toMatchObject({ zoom: HOTEL_MAP_ZOOM })
+    expect(mapMock.eased.at(-1)).toMatchObject({ center: [-0.3799, 39.4735], zoom: HOTEL_MAP_ZOOM, bearing: 0 })
   })
 
   it('names the place, its kind, distance and verdict on hover, and on press by click or keyboard', async () => {
