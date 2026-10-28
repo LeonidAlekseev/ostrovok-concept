@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Fragment, useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react'
-import { ArrowDown, Car, CheckCheck, ChevronRight, Eye, MapPin, RotateCcw, Search, TriangleAlert } from 'lucide-react'
+import { ArrowDown, CheckCheck, ChevronRight, Eye, MapPin, RotateCcw, Search, TriangleAlert } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -337,7 +337,7 @@ function PlanView({ plan, onChoose }: PlanProps) {
         </BubbleContent>
       </Bubble>
       <HotelRow plan={plan} full={state.status === 'done' ? full : undefined} onChoose={onChoose} />
-      <PlanComment plan={plan} full={full} />
+      <PlanComment plan={plan} />
       {plan.overBudget && (
         <p className="px-1 text-sm/[normal] text-muted-foreground">
           В бюджет не уложился — показал самые близкие варианты. Можно сократить поездку.
@@ -451,11 +451,9 @@ function OptionCard({ option, full, plan, onChoose }: OptionCardProps) {
   )
 }
 
-/** «Парковка», «Номера с видом на море»: at most two real features of the hotel, none without data. */
-function featureLines(option: AssistantOption, hotel: Hotel | undefined): { icon: typeof Car; text: string }[] {
-  const lines: { icon: typeof Car; text: string }[] = []
-  if (hotel?.amenities.includes('parking')) lines.push({ icon: Car, text: 'Парковка' })
-  else if (hotel?.amenities.includes('parking-nearby')) lines.push({ icon: Car, text: 'Парковка рядом' })
+/** «Номера с видом на море»: the real features of the hotel, none without data. The parking is not told unasked. */
+function featureLines(option: AssistantOption): { icon: typeof Eye; text: string }[] {
+  const lines: { icon: typeof Eye; text: string }[] = []
   const view = option.views?.[0]
   // The view is of some room types, as their names say; a reason of the wish for a view tells it already.
   const told = option.reasons?.some((reason) => reason.includes(' вид'))
@@ -464,12 +462,12 @@ function featureLines(option: AssistantOption, hotel: Hotel | undefined): { icon
 }
 
 /**
- * Eval's word after the cards: a line a hotel — its name, why it fits, its real features and «выше бюджета» over the
+ * Eval's word after the cards: a line a hotel — its name, why it fits, its view and «выше бюджета» over the
  * traveller's budget. A hotel with nothing to tell has no line; with no lines there is no message.
  */
-function PlanComment({ plan, full }: { plan: Plan; full: ReadonlyMap<string, Hotel> }) {
+function PlanComment({ plan }: { plan: Plan }) {
   const lines = plan.options.flatMap((option) => {
-    const features = featureLines(option, option.hotel && full.get(option.hotel.id))
+    const features = featureLines(option)
     const reasons = option.reasons ?? []
     if (reasons.length === 0 && features.length === 0 && option.fitsBudget) return []
     return [{ option, reasons, features }]
