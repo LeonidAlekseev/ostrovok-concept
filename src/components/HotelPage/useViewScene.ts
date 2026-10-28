@@ -110,16 +110,18 @@ export function useViewScene(
         line: t === sidePoint || inView.some(({ target }) => target === t),
       }
     }),
-    ...places.map((p) => ({
-      name: p.name,
-      category: p.category,
-      lat: p.lat,
-      lon: p.lon,
-      distanceM: p.distanceM,
-      tone: p.tone,
-      verdict: p.verdict,
-      line: true,
-    })),
+    ...places
+      .filter((p) => !dots.some((t) => t.name === p.name && t.lat === p.lat && t.lon === p.lon))
+      .map((p) => ({
+        name: p.name,
+        category: p.category,
+        lat: p.lat,
+        lon: p.lon,
+        distanceM: p.distanceM,
+        tone: p.tone,
+        verdict: p.verdict,
+        line: true,
+      })),
   ]
   const blockers = [
     ...sunBlockers(sunsetSun?.ray, eyeM),
