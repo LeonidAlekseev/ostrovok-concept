@@ -175,9 +175,6 @@ function sunriseLine(view: HotelView, hotel: LatLon, date: string, floor: number
   return `• Восход ${dayOf(date)} в ${localTime(sunrise.at)}, азимут ${bearingLabel(sunrise.azimuth)}: ${reachLabel(reach)}${why({ line: ray?.line ?? null, angle: 1, reach }, view.window, floor)} (солнце на высоте ${SUN_CHECK_ALTITUDE_DEG}°).`
 }
 
-const NOTE =
-  'Это оценка по высотам зданий EUBUCCO (обычно — оценка модели) без деревьев и рельефа; с какого этажа и на какую сторону смотрит окно номера, неизвестно — проверяю каждый этаж, будто окно смотрит на место. Подробнее — в разделе «Вид из отеля» на странице отеля.'
-
 /** The view steps of a hotel's question about the view from its windows. */
 export async function viewTurn(
   hotel: GeoHotel & { id: string },
@@ -244,7 +241,11 @@ export async function viewTurn(
 
   const lower = text.toLocaleLowerCase('ru')
   const named = view.landmarks.filter((t) => lower.includes(t.name.toLocaleLowerCase('ru')))
-  for (const target of named) checked.push(fromTarget(target, view.window))
+  for (const target of named) {
+    const c = fromTarget(target, view.window)
+    checked.push(c)
+    lookedUp.push(c)
+  }
 
   const kinds = questionCategories(text).filter((c) => c !== 'sea' && c !== 'beach')
   const query = named.length || kinds.length || wantsSea || wantsSunset || wantsSunrise ? null : placeQuery(text)
@@ -335,6 +336,7 @@ export async function viewTurn(
           ? countRu(sightLines.filter(Boolean).length, ['линия взгляда', 'линии взгляда', 'линий взгляда'])
           : 'не удалось проверить',
       })
+      const before = lookedUp.length
       found.forEach((f, i) => {
         const line: SightLine | null = sightLines?.[i] ?? null
         lookedUp.push({
@@ -346,7 +348,7 @@ export async function viewTurn(
           reach: reachOf(line, view.window),
         })
       })
-      checked.push(...lookedUp)
+      checked.push(...lookedUp.slice(before))
     } else if (kinds.length) lines.push(`• ${capital(kinds.map((k) => CATEGORY[k].label).join(', '))}: рядом не нашёл.`)
   }
 
@@ -372,7 +374,6 @@ export async function viewTurn(
     ...lines,
     ...placeLines,
     ...(quote ? [`Гость о виде: «${quote.text}»`] : []),
-    NOTE,
   ].join('\n')
 
   // The widget's map: the lines of the page's data are read by the widget, the places looked up come with it.
