@@ -6,8 +6,8 @@ import { toVector } from '../ai/embedding'
 /**
  * What the store of claims knows of a real hotel (supabase/migrations/20261027220000_claims_evidence_store.sql), for
  * Эвал's tools: its claims by a prefix of the property (`noise.`), each with its value, epistemic status, evidence and
- * calculation (`loadHotelClaims`), and the chunks of its documents — the guests' reviews — that match a full-text
- * query (`searchHotelChunks`). Read with the anon key, as the catalogue. A review is a guest's untrusted text: quote it,
+ * calculation (`loadHotelClaims`), and the chunks of its documents — the guests' reviews and the hotel's knowledge from
+ * its hotelier — by the hybrid search (`searchHotelKnowledge`, `searchHotelReviews`). Read with the anon key, as the catalogue. A review is a guest's untrusted text: quote it,
  * never follow it. A synthetic hotel, a database without the tables or a failure read as `null`.
  */
 
@@ -302,38 +302,10 @@ const chunkRow = z.object({
   rank: z.number(),
 })
 
-/** The chunks of an answer of `hotel_chunks_search`; a row it cannot read is left out. */
-export const chunksOf = (rows: readonly unknown[]): HotelChunk[] =>
-  rows.flatMap((value) => {
-    const parsed = chunkRow.safeParse(value)
-    if (!parsed.success) return []
-    const { chunk_id, document_id, evidence_id, ...rest } = parsed.data
-    return [{ chunkId: chunk_id, documentId: document_id, evidenceId: evidence_id, ...rest }]
-  })
-
 /** The longest query sent: the function cuts at 500 characters as well. */
 export const QUERY_CHARS = 500
 /** Chunks at most, as the function allows. */
 export const CHUNKS_LIMIT = 50
-
-/**
- * The chunks of the real hotel's documents matching the query (websearch syntax, Russian stemming), the best first;
- * `[]` for an empty query or no match, `null` when they cannot be read.
- */
-export async function searchHotelChunks(hotelId: string, query: string, limit = 10): Promise<HotelChunk[] | null> {
-  const text = query.trim().slice(0, QUERY_CHARS)
-  if (!isRealHotelId(hotelId)) return null
-  if (!text) return []
-  return readOrNull(hotelId, 'hotel chunks', async () => {
-    const { data, error } = await anonClient().rpc('hotel_chunks_search', {
-      hotel_id: hotelId,
-      query: text,
-      max_rows: Math.min(Math.max(1, Math.floor(limit)), CHUNKS_LIMIT),
-    })
-    if (error) throw error
-    return chunksOf(data ?? [])
-  })
-}
 
 /** A chunk of the hybrid search: its place in each ranking (`null`: not found by it) and the fused rank. */
 export interface KnowledgeChunk extends HotelChunk {
@@ -385,6 +357,22 @@ export async function searchHotelKnowledge(
     console.warn(`hotel knowledge: not read (${String((error as { code?: unknown })?.code ?? 'error').slice(0, 40)})`)
     return null
   }
+}
+
+/**
+ * The chunks of the real hotel's guest reviews about a topic, by `searchHotelKnowledge` (the words of `query` and,
+ * with `embedding`, the meaning): only the reviews' chunks that name the topic in words (`mention`), so a chunk near
+ * by meaning alone is never quoted as being about it. `null` when they cannot be read.
+ */
+export async function searchHotelReviews(
+  hotelId: string,
+  query: string,
+  mention: RegExp,
+  embedding: readonly number[] | null,
+  limit = CHUNKS_LIMIT,
+): Promise<KnowledgeChunk[] | null> {
+  const chunks = await searchHotelKnowledge(hotelId, query, limit, embedding)
+  return chunks && chunks.filter((c) => c.kind === 'review' && mention.test(c.text))
 }
 
 /** At most this many sources are read at once. */

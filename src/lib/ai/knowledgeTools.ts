@@ -5,7 +5,7 @@ import { isRealHotelId } from '../db/anon'
 import {
   loadEvidence,
   loadHotelClaims,
-  searchHotelChunks,
+  searchHotelReviews,
   type ClaimEvidence,
   type HotelChunk,
   type HotelClaim,
@@ -16,6 +16,7 @@ import { countRu, formatDecimal, formatMeters } from '../format'
 import { CATEGORY } from '../geo/categories'
 import { distanceLabel } from '../hotelDetails'
 import { NOISE_ESTIMATE_METHOD, dayLabel } from '../noise'
+import { queryVectorOrNull } from './semantic'
 import {
   MAX_CALCULATIONS,
   MAX_CLAIMS,
@@ -100,8 +101,9 @@ export const REVIEW_TOPIC_LABEL: Record<ReviewTopic, string> = {
 }
 
 /**
- * The words of each topic in websearch syntax: the Russian stemming does not take «шумно» to «шум», so the forms are
- * asked one by one (`NOISE_MENTION` of src/lib/claimRows.ts is the same list as a pattern).
+ * The words of each topic in websearch syntax for the full-text part of the search: the Russian stemming does not take
+ * «шумно» to «шум», so the forms are asked one by one (`NOISE_MENTION` of src/lib/claimRows.ts is the same list as a
+ * pattern). The meaning part embeds the topic's label (`REVIEW_TOPIC_LABEL`).
  */
 export const REVIEW_QUERY: Record<ReviewTopic, string> = {
   noise: ['шум', 'шумно', 'шумный', 'тихо', 'тихий', 'тишина', 'громко', 'слышно', 'звукоизоляция'].join(' or '),
@@ -112,7 +114,7 @@ export const REVIEW_QUERY: Record<ReviewTopic, string> = {
   location: ['расположение', 'район', 'центр', 'метро', 'рядом', 'близко', 'пешком'].join(' or '),
 }
 
-/** The words of a topic in a sentence: the excerpt is cut around the first. */
+/** The words of a topic in a sentence: a chunk without them is not quoted, its excerpt is cut around the first. */
 const TOPIC_MENTION: Record<ReviewTopic, RegExp> = {
   noise: NOISE_MENTION,
   cleanliness: /(?<!\p{L})(?:чист|грязн|грязь|убор|убира)\p{L}*/iu,
@@ -640,17 +642,19 @@ export function reviewsResult({ topic, candidates, chosen }: ReviewsInput, revie
     summary: `${REVIEW_TOPIC_LABEL[topic]}: ${countRu(found, ['фрагмент', 'фрагмента', 'фрагментов'])} отзывов у ${ofHotels(chosen.length)}`,
     data: { topic, found },
     method: {
-      name: 'Поиск по тексту отзывов гостей со страниц Островка',
-      version: '1',
+      name: 'Поиск по словам и по смыслу в отзывах гостей со страниц Островка',
+      version: '2',
       inputs: [
         { label: 'Тема', value: REVIEW_TOPIC_LABEL[topic] },
         { label: 'Слова', value: REVIEW_QUERY[topic].split(' or ').join(', ') },
+        { label: 'Смысл', value: REVIEW_TOPIC_LABEL[topic] },
       ],
       assumptions: [`Не больше ${REVIEWS_PER_HOTEL} фрагментов на отель, из разных отзывов`],
     },
     limitations: [
       'Отзывы — слова отдельных гостей, а не измерение',
-      'Поиск по словам: отзыв о теме другими словами не найдётся',
+      'Показаны фрагменты, где тема названа словами: отзыв о ней совсем другими словами не попадёт',
+      'Без модели векторов поиск идёт только по словам',
     ],
   })
 }
@@ -696,11 +700,12 @@ export async function runNearTool(input: NearInput, index: readonly NearRow[] | 
 /** Runs «Отзывы» for the chosen hotels; never throws. */
 export async function runReviewsTool(input: ReviewsInput): Promise<ToolResult> {
   try {
+    const vector = input.chosen.some(isRealHotelId) ? await queryVectorOrNull(REVIEW_TOPIC_LABEL[input.topic]) : null
     const read = await Promise.all(
       input.chosen.map(async (id) => {
         // A hotel not of the base of Островок has no reviews in the store.
         if (!isRealHotelId(id)) return [id, { chunks: [], sources: [] } as HotelReviews] as const
-        const chunks = await searchHotelChunks(id, REVIEW_QUERY[input.topic], REVIEWS_PER_HOTEL * 3)
+        const chunks = await searchHotelReviews(id, REVIEW_QUERY[input.topic], TOPIC_MENTION[input.topic], vector)
         const sources = chunks
           ? await loadEvidence(
               id,

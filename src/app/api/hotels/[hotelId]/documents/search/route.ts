@@ -1,24 +1,9 @@
 import type { NextRequest } from 'next/server'
 import { apiError, CDN_CACHE_HEADERS, loadVisibleHotel } from '@/lib/api'
 import { isRealHotelId } from '@/lib/db/anon'
-import { NVIDIA_KEY } from '@/lib/ai/nvidia'
-import { queryVector } from '@/lib/ai/semantic'
+import { queryVectorOrNull } from '@/lib/ai/semantic'
 import { loadEvidence, searchHotelKnowledge } from '@/lib/db/claims'
-import { getSecret } from '@/lib/secrets'
 import { NOT_FOUND_ERROR, SEARCH_QUERY_ERROR, STORE_ERROR, searchQuerySchema, type SearchResponse } from './schema'
-
-/** The query's vector waits this long at most: without it the search is by the words alone. */
-const VECTOR_MS = 4000
-
-/** The query's vector for the meaning part of the search; `null` without the key, on a failure or too late. */
-async function vectorOf(text: string): Promise<number[] | null> {
-  const key = await getSecret(NVIDIA_KEY).catch(() => undefined)
-  if (!key) return null
-  return Promise.race([
-    queryVector(key, text).catch(() => null),
-    new Promise<null>((resolve) => setTimeout(() => resolve(null), VECTOR_MS)),
-  ])
-}
 
 /**
  * The chunks of the documents of a real hotel — the guests' reviews and the hotel's knowledge from its hotelier — for
@@ -38,7 +23,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ hot
   if (!hotel || !isRealHotelId(hotel.id)) return apiError(404, NOT_FOUND_ERROR)
 
   const { q, limit } = query.data
-  const chunks = await searchHotelKnowledge(hotel.id, q, limit, await vectorOf(q))
+  const chunks = await searchHotelKnowledge(hotel.id, q, limit, await queryVectorOrNull(q))
   const evidence =
     chunks &&
     (await loadEvidence(

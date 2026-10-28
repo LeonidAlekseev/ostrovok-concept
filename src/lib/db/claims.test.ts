@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { chunksOf, claimsOf, likePrefix, loadHotelClaims, searchHotelChunks } from './claims'
+import { NOISE_MENTION } from '../claimRows'
+import { claimsOf, likePrefix, loadHotelClaims, searchHotelReviews } from './claims'
 
 /** The answers of the database by table or function, and what was asked. */
 const db = vi.hoisted(() => ({
@@ -143,40 +144,55 @@ describe('loadHotelClaims', () => {
   })
 })
 
-// hotel-knowledge, Requirement: Полнотекстовый поиск по отзывам
-describe('searchHotelChunks', () => {
-  const chunk = {
-    chunk_id: 'ch1',
+// hotel-knowledge, Requirement: Гибридный поиск по отзывам
+describe('searchHotelReviews', () => {
+  const row = (
+    chunk_id: string,
+    kind: string,
+    text: string,
+    fts_place: number | null,
+    vector_place: number | null,
+  ) => ({
+    chunk_id,
     document_id: 'd1',
     evidence_id: 'e2',
-    kind: 'review',
-    ord: 2,
-    text: 'По ночам слышно улицу.',
-    metadata: { part: 'minus' },
-    rank: 0.06,
-  }
-
-  it('asks the function for the hotel and reads the chunks', async () => {
-    db.answers.hotel_chunks_search = { data: [chunk, { chunk_id: 1 }], error: null }
-    expect(await searchHotelChunks('ota-1', '  шумно  ', 500)).toEqual([
-      {
-        chunkId: 'ch1',
-        documentId: 'd1',
-        evidenceId: 'e2',
-        kind: 'review',
-        ord: 2,
-        text: 'По ночам слышно улицу.',
-        metadata: { part: 'minus' },
-        rank: 0.06,
-      },
-    ])
-    expect(db.calls).toContainEqual(['rpc', 'hotel_chunks_search', { hotel_id: 'ota-1', query: 'шумно', max_rows: 50 }])
+    kind,
+    ord: 0,
+    text,
+    metadata: {},
+    rank: 0.03,
+    fts_place,
+    vector_place,
   })
 
-  it('is [] for an empty query and null for a synthetic hotel or a failure', async () => {
-    expect(await searchHotelChunks('ota-1', '   ')).toEqual([])
-    expect(await searchHotelChunks('h-1', 'шумно')).toBeNull()
-    expect(await searchHotelChunks('ota-1', 'шумно')).toBeNull()
-    expect(chunksOf([null])).toEqual([])
+  it('asks the hybrid search with the vector and keeps the reviews that name the topic', async () => {
+    db.answers.hotel_chunks_hybrid = {
+      data: [
+        row('c1', 'review', 'Хорошо, но шумно', null, 1),
+        row('c2', 'review', 'Прекрасно!!!!', null, 2),
+        row('c3', 'hotelier_answer', 'Со слов отельера, номера Premium: шум в номере — ночью тихо.', 1, 3),
+        row('c4', 'review', 'По ночам слышно улицу.', 2, null),
+      ],
+      error: null,
+    }
+    const found = await searchHotelReviews('ota-1', ' шум or шумно ', NOISE_MENTION, [0.6, 0.8])
+    expect(found?.map((c) => [c.chunkId, c.ftsPlace, c.vectorPlace])).toEqual([
+      ['c1', null, 1],
+      ['c4', 2, null],
+    ])
+    expect(db.calls).toContainEqual([
+      'rpc',
+      'hotel_chunks_hybrid',
+      { hotel_id: 'ota-1', query: 'шум or шумно', query_embedding: '[0.6,0.8]', max_rows: 50 },
+    ])
+  })
+
+  it('searches by the words alone without a vector, null for a synthetic hotel or a failure', async () => {
+    db.answers.hotel_chunks_hybrid = { data: [row('c4', 'review', 'По ночам слышно улицу.', 1, null)], error: null }
+    expect(await searchHotelReviews('ota-1', 'шумно', NOISE_MENTION, null, 5)).toHaveLength(1)
+    expect(db.calls).toContainEqual(['rpc', 'hotel_chunks_hybrid', { hotel_id: 'ota-1', query: 'шумно', max_rows: 5 }])
+    expect(await searchHotelReviews('h-1', 'шумно', NOISE_MENTION, null)).toBeNull()
+    delete db.answers.hotel_chunks_hybrid
+    expect(await searchHotelReviews('ota-1', 'шумно', NOISE_MENTION, null)).toBeNull()
   })
 })

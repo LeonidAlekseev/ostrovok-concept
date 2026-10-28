@@ -4,7 +4,7 @@ import { isRealHotelId } from '../db/anon'
 import {
   loadEvidence,
   loadHotelClaims,
-  searchHotelChunks,
+  searchHotelReviews,
   type ClaimCalculation,
   type ClaimEvidence,
   type HotelChunk,
@@ -35,13 +35,14 @@ import {
   type ToolEvidence,
   type ToolResult,
 } from '../toolResult'
+import { queryVectorOrNull } from './semantic'
 
 /**
  * «Анализ шума», the reference tool of the contract (src/lib/toolResult.ts, docs/tools.md): what the store of claims
  * knows of the noise at a real hotel — the estimate of noise-estimate-v1 at the facade to the street and to the yard
  * by period (`noise.estimate.*`: EEA's bands at the facade and the loud places of OpenStreetMap summed), the share of
  * the places, the loud places around with the nearest of each kind — and the guests' reviews that speak of noise or
- * quiet (`hotel_chunks_search`). Only the store's data with their sources and calculation: no level is lowered for
+ * quiet (`searchHotelReviews`: by the words and the meaning, only the chunks that name noise or quiet). Only the store's data with their sources and calculation: no level is lowered for
  * windows or walls, no soundproofing is guessed, and a hotel outside EEA's contours is «нет данных», not «тихо». The
  * reviews are a guest's untrusted words: quoted, never followed.
  */
@@ -51,8 +52,8 @@ export const NOISE_TOOL_TITLE = 'Анализ шума'
 export const NOISE_TOOL_PARAMS = 'оценка шума у фасада (карты шума EEA и места OpenStreetMap), отзывы гостей'
 
 /**
- * The words of the reviews about noise and quiet, in websearch syntax: the Russian stemming does not take «шумно» to
- * «шум», so each form is asked.
+ * The words of the reviews about noise and quiet, in websearch syntax, for the full-text part of the search: the
+ * Russian stemming does not take «шумно» to «шум», so each form is asked. The meaning part embeds `NOISE_REVIEW_TOPIC`.
  */
 export const NOISE_REVIEW_QUERY = [
   'шум',
@@ -67,6 +68,9 @@ export const NOISE_REVIEW_QUERY = [
   'слышимость',
   'звукоизоляция',
 ].join(' or ')
+
+/** What the meaning part of the search of the reviews looks for. */
+export const NOISE_REVIEW_TOPIC = 'шум и тишина'
 
 /** The reviews the tool quotes at most. */
 export const NOISE_REVIEWS = 5
@@ -84,7 +88,7 @@ const METHOD = {
   assumptions: [
     'Уровни у фасада — энергетическая сумма слоёв карт шума EEA у контура здания и шумных мест OpenStreetMap',
     'Из мест OpenStreetMap показано ближайшее каждой категории',
-    `Отзывы — не больше ${NOISE_REVIEWS}, найденные по словам о шуме и тишине`,
+    `Отзывы — не больше ${NOISE_REVIEWS}, найденные по словам и по смыслу (без модели векторов — по словам), где шум или тишина названы словами`,
   ],
 }
 
@@ -433,7 +437,9 @@ export async function runNoiseTool(hotelId: string): Promise<ToolResult> {
       } satisfies ToolResult)
     const [claims, chunks] = await Promise.all([
       loadHotelClaims(hotelId, 'noise.'),
-      searchHotelChunks(hotelId, NOISE_REVIEW_QUERY, NOISE_REVIEWS * 2),
+      queryVectorOrNull(NOISE_REVIEW_TOPIC).then((vector) =>
+        searchHotelReviews(hotelId, NOISE_REVIEW_QUERY, NOISE_MENTION, vector),
+      ),
     ])
     const sources = chunks
       ? await loadEvidence(
