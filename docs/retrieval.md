@@ -16,16 +16,46 @@
 Общий принцип: любая часть может не ответить (нет ключа, таймаут, пустая таблица). Тогда Эвал работает по правилам без
 модели и не показывает путешественнику ошибку; число, единицу измерения и источник в ответ кладёт код, а не языковая модель.
 
+## Оглавление
+
+- [1. KAG: граф знаний](#1-kag-граф-знаний)
+  - [Поток данных](#поток-данных)
+  - [Таблицы и функции](#таблицы-и-функции)
+  - [Схема таблиц](#схема-таблиц)
+  - [Уверенность: политика `confidence-1`](#уверенность-политика-confidence-1)
+  - [Методы расчёта](#методы-расчёта)
+  - [Как Эвал подбирает отели по характеристикам](#как-эвал-подбирает-отели-по-характеристикам)
+  - [Ограничения](#ограничения)
+- [2. RAG: фрагменты и гибридный поиск](#2-rag-фрагменты-и-гибридный-поиск)
+  - [Поток данных](#поток-данных-1)
+  - [Таблицы и функции](#таблицы-и-функции-1)
+  - [Модули](#модули)
+  - [Как фрагменты попадают в ответ](#как-фрагменты-попадают-в-ответ)
+  - [Ограничения](#ограничения-1)
+- [3. Поиск по смыслу](#3-поиск-по-смыслу)
+  - [Поток данных](#поток-данных-2)
+  - [Таблицы и функции](#таблицы-и-функции-2)
+  - [Что эмбеддится](#что-эмбеддится)
+  - [Модели и параметры](#модели-и-параметры)
+  - [Как сочетается с правилами без модели](#как-сочетается-с-правилами-без-модели)
+  - [Ограничения](#ограничения-2)
+- [4. Поиск по фото](#4-поиск-по-фото)
+  - [Поток данных](#поток-данных-3)
+  - [Таблицы и функции](#таблицы-и-функции-3)
+  - [Модули и параметры](#модули-и-параметры)
+  - [Качество](#качество)
+  - [Ограничения](#ограничения-3)
+
 ## 1. KAG: граф знаний
 
 ### Поток данных
 
 ```mermaid
 flowchart LR
-  A[Страницы Островка<br/>ota_hotel_pages, ota_hotel_places] --> F
-  B[EEA, EUBUCCO, OSM<br/>hotel_noise_facade, hotel_geo,<br/>osm_places_near_facade] --> F
-  F["npm run db:features<br/>scripts/hotel-features.ts<br/>src/lib/claimRows.ts"] --> S[(entities · claims · evidence<br/>calculations · relations)]
-  H[Ответ отельера<br/>src/lib/db/hotelierKnowledge.ts] --> S
+  A["Страницы Островка<br/>ota_hotel_pages, ota_hotel_places"] --> F
+  B["EEA, EUBUCCO, OSM<br/>hotel_noise_facade, hotel_geo,<br/>osm_places_near_facade"] --> F
+  F["npm run db:features<br/>scripts/hotel-features.ts<br/>src/lib/claimRows.ts"] --> S[("entities · claims · evidence<br/>calculations · relations")]
+  H["Ответ отельера<br/>src/lib/db/hotelierKnowledge.ts"] --> S
   S --> I["Индексы уровней и мест<br/>src/lib/db/knowledge.ts"]
   I --> V["Решения по отелям<br/>featureVerdicts · nearVerdicts · chooseHotels"]
   V --> R["runFeaturesTool · runNearTool<br/>→ ToolResult с claims и evidence"]
@@ -182,10 +212,10 @@ erDiagram
 
 ```mermaid
 flowchart LR
-  P["Отзывы страниц Островка<br/>npm run db:features"] --> D[(documents · document_chunks)]
+  P["Отзывы страниц Островка<br/>npm run db:features"] --> D[("documents · document_chunks")]
   O["Ответ отельера, «в общих сведениях»<br/>writeDocument"] --> D
   D --> M["npm run db:embed:chunks<br/>embedding halfvec(2048)"]
-  Q[Вопрос или тема] --> QV["queryVectorOrNull<br/>input_type: query"]
+  Q["Вопрос или тема"] --> QV["queryVectorOrNull<br/>input_type: query"]
   QV --> H["hotel_chunks_hybrid<br/>FTS + векторы → RRF"]
   Q --> H
   M --> H
@@ -254,13 +284,13 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  W[Слова путешественника<br/>все его сообщения] --> U["understandWish → Brief<br/>src/lib/ai/understand.ts"]
-  U --> PC[Города плана]
+  W["Слова путешественника<br/>все его сообщения"] --> U["understandWish → Brief<br/>src/lib/ai/understand.ts"]
+  U --> PC["Города плана"]
   W --> QV["embed, input_type: query<br/>nvidia/nemotron-3.5-embed-1b"]
   QV --> MM["match_embeddings<br/>HNSW, косинус, до 50"]
   PC --> MM
   MM --> RR["rerank<br/>nemotron-3.5-rerank-8b"]
-  RR --> T[6 отелей плана]
+  RR --> T["6 отелей плана"]
   T --> FS["featuresStep<br/>(шум, этажи, вид, море)"]
 ```
 
@@ -384,3 +414,5 @@ flowchart LR
 - Поиск ищет похожие снимки, а не проверяет факты: «вид на море» на фото не становится утверждением в графе знаний.
 - Фото в каталоге — только то, что отдаёт CDN Островка в WebP или JPEG; остальные пропускаются.
 - Вектор фото пользователя считается на лету и в `hotel_photo_embeddings` не пишется (сами фото в чате — вложения в Storage, миграция `20261025120000_assistant_attachments.sql`).
+
+[← README](../README.md)

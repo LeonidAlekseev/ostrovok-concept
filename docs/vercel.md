@@ -10,3 +10,5 @@ Vercel определяет проект как Next.js без дополнит�
 Вне production (`npm run dev` и preview-деплои Vercel, по `VERCEL_ENV`) в левом нижнем углу
 показываются технические параметры глобуса: fps, время кадра, разрешение рендера,
 объём геометрии. Проверить production-сборку с ними локально: `VERCEL_ENV=preview npm run build`.
+
+[← README](../README.md)

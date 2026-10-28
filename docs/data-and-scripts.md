@@ -2,13 +2,23 @@
 
 Supabase, каталог, скрипты загрузки и пересборки данных, места OSM.
 
+## Оглавление
+
+- [Supabase](#supabase)
+  - [Каталог в Supabase](#каталог-в-supabase)
+  - [Скрипты npm](#скрипты-npm)
+- [Скрипты `scripts/`](#скрипты-scripts)
+- [Загрузка мест другого города](#загрузка-мест-другого-города)
+
 ## Supabase
 
 Постоянные данные — в Supabase: аккаунты (`profiles`) и каталог (`destinations`, `hotels`: ключевые колонки, порядок
 `position` и весь объект в `data jsonb`). Схема с RLS — `supabase/migrations/`: каталог читают все, пишет только
 сервисный ключ, профиль читает и меняет владелец.
 
-**Каталог в Supabase.** Интерфейс читает его на сервере через `src/lib/db/catalog.ts` (`server-only`, anon-ключ под
+### Каталог в Supabase
+
+Интерфейс читает его на сервере через `src/lib/db/catalog.ts` (`server-only`, anon-ключ под
 RLS): `loadDestinations`, `loadHotelSummaries`, `loadNewHotels`, `loadHotel`, `loadHotels(ids)`,
 `loadCityHotels(destinationIds)`, `loadAllHotels`. Чтения кешируются `unstable_cache` с тегом `catalog` на час
 (`CATALOG_LIFETIME`; полные отели — по городу на запись кеша); страницы с ними перестраиваются в фоне так же часто.
@@ -28,6 +38,8 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 `npm run db:seed -- --revalidate https://<сайт>` (или `POST /api/revalidate` с `Authorization: Bearer
 <SUPABASE_SERVICE_ROLE_KEY>`), иначе сайт обновится сам в течение часа. Сборка читает базу: без ключей она
 останавливается с «нет NEXT_PUBLIC_SUPABASE_URL…: npm run secrets:reveal».
+
+### Скрипты npm
 
 - `npm run db:types` — `scripts/db-types.mjs`: `supabase gen types typescript` по базе (`SUPABASE_DB_URL` из `.env`, схема
   только читается) в `src/lib/db/database.types.ts`, затем Prettier. Клиенты Supabase типизированы `Database`. **Перегенерируйте
@@ -114,7 +126,9 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
   публичном bucket без снимка (удалён вместе с аккаунтом или вручную); без `--delete` только показывает папки и число
   файлов. Папки моложе часа не трогает. Нужен `SUPABASE_SERVICE_ROLE_KEY`.
 
-**Скрипты `scripts/`.** Исходные файлы данных вне репозитория, поэтому скрипты загрузки — единственный способ
+## Скрипты `scripts/`
+
+Исходные файлы данных вне репозитория, поэтому скрипты загрузки — единственный способ
 восстановить базу; не удаляйте их. TypeScript-скрипты исполняет Node и начинают с `scripts/lib/node.ts`: он
 разрешает импорты модулей приложения без расширения, даёт `required()` (переменная `.env` или ошибка с её
 именем) и `serviceClient()` (клиент с сервисным ключом).
@@ -142,7 +156,7 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 | `openapi-examples.ts` (`docs:examples`)                                               | реальные примеры ответов документации API с запущенного сайта                                         |
 | `build-images.py`, `build-star-assets.mjs`, `build-draw-images.mjs`, `build-globe.py` | изображения и глобус из исходников вне репозитория (см. [«Изображения»](architecture.md#изображения)) |
 
-### Загрузка мест другого города
+## Загрузка мест другого города
 
 Места для гео-инструментов Эвала (медицина, бары и клубы, еда, супермаркеты, транспорт, пляжи и берег, парки,
 достопримечательности, центр) хранятся в `osm_places`, а загруженный прямоугольник — в `osm_place_areas`: внутри него
@@ -173,3 +187,5 @@ npm run db:city-places -- --city València \
 `NEXT_PUBLIC_SUPABASE_URL` и `SUPABASE_SERVICE_ROLE_KEY` (кроме `--dry-run`); ключи не печатаются. Пример:
 Валенсия 2026-10-26 — выгрузка 134 МБ, 5 минут на разбор, 8962 места. Геокодирование Эвала сейчас ограничено
 Валенсией (`VALENCIA_BBOX` в `src/lib/geo/distance.ts`): для другого города его тоже нужно расширить.
+
+[← README](../README.md)
