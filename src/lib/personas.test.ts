@@ -18,13 +18,14 @@ describe('personaHotels', () => {
   })
 
   it('reads each persona by its rule, the best for it first', () => {
+    const priced = inValencia.filter((h) => h.priceFrom > 0).map((h) => h.priceFrom)
     const student = personaHotels(hotels, 'student')
-    expect(student.every((h) => h.rating >= 7)).toBe(true)
-    expect(student[0].priceFrom).toBe(Math.min(...inValencia.filter((h) => h.rating >= 7).map((h) => h.priceFrom)))
+    expect(student[0].priceFrom).toBe(Math.min(...priced))
+    expect(student.map((h) => h.priceFrom)).toEqual(student.map((h) => h.priceFrom).toSorted((a, b) => a - b))
 
     const luxury = personaHotels(hotels, 'luxury')
-    expect(luxury.every((h) => h.stayType === 'hotel' && h.stars === 5)).toBe(true)
-    expect(luxury.map((h) => h.rating)).toEqual(luxury.map((h) => h.rating).toSorted((a, b) => b - a))
+    expect(luxury[0].priceFrom).toBe(Math.max(...priced))
+    expect(luxury.map((h) => h.priceFrom)).toEqual(luxury.map((h) => h.priceFrom).toSorted((a, b) => b - a))
 
     // Scenario: Смена персоны
     const workation = personaHotels(hotels, 'workation')
@@ -32,7 +33,7 @@ describe('personaHotels', () => {
     expect(workation[0].wifiMbps).toBe(Math.max(...inValencia.filter((h) => h.workspace).map((h) => h.wifiMbps ?? 0)))
 
     const culture = personaHotels(hotels, 'culture')
-    expect(culture.every((h) => h.rating >= 8)).toBe(true)
+    expect(culture[0].distanceKm).toBe(Math.min(...inValencia.map((h) => h.distanceKm)))
     expect(culture.map((h) => h.distanceKm)).toEqual(culture.map((h) => h.distanceKm).toSorted((a, b) => a - b))
   })
 

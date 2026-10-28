@@ -17,12 +17,16 @@ export const PERSONA_HOTELS = 3
 /** The only city of the selections: the one whose catalogue is real. */
 export const PERSONA_CITY = 'valencia'
 
-/** Which hotels suit a persona, and which of them come first. */
+/** Which hotels suit a persona, and which of them come first: each tab by its theme, ties by the guests' rating. */
+const priced = (h: Hotel) => h.priceFrom > 0
 const RULES: Record<Persona, { fits: (h: Hotel) => boolean; order: (a: Hotel, b: Hotel) => number }> = {
-  student: { fits: (h) => h.rating >= 7, order: (a, b) => a.priceFrom - b.priceFrom },
-  luxury: { fits: (h) => h.stayType === 'hotel' && h.stars === 5, order: (a, b) => b.rating - a.rating },
-  workation: { fits: (h) => h.workspace, order: (a, b) => (b.wifiMbps ?? 0) - (a.wifiMbps ?? 0) },
-  culture: { fits: (h) => h.rating >= 8, order: (a, b) => a.distanceKm - b.distanceKm },
+  student: { fits: priced, order: (a, b) => a.priceFrom - b.priceFrom || b.rating - a.rating },
+  luxury: { fits: priced, order: (a, b) => b.priceFrom - a.priceFrom || b.rating - a.rating },
+  workation: {
+    fits: (h) => h.workspace,
+    order: (a, b) => (b.wifiMbps ?? 0) - (a.wifiMbps ?? 0) || b.rating - a.rating,
+  },
+  culture: { fits: () => true, order: (a, b) => a.distanceKm - b.distanceKm || b.rating - a.rating },
 }
 
 /**
