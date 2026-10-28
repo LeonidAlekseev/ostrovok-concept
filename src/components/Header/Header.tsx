@@ -26,7 +26,7 @@ const menuItemClass =
   'block w-full rounded-md p-3 text-left font-[550] text-foreground no-underline hover:bg-muted hover:text-primary'
 
 const links = [
-  { href: '/assistant', label: 'Спросить Эвал' },
+  { href: '/assistant', label: 'Мои чаты' },
   { href: '/search', label: 'Искать вручную' },
   { href: '/trips', label: 'Мои поездки' },
   { href: '/favorites', label: 'Избранное' },
@@ -110,7 +110,7 @@ export function Header() {
                   ))}
                   <li>
                     <Link className={menuItemClass} href="/api/docs" onClick={close}>
-                      API
+                      API Docs
                     </Link>
                   </li>
                   {!session && (

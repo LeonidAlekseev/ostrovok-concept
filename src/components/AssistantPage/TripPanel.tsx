@@ -68,7 +68,7 @@ export function TripPanel({ trip, plan, recent, busy, onEdit, onAsk, className =
   const hotels = plan?.options.some((o) => o.hotel)
   const known = trip.checkIn || trip.guests || trip.city
   return (
-    <aside aria-label="О поездке" className={`flex min-h-0 flex-col gap-3 overflow-y-auto ${className}`}>
+    <aside aria-label="О поездке" className={`min-h-0 flex-col gap-3 overflow-y-auto ${className || 'flex'}`}>
       <section aria-labelledby="trip-title" className={cardClass}>
         <div className="flex items-center justify-between gap-2">
           <h2 id="trip-title" className="text-base font-bold">

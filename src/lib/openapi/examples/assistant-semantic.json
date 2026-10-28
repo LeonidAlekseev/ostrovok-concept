@@ -1,0 +1,214 @@
+{
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "text": "Уютный отель с видом на старый город и террасой на крыше"
+      }
+    ],
+    "brief": {
+      "destinationId": "valencia",
+      "when": "any",
+      "party": "couple"
+    }
+  },
+  "response": {
+    "brief": {
+      "destinationId": "valencia",
+      "when": "any",
+      "party": "couple",
+      "view": "city"
+    },
+    "reply": "Красивый город — отличный выбор! Хотите, чтобы был центр или набережная?",
+    "source": "model",
+    "matches": [
+      {
+        "id": "ota-13410999",
+        "destinationId": "valencia",
+        "name": "Smartr Valencia Turia",
+        "stayType": "apartments",
+        "stars": 3,
+        "rating": 10,
+        "reviewCount": 1,
+        "priceFrom": 15700,
+        "wifiMbps": null,
+        "workspace": false,
+        "isNew": false
+      },
+      {
+        "id": "ota-11236534",
+        "destinationId": "valencia",
+        "name": "ESTIMAR Valencia",
+        "stayType": "hotel",
+        "stars": 4,
+        "rating": 10,
+        "reviewCount": 1,
+        "priceFrom": 23100,
+        "wifiMbps": null,
+        "workspace": false,
+        "isNew": false
+      },
+      {
+        "id": "ota-9197221",
+        "destinationId": "valencia",
+        "name": "Palacio Santa Clara, Autograph Collection",
+        "stayType": "hotel",
+        "stars": 4,
+        "rating": 9.2,
+        "reviewCount": 131,
+        "priceFrom": 25500,
+        "wifiMbps": null,
+        "workspace": true,
+        "isNew": false
+      }
+    ],
+    "features": {
+      "ota-13410999": {
+        "floors": 13,
+        "heightM": 43.9,
+        "heightEstimated": true,
+        "heightRangeM": [37.4, 50.3],
+        "lden": {
+          "min": 75
+        },
+        "lnight": {
+          "min": 65,
+          "max": 69
+        },
+        "views": [
+          {
+            "roomName": "Апартаменты c 1 комнатой с видом на город",
+            "view": "city"
+          },
+          {
+            "roomName": "Двухместные апартаменты c 1 комнатой с видом на город",
+            "view": "city"
+          },
+          {
+            "roomName": "Двухместная студия с видом на город",
+            "view": "city"
+          }
+        ],
+        "seaM": 5750
+      },
+      "ota-11236534": {
+        "floors": 8,
+        "heightM": 28.7,
+        "heightEstimated": true,
+        "heightRangeM": [23.7, 33.6],
+        "lden": {
+          "min": 65,
+          "max": 69
+        },
+        "lnight": {
+          "min": 55,
+          "max": 59
+        },
+        "views": [
+          {
+            "roomName": "Номер Standard с видом на город",
+            "view": "city"
+          },
+          {
+            "roomName": "Номер Standard с красивым видом из окна",
+            "view": "nice"
+          },
+          {
+            "roomName": "Одноместный номер Standard с видом на город",
+            "view": "city"
+          },
+          {
+            "roomName": "Двухместный номер Standard с видом на город",
+            "view": "city"
+          },
+          {
+            "roomName": "Двухместный номер Standard с частичным видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Двухместный номер Standard с балконом и с видом на улицу",
+            "view": "street"
+          },
+          {
+            "roomName": "Двухместный номер Standard с балконом и с красивым видом из окна",
+            "view": "nice"
+          },
+          {
+            "roomName": "Двухместный номер Standard с балконом и с красивым видом из окна",
+            "view": "nice"
+          },
+          {
+            "roomName": "Двухместный номер Deluxe с видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Двухместный номер Executive с частичным видом на море",
+            "view": "sea"
+          },
+          {
+            "roomName": "Студия с видом на море",
+            "view": "sea"
+          }
+        ],
+        "seaM": 3747
+      },
+      "ota-9197221": {
+        "floors": 7,
+        "heightM": 28.6,
+        "heightEstimated": true,
+        "heightRangeM": [23.4, 33.8],
+        "lden": {
+          "min": 60,
+          "max": 64
+        },
+        "lnight": {
+          "min": 50,
+          "max": 54
+        },
+        "views": [
+          {
+            "roomName": "Двухместный номер Deluxe Interior с видом на внутренний двор",
+            "view": "courtyard"
+          },
+          {
+            "roomName": "Двухместный номер Deluxe Interior с видом на внутренний двор",
+            "view": "courtyard"
+          },
+          {
+            "roomName": "Двухместный номер Deluxe с видом на город",
+            "view": "city"
+          },
+          {
+            "roomName": "Двухместный номер Premium Deluxe с видом на город",
+            "view": "city"
+          },
+          {
+            "roomName": "Двухместный номер Corner Premium Deluxe с видом на город",
+            "view": "city"
+          },
+          {
+            "roomName": "Двухместный люкс с видом на город",
+            "view": "city"
+          }
+        ],
+        "seaM": 3777
+      }
+    },
+    "steps": [
+      {
+        "agent": "search",
+        "title": "Подбираю отели по вашему описанию",
+        "params": "Валенсия",
+        "status": "done",
+        "result": "нашёл 6 отелей"
+      },
+      {
+        "agent": "features",
+        "title": "Проверяю данные о виде из окна",
+        "params": "вид на город",
+        "status": "done",
+        "result": "подходят 31 отель из 204"
+      }
+    ]
+  }
+}

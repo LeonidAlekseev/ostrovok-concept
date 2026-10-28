@@ -1,0 +1,80 @@
+{
+  "request": {
+    "messages": [
+      {
+        "role": "user",
+        "text": "Найди похожие отели"
+      }
+    ],
+    "brief": {
+      "destinationId": "valencia",
+      "when": "any",
+      "party": "couple"
+    },
+    "photos": [
+      "data:image/jpeg;base64,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"
+    ]
+  },
+  "response": {
+    "brief": {
+      "destinationId": "valencia",
+      "when": "any",
+      "party": "couple"
+    },
+    "source": "model",
+    "photo": {
+      "action": "similar",
+      "seen": "Современный интерьер лобби отеля с белой стойкой ресепшен, большими растениями в горшках и стильным освещением. Это указывает на современный дизайн и комфортную общую атмосферу отеля.",
+      "like": "современный интерьер, приветливый лобби, дизайнерское освещение"
+    },
+    "matches": [
+      {
+        "id": "ota-7481548",
+        "destinationId": "valencia",
+        "name": "INNSiDE by Melia Valencia Oceanic",
+        "stayType": "hotel",
+        "stars": 4,
+        "rating": 8.4,
+        "reviewCount": 2788,
+        "priceFrom": 14500,
+        "wifiMbps": null,
+        "workspace": true,
+        "isNew": false
+      },
+      {
+        "id": "ota-9322089",
+        "destinationId": "valencia",
+        "name": "Отель Malcom and Barret",
+        "stayType": "hotel",
+        "stars": 3,
+        "rating": 9.2,
+        "reviewCount": 3567,
+        "priceFrom": 11800,
+        "wifiMbps": null,
+        "workspace": false,
+        "isNew": false
+      },
+      {
+        "id": "ota-10552223",
+        "destinationId": "valencia",
+        "name": "Pamphylia Hotel",
+        "stayType": "hotel",
+        "stars": 3,
+        "rating": 0,
+        "reviewCount": 0,
+        "priceFrom": 16300,
+        "wifiMbps": null,
+        "workspace": false,
+        "isNew": false
+      }
+    ],
+    "steps": [
+      {
+        "agent": "search",
+        "title": "Ищу отели, похожие на фото",
+        "status": "done",
+        "result": "нашёл 6"
+      }
+    ]
+  }
+}

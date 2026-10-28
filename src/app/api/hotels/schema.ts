@@ -115,7 +115,7 @@ const reviewSchema = component(
 )
 
 const summaryShape = {
-  id: z.string().meta({ description: 'Настоящий отель — `ota-<master_id>`', examples: ['ota-9096882'] }),
+  id: z.string().meta({ description: 'Настоящий отель — `ota-<master_id>`', examples: ['ota-7481548'] }),
   destinationId: z.string().meta({ examples: ['valencia'] }),
   name: z.string(),
   stayType: z.enum(Object.keys(STAY_TYPES) as [StayType, ...StayType[]]),
@@ -172,7 +172,7 @@ export const hotelIdParameter = {
   required: true,
   description: 'Id отеля: настоящий — `ota-<master_id>`',
   schema: z.string().regex(/^[a-z0-9-]{1,80}$/),
-  example: 'ota-9096882',
+  example: 'ota-7481548',
 } as const
 
 export const hotelsOperations: ApiOperation[] = [

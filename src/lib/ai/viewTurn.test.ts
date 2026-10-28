@@ -329,6 +329,17 @@ describe('the view steps of a hotel question', () => {
     expect(outcome.summary).toContain('• Восход 21 июня')
     expect(outcome.summary).toContain('«Torres de Serranos»')
   })
+
+  it('keeps the method out of the answer’s text', async () => {
+    const outcome = await viewTurn(hotel, ask('Какой вид из окна?'), options())
+    expect(outcome.summary).not.toContain('EUBUCCO (обычно')
+    expect(outcome.summary).not.toContain('без деревьев')
+  })
+
+  it('puts a landmark named in the question on the widget’s map with its line', async () => {
+    const outcome = await viewTurn(hotel, ask('Виден ли Torres de Serranos из окна?'), options())
+    expect(outcome.widget?.kind === 'view' && outcome.widget.places.map((p) => p.name)).toEqual(['Torres de Serranos'])
+  })
 })
 
 describe('the words of a view question', () => {

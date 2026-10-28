@@ -2,6 +2,7 @@ import type { Hotel } from '@/lib/catalog'
 import type { NoiseMap } from '@/lib/db/noise'
 import type { ViewMap } from '@/lib/db/view'
 import type { ChatMap } from '@/lib/geo/chatMap'
+import { parseChatWidget, type ChatWidget } from '@/lib/chatWidget'
 import { NOISE_COLORS, NOISE_UNKNOWN_COLOR, QUIET_SOURCE, noiseColor } from '@/lib/noise'
 import { pointAt, reachOf, reachTone, type HotelView, type SightLine, type ViewWindow } from '@/lib/view'
 import { BUILDING_COLOR, ESTIMATED_BUILDING_COLOR, HOTEL_BUILDING_COLOR, TONE_COLOR } from '../HotelPage/viewColors'
@@ -196,8 +197,44 @@ function chatMap(map: ChatMap): GeoAnswer {
 }
 
 /**
+ * The places of the widget of Эвал's answer about a hotel: the view's places with the colour of their verdict and a
+ * line of sight from the hotel, the loud places of the noise. The hotel's lines of sight, buildings and noise are the
+ * page's routes (`/view`, `/view-map`, `/noise-map`). `null` when the widget has no places.
+ */
+function widgetMap(widget: ChatWidget): GeoAnswer | null {
+  const from: [number, number] = [widget.hotel.lon, widget.hotel.lat]
+  const hotel = point(widget.hotel, 'hotel', HOTEL_COLOR, widget.hotel.name)
+  if (widget.kind === 'view') {
+    if (widget.places.length === 0) return null
+    return {
+      title: 'Вид из отеля: места ответа Эвала',
+      features: [
+        ...widget.places.flatMap((place) => {
+          const color = TONE_COLOR[place.tone]
+          const label = `${place.name} · ${place.verdict}`
+          return [line([from, [place.lon, place.lat]], 'line', color, label), point(place, 'place', color, label)]
+        }),
+        hotel,
+      ],
+      sources: ['eubucco'],
+    }
+  }
+  if (widget.noise.places.length === 0) return null
+  return {
+    title: 'Шум рядом: места ответа Эвала',
+    features: [
+      ...widget.noise.places.map((place) =>
+        point(place, 'place', PLACE_COLOR, `${place.name ?? place.category} · ${Math.round(place.distanceM)} м`),
+      ),
+      hotel,
+    ],
+    sources: ['eea'],
+  }
+}
+
+/**
  * The geo of an answer of `path` (`/api/hotels`, `/api/hotels/{id}/view|view-map|noise-map|relations`, `/api/assistant`), or
- * `null` when it has none: an error, `{ view: null }`, an answer of Эвал without a map. `hotel` is the point of the
+ * `null` when it has none: an error, `{ view: null }`, an answer of Эвал without a map or a widget with places. `hotel` is the point of the
  * hotel of a hotel route, for its marker.
  */
 export function geoOfResponse(path: string, body: unknown, hotel: GeoPoint | null = null): GeoAnswer | null {
@@ -206,7 +243,10 @@ export function geoOfResponse(path: string, body: unknown, hotel: GeoPoint | nul
   if (path === '/api/hotels' && Array.isArray(body.hotels) && body.hotels.length > 0)
     answer = hotels(body.hotels as Hotel[])
   else if (path === '/api/assistant' && isObject(body.map)) answer = chatMap(body.map as unknown as ChatMap)
-  else {
+  else if (path === '/api/assistant' && isObject(body.widget)) {
+    const widget = parseChatWidget(body.widget)
+    answer = widget ? widgetMap(widget) : null
+  } else {
     const route = hotelRoute(path)
     if (route?.part === 'view' && isObject(body.view)) answer = view(body.view as unknown as HotelView, hotel)
     else if (route?.part === 'view-map' && isObject(body.map)) answer = buildings(body.map as unknown as ViewMap, hotel)

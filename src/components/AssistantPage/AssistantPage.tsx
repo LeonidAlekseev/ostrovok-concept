@@ -19,7 +19,7 @@ export function AssistantPage({ newHotels }: Props) {
   const { searchFor } = useHotelSearch()
   return (
     <main className="flex w-full flex-1 flex-col px-(--page-x) pt-2 pb-6 has-data-[assistant-app=chat]:p-0 lg:h-dvh lg:flex-none lg:p-4 lg:has-data-[assistant-app=chat]:p-4">
-      <h1 className="sr-only">Спросить Эвал</h1>
+      <h1 className="sr-only">Мои чаты</h1>
       <AssistantSearch newHotels={newHotels} onChoose={searchFor} />
     </main>
   )

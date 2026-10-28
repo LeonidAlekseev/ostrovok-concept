@@ -4,6 +4,7 @@ import { cacheHeader, component, errorSchema, sameType, type ApiOperation } from
 import { hotelIdParameter } from '../../../schema'
 import { evidenceSchema, NOT_FOUND_ERROR, STORE_ERROR } from '../../claims/schema'
 import searchExample from '@/lib/openapi/examples/documents-search.json'
+import hotelierExample from '@/lib/openapi/examples/documents-search-hotelier.json'
 
 /**
  * `GET /api/hotels/{hotelId}/documents/search`: the guests' reviews and the hotelier's knowledge of a real hotel by the
@@ -105,6 +106,12 @@ export const searchOperations: ApiOperation[] = [
             summary: 'ota-7857547, `шумно or шум`',
             description: `${searchExample.response.chunks.length} фрагмента из ответа`,
             value: searchExample.response,
+          },
+          hotelier: {
+            summary: `${hotelierExample.hotel}, \`${hotelierExample.query.q}\``,
+            description:
+              'Слова отельера (демонстрационные данные, `kind: hotelier_answer`) находятся по смыслу вместе с отзывами: у фрагмента отельера может не быть места в полнотекстовом поиске (`ftsPlace: null`), но есть в векторном',
+            value: hotelierExample.response,
           },
         },
       },

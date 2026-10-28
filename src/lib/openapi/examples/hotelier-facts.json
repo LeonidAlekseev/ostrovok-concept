@@ -1,0 +1,62 @@
+{
+  "hotel": "ota-7568446",
+  "response": {
+    "hotelId": "ota-7568446",
+    "facts": [
+      {
+        "id": "78a0c7e5-f39d-4db2-a973-f8bbe7103810",
+        "characteristic": "room.view",
+        "label": "Вид из окон",
+        "room": "Premium",
+        "value": "на море",
+        "status": "reported",
+        "confidence": 0.75,
+        "observedAt": "2026-10-22T12:40:00+00:00",
+        "conflict": false,
+        "demo": true,
+        "limitations": ["Сообщено отельером, сервис это не проверял"],
+        "source": {
+          "title": "Ответ отельера на вопрос: Есть ли вид на море из апартаментов Classic?",
+          "excerpt": "Со слов отельера, номера Classic: вид из окон — на город. Со слов отельера, номера Premium: вид из окон — на море. Со слов отельера, номера Premium: этажи номеров — 5–7 этажи.",
+          "retrievedAt": "2026-10-22T12:40:00+00:00"
+        }
+      },
+      {
+        "id": "1d3d75ed-ba54-4969-b92e-8f0adb58f6c0",
+        "characteristic": "room.view",
+        "label": "Вид из окон",
+        "room": "Classic",
+        "value": "на город",
+        "status": "reported",
+        "confidence": 0.75,
+        "observedAt": "2026-10-22T12:40:00+00:00",
+        "conflict": false,
+        "demo": true,
+        "limitations": ["Сообщено отельером, сервис это не проверял"],
+        "source": {
+          "title": "Ответ отельера на вопрос: Есть ли вид на море из апартаментов Classic?",
+          "excerpt": "Со слов отельера, номера Classic: вид из окон — на город. Со слов отельера, номера Premium: вид из окон — на море. Со слов отельера, номера Premium: этажи номеров — 5–7 этажи.",
+          "retrievedAt": "2026-10-22T12:40:00+00:00"
+        }
+      },
+      {
+        "id": "cab71f1d-81d3-4778-85c8-1d497429579e",
+        "characteristic": "room.floors",
+        "label": "Этажи номеров",
+        "room": "Premium",
+        "value": "5–7 этажи",
+        "status": "reported",
+        "confidence": 0.75,
+        "observedAt": "2026-10-22T12:40:00+00:00",
+        "conflict": false,
+        "demo": true,
+        "limitations": ["Сообщено отельером, сервис это не проверял"],
+        "source": {
+          "title": "Ответ отельера на вопрос: Есть ли вид на море из апартаментов Classic?",
+          "excerpt": "Со слов отельера, номера Classic: вид из окон — на город. Со слов отельера, номера Premium: вид из окон — на море. Со слов отельера, номера Premium: этажи номеров — 5–7 этажи.",
+          "retrievedAt": "2026-10-22T12:40:00+00:00"
+        }
+      }
+    ]
+  }
+}

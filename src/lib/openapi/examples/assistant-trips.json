@@ -15,8 +15,8 @@
         "id": "OS-7K2Q9Z",
         "createdAt": "2026-10-27T18:00:00.000Z",
         "status": "confirmed",
-        "hotelId": "ota-9096882",
-        "roomId": "room-3202",
+        "hotelId": "ota-7481548",
+        "roomId": "room-3202402",
         "rateId": "rate-1",
         "checkIn": "2026-11-10",
         "checkOut": "2026-11-12",
@@ -26,7 +26,7 @@
           "rooms": 1
         },
         "payment": "now",
-        "total": 19200,
+        "total": 29000,
         "cancellation": {
           "kind": "free",
           "daysBefore": 4
@@ -39,7 +39,7 @@
       "trips": true,
       "bookingId": "OS-7K2Q9Z"
     },
-    "reply": "Могу перенести OS-7K2Q9Z на 20 – 23 нояб. 2026 г., 3 ночи. Новая цена — 31 800 ₽ (сейчас 19 200 ₽, доплата 12 600 ₽). Бесплатная отмена до 16 ноября. Даты изменятся, только когда вы нажмёте «Подтвердить».",
+    "reply": "Могу перенести OS-7K2Q9Z на 20 – 23 нояб. 2026 г., 3 ночи. Новая цена — 47 900 ₽ (сейчас 29 000 ₽, доплата 18 900 ₽). Невозвратный тариф. Даты изменятся, только когда вы нажмёте «Подтвердить».",
     "source": "model",
     "steps": [
       {
@@ -47,26 +47,25 @@
         "title": "Пересчёт при смене дат",
         "params": "OS-7K2Q9Z: 20 – 23 нояб. 2026 г., 3 ночи",
         "status": "done",
-        "result": "OS-7K2Q9Z: 20 – 23 нояб. 2026 г., 3 ночи — 31 800 ₽",
+        "result": "OS-7K2Q9Z: 20 – 23 нояб. 2026 г., 3 ночи — 47 900 ₽",
         "run": {
-          "id": "d359ff7d-bb83-4ca2-b35b-4c1fe1757b03",
+          "id": "6d626d8b-c695-496c-a656-a8449f16a108",
           "result": {
             "status": "success",
-            "summary": "OS-7K2Q9Z: 20 – 23 нояб. 2026 г., 3 ночи — 31 800 ₽",
+            "summary": "OS-7K2Q9Z: 20 – 23 нояб. 2026 г., 3 ночи — 47 900 ₽",
             "data": {
               "change": {
                 "bookingId": "OS-7K2Q9Z",
                 "from": {
                   "checkIn": "2026-11-10",
                   "checkOut": "2026-11-12",
-                  "total": 19200
+                  "total": 29000
                 },
                 "checkIn": "2026-11-20",
                 "checkOut": "2026-11-23",
-                "total": 31800,
+                "total": 47900,
                 "cancellation": {
-                  "kind": "free",
-                  "daysBefore": 4
+                  "kind": "non-refundable"
                 }
               }
             },
@@ -75,12 +74,12 @@
                 "id": "OS-7K2Q9Z:rate",
                 "source_type": "ota_page",
                 "source_name": "Островок",
-                "source_id": "ota-9096882",
+                "source_id": "ota-7481548",
                 "source_url": null,
-                "title": "You & Co. Saler Beach Boutique Hotel: Номер Standard, тариф",
+                "title": "INNSiDE by Melia Valencia Oceanic: Двухместный номер Standard, тариф",
                 "excerpt": null,
                 "retrieved_at": null,
-                "entity_id": "ota-9096882",
+                "entity_id": "ota-7481548",
                 "claim_id": null
               }
             ],
@@ -88,7 +87,7 @@
               {
                 "id": "OS-7K2Q9Z:was",
                 "label": "Сейчас",
-                "value": "10 – 12 нояб. 2026 г., 2 ночи, 19 200 ₽",
+                "value": "10 – 12 нояб. 2026 г., 2 ночи, 29 000 ₽",
                 "status": "reported",
                 "confidence": null,
                 "evidence_ids": [],
@@ -106,7 +105,7 @@
               {
                 "id": "OS-7K2Q9Z:total",
                 "label": "Новая цена",
-                "value": "31 800 ₽",
+                "value": "47 900 ₽",
                 "status": "derived",
                 "confidence": null,
                 "evidence_ids": ["OS-7K2Q9Z:rate"],
@@ -115,7 +114,7 @@
               {
                 "id": "OS-7K2Q9Z:difference",
                 "label": "Разница",
-                "value": "доплата 12 600 ₽",
+                "value": "доплата 18 900 ₽",
                 "status": "derived",
                 "confidence": null,
                 "evidence_ids": ["OS-7K2Q9Z:rate"],
@@ -124,7 +123,7 @@
               {
                 "id": "OS-7K2Q9Z:cancellation",
                 "label": "Условия отмены",
-                "value": "Бесплатная отмена до 16 ноября",
+                "value": "Невозвратный тариф",
                 "status": "derived",
                 "confidence": null,
                 "evidence_ids": ["OS-7K2Q9Z:rate"],
@@ -138,11 +137,11 @@
                 "inputs": [
                   {
                     "label": "Цена ночи тарифа (вс–чт)",
-                    "value": "9 600 ₽"
+                    "value": "14 500 ₽"
                   },
                   {
                     "label": "Цена ночи пт и сб",
-                    "value": "11 100 ₽"
+                    "value": "16 700 ₽"
                   },
                   {
                     "label": "Ночей вс–чт",
@@ -169,7 +168,7 @@
                 "inputs": [
                   {
                     "label": "Условия тарифа",
-                    "value": "Бесплатная отмена за 4 дня до заезда"
+                    "value": "Невозвратный тариф"
                   },
                   {
                     "label": "Новый заезд",
@@ -196,14 +195,13 @@
       "from": {
         "checkIn": "2026-11-10",
         "checkOut": "2026-11-12",
-        "total": 19200
+        "total": 29000
       },
       "checkIn": "2026-11-20",
       "checkOut": "2026-11-23",
-      "total": 31800,
+      "total": 47900,
       "cancellation": {
-        "kind": "free",
-        "daysBefore": 4
+        "kind": "non-refundable"
       }
     }
   }

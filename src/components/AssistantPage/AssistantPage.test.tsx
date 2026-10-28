@@ -20,7 +20,7 @@ afterEach(() => {
 describe('AssistantPage', () => {
   it('shows Eval’s chat with its input (Scenario: Открытие страницы)', () => {
     render(<AssistantPage newHotels={newHotels} />)
-    expect(screen.getByRole('heading', { level: 1, name: 'Спросить Эвал' })).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1, name: 'Мои чаты' })).toBeTruthy()
     expect(screen.getByLabelText('Опишите поездку')).toBeTruthy()
     expect(screen.queryByRole('combobox', { name: 'Направление' })).toBeNull()
   })

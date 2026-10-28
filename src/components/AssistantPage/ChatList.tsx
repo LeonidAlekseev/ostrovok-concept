@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import { useId, useRef, useState } from 'react'
 import {
+  BellRing,
   Building2,
   Heart,
   Landmark,
@@ -25,6 +26,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/in
 import { chatKind, chatPreview, chatTime, groupChats, searchChats, type ChatKind } from '../../lib/assistantChatList'
 import { DeleteDialog, RenameForm, ShareDialog } from './ChatActions'
 import { isPending, type Chat } from '../../lib/assistantChats'
+import type { HotelierConversation } from '../../lib/hotelierChat'
 
 /** The icon of a chat by the kind of trip, on its tint. */
 const KIND_ICON: Record<ChatKind, { icon: LucideIcon; tint: string }> = {
@@ -69,6 +71,11 @@ interface Props {
   onNew: () => void
   onRename: (chatId: string, title: string) => void
   onDelete: (chatId: string) => void
+  /** The traveller's chats with the hotels' hoteliers, listed under Эвал's. */
+  hotelier: readonly HotelierConversation[]
+  /** The hotel whose chat is open. */
+  hotelierActive: string | null
+  onChooseHotelier: (hotelId: string) => void
   className?: string
 }
 
@@ -86,6 +93,9 @@ export function ChatList({
   onNew,
   onRename,
   onDelete,
+  hotelier,
+  hotelierActive,
+  onChooseHotelier,
   className = '',
 }: Props) {
   const [query, setQuery] = useState('')
@@ -94,6 +104,10 @@ export function ChatList({
   const [now] = useState(() => new Date())
   const found = searchChats(chats, query)
   const groups = groupChats(found, now)
+  const needle = query.trim().toLowerCase()
+  const hotelierFound = needle
+    ? hotelier.filter((c) => `${c.hotelName ?? ''} ${c.lastMessageText}`.toLowerCase().includes(needle))
+    : hotelier
   return (
     <nav aria-label="Чаты" className={`flex min-h-0 flex-col gap-3 ${className}`}>
       {/* Phones have the site's header with the logo above the list. */}
@@ -149,10 +163,27 @@ export function ChatList({
             </ul>
           </section>
         ))}
-        {ready && chats.length > 0 && found.length === 0 && (
+        {hotelierFound.length > 0 && (
+          <section aria-label="С отельерами" className="flex flex-col gap-1">
+            <h3 className="px-2 text-sm/[normal] font-medium text-muted-foreground">С отельерами</h3>
+            <ul className="flex flex-col divide-y divide-border/70">
+              {hotelierFound.map((chat) => (
+                <li key={chat.id}>
+                  <HotelierRow
+                    chat={chat}
+                    now={now}
+                    current={chat.hotelId === hotelierActive}
+                    onChoose={onChooseHotelier}
+                  />
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {ready && chats.length > 0 && found.length === 0 && hotelierFound.length === 0 && (
           <p className="px-2 text-sm/[normal] text-muted-foreground">Ничего не нашлось</p>
         )}
-        {ready && chats.length === 0 && (
+        {ready && chats.length === 0 && hotelier.length === 0 && (
           <p className="px-2 text-sm/[normal] text-muted-foreground">
             Здесь будут ваши чаты. Начните новый — опишите поездку своими словами.
           </p>
@@ -272,5 +303,49 @@ function ChatRow({ chat, now, current, signedIn, onChoose, onRename, onDelete }:
       <ShareDialog chat={chat} signedIn={signedIn} open={sharing} onOpenChange={setSharing} />
       <DeleteDialog chat={chat} open={confirm} onOpenChange={setConfirm} onDelete={onDelete} />
     </div>
+  )
+}
+
+interface HotelierRowProps {
+  chat: HotelierConversation
+  now: Date
+  current: boolean
+  onChoose: (hotelId: string) => void
+}
+
+/** A chat with a hotelier: the hotel's name, the time and the start of the last message. */
+function HotelierRow({ chat, now, current, onChoose }: HotelierRowProps) {
+  const title = chat.hotelName ?? 'Отель'
+  return (
+    <button
+      type="button"
+      className="group flex w-full min-w-0 items-center gap-3 rounded-2xl px-2 py-3 text-left transition-colors hover:bg-(--decor-light) aria-[current=true]:bg-[color-mix(in_srgb,var(--primary)_10%,var(--decor-light))]"
+      aria-current={current}
+      onClick={() => onChoose(chat.hotelId)}
+    >
+      <span
+        className="grid size-12 flex-none place-items-center rounded-full bg-muted text-muted-foreground-strong"
+        aria-hidden
+      >
+        <BellRing className="size-5" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex items-baseline gap-2">
+          <span className="min-w-0 flex-1 truncate text-base/[1.3] font-bold group-aria-[current=true]:text-primary">
+            {title}
+          </span>
+          <time
+            dateTime={chat.lastMessageAt}
+            className="flex-none text-xs/[normal] text-muted-foreground group-aria-[current=true]:text-primary"
+          >
+            {chatTime(chat.lastMessageAt, now)}
+          </time>
+        </span>
+        <span className="flex items-center gap-1.5 text-sm/[1.3] text-muted-foreground">
+          <span className="min-w-0 flex-1 truncate">{chat.lastMessageText || 'Отельер'}</span>
+          {chat.userUnread > 0 && <Badge className="h-4 flex-none px-1.5 text-[11px]">новое</Badge>}
+        </span>
+      </span>
+    </button>
   )
 }
