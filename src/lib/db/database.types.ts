@@ -1978,6 +1978,26 @@ export type Database = {
       hotel_view_eyes: { Args: { lat: number; lon: number; targets: Json }; Returns: Json }
       hotelier_conversation_read: { Args: { conversation_id: string }; Returns: undefined }
       hotelier_conversation_status: { Args: { conversation_id: string; status: string }; Returns: boolean }
+      hotelier_my_chats: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          created_at: string
+          hotel_id: string
+          hotelier_unread: number
+          id: string
+          is_demo: boolean
+          kind: string
+          last_message_at: string
+          last_message_text: string
+          last_sender: string | null
+          origin_chat_id: string | null
+          origin_tool_run_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          user_unread: number
+        }[]
+      }
       hotelier_own_answer: { Args: { message_id: string }; Returns: boolean }
       hotelier_traveller_chat: {
         Args: { hotel_id: string }

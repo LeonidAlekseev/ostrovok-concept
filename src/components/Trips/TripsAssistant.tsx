@@ -1,7 +1,7 @@
 'use client'
 
-import Image from 'next/image'
 import { useCallback } from 'react'
+import { MessageCircle } from 'lucide-react'
 import { tripsChatOf, type Chat } from '@/lib/assistantChats'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -39,13 +39,11 @@ export function TripsAssistant({
             <Button
               shape="pill"
               size="lg"
-              className="fixed right-[max(16px,env(safe-area-inset-right))] bottom-[max(16px,env(safe-area-inset-bottom))] z-40 h-14 gap-2 pr-5 pl-1.5 shadow-(--shadow-card)"
+              className="fixed right-[max(16px,env(safe-area-inset-right))] bottom-[max(16px,env(safe-area-inset-bottom))] z-40 h-14 gap-2 px-5 shadow-(--shadow-card)"
             />
           }
         >
-          <span className="size-11 flex-none overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--decor-assistant-sky)_45%,var(--decor-light))]">
-            <Image src="/assistant/eval.webp" alt="" width={88} height={88} className="size-full" />
-          </span>
+          <MessageCircle className="size-5.5" aria-hidden />
           Спросить Эвала
         </SheetTrigger>
         <SheetContent

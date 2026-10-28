@@ -29,6 +29,16 @@ export function chatIdOf(pathname: string): string | null {
   }
 }
 
+/** A path `/assistant/hotelier-<hotelId>` opens the traveller's chat with that hotel's hotelier, not one of Эвал's. */
+const HOTELIER_PREFIX = 'hotelier-'
+
+/** The hotel of a chat id that names a chat with a hotelier; `null` for Эвал's chats. */
+export const hotelierHotelOf = (chatId: string | null): string | null =>
+  chatId?.startsWith(HOTELIER_PREFIX) ? chatId.slice(HOTELIER_PREFIX.length) : null
+
+/** The chat id that opens the traveller's chat with the hotel's hotelier. */
+export const hotelierChatId = (hotelId: string) => `${HOTELIER_PREFIX}${hotelId}`
+
 /** The id of the open chat; `null` on the server and at `/assistant`. */
 export const useChatPath = (): string | null =>
   useSyncExternalStore(
