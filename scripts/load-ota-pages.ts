@@ -14,6 +14,7 @@ import { parseArgs } from 'node:util'
 import { serviceClient, type Table } from './lib/node.ts'
 
 const { nextDataPageProps, poiName, trimPage } = await import('../src/lib/ota/page.ts')
+const { MERGED_OTA_HOTELS } = await import('../src/lib/ota/merged.ts')
 type TrimmedPage = import('../src/lib/ota/page.ts').TrimmedPage
 
 const MAX_FILE_BYTES = 4 * 1024 * 1024
@@ -36,6 +37,7 @@ const pages: TrimmedPage[] = []
 for (const name of names) {
   const match = /^(\d{1,15})\.json$/.exec(name)
   if (!match) throw new Error(`${name}: not <master_id>.json`)
+  if (Number(match[1]) in MERGED_OTA_HOTELS) continue // folded into another hotel: no page of its own
   const path = join(dir, name)
   const info = await stat(path)
   if (!info.isFile() || info.size > MAX_FILE_BYTES) throw new Error(`${name}: not a file of at most 4 MB`)
