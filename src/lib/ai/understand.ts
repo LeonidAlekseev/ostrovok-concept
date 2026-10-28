@@ -64,7 +64,9 @@ const wishSchema = z.object({
   view: optional(z.string()).describe(
     'вид из окна номера: id вида из списка, any — «с видом» без уточнения; иначе null',
   ),
-  reply: optional(z.string()).describe('одна короткая дружелюбная фраза-реакция без вопросов, до 120 символов'),
+  reply: optional(z.string()).describe(
+    'одна короткая живая фраза-реакция без вопросов и шаблонных вступлений, до 120 символов, только русские слова',
+  ),
 })
 
 const list = (labels: Record<string, string>) =>

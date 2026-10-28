@@ -715,10 +715,10 @@ describe('POST /api/assistant: a question about a hotel', () => {
     const body = await (await aboutHotel('Есть бар рядом и можно ли с собакой?')).json()
     expect(geoTurn).toHaveBeenCalledTimes(1)
     expect(body.reply).toMatch(
-      /^По данным OpenStreetMap: бар рядом\.\n\n(Да, можно с питомцами|В данных отеля о размещении с питомцами)/,
+      /^По данным OpenStreetMap: бар рядом\.\n\n(Да, можно с питомцами|Про питомцев в данных отеля)/,
     )
     // The places are not answered twice: the hotel part has none.
-    expect(body.reply).not.toContain('Рядом с отелем, по данным Островка')
+    expect(body.reply).not.toContain('Вот что есть рядом с отелем')
   })
 
   it('asks the geo steps only of a question about the places near', async () => {

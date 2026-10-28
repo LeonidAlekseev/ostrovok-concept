@@ -180,7 +180,9 @@ describe('the view steps of a hotel question', () => {
       ],
       ['Проверяю линии взгляда над зданиями', 'done', '120 направлений, 1 точек берега, 1 ориентиров'],
     ])
-    expect(outcome.summary).toContain('Из отеля (здание 12 этажей, ≈ 36 м; проверены этажи с 1-го по 12-й):')
+    expect(outcome.summary).toContain(
+      'Вот что видно из окон отеля (здание 12 этажей, ≈ 36 м; проверены этажи с 1-го по 12-й):',
+    )
     expect(outcome.summary).toContain(
       '• Море (берег в 4,4 км, азимут 110° (восток)): видно с 9-го этажа (ниже — возможно, закрыто: здание ≈ 40 м в 800 м от отеля может быть выше — до 43 м).',
     )
@@ -328,6 +330,7 @@ describe('the view steps of a hotel question', () => {
     expect(outcome.summary).toContain('• Закат 21 июня')
     expect(outcome.summary).toContain('• Восход 21 июня')
     expect(outcome.summary).toContain('«Torres de Serranos»')
+    expect(outcome.summary).toMatch(/^Море видно с 9-го этажа, так что при бронировании просите номер повыше\.\n/)
   })
 
   it('keeps the method out of the answer’s text', async () => {

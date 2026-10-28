@@ -13,6 +13,7 @@ import type { HotelClaim } from '../db/claims'
 import { HOTELIER_KEYS, isHotelierKey, type HotelierKey } from '../hotelierFacts'
 import { conflictingIds, hotelierClaimLine, hotelierNotes } from '../hotelierClaims'
 import { EPISTEMIC_LABEL, type ToolResult } from '../toolResult'
+import { REPLY_STYLE } from './style'
 import { MODEL_TIMEOUT_MS } from './understand'
 
 /**
@@ -115,7 +116,7 @@ export function ruleAnswer(
     answers.push(
       pets
         ? `Да, ${amenityLabel(pets).toLocaleLowerCase('ru')}${paid(pets)}.${fees}`
-        : 'В данных отеля о размещении с питомцами ничего не сказано. Уточните это у отеля до бронирования.',
+        : 'Про питомцев в данных отеля ничего не сказано, так что лучше уточнить у отеля до бронирования.',
     )
   }
   if (PARKING.test(text)) {
@@ -126,7 +127,7 @@ export function ruleAnswer(
         ? `Да: ${amenityLabel(parking).toLocaleLowerCase('ru')}${paid(parking)}.${fees}`
         : fees
           ? `По данным отеля:${fees}`
-          : 'В данных отеля парковка не указана. Уточните это у отеля до бронирования.',
+          : 'Парковка в данных отеля не указана, так что лучше уточнить у отеля до бронирования.',
     )
   }
   if (isNoiseQuestion(text) && noiseTool) {
@@ -135,7 +136,7 @@ export function ruleAnswer(
       const lines = noiseTool.claims.map((claim) => `${claim.label}: ${claim.value}`)
       answers.push(
         lines.length
-          ? `О шуме у отеля, по данным хранилища (источники — в блоке «${NOISE_TOOL_LABEL}»):\n${lines.map((line) => `• ${line}`).join('\n')}`
+          ? `Вот что известно о шуме у отеля, по данным хранилища (источники — в блоке «${NOISE_TOOL_LABEL}»):\n${lines.map((line) => `• ${line}`).join('\n')}`
           : 'Сейчас не могу ответить: данных о шуме у этого отеля нет. Это не значит, что там тихо.',
       )
     }
@@ -143,7 +144,7 @@ export function ruleAnswer(
     const lines = noiseLines(noise)
     answers.push(
       lines.length
-        ? `О шуме у отеля, по картам шума EEA и OpenStreetMap:\n${lines.map((line) => `• ${line}`).join('\n')}`
+        ? `Вот что известно о шуме у отеля, по картам шума EEA и OpenStreetMap:\n${lines.map((line) => `• ${line}`).join('\n')}`
         : 'Сейчас не могу ответить: данных о шуме у этого отеля нет.',
     )
   }
@@ -153,16 +154,16 @@ export function ruleAnswer(
     answers.push(
       nearby.length === 0
         ? `${NO_NEARBY_DATA} Расстояния: ${distanceLine(hotel)}.`
-        : `Рядом с отелем, по данным Островка:\n${nearby.map((place) => `• ${placeLine(place)}`).join('\n')}`,
+        : `Вот что есть рядом с отелем, по данным Островка:\n${nearby.map((place) => `• ${placeLine(place)}`).join('\n')}`,
     )
   }
   if (ROOMS.test(text)) {
     const lines = roomLines(hotel, dates)
-    const hint = dates ? '' : '\nВыберите даты — покажу цены.'
+    const hint = dates ? '' : '\nВыберите даты, и я покажу цены.'
     answers.push(
       lines.length === 0
         ? 'В данных отеля номеров нет.'
-        : `Номера отеля:\n${lines.map((line) => `• ${line}`).join('\n')}${hint}`,
+        : `Вот какие номера есть в отеле:\n${lines.map((line) => `• ${line}`).join('\n')}${hint}`,
     )
   }
   if (answers.length > 0) return { answer: answers.join('\n\n') }
@@ -344,7 +345,8 @@ function instructions(
   hotelier?: readonly HotelClaim[],
 ) {
   return [
-    `Ты Эвал, помощник сервиса «О!бъективно» на странице отеля «${hotel.name}». Отвечай по-русски, дружелюбно и коротко.`,
+    `Ты Эвал, помощник сервиса «О!бъективно» на странице отеля «${hotel.name}». Отвечай по-русски.`,
+    REPLY_STYLE,
     'Поле answer — ТОЛЬКО то, что есть в данных отеля ниже. Ничего не выдумывай: если в данных ответа нет, так и скажи.',
     'Поле unverified — то, чего в данных нет, но ты знаешь из общих знаний (например, что обычно есть рядом с этим районом); это не проверено. Если нечего добавить — null.',
     'Названия мест рядом, расстояния и время пешком, которых нет в данных, можно писать только в unverified.',
@@ -356,7 +358,8 @@ function instructions(
       : []),
     'Ты не отельер и не говоришь от имени отеля. Никогда не подтверждай сам наличие свободных номеров, цены сверх данных, гарантированный вид или номер и индивидуальные условия проживания.',
     'Поле ask_hotelier — инструмент «Запрос отельеру»: заполни его, если в данных нет ответа о конкретной характеристике номера или отеля (балкон, сторона окон, вид, этаж, шум в номере, кровати, парковка, питомцы и т. п.), если сведения противоречат друг другу или если пользователь просит уточнить у отеля или подтвердить наличие, цену, вид, условия. Тогда в answer скажи, что спросишь отельера и ответ придёт в блок «Запрос отельеру». Иначе ask_hotelier — null.',
-    'Цены называй только из данных. Отвечай только JSON по схеме: ' + JSON.stringify(z.toJSONSchema(answerSchema)),
+    'Правила точности выше стиля. Цены называй только из данных. Отвечай только JSON по схеме: ' +
+      JSON.stringify(z.toJSONSchema(answerSchema)),
     '',
     'Данные отеля:',
     hotelFacts(hotel, dates, features, details, noise, noiseTool, hotelier),
