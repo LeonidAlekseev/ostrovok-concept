@@ -369,8 +369,8 @@ describe('the hotel cards of an answer', () => {
     const card = await cardOf(withParking.name)
     const line = within(await within(log()).findByRole('list', { name: 'Почему эти отели' })).getByRole('listitem')
     expect(within(line).getByText(withParking.name)).toBeTruthy()
-    expect(await within(line).findByText('Парковка')).toBeTruthy()
-    expect(within(line).getByText('Номера с видом на море')).toBeTruthy()
+    expect(await within(line).findByText('Номера с видом на море')).toBeTruthy()
+    expect(within(line).queryByText(/Парковка/)).toBeNull()
     expect(within(line).getByText('выше бюджета')).toBeTruthy()
     expect(within(card).queryByText(/Парковка|с видом|выше бюджета/)).toBeNull()
     // The cards, then the word, then the note on the budget.
