@@ -1,21 +1,35 @@
-# docker compose up --build  → http://localhost:3000. Keys: .env (env_file) or only AGE_SECRET_KEY; see README «Docker».
+# docker compose up --build  → http://localhost:8080. Keys: .env (cp .env.example .env, fill in the values or
+# only AGE_SECRET_KEY); see README. Only the app runs here: the database is the cloud Supabase.
 services:
   app:
     build:
       context: .
+      target: runner
       args:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
       secrets:
         - age_secret_key
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      AGE_SECRET_KEY: ${AGE_SECRET_KEY:-}
+    platform: linux/amd64
+    env_file: .env
     ports:
-      - '3000:3000'
+      - '8080:8080'
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8080/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     restart: unless-stopped
+
+  # make seed: scripts of package.json against the cloud database; not started by `up`.
+  tools:
+    profiles: ['tools']
+    build:
+      context: .
+      target: tools
+    platform: linux/amd64
+    env_file: .env
 
 secrets:
   age_secret_key:
