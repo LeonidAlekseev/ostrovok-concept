@@ -45,6 +45,13 @@ export async function loadHotelChat(client: Client, hotelId: string): Promise<Ho
   return data && conversationOf(data)
 }
 
+/** The traveller's own chats with the hotels' hoteliers, newest first («Мои чаты»): the database's to find, `user_id` is hidden. */
+export async function loadMyChats(client: Client): Promise<HotelierConversation[]> {
+  const { data, error } = await client.rpc('hotelier_my_chats').select(INBOX_COLUMNS)
+  if (error) throw new Error(error.message)
+  return (data as unknown as ConversationRow[]).map(conversationOf)
+}
+
 /** The conversations the hotelier may answer, newest first. */
 export async function loadInbox(client: Client): Promise<HotelierConversation[]> {
   const { data, error } = await client
