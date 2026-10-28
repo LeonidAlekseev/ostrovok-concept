@@ -1225,9 +1225,6 @@
                   "context_summary": {
                     "type": "string"
                   },
-                  "conversation_id": {
-                    "type": "string"
-                  },
                   "hotel_id": {
                     "type": "string"
                   },
@@ -1242,9 +1239,12 @@
                   },
                   "room_ref": {
                     "type": "string"
+                  },
+                  "traveller": {
+                    "type": "string"
                   }
                 },
-                "required": ["hotel_id", "question"]
+                "required": ["hotel_id", "origin_chat_id", "origin_tool_run_id", "question", "traveller"]
               }
             }
           }
@@ -1738,6 +1738,147 @@
               "application/json": {
                 "schema": {
                   "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/hotelier_own_answer": {
+      "post": {
+        "operationId": "rpc_hotelier_own_answer",
+        "tags": ["Функции"],
+        "summary": "hotelier_own_answer",
+        "description": "Функция `hotelier_own_answer` базы через PostgREST.",
+        "x-used-in": ["src/lib/db/hotelierChat.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message_id": {
+                    "type": "string"
+                  }
+                },
+                "required": ["message_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rpc/hotelier_traveller_chat": {
+      "post": {
+        "operationId": "rpc_hotelier_traveller_chat",
+        "tags": ["Функции"],
+        "summary": "hotelier_traveller_chat",
+        "description": "Функция `hotelier_traveller_chat` базы через PostgREST.",
+        "x-used-in": ["src/lib/db/hotelierChat.ts", "src/lib/hotelierChatRemote.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "hotel_id": {
+                    "type": "string"
+                  }
+                },
+                "required": ["hotel_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "created_at": {
+                        "type": "string"
+                      },
+                      "hotel_id": {
+                        "type": "string"
+                      },
+                      "hotelier_unread": {
+                        "type": "number"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "is_demo": {
+                        "type": "boolean"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "last_message_at": {
+                        "type": "string"
+                      },
+                      "last_message_text": {
+                        "type": "string"
+                      },
+                      "last_sender": {
+                        "type": ["string", "null"]
+                      },
+                      "origin_chat_id": {
+                        "type": ["string", "null"]
+                      },
+                      "origin_tool_run_id": {
+                        "type": ["string", "null"]
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "updated_at": {
+                        "type": "string"
+                      },
+                      "user_id": {
+                        "type": "string"
+                      },
+                      "user_unread": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "created_at",
+                      "hotel_id",
+                      "hotelier_unread",
+                      "id",
+                      "is_demo",
+                      "kind",
+                      "last_message_at",
+                      "last_message_text",
+                      "last_sender",
+                      "origin_chat_id",
+                      "origin_tool_run_id",
+                      "status",
+                      "updated_at",
+                      "user_id",
+                      "user_unread"
+                    ]
+                  }
                 }
               }
             }
@@ -2723,6 +2864,12 @@
           "is_demo": {
             "type": "boolean"
           },
+          "knowledge_attempts": {
+            "type": "number"
+          },
+          "knowledge_due_at": {
+            "type": ["string", "null"]
+          },
           "knowledge_revoked_at": {
             "type": ["string", "null"]
           },
@@ -2749,6 +2896,8 @@
           "data",
           "id",
           "is_demo",
+          "knowledge_attempts",
+          "knowledge_due_at",
           "knowledge_revoked_at",
           "read_at",
           "request_id",

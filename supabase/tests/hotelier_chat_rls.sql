@@ -36,7 +36,12 @@ do $$
 declare
   c public.hotelier_conversations;
 begin
-  select * into c from public.hotelier_conversations where id = '00000000-0000-4000-8000-00000000cc01';
+  -- A's own chat with the hotel, whole: by the function, as the traveller may not filter by the hidden `user_id`.
+  select * into c from public.hotelier_traveller_chat((select id from rls_hotels where n = 1));
+  if c.id is distinct from '00000000-0000-4000-8000-00000000cc01'
+    or c.user_id is distinct from '00000000-0000-4000-8000-0000000000a1' then
+    raise exception 'A does not find their own chat';
+  end if;
   if c.hotelier_unread <> 1 or c.user_unread <> 0 then raise exception 'the unread counts are wrong'; end if;
   if c.last_message_text <> 'Есть ли балкон в номере Deluxe?' or c.last_sender <> 'user' then
     raise exception 'the newest message is wrong: %', c.last_message_text;
@@ -103,7 +108,10 @@ set local request.jwt.claims = '{"sub": "00000000-0000-4000-8000-0000000000e2", 
 do $$
 begin
   if not public.is_hotelier() then raise exception 'H2 is not a hotelier'; end if;
-  if (select count(*) from public.hotelier_conversations) <> 0 then raise exception 'H2 sees another hotel''s chat'; end if;
+  -- The demo data of the live database have chats of their own: only the test's are counted.
+  if (select count(*) from public.hotelier_conversations where id = '00000000-0000-4000-8000-00000000cc01') <> 0 then
+    raise exception 'H2 sees another hotel''s chat';
+  end if;
   begin
     insert into public.hotelier_messages (conversation_id, sender, text)
     values ('00000000-0000-4000-8000-00000000cc01', 'hotelier', 'Не мой отель');
@@ -116,9 +124,38 @@ end $$;
 set local request.jwt.claims = '{"sub": "00000000-0000-4000-8000-0000000000e1", "role": "authenticated"}';
 do $$
 declare
-  c public.hotelier_conversations;
+  c record;
+  hidden text;
 begin
-  if (select count(*) from public.hotelier_messages) <> 1 then raise exception 'H does not see A''s message'; end if;
+  if (select count(*) from public.hotelier_messages where conversation_id = '00000000-0000-4000-8000-00000000cc01') <> 1 then
+    raise exception 'H does not see A''s message';
+  end if;
+  -- H never gets who the traveller is: not the id, not their chats with Эвал, not the author of their message.
+  foreach hidden in array array[
+    'select user_id from public.hotelier_conversations',
+    'select origin_chat_id from public.hotelier_conversations',
+    'select origin_tool_run_id from public.hotelier_conversations',
+    'select * from public.hotelier_conversations',
+    'select user_id from public.hotelier_requests',
+    'select origin_tool_run_id from public.hotelier_requests',
+    'select author_id from public.hotelier_messages',
+    'select * from public.hotelier_messages'
+  ] loop
+    begin
+      execute hidden;
+      raise exception 'H read: %', hidden;
+    exception when insufficient_privilege then null;
+    end;
+  end loop;
+  if exists (select 1 from public.hotelier_traveller_chat((select id from rls_hotels where n = 1))) then
+    raise exception 'H found A''s chat as their own';
+  end if;
+  if public.hotelier_own_answer((
+    select id from public.hotelier_messages
+    where sender = 'user' and conversation_id = '00000000-0000-4000-8000-00000000cc01'
+  )) then
+    raise exception 'A''s message is H''s answer';
+  end if;
   begin
     insert into public.hotelier_messages (conversation_id, sender, text)
     values ('00000000-0000-4000-8000-00000000cc01', 'user', 'Как гость');
@@ -137,11 +174,18 @@ begin
   if not public.hotelier_conversation_status('00000000-0000-4000-8000-00000000cc01', 'resolved') then
     raise exception 'H did not resolve the chat';
   end if;
-  select * into c from public.hotelier_conversations where id = '00000000-0000-4000-8000-00000000cc01';
+  if not public.hotelier_own_answer((
+    select id from public.hotelier_messages
+    where sender = 'hotelier' and conversation_id = '00000000-0000-4000-8000-00000000cc01'
+  )) then
+    raise exception 'H''s answer is not theirs';
+  end if;
+  select hotelier_unread, user_unread, status into c
+  from public.hotelier_conversations where id = '00000000-0000-4000-8000-00000000cc01';
   if c.hotelier_unread <> 0 or c.user_unread <> 1 or c.status <> 'resolved' then
     raise exception 'the state after the answer is wrong: % % %', c.hotelier_unread, c.user_unread, c.status;
   end if;
-  if (select read_at from public.hotelier_messages where sender = 'user') is null then
+  if (select read_at from public.hotelier_messages where sender = 'user' and conversation_id = '00000000-0000-4000-8000-00000000cc01') is null then
     raise exception 'the traveller''s message is not read';
   end if;
   -- The counts and the state are not H's to write.
@@ -173,7 +217,8 @@ begin
   end;
 end $$;
 
--- B writes at most 20 messages a minute.
+-- B writes at most 20 messages a minute, strictly: each message of B's waits for B's lock of the transaction (held
+-- until it ends), so a parallel transaction of B counts these 20 once they are committed instead of missing them.
 set local request.jwt.claims = '{"sub": "00000000-0000-4000-8000-0000000000b2", "role": "authenticated"}';
 insert into public.hotelier_conversations (id, hotel_id)
 select '00000000-0000-4000-8000-00000000cc02', id from rls_hotels where n = 2;
@@ -188,6 +233,14 @@ begin
   exception when raise_exception then
     if sqlerrm <> 'hotelier_rate_limited' then raise; end if;
   end;
+  if not exists (
+    select 1 from pg_catalog.pg_locks l
+    where l.locktype = 'advisory' and l.pid = pg_catalog.pg_backend_pid() and l.mode = 'ExclusiveLock' and l.granted
+      and ((l.classid::bigint << 32) | l.objid::bigint)
+        = pg_catalog.hashtextextended('hotelier_messages:00000000-0000-4000-8000-0000000000b2', 0)
+  ) then
+    raise exception 'B''s messages do not hold B''s lock';
+  end if;
 end $$;
 
 -- A guest reads and writes none of it.

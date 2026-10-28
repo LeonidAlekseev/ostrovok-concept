@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { apiError } from '@/lib/api'
 import { allowRequest, clientIp } from '@/lib/ai/rateLimit'
 import { answerRequest, sendHotelierMessage, signedInUser } from '@/lib/db/hotelierChat'
-import { processHotelierAnswer } from '@/lib/db/hotelierKnowledge'
+import { processHotelierAnswer, retryDueHotelierKnowledge } from '@/lib/db/hotelierKnowledge'
 import { createClient } from '@/lib/supabase/server'
 import { failureResponse, jsonBody } from '../../../respond'
 import {
@@ -19,7 +19,8 @@ import {
  * The hotelier's answer in a conversation of their hotel. The database checks the right (`is_hotelier_of`): anyone
  * else gets 403. An answer to a request finishes it at once, as the hotelier (`answer_hotelier_request`: the waiting
  * runs of Эвал, the traveller's chat); its knowledge — the characteristics of a shareable answer, the documents of the
- * search — is the server's after the response (`after`), so nothing waits for the model. 400 for a bad body, 401 for a
+ * search — is the server's after the response (`after`), so nothing waits for the model; the answers whose knowledge
+ * failed before are tried again then too. 400 for a bad body, 401 for a
  * guest, 404 for an unknown conversation, 409 for a closed one, 429 over the limits, 503 when the database fails.
  */
 export async function POST(request: Request, context: { params: Promise<{ conversationId: string }> }) {
@@ -36,6 +37,10 @@ export async function POST(request: Request, context: { params: Promise<{ conver
   if (!result.ok) return failureResponse(result.failure)
   const message = result.value
   if (message.requestId) await answerRequest(client, message.requestId, message.id)
-  if (message.shareable || message.requestId) after(() => processHotelierAnswer(message.id))
+  // A shareable answer is due for its knowledge from the moment it is written; a try that fails is due again later.
+  after(async () => {
+    if (message.shareable) await processHotelierAnswer(message.id)
+    await retryDueHotelierKnowledge()
+  })
   return Response.json(message)
 }

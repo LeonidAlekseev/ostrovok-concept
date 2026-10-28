@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   later: [] as (() => unknown)[],
   mediate: vi.fn(async () => 'answered'),
   process: vi.fn(async () => 'done'),
+  retry: vi.fn(async () => 0),
   revoke: vi.fn(async () => true),
 }))
 vi.mock('next/server', async (load) => ({
@@ -26,6 +27,7 @@ vi.mock('next/server', async (load) => ({
 vi.mock('@/lib/ai/hotelierMediator', () => ({ mediate: mocks.mediate }))
 vi.mock('@/lib/db/hotelierKnowledge', () => ({
   processHotelierAnswer: mocks.process,
+  retryDueHotelierKnowledge: mocks.retry,
   revokeHotelierAnswer: mocks.revoke,
 }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => mocks.client }))
@@ -71,6 +73,7 @@ beforeEach(() => {
   mocks.answerRequest.mockClear()
   mocks.mediate.mockClear()
   mocks.process.mockClear()
+  mocks.retry.mockClear()
   mocks.revoke.mockClear()
   mocks.own = true
   mocks.later = []
@@ -144,6 +147,8 @@ describe('POST /api/hotelier/conversations/{conversationId}/messages', () => {
     expect(mocks.process).not.toHaveBeenCalled()
     await runLater()
     expect(mocks.process).toHaveBeenCalledWith('m2')
+    // The answers whose knowledge failed before are tried again after the response too.
+    expect(mocks.retry).toHaveBeenCalled()
   })
 
   it('refuses a bad id, a bad body, a guest and another hotel’s hotelier', async () => {
