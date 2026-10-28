@@ -14,6 +14,7 @@ import { serviceClient, type Table } from './lib/node.ts'
 const { REAL_HOTEL_ID_PREFIX } = await import('../src/lib/catalog.ts')
 const { otaHotel, searchStay } = await import('../src/lib/ota/hotel.ts')
 const { otaHotelSchema, otaMapHotelSchema } = await import('../src/lib/ota/search.ts')
+const { withoutMergedHotels } = await import('../src/lib/ota/merged.ts')
 const { pageFields, pageFieldsRowSchema, PAGE_FIELDS_COLUMNS } = await import('../src/lib/ota/page.ts')
 
 const DESTINATION_ID = 'valencia'
@@ -53,7 +54,11 @@ interface HotelRow {
   data: unknown
 }
 
-const otaRows = await readAll<OtaRow>('ota_hotels', 'master_id,ota_hotel_id,static_vm,rates,map_hotel', 'master_id')
+// A duplicate folded into another hotel (src/lib/ota/merged.ts) is not rebuilt, even if its row is still there.
+const otaRows = withoutMergedHotels(
+  await readAll<OtaRow>('ota_hotels', 'master_id,ota_hotel_id,static_vm,rates,map_hotel', 'master_id'),
+  (row) => row.master_id,
+)
 const raws = otaRows.map((row) =>
   otaHotelSchema.parse({
     master_id: row.master_id,
