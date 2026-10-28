@@ -24,8 +24,9 @@ ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 # `npm run build` runs scripts/secrets.mjs first: with AGE_SECRET_KEY it writes .env.production.local, removed right after.
 # An empty build arg would shadow that file (Next.js never overrides a set variable), so empty ones are unset first.
-RUN --mount=type=secret,id=age_secret_key,env=AGE_SECRET_KEY,required=false \
-    for name in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY AGE_SECRET_KEY; do \
+RUN --mount=type=secret,id=age_secret_key,required=false \
+    if [ -s /run/secrets/age_secret_key ]; then AGE_SECRET_KEY="$(cat /run/secrets/age_secret_key)"; export AGE_SECRET_KEY; fi; \
+    for name in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY; do \
       eval "[ -n \"\$$name\" ] || unset $name"; \
     done; \
     npm run build && rm -f .env.production.local
