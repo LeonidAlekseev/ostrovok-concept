@@ -390,11 +390,12 @@ const osmEvidence = (place: NonNullable<ReturnType<typeof nearPlace>>): Evidence
   dataset_id: null,
 })
 
-export const NEAR_METHOD = 'osm_places_near: расстояние по прямой от точки отеля до формы объекта OSM'
-export const NEAR_VERSION = 'osm_places_near-1'
+export const NEAR_METHOD =
+  'osm_places_near_facade: расстояние по прямой от фасада здания отеля (контур EUBUCCO; от точки отеля, если здания нет) до формы объекта OSM'
+export const NEAR_VERSION = 'osm_places_near_facade-1'
 
 /**
- * The loud places of OSM around the hotel (`osm_places_near` over `NOISY_CATEGORIES`): each place an entity with its
+ * The loud places of OSM around the hotel's facade (`osm_places_near_facade` over `NOISY_CATEGORIES`): each place an entity with its
  * OSM evidence and the edge hotel —near→ place, its distance a `derived` claim of the hotel's calculation, and the
  * count of each category found (`noise.nearby.<category>.count`, «20 и больше» at the answer's limit). A category with
  * no place gives no claim: OSM may lack it.
@@ -424,7 +425,7 @@ export function nearbyStore(
     parameters: { radius_m: radiusM, per_category: perCategory, categories: [...NOISY_CATEGORIES] },
     limitations: [
       'Данные OpenStreetMap могут быть неполными: места нет в данных — не значит, что его нет на месте',
-      'Расстояние по прямой до формы объекта, не путь пешком',
+      'Расстояние по прямой от стены здания отеля до формы объекта, не путь пешком',
       `Не более ${perCategory} мест каждой категории`,
     ],
   })
@@ -446,7 +447,7 @@ export function nearbyStore(
       value_text: null,
       unit: 'm',
       epistemic_status: 'derived',
-      ...rated('osm_distance', { categories: place.categories.filter((c) => NOISY.has(c)) }),
+      ...rated('osm_distance_facade', { categories: place.categories.filter((c) => NOISY.has(c)) }),
       calculation: key,
       observed_at: null,
       limitations: [],
@@ -491,17 +492,17 @@ export function nearbyStore(
 export const ESTIMATE_METHOD =
   'Оценка шума у фасада: самые громкие (улица) и самые тихие (двор) полосы карт шума EEA у контура здания, энергетическая сумма слоёв и шумных мест OpenStreetMap как точечных источников'
 
-/** What the estimate of noise-estimate-v1 does not take into account, for its calculation and the API's docs. */
+/** What the estimate of noise-estimate-v2 does not take into account, for its calculation and the API's docs. */
 export const ESTIMATE_LIMITATIONS = [
   'Модель, а не измерение: полосы стратегической карты шума EEA (END, раунд 2022) и типовые уровни заведений',
-  'Экранирование зданиями не учитывается: шум заведения доходит до фасада и двора без препятствий',
+  'Здание отеля полностью экранирует двор от заведений (к окнам во двор они не прибавляются); другие здания между заведением и фасадом не учитываются',
   'Уровни снаружи у стены: окна, стены и звукоизоляция номеров не учитываются',
   'Уровни заведений — типовые для вида (терраса, открытая дверь), а не измерение конкретного места; часы работы не проверяются',
-  'Расстояние до заведения — от точки отеля по прямой; заведения, которых нет в OpenStreetMap, не учтены',
+  'Расстояние до заведения — по прямой от фасада (контур здания отеля по EUBUCCO; от точки отеля, если здания нет); заведения, которых нет в OpenStreetMap, не учтены',
   'Дневной и вечерний уровни из Lden и Lnight при допущениях «вечер = день» и «день не тише ночи»',
 ]
 
-/** The parameters of noise-estimate-v1, for the calculation's rows and the API's docs. */
+/** The parameters of noise-estimate-v2, for the calculation's rows and the API's docs. */
 export const ESTIMATE_PARAMETERS = {
   facade_buffer_m: FACADE_BUFFER_M,
   circle_radius_m: FACADE_CIRCLE_M,
@@ -542,7 +543,7 @@ export function facadeDataset(facade: unknown): string | null {
 }
 
 /**
- * The estimate of noise-estimate-v1 (`noiseEstimate`) from the answers of `hotel_noise_facade` and `osm_places_near`
+ * The estimate of noise-estimate-v2 (`noiseEstimate`) from the answers of `hotel_noise_facade` and `osm_places_near_facade`
  * over `NOISY_CATEGORIES`, with the facade's bands and the loud places read, each place once (nearest first, under
  * the first of its categories), as the page reads them.
  */
@@ -569,8 +570,8 @@ export function estimateOf(facade: unknown, near: unknown) {
 }
 
 /**
- * The estimate of noise-estimate-v1 at the hotel's facade (`noiseEstimate`) from `hotel_noise_facade` and the loud
- * places of `osm_places_near`: `noise.estimate.street.<period>` and `noise.estimate.yard.<period>` (the facade to the
+ * The estimate of noise-estimate-v2 at the hotel's facade (`noiseEstimate`) from `hotel_noise_facade` and the loud
+ * places of `osm_places_near_facade`: `noise.estimate.street.<period>` and `noise.estimate.yard.<period>` (the facade to the
  * street and the windows to the yard, the EEA layers and the places summed), `noise.estimate.facade.<period>` (the
  * EEA layers alone, street side) and `noise.estimate.venues.<period>` (the places alone), all `derived` from one
  * calculation with the datasets of EEA and EUBUCCO and the places of OSM as its inputs. Nothing without an EEA band
@@ -648,13 +649,18 @@ export function estimateStore(
         claim(
           `noise.estimate.${side}.${period}`,
           bounds(range),
-          withPlaces
+          // The yard has no places in it: its levels are the EEA layers alone.
+          side === 'yard'
             ? day
-              ? 'noise_estimate_day'
-              : 'noise_estimate'
-            : day
-              ? 'noise_estimate_no_places_day'
-              : 'noise_estimate_no_places',
+              ? 'facade_day'
+              : 'facade_band'
+            : withPlaces
+              ? day
+                ? 'noise_estimate_day'
+                : 'noise_estimate'
+              : day
+                ? 'noise_estimate_no_places_day'
+                : 'noise_estimate_no_places',
         )
     }
   for (const period of PERIOD_PROPERTY) {

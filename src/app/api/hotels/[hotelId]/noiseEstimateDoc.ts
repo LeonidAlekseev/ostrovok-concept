@@ -3,7 +3,7 @@ import { CONFIDENCE } from '@/lib/confidence'
 import { NOISE_ESTIMATE_METHOD, NOISE_ESTIMATE_NOTES, VENUE_LEVELS, noiseSourceLabel } from '@/lib/noise'
 
 /**
- * How the noise at the hotel's facade is computed (noise-estimate-v1), for the descriptions of `/api/docs`: the
+ * How the noise at the hotel's facade is computed (noise-estimate-v2), for the descriptions of `/api/docs`: the
  * method, the formulas, the parameters and the limitations, from the same constants the estimate uses.
  */
 

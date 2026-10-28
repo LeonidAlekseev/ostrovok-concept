@@ -136,6 +136,32 @@ describe('featuresOf', () => {
     })
     expect(map.get('ota-2')).toEqual({ views: [{ roomName: 'Номер с видом на город', view: 'city' }] })
   })
+
+  it("marks the height and the floors a model estimated, with the height's interval", () => {
+    const row = {
+      hotel_id: 'ota-3',
+      floors: 5,
+      height_m: 17.4,
+      lden_min: null,
+      lden_max: null,
+      lnight_min: null,
+      lnight_max: null,
+    }
+    const model = featuresOf(
+      [{ ...row, height_source: 'estimated', height_lower_m: 14.5, height_upper_m: 20.2, floors_source: 'estimated' }],
+      [],
+    ).get('ota-3')!
+    expect(model).toMatchObject({ heightEstimated: true, heightRangeM: [14.5, 20.2], floorsEstimated: true })
+    expect(featureReasons(model, { height: 'high' })).toEqual([
+      'здание ≈5 этажей (по оценке модели), ≈17 м (по оценке модели, 15–20 м)',
+    ])
+    expect(featureLines(model)[0]).toBe(
+      'Здание: ≈5 этажей (по оценке модели), высота ≈17 м (по оценке модели, 15–20 м).',
+    )
+    const tagged = featuresOf([{ ...row, height_source: 'osm', floors_source: 'gov-spain' }], []).get('ota-3')!
+    expect(tagged).not.toHaveProperty('heightEstimated')
+    expect(featureReasons(tagged, { height: 'high' })).toEqual(['здание 5 этажей, 17 м'])
+  })
 })
 
 describe('withoutDoubtfulBuildings', () => {
@@ -145,6 +171,15 @@ describe('withoutDoubtfulBuildings', () => {
     expect(isDoubtfulBuilding(6, 6)).toBe(false)
     expect(isDoubtfulBuilding(3, null)).toBe(false)
     expect(isDoubtfulBuilding(undefined, 12)).toBe(false)
+  })
+
+  it("doubts a building whose height is more than 8 m a floor: the cadastre's floors with a model's height", () => {
+    // ota-10172244: EUBUCCO «1 этаж, ≈17 м».
+    expect(isDoubtfulBuilding(1, null, 17.4)).toBe(true)
+    expect(isDoubtfulBuilding(2, 0, 38)).toBe(true)
+    expect(isDoubtfulBuilding(12, null, 38)).toBe(false)
+    expect(isDoubtfulBuilding(1, null, 7.9)).toBe(false)
+    expect(isDoubtfulBuilding(null, null, 17.4)).toBe(false)
   })
 
   it('drops the floors and the height of a doubtful building, keeps the noise and the views', () => {

@@ -38,7 +38,7 @@ import { calculationOf, evidenceOf } from './noiseTool'
 /**
  * Эвал's tools of the choice of hotels (docs/tools.md), each a run of the contract with its sources:
  * - «Отели по характеристикам» — the hotels of the plan's cities by their claims: the night and the day at the
- *   facade to the street (noise-estimate-v1: EEA's bands and the loud places nearby), the building's height; a hotel without the claim is «нет данных», never «подходит» or not;
+ *   facade to the street (noise-estimate-v2: EEA's bands and the loud places nearby), the building's height; a hotel without the claim is «нет данных», never «подходит» or not;
  * - «Места рядом» (the graph of the store) — the nearest place of a category by the edges `near` of each hotel, its
  *   distance a claim with its evidence of OSM or Островок; no edge is «в данных нет», never «рядом нет»;
  * - «Отзывы» (the search of the reviews) — the guests' words on a topic for the chosen hotels, quoted.
@@ -139,7 +139,7 @@ const ofHotels = (n: number) => countRu(n, ['отеля', 'отелей', 'от�
 
 // ——— The choice ———
 
-/** The estimate of noise-estimate-v1 at the facade to the street: the EEA layers and the loud places summed. */
+/** The estimate of noise-estimate-v2 at the facade to the street: the EEA layers and the loud places summed. */
 const NIGHT = /^noise\.estimate\.street\.lnight$/
 const DAY = /^noise\.estimate\.street\.lday$/
 const HEIGHT = 'building.height'

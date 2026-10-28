@@ -97,6 +97,25 @@ function wayShape(points: LatLon[]): { geom: string; centre: LatLon } | undefine
   return { geom: `SRID=4326;LINESTRING(${points.map(pair).join(',')})`, centre: middle }
 }
 
+/**
+ * The border of a relation of a shape category (a park, a beach) as a MULTIPOLYGON, from the `polygons` of
+ * scripts/osm-pbf-to-overpass.py (Overpass gives a relation only a centre): each polygon a list of rings, the outer
+ * one first. A ring of fewer than 4 points is no ring and is left out; `undefined` when no polygon is left.
+ */
+function relationShape(polygons: unknown): string | undefined {
+  const text = (Array.isArray(polygons) ? polygons : []).flatMap((polygon) => {
+    const rings = (Array.isArray(polygon) ? polygon : []).flatMap((ring) => {
+      const points = Array.isArray(ring) ? ring.filter(isPoint) : []
+      return points.length >= 4 ? [`(${points.map(pair).join(',')})`] : []
+    })
+    // The outer ring is the polygon: a polygon without it would take a hole for its border.
+    return rings.length > 0 && Array.isArray(polygon) && (polygon[0] as unknown[])?.length >= 4
+      ? [`(${rings.join(',')})`]
+      : []
+  })
+  return text.length > 0 ? `SRID=4326;MULTIPOLYGON(${text.join(',')})` : undefined
+}
+
 /** One element of an Overpass answer as a row; `undefined` for one of no category or without coordinates. */
 export function elementRow(element: unknown): OsmPlaceRow | undefined {
   if (!element || typeof element !== 'object') return undefined
@@ -122,6 +141,8 @@ export function elementRow(element: unknown): OsmPlaceRow | undefined {
   }
   if (isPoint(e.center)) {
     const centre = { lat: round(e.center.lat), lon: round(e.center.lon) }
+    const border = type === 'relation' && isShape(tags) ? relationShape(e.polygons) : undefined
+    if (border) return { ...base, ...centre, geom: border }
     return { ...base, ...centre, geom: `SRID=4326;POINT(${pair(centre)})` }
   }
   return undefined

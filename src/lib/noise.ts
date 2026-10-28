@@ -7,7 +7,7 @@ import { isViewQuestion } from './view'
 /**
  * «Шум и окружение» of a real hotel, the same for its page and for Эвал: the bands of the EEA strategic noise maps
  * (END, round 2022) at the hotel's facade, by source, the loud places of OpenStreetMap around it, and the estimate of
- * both at the facade (`noiseEstimate`, noise-estimate-v1). A band is what EEA gives — a 5 dB range, not a level — and
+ * both at the facade (`noiseEstimate`, noise-estimate-v2). A band is what EEA gives — a 5 dB range, not a level — and
  * the estimate keeps the range. A hotel outside every contour has no EEA data (the maps stop below their lowest band),
  * which is not «тихо».
  */
@@ -314,7 +314,7 @@ export function venuesLine(venues: NoiseEstimate['venues']): string {
 
 /**
  * The facts of the noise for the page's summary and for Эвал, one line each: the estimate at the facade to the street
- * and to the yard (noise-estimate-v1), the places' share, the EEA layers at the facade and the loud places nearby.
+ * and to the yard (noise-estimate-v2), the places' share, the EEA layers at the facade and the loud places nearby.
  * Only the data: no level is stated without its range.
  */
 export function noiseLines(noise: HotelNoise | null | undefined): string[] {
@@ -325,7 +325,7 @@ export function noiseLines(noise: HotelNoise | null | undefined): string[] {
   else {
     lines.push(
       `Оценка шума у фасада на улицу (${NOISE_ESTIMATE_METHOD}: карты шума EEA 2022 и шумные места OpenStreetMap): ${sideLine(estimate.street)}.`,
-      `Окна во двор (самые тихие полосы EEA у здания и те же места): ${sideLine(estimate.yard)}.`,
+      `Окна во двор (самые тихие полосы EEA у здания, без заведений: здание их экранирует): ${sideLine(estimate.yard)}.`,
     )
     if (estimate.counted.length)
       lines.push(
@@ -398,13 +398,15 @@ export function facadeOf(answer: unknown): Pick<HotelNoise, 'sources' | 'yard' |
 }
 
 /**
- * noise-estimate-v1, the noise at the hotel's facade by period (hotel-knowledge, «Оценка шума у фасада»): the EEA layers
- * at the facade summed by energy, the loud OSM places within `NOISY_RADIUS_M` as point sources added to them, for the
- * street side (the loudest bands) and the yard side (the quietest). Lday and Levening from Lden and Lnight of each layer
- * (`dayEstimate`, the directive 2002/49/EC); every level a range from the bands' lower and upper bounds, an open band
- * open in the sum. No screening by the buildings, no windows: the levels are outside, at the wall.
+ * noise-estimate-v2, the noise at the hotel's facade by period (hotel-knowledge, «Оценка шума у фасада»): the EEA layers
+ * at the facade summed by energy, for the street side (the loudest bands) and the yard side (the quietest); the loud OSM
+ * places within `NOISY_RADIUS_M` of the facade (measured from the building's wall, not from the hotel's point) as point
+ * sources added to the street side only: the building screens the yard from them. Lday and Levening from Lden and Lnight
+ * of each layer (`dayEstimate`, the directive 2002/49/EC); every level a range from the bands' lower and upper bounds,
+ * an open band open in the sum. No windows: the levels are outside, at the wall. (v1 added the places to the yard too
+ * and measured from the hotel's point.)
  */
-export const NOISE_ESTIMATE_METHOD = 'noise-estimate-v1'
+export const NOISE_ESTIMATE_METHOD = 'noise-estimate-v2'
 export const FACADE_BUFFER_M = 5
 export const FACADE_CIRCLE_M = 25
 
@@ -474,7 +476,7 @@ export interface NoiseEstimate {
   /** The places summed by period, dB; `null`: none open then. */
   venues: Record<'lday' | 'levening' | 'lnight' | 'lden', number | null>
   counted: CountedVenue[]
-  /** EEA and the places: the facade to the street and the windows to the yard. */
+  /** The facade to the street (EEA and the places) and the windows to the yard (EEA alone: the building screens the places). */
   street: SideLevels
   yard: SideLevels
   /** The layers whose bands give no day level (one band, or two that do not fit): left out of the day and evening. */
@@ -512,7 +514,7 @@ const addVenues = (side: SideLevels, venues: NoiseEstimate['venues']): SideLevel
 })
 
 /**
- * The estimate of noise-estimate-v1 from the facade's bands and the loud places (each once, nearest first, as
+ * The estimate of noise-estimate-v2 from the facade's bands and the loud places (each once, nearest first, as
  * `HotelNoise.places`); `null` without any EEA band at the facade: the places alone make no level of the street.
  */
 export function noiseEstimate(noise: Pick<HotelNoise, 'sources' | 'yard' | 'zone' | 'places'>): NoiseEstimate | null {
@@ -547,16 +549,17 @@ export function noiseEstimate(noise: Pick<HotelNoise, 'sources' | 'yard' | 'zone
     venues,
     counted,
     street: addVenues(street.levels, venues),
-    yard: addVenues(yard.levels, venues),
+    // The building screens the yard from the places on the street.
+    yard: yard.levels,
     noDay: street.noDay,
   }
 }
 
-/** How noise-estimate-v1 is computed, for the page's «Как мы считаем», Эвал and the API's docs. */
+/** How noise-estimate-v2 is computed, for the page's «Как мы считаем», Эвал and the API's docs. */
 export const NOISE_ESTIMATE_NOTES = [
-  `Фасад на улицу — для каждого источника карт шума EEA (дороги, железная дорога, аэропорт, промышленность) самая громкая полоса Lden и Lnight, которая пересекает контур здания отеля, расширенный на ${FACADE_BUFFER_M} м (если здания нет — круг ${FACADE_CIRCLE_M} м вокруг точки отеля). Окна во двор — самая тихая полоса в той же зоне. Карты EEA не заходят внутрь зданий, поэтому по одной точке отеля шум улицы не виден.`,
+  `Фасад на улицу — для каждого источника карт шума EEA (дороги, железная дорога, аэропорт, промышленность) самая громкая полоса Lden и Lnight, которая пересекает контур здания отеля, расширенный на ${FACADE_BUFFER_M} м (если здания нет — круг ${FACADE_CIRCLE_M} м вокруг точки отеля). Окна во двор — самая тихая полоса в той же зоне; заведения к ним не прибавляются. Карты EEA не заходят внутрь зданий, поэтому по одной точке отеля шум улицы не виден.`,
   'День (07–19) и вечер (19–23) — из Lden и Lnight каждого источника по формуле директивы ЕС 2002/49/EC (приложение I) при допущениях «вечер так же громок, как день» и «день не тише ночи»; ночь (23–07) — полоса Lnight.',
-  `Бары и пабы, ночные клубы, рестораны, кафе и фастфуд OpenStreetMap в ${NOISY_RADIUS_M} м — точечные источники с типовым уровнем на ${VENUE_REFERENCE_M} м (день/вечер/ночь, дБ): рестораны, кафе и фастфуд 60/62/—, бары и пабы 58/65/62, ночные клубы —/65/72 («—» — обычно закрыто). У отеля L = Lref − 20·lg(d/10): чем ближе, тем громче; расстояние d — от точки отеля, не меньше ${VENUE_MIN_DISTANCE_M} м.`,
+  `Бары и пабы, ночные клубы, рестораны, кафе и фастфуд OpenStreetMap в ${NOISY_RADIUS_M} м — точечные источники с типовым уровнем на ${VENUE_REFERENCE_M} м (день/вечер/ночь, дБ): рестораны, кафе и фастфуд 60/62/—, бары и пабы 58/65/62, ночные клубы —/65/72 («—» — обычно закрыто). У фасада L = Lref − 20·lg(d/10): чем ближе, тем громче; расстояние d — от фасада (контур здания отеля по EUBUCCO; от точки отеля, если здания нет), не меньше ${VENUE_MIN_DISTANCE_M} м. Заведения прибавляются только к фасаду на улицу.`,
   'Уровни складываются по энергии, 10·lg Σ10^(L/10): сначала заведения, затем с картами EEA. Считаем для нижней и верхней границы полос, поэтому итог — диапазон; открытая полоса «75 дБ и выше» остаётся открытой сверху.',
-  'Не учитываем экранирование зданиями (заведение слышно и со двора), окна и звукоизоляцию номеров, часы работы конкретных мест; уровни — снаружи у стены. Уверенность по политике confidence-1: полосы у фасада — 0,9, вклад заведений — 0,6.',
+  'Здание полностью экранирует двор от заведений (их вклад к окнам во двор нулевой), другие здания между заведением и фасадом, окна и звукоизоляцию номеров, часы работы конкретных мест не учитываем; уровни — снаружи у стены. Уверенность по политике confidence-1: полосы у фасада — 0,9, вклад заведений — 0,6.',
 ] as const
