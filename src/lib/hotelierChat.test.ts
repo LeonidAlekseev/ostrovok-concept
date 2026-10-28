@@ -17,6 +17,7 @@ const message = (id: string, createdAt: string): HotelierMessage => ({
   text: id,
   requestId: null,
   shareable: false,
+  knowledgeRevokedAt: null,
   readAt: null,
   createdAt,
 })

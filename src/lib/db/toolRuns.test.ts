@@ -102,6 +102,37 @@ describe('the runs of the tools', () => {
     expect(run.result).toEqual(sampleResult)
   })
 
+  // hotelier-knowledge, Requirement: Запрос отельеру
+  it('gives the tool its run’s id, and leaves a pending run waiting with what resumes it', async () => {
+    const { client, calls } = session()
+    let given: string | null = null
+    const pending = {
+      ...sampleResult,
+      status: 'pending' as const,
+      data: { request_id: 'request-1' },
+      evidence: [],
+      claims: [],
+      calculations: [],
+    }
+    const run = await recordRun(ownerOf(client), 'ask_hotelier', 'Отель', async (runId) => {
+      given = runId
+      return pending
+    })
+    expect(given).toBe(run.id)
+    expect(calls.find((c) => c.op === 'update')?.value).toMatchObject({
+      status: 'waiting',
+      completed_at: null,
+      resume: { request_id: 'request-1' },
+      result_data: pending,
+    })
+    // A guest's run has no row, so no id to link.
+    await recordRun(null, 'ask_hotelier', 'Отель', async (runId) => {
+      given = runId
+      return pending
+    })
+    expect(given).toBeNull()
+  })
+
   it('keeps parallel runs apart: a row and an id each (Scenario: Параллельные вызовы)', async () => {
     const { client, calls } = session()
     const owner = ownerOf(client)

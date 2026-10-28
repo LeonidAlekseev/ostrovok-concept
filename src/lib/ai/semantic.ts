@@ -59,7 +59,7 @@ function forgetVector(query: string, vector: Promise<number[]>) {
 }
 
 /** The shared request has its own limit: a search that gives up does not cancel the vector for the others. */
-function queryVector(apiKey: string, query: string): Promise<number[]> {
+export function queryVector(apiKey: string, query: string): Promise<number[]> {
   const cached = queryVectors.get(query)
   if (cached) return cached
   const vector = embed({

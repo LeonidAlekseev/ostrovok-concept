@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { POST as writeToHotel } from '../hotels/[hotelId]/hotelier/messages/route'
 import { POST as answer } from './conversations/[conversationId]/messages/route'
 import { POST as setStatus } from './conversations/[conversationId]/status/route'
+import { POST as revoke } from './messages/[messageId]/revoke/route'
 
 const mocks = vi.hoisted(() => ({
   client: {} as object | null,
@@ -11,6 +12,21 @@ const mocks = vi.hoisted(() => ({
   traveller: vi.fn(),
   hotelier: vi.fn(),
   status: vi.fn(),
+  answerRequest: vi.fn(async () => ['run-1']),
+  own: true,
+  later: [] as (() => unknown)[],
+  mediate: vi.fn(async () => 'answered'),
+  process: vi.fn(async () => 'done'),
+  revoke: vi.fn(async () => true),
+}))
+vi.mock('next/server', async (load) => ({
+  ...(await load<typeof import('next/server')>()),
+  after: (callback: () => unknown) => void mocks.later.push(callback),
+}))
+vi.mock('@/lib/ai/hotelierMediator', () => ({ mediate: mocks.mediate }))
+vi.mock('@/lib/db/hotelierKnowledge', () => ({
+  processHotelierAnswer: mocks.process,
+  revokeHotelierAnswer: mocks.revoke,
 }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => mocks.client }))
 vi.mock('@/lib/ai/rateLimit', () => ({ allowRequest: async () => mocks.allowed, clientIp: () => '1.2.3.4' }))
@@ -23,7 +39,14 @@ vi.mock('@/lib/db/hotelierChat', () => ({
   sendTravellerMessage: mocks.traveller,
   sendHotelierMessage: mocks.hotelier,
   setConversationStatus: mocks.status,
+  answerRequest: mocks.answerRequest,
+  ownAnswer: async () => mocks.own,
 }))
+
+/** Runs what the route left for after its response. */
+const runLater = async () => {
+  for (const callback of mocks.later.splice(0)) await callback()
+}
 
 const ID = '6f1c1d6e-2f4a-4c55-9d3b-0b9a3f1e2a10'
 const request = (body: unknown) =>
@@ -45,6 +68,12 @@ beforeEach(() => {
     .mockResolvedValue({ ok: true, value: { conversation: { id: ID }, message: { id: 'm1' } } })
   mocks.hotelier.mockReset().mockResolvedValue({ ok: true, value: { id: 'm2' } })
   mocks.status.mockReset().mockResolvedValue({ ok: true, value: { id: ID, status: 'resolved' } })
+  mocks.answerRequest.mockClear()
+  mocks.mediate.mockClear()
+  mocks.process.mockClear()
+  mocks.revoke.mockClear()
+  mocks.own = true
+  mocks.later = []
 })
 
 describe('POST /api/hotels/{hotelId}/hotelier/messages', () => {
@@ -52,6 +81,10 @@ describe('POST /api/hotels/{hotelId}/hotelier/messages', () => {
     const response = await writeToHotel(request({ text: '  Есть балкон?  ' }), hotelParams)
     expect(response.status).toBe(200)
     expect(mocks.traveller).toHaveBeenCalledWith(mocks.client, 'u1', 'ota-1', 'Есть балкон?')
+    // The hotel's AI assistant answers after the response: nothing waits for it.
+    expect(mocks.mediate).not.toHaveBeenCalled()
+    await runLater()
+    expect(mocks.mediate).toHaveBeenCalledWith(ID, 'm1')
   })
 
   it.each([
@@ -95,9 +128,22 @@ describe('POST /api/hotelier/conversations/{conversationId}/messages', () => {
     expect(mocks.hotelier).toHaveBeenCalledWith(mocks.client, 'u1', ID, body)
   })
 
-  it('shares nothing unless asked', async () => {
+  it('shares nothing unless asked, and keeps a private answer out of the knowledge', async () => {
     await answer(request({ text: 'Да' }), conversationParams())
     expect(mocks.hotelier.mock.calls[0][3]).toEqual({ text: 'Да', shareable: false })
+    await runLater()
+    expect(mocks.process).not.toHaveBeenCalled()
+    expect(mocks.answerRequest).not.toHaveBeenCalled()
+  })
+
+  it('finishes the request at once as the hotelier, and leaves its knowledge for after the response', async () => {
+    mocks.hotelier.mockResolvedValueOnce({ ok: true, value: { id: 'm2', requestId: ID, shareable: true } })
+    const response = await answer(request({ text: 'Да', shareable: true, requestId: ID }), conversationParams())
+    expect(response.status).toBe(200)
+    expect(mocks.answerRequest).toHaveBeenCalledWith(mocks.client, ID, 'm2')
+    expect(mocks.process).not.toHaveBeenCalled()
+    await runLater()
+    expect(mocks.process).toHaveBeenCalledWith('m2')
   })
 
   it('refuses a bad id, a bad body, a guest and another hotel’s hotelier', async () => {
@@ -118,5 +164,23 @@ describe('POST /api/hotelier/conversations/{conversationId}/status', () => {
     expect((await setStatus(request({ status: 'waiting_hotelier' }), conversationParams())).status).toBe(400)
     mocks.status.mockResolvedValueOnce({ ok: false, failure: 'forbidden' })
     expect((await setStatus(request({ status: 'closed' }), conversationParams())).status).toBe(403)
+  })
+})
+
+describe('POST /api/hotelier/messages/{messageId}/revoke', () => {
+  it('withdraws the hotelier’s own answer after the response', async () => {
+    const response = await revoke(request({}), { params: Promise.resolve({ messageId: ID }) })
+    expect(response.status).toBe(202)
+    await runLater()
+    expect(mocks.revoke).toHaveBeenCalledWith(ID)
+  })
+
+  it('refuses another’s message and a guest', async () => {
+    mocks.own = false
+    expect((await revoke(request({}), { params: Promise.resolve({ messageId: ID }) })).status).toBe(403)
+    mocks.userId = null
+    expect((await revoke(request({}), { params: Promise.resolve({ messageId: ID }) })).status).toBe(401)
+    await runLater()
+    expect(mocks.revoke).not.toHaveBeenCalled()
   })
 })

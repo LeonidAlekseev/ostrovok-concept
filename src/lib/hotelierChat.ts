@@ -1,4 +1,5 @@
 import type { Database } from './db/database.types'
+import { parseToolRun, type ToolRun } from './toolResult'
 
 /**
  * The chats with the hotels' owners (supabase/migrations/20261028130000_hotelier_chat.sql): a traveller's chat with a
@@ -79,8 +80,12 @@ export interface HotelierMessage {
   text: string
   requestId: string | null
   shareable: boolean
+  /** The hotelier withdrew the answer's knowledge. */
+  knowledgeRevokedAt: string | null
   readAt: string | null
   createdAt: string
+  /** The AI assistant's answer: the sources it used, from the store. */
+  run?: ToolRun
 }
 
 export interface HotelierRequest {
@@ -91,6 +96,8 @@ export interface HotelierRequest {
   characteristicKeys: string[]
   contextSummary: string | null
   status: RequestStatus
+  /** The answer's characteristics: `queued` on the way, `done`, `failed` (re-run), `none` before an answer. */
+  knowledgeStatus: 'none' | 'queued' | 'done' | 'failed'
   answeredAt: string | null
   createdAt: string
 }
@@ -118,16 +125,23 @@ export const conversationOf = (row: ConversationRow): HotelierConversation => ({
   createdAt: row.created_at,
 })
 
-export const messageOf = (row: MessageRow): HotelierMessage => ({
-  id: row.id,
-  conversationId: row.conversation_id,
-  sender: oneOf(HOTELIER_SENDERS, row.sender, 'user'),
-  text: row.text,
-  requestId: row.request_id,
-  shareable: row.shareable,
-  readAt: row.read_at,
-  createdAt: row.created_at,
-})
+export function messageOf(row: MessageRow): HotelierMessage {
+  const sender = oneOf(HOTELIER_SENDERS, row.sender, 'user')
+  // Only the assistant's message carries a run: the people's never do.
+  const run = sender === 'ai_assistant' ? parseToolRun((row.data as { run?: unknown } | null)?.run) : undefined
+  return {
+    id: row.id,
+    conversationId: row.conversation_id,
+    sender,
+    text: row.text,
+    requestId: row.request_id,
+    shareable: row.shareable,
+    knowledgeRevokedAt: row.knowledge_revoked_at ?? null,
+    readAt: row.read_at,
+    createdAt: row.created_at,
+    ...(run && { run }),
+  }
+}
 
 export const requestOf = (row: RequestRow): HotelierRequest => ({
   id: row.id,
@@ -137,6 +151,7 @@ export const requestOf = (row: RequestRow): HotelierRequest => ({
   characteristicKeys: row.characteristic_keys,
   contextSummary: row.context_summary,
   status: oneOf(REQUEST_STATUSES, row.status, 'pending'),
+  knowledgeStatus: oneOf(['none', 'queued', 'done', 'failed'] as const, row.knowledge_status, 'none'),
   answeredAt: row.answered_at,
   createdAt: row.created_at,
 })

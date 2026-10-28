@@ -793,9 +793,10 @@ export interface TurnStep {
   /**
    * `search` picks the hotels by meaning, `features` checks their building, noise and views, `vision` looks at the
    * photos (another model when the first failed), `geo` is a call of a geo tool: the places near, a route; `trips`
-   * reads the traveller's bookings and counts a change of their dates.
+   * reads the traveller's bookings and counts a change of their dates; `hotelier` asks the hotel's hotelier
+   * (`ask_hotelier`) and waits for the answer.
    */
-  agent: 'search' | 'features' | 'vision' | 'geo' | 'trips'
+  agent: 'search' | 'features' | 'vision' | 'geo' | 'trips' | 'hotelier'
   title: string
   /** What the step was called with, briefly in Russian: «Валенсия», «до моря до 1 км · тихо ночью». */
   params?: string
@@ -866,7 +867,7 @@ const isCriterion = (value: unknown): value is Criterion =>
 const isStep = (value: unknown): value is TurnStep =>
   typeof value === 'object' &&
   value !== null &&
-  ['search', 'features', 'vision', 'geo', 'trips'].includes((value as TurnStep).agent) &&
+  ['search', 'features', 'vision', 'geo', 'trips', 'hotelier'].includes((value as TurnStep).agent) &&
   typeof (value as TurnStep).title === 'string' &&
   ['done', 'failed'].includes((value as TurnStep).status)
 /** The known fields of a step only; a run off the contract is dropped, the step stays as an older one. */

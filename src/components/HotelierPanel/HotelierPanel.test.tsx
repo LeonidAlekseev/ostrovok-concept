@@ -55,6 +55,7 @@ const message = (id: string, sender: HotelierMessage['sender'], text: string): H
   text,
   requestId: null,
   shareable: false,
+  knowledgeRevokedAt: null,
   readAt: null,
   createdAt: `2026-10-28T10:0${id.length}:00Z`,
 })
@@ -75,6 +76,7 @@ beforeEach(() => {
       characteristicKeys: ['room.balcony'],
       contextSummary: 'Гость ищет номер с балконом',
       status: 'pending',
+      knowledgeStatus: 'none',
       answeredAt: null,
       createdAt: '2026-10-28T10:00:00Z',
     },
@@ -175,5 +177,39 @@ describe('HotelierPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Решено' }))
     expect(await screen.findByRole('button', { name: 'Открыть снова' })).toBeDefined()
     expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string)).toEqual({ status: 'resolved' })
+  })
+
+  it('withdraws the knowledge of the hotelier’s shared answer, and shows the assistant’s sources', async () => {
+    remote.messages = [
+      { ...message('mm', 'hotelier', 'Да, балкон есть'), shareable: true },
+      {
+        ...message('mmm', 'ai_assistant', 'По словам отельера, балкон есть.'),
+        run: {
+          id: '00000000-0000-4000-8000-0000000001a1',
+          result: {
+            status: 'success',
+            summary: 'По словам отельера, балкон есть.',
+            data: null,
+            evidence: [],
+            claims: [],
+            calculations: [],
+            method: null,
+            limitations: ['Ответ AI-помощника по сохранённым данным, не отельера'],
+            error: null,
+          },
+        },
+      },
+    ]
+    signIn()
+    render(<HotelierPanel />)
+    const user = userEvent.setup()
+    await user.click(within(await screen.findByRole('list', { name: 'Обращения' })).getAllByRole('button')[0])
+    await user.click(await screen.findByRole('button', { name: 'Источники ответа AI-помощника' }))
+    expect(screen.getByText('Ответ AI-помощника по сохранённым данным, не отельера')).toBeDefined()
+    fetchMock.mockResolvedValueOnce(Response.json({ messageId: 'mm', revoked: true }, { status: 202 }))
+    await user.click(screen.getByRole('button', { name: 'Отозвать сведения' }))
+    expect(await screen.findByText(/сведения отозваны/)).toBeDefined()
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/hotelier/messages/mm/revoke')
+    expect(screen.queryByRole('button', { name: 'Отозвать сведения' })).toBeNull()
   })
 })

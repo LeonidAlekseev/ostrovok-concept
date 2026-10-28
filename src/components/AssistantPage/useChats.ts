@@ -29,8 +29,10 @@ import {
   dialogOf,
   lastPhotoMessage,
   loadGuestChats,
+  mergeServerMessage,
   newChat,
   newId,
+  parseMessage,
   saveGuestChats,
   shownHotels,
   type Chat,
@@ -57,6 +59,8 @@ import { todayIso } from '@/lib/dates'
 import { isHotelGeoQuestion, isHotelViewQuestion, isNoiseQuestion } from '@/lib/noise'
 import type { OptimizedPhoto } from '@/lib/imageOptimize'
 import { getBrowserClient } from '@/lib/supabase/client'
+import { channelName, join, rowOf } from '@/lib/supabase/realtime'
+import type { Tables } from '@/lib/db/database.types'
 import { bookingsStore, findBooking, saveBooking } from '@/lib/storage'
 import { MAX_BOOKINGS, applyDateChange, tripBooking } from '@/lib/trips'
 
@@ -330,6 +334,39 @@ export function useChats(
       pending.clear()
     }
   }, [])
+
+  // What the server adds to the chats later — the hotelier's answer, the finished «Запрос отельеру» — comes by Realtime.
+  const remoteUser = mode.kind === 'remote' ? mode.userId : null
+  useEffect(() => {
+    const client = getBrowserClient()
+    if (!client || !remoteUser) return
+    const channel = client
+      .channel(channelName('assistant-messages'))
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'assistant_messages', filter: `user_id=eq.${remoteUser}` },
+        (payload) => {
+          const row = rowOf<Tables<'assistant_messages'>>(payload)
+          const message =
+            row &&
+            parseMessage({
+              id: row.id,
+              role: row.role,
+              status: row.status,
+              text: row.text,
+              data: row.data,
+              createdAt: row.created_at,
+            })
+          if (!row || !message) return
+          setChats((list) =>
+            list.map((chat) =>
+              chat.id === row.chat_id ? mergeServerMessage(chat, message, activeRef.current === chat.id) : chat,
+            ),
+          )
+        },
+      )
+    return join(client, channel)
+  }, [remoteUser])
 
   // Saves what changed: the whole list for a guest, the changed chats for a signed-in user, in order.
   useEffect(() => {

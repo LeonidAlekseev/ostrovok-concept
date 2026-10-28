@@ -233,7 +233,7 @@ export const assistantResponseSchema = component(
       steps: z
         .array(
           z.object({
-            agent: z.enum(['search', 'features', 'vision', 'geo', 'trips']),
+            agent: z.enum(['search', 'features', 'vision', 'geo', 'trips', 'hotelier']),
             title: z.string(),
             params: z.string().optional(),
             status: z.enum(['done', 'failed']),

@@ -1,4 +1,5 @@
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
+import { channelName, join, rowOf } from './supabase/realtime'
 import type { Database } from './db/database.types'
 import {
   conversationOf,
@@ -90,38 +91,6 @@ export async function isHotelier(client: Client): Promise<boolean> {
   return data === true
 }
 
-let channels = 0
-
-/**
- * The Realtime connection with the user's token before a channel joins: the browser's client connects with the anon
- * key, and the policies would refuse every row of the subscription (`Error 401: Unauthorized`).
- */
-async function authorize(client: Client) {
-  const { data } = await client.auth.getSession()
-  const token = data.session?.access_token
-  if (token) await client.realtime.setAuth(token)
-}
-
-/** The channel joins once authorized, unless it was removed meanwhile; the returned function removes it. */
-function join(client: Client, channel: RealtimeChannel): () => void {
-  let removed = false
-  void authorize(client)
-    .catch(() => undefined)
-    .then(() => {
-      if (!removed) channel.subscribe()
-    })
-  return () => {
-    removed = true
-    void client.removeChannel(channel)
-  }
-}
-
-/** The row of an event, or `null` for one the policies refused or a deletion. */
-const rowOf = <T>(payload: { new: unknown; errors?: unknown }): T | null => {
-  const row = payload.new as { id?: unknown } | null
-  return !payload.errors && row && typeof row.id === 'string' ? (row as T) : null
-}
-
 /**
  * Follows a conversation: its new messages, its changes and its requests. Each subscription is a channel of its own,
  * so two chats open at once never share one; the returned function removes it.
@@ -136,9 +105,8 @@ export function followConversation(
   },
 ): () => void {
   const filter = `conversation_id=eq.${conversationId}`
-  channels += 1
   let channel: RealtimeChannel = client
-    .channel(`hotelier-conversation:${conversationId}:${channels}`)
+    .channel(channelName(`hotelier-conversation:${conversationId}`))
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'hotelier_messages', filter }, (payload) => {
       const row = rowOf<MessageRow>(payload)
       if (row) on.message(messageOf(row))
@@ -167,9 +135,8 @@ export function followConversation(
 
 /** Follows the hotelier's list: every conversation of their hotels that starts or changes. */
 export function followInbox(client: Client, on: (conversation: HotelierConversation) => void): () => void {
-  channels += 1
   const channel = client
-    .channel(`hotelier-inbox:${channels}`)
+    .channel(channelName('hotelier-inbox'))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'hotelier_conversations' }, (payload) => {
       const row = rowOf<ConversationRow>(payload)
       if (row) on(conversationOf(row))

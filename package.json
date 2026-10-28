@@ -19,6 +19,7 @@
     "db:push": "node --env-file-if-exists=.env.local scripts/db-push.mjs",
     "db:seed": "node --env-file-if-exists=.env.local scripts/seed.ts",
     "db:hotelier": "node --env-file-if-exists=.env.local scripts/hotelier-account.ts",
+    "db:hotelier-knowledge": "node --env-file-if-exists=.env.local scripts/hotelier-knowledge.ts",
     "db:seed:valencia": "node --env-file-if-exists=.env.local scripts/seed-valencia.ts",
     "db:load:ota-pages": "node --env-file-if-exists=.env.local scripts/load-ota-pages.ts",
     "db:rebuild:ota": "node --env-file-if-exists=.env.local scripts/rebuild-ota-hotels.ts",

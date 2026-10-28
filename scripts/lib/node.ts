@@ -5,8 +5,12 @@ import { registerHooks } from 'node:module'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '../../src/lib/db/database.types.ts'
 
+/** `server-only` is Next's guard of the server's modules; a script is the server's too. */
+const SERVER_ONLY = new URL('../../node_modules/next/dist/compiled/server-only/empty.js', import.meta.url).href
+
 registerHooks({
   resolve(specifier, context, nextResolve) {
+    if (specifier === 'server-only') return nextResolve(SERVER_ONLY, context)
     try {
       return nextResolve(specifier, context)
     } catch (error) {

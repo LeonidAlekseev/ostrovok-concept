@@ -22,7 +22,15 @@ import {
   type HotelierRequest,
 } from '@/lib/hotelierChat'
 import { followConversation, loadMessages, loadRequests, markRead } from '@/lib/hotelierChatRemote'
+import { RunSources } from '../AssistantPage/ChatCards'
 import { getBrowserClient } from '@/lib/supabase/client'
+
+const KNOWLEDGE_LABEL: Record<HotelierRequest['knowledgeStatus'], string> = {
+  none: '',
+  queued: 'характеристики извлекаются',
+  done: 'характеристики сохранены',
+  failed: 'характеристики не сохранились, повторим позже',
+}
 
 /** What the hotelier is told of a refused answer or state, by the route's status. */
 const ANSWER_ERRORS: Record<number, string> = {
@@ -32,8 +40,9 @@ const ANSWER_ERRORS: Record<number, string> = {
 }
 const ANSWER_ERROR = 'Не удалось отправить, попробуйте ещё раз'
 
-function Message({ message }: { message: HotelierMessage }) {
+function Message({ message, onRevoke }: { message: HotelierMessage; onRevoke: (id: string) => void }) {
   const own = message.sender === 'hotelier'
+  const shared = own && message.shareable && !message.knowledgeRevokedAt
   return (
     <div className={cn('flex max-w-[85%] flex-col gap-0.5', own ? 'items-end self-end' : 'items-start self-start')}>
       <span className="px-1 text-xs font-semibold text-muted-foreground">
@@ -47,9 +56,24 @@ function Message({ message }: { message: HotelierMessage }) {
       >
         {message.text}
       </p>
-      <span className="px-1 text-[11px] text-muted-foreground">
+      {message.run && (
+        <div className="w-full rounded-xl bg-muted px-3 pb-1">
+          <RunSources result={message.run.result} label="Источники ответа AI-помощника" />
+        </div>
+      )}
+      <span className="flex items-center gap-1 px-1 text-[11px] text-muted-foreground">
         <time dateTime={message.createdAt}>{messageTime(message.createdAt)}</time>
-        {own && message.shareable && ' · в общих сведениях'}
+        {shared && ' · в общих сведениях'}
+        {own && message.knowledgeRevokedAt && ' · сведения отозваны'}
+        {shared && (
+          <button
+            type="button"
+            className="cursor-pointer font-semibold text-primary underline-offset-2 hover:underline"
+            onClick={() => onRevoke(message.id)}
+          >
+            Отозвать сведения
+          </button>
+        )}
       </span>
     </div>
   )
@@ -64,6 +88,9 @@ function RequestCard({ request }: { request: HotelierRequest }) {
         <Badge variant={request.status === 'answered' ? 'success' : 'secondary'}>
           {REQUEST_STATUS_LABEL[request.status]}
         </Badge>
+        {request.knowledgeStatus !== 'none' && (
+          <span className="text-xs text-muted-foreground">{KNOWLEDGE_LABEL[request.knowledgeStatus]}</span>
+        )}
       </div>
       <p className="whitespace-pre-wrap">{request.question}</p>
       {request.characteristicKeys.length > 0 && (
@@ -182,6 +209,21 @@ export function ConversationView({
     setText('')
   }
 
+  async function revoke(messageId: string) {
+    setBusy(true)
+    setError(null)
+    try {
+      const response = await fetch(`/api/hotelier/messages/${encodeURIComponent(messageId)}/revoke`, { method: 'POST' })
+      if (!response.ok) throw new Error(String(response.status))
+      const now = new Date().toISOString()
+      setMessages((list) => list.map((m) => (m.id === messageId ? { ...m, knowledgeRevokedAt: now } : m)))
+    } catch {
+      setError('Не удалось отозвать сведения, попробуйте ещё раз')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function setStatus(next: ConversationStatus) {
     const response = await post('status', { status: next })
     if (response) onChange((await response.json()) as HotelierConversation)
@@ -236,7 +278,7 @@ export function ConversationView({
         {loaded === 'loading' && <p className="text-muted-foreground">Загружаем переписку…</p>}
         {loaded === 'error' && <p role="alert">Переписка не загрузилась.</p>}
         {messages.map((message) => (
-          <Message key={message.id} message={message} />
+          <Message key={message.id} message={message} onRevoke={revoke} />
         ))}
       </div>
 

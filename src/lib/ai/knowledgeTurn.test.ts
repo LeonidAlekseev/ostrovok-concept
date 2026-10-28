@@ -90,8 +90,13 @@ function deps(extra: Partial<KnowledgeDeps> = {}) {
       return run(...args)
     }
   const record = vi.fn(
-    async (_owner: RunOwner | null, _tool: string, _input: string, execute: () => Promise<ToolResult>) => {
-      const result = toolResultSchema.parse(await execute())
+    async (
+      _owner: RunOwner | null,
+      _tool: string,
+      _input: string,
+      execute: (runId: string | null) => Promise<ToolResult>,
+    ) => {
+      const result = toolResultSchema.parse(await execute(null))
       return { id: crypto.randomUUID(), result } satisfies ToolRun
     },
   )

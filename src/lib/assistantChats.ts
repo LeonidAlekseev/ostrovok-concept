@@ -261,6 +261,29 @@ export function parseMessage(value: unknown): ChatMessage | null {
   }
 }
 
+/** The step's run is still open: «Запрос отельеру» waits for the hotelier or for the characteristics of the answer. */
+const openRun = (message: ChatMessage) => {
+  const result = message.data.step?.run?.result
+  return result?.status === 'pending' || result?.data?.knowledge === 'queued'
+}
+
+/**
+ * A message the server wrote into the chat later, by Realtime: the hotelier's answer (`owner`) joins the feed, and the
+ * step of «Запрос отельеру» still waiting takes its finished run. Anything else — an echo of the browser's own save,
+ * which may be older than what the browser has — leaves the chat as it is (the same object). `active`: the traveller
+ * is in this chat, so a new answer is not unread.
+ */
+export function mergeServerMessage(chat: Chat, message: ChatMessage, active: boolean): Chat {
+  const old = chat.messages.find((m) => m.id === message.id)
+  if (!old) {
+    if (message.role !== 'owner') return chat
+    const messages = [...chat.messages, message].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    return { ...chat, messages, unread: chat.unread || !active, updatedAt: message.createdAt }
+  }
+  if (!openRun(old) || !message.data.step?.run || JSON.stringify(old.data) === JSON.stringify(message.data)) return chat
+  return { ...chat, messages: chat.messages.map((m) => (m.id === message.id ? { ...m, data: message.data } : m)) }
+}
+
 export function parseChat(value: unknown): Chat | null {
   if (!isObject(value) || !isString(value.id) || !isString(value.title)) return null
   if (!isString(value.createdAt) || !isString(value.updatedAt) || !isBrief(value.brief)) return null

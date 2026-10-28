@@ -1,6 +1,7 @@
 import 'server-only'
 import { z } from 'zod'
 import { anonClient, catalogCached, isRealHotelId, readOrNull } from './anon'
+import { toVector } from '../ai/embedding'
 
 /**
  * What the store of claims knows of a real hotel (supabase/migrations/20261027220000_claims_evidence_store.sql), for
@@ -32,6 +33,8 @@ export interface ClaimEvidence {
   retrievedAt: string | null
   excerpt: string | null
   datasetId: string | null
+  /** Synthetic demonstration data (`evidence.is_demo`); absent for the real ones. */
+  demo?: true
 }
 
 export interface ClaimCalculation {
@@ -60,6 +63,8 @@ export interface HotelClaim {
   limitations: string[]
   calculation: ClaimCalculation | null
   evidence: ClaimEvidence[]
+  /** Synthetic demonstration data (`claims.is_demo`); absent for the real ones. */
+  demo?: true
 }
 
 const object = z.record(z.string(), z.unknown())
@@ -73,6 +78,7 @@ const evidenceRow = z.object({
   retrieved_at: z.string().nullable(),
   excerpt: z.string().nullable(),
   dataset_id: z.string().nullable(),
+  is_demo: z.boolean().catch(false),
 })
 const calculationRow = z.object({
   id: z.string(),
@@ -101,6 +107,7 @@ const claimRow = z.object({
   valid_from: z.string().nullable(),
   valid_to: z.string().nullable(),
   limitations: z.array(z.string()),
+  is_demo: z.boolean().catch(false),
   calculation: calculationRow.nullable(),
   claim_evidence: z.array(z.object({ role: z.enum(['source', 'input']).nullable(), evidence: evidenceRow.nullable() })),
 })
@@ -166,10 +173,12 @@ export function claimsOf(rows: readonly unknown[]): HotelClaim[] {
                   retrievedAt: e.retrieved_at,
                   excerpt: e.excerpt,
                   datasetId: e.dataset_id,
+                  ...(e.is_demo && { demo: true as const }),
                 },
               ]
             : [],
         ),
+        ...(row.is_demo && { demo: true as const }),
       },
     ]
   })
@@ -183,10 +192,10 @@ export const likePrefix = (prefix: string) => `${prefix.replace(/[\\%_]/g, (c) =
 
 const CLAIM_SELECT =
   'id, property, source_key, value_numeric, value_min, value_max, value_text, value_boolean, value_json, unit, ' +
-  'epistemic_status, confidence, method, observed_at, valid_from, valid_to, limitations, ' +
+  'epistemic_status, confidence, method, observed_at, valid_from, valid_to, limitations, is_demo, ' +
   'calculation:calculations(id, method, version, inputs, parameters, limitations, computed_at), ' +
-  'claim_evidence(role, evidence(id, type, title, provider, external_id, url, retrieved_at, excerpt, dataset_id)), ' +
-  'entity:entities!inner(kind, ref)'
+  'claim_evidence(role, evidence(id, type, title, provider, external_id, url, retrieved_at, excerpt, dataset_id, is_demo)), ' +
+  'entity:entities!inner(kind, ref, hotel_id)'
 
 /** At most this many claims of a hotel at once: a hotel has a few hundred. */
 export const CLAIMS_LIMIT = 1000
@@ -198,6 +207,8 @@ const readClaims = catalogCached(['hotel-claims', 'v1'], async (hotelId: string,
     .eq('entity.kind', 'hotel')
     .eq('entity.ref', hotelId)
     .like('property', likePrefix(prefix))
+    // A claim that ended (a withdrawn or replaced answer of the hotelier) is no longer said.
+    .or(`valid_to.is.null,valid_to.gt.${new Date().toISOString()}`)
     .order('property')
     .order('source_key')
     .limit(CLAIMS_LIMIT)
@@ -212,6 +223,29 @@ const readClaims = catalogCached(['hotel-claims', 'v1'], async (hotelId: string,
 export function loadHotelClaims(hotelId: string, propertyPrefix = ''): Promise<HotelClaim[] | null> {
   if (!PREFIX.test(propertyPrefix)) return Promise.resolve(null)
   return readOrNull(hotelId, 'hotel claims', () => readClaims(hotelId, propertyPrefix))
+}
+
+/**
+ * The hotelier's current characteristics of the real hotel (`hotelier.*`, not ended), read fresh: an answer counts at
+ * once, the catalogue's cache would keep it out for an hour. `[]` when there are none, `null` when unreadable.
+ */
+export async function loadHotelierClaims(hotelId: string): Promise<HotelClaim[] | null> {
+  if (!isRealHotelId(hotelId)) return null
+  try {
+    const { data, error } = await anonClient()
+      .from('claims')
+      .select(CLAIM_SELECT)
+      .eq('entity.hotel_id', hotelId)
+      .like('property', 'hotelier.%')
+      .or(`valid_to.is.null,valid_to.gt.${new Date().toISOString()}`)
+      .order('observed_at', { ascending: false })
+      .limit(100)
+    if (error) throw error
+    return claimsOf(data ?? [])
+  } catch (error) {
+    console.warn(`hotelier claims: not read (${String((error as { code?: unknown })?.code ?? 'error').slice(0, 40)})`)
+    return null
+  }
 }
 
 /** A chunk of a hotel's document that matched: its text is the source's, untrusted. */
@@ -270,6 +304,58 @@ export async function searchHotelChunks(hotelId: string, query: string, limit = 
   })
 }
 
+/** A chunk of the hybrid search: its place in each ranking (`null`: not found by it) and the fused rank. */
+export interface KnowledgeChunk extends HotelChunk {
+  ftsPlace: number | null
+  vectorPlace: number | null
+}
+
+const knowledgeRow = chunkRow.extend({ fts_place: z.number().nullable(), vector_place: z.number().nullable() })
+
+/**
+ * The chunks of the real hotel's documents — the guests' reviews and the hotel's knowledge from its hotelier — for the
+ * query, by `hotel_chunks_hybrid`: the full text and, with `embedding` (the query's vector), the meaning, fused by
+ * reciprocal rank. Read fresh, not cached: a hotelier's answer is searchable at once. `[]` for an empty query or no
+ * match, `null` when they cannot be read.
+ */
+export async function searchHotelKnowledge(
+  hotelId: string,
+  query: string,
+  limit = 10,
+  embedding: readonly number[] | null = null,
+): Promise<KnowledgeChunk[] | null> {
+  const text = query.trim().slice(0, QUERY_CHARS)
+  if (!isRealHotelId(hotelId)) return null
+  if (!text) return []
+  try {
+    const { data, error } = await anonClient().rpc('hotel_chunks_hybrid', {
+      hotel_id: hotelId,
+      query: text,
+      ...(embedding && { query_embedding: toVector(embedding) }),
+      max_rows: Math.min(Math.max(1, Math.floor(limit)), CHUNKS_LIMIT),
+    })
+    if (error) throw error
+    return (data ?? []).flatMap((value) => {
+      const parsed = knowledgeRow.safeParse(value)
+      if (!parsed.success) return []
+      const { chunk_id, document_id, evidence_id, fts_place, vector_place, ...rest } = parsed.data
+      return [
+        {
+          chunkId: chunk_id,
+          documentId: document_id,
+          evidenceId: evidence_id,
+          ftsPlace: fts_place,
+          vectorPlace: vector_place,
+          ...rest,
+        },
+      ]
+    })
+  } catch (error) {
+    console.warn(`hotel knowledge: not read (${String((error as { code?: unknown })?.code ?? 'error').slice(0, 40)})`)
+    return null
+  }
+}
+
 /** At most this many sources are read at once. */
 export const EVIDENCE_LIMIT = 100
 
@@ -293,6 +379,7 @@ export const evidenceOf = (rows: readonly unknown[]): ClaimEvidence[] =>
         retrievedAt: e.retrieved_at,
         excerpt: e.excerpt,
         datasetId: e.dataset_id,
+        ...(e.is_demo && { demo: true as const }),
       },
     ]
   })
@@ -308,7 +395,7 @@ export async function loadEvidence(hotelId: string, ids: readonly string[]): Pro
   return readOrNull(hotelId, 'evidence', async () => {
     const { data, error } = await anonClient()
       .from('evidence')
-      .select('id, type, title, provider, external_id, url, retrieved_at, excerpt, dataset_id')
+      .select('id, type, title, provider, external_id, url, retrieved_at, excerpt, dataset_id, is_demo')
       .in('id', wanted)
     if (error) throw error
     return evidenceOf(data ?? [])

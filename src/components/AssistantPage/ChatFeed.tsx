@@ -230,7 +230,7 @@ function MessageItem({ message, photoUrl, onChoose, onRetry, actions, params, on
   return (
     <Message>
       <MessageContent className="gap-1">
-        {role === 'owner' && <MessageHeader className="px-0">Владелец отеля</MessageHeader>}
+        {role === 'owner' && <MessageHeader className="px-0">Отельер</MessageHeader>}
         {data.notFound && params ? (
           // «Ничего не нашёл»: the words and the parameters of the session in one bubble.
           <Bubble variant="muted" className={`${agentBubble} w-full sm:w-[min(100%,36rem)]`}>

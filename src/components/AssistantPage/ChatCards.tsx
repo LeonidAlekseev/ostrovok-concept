@@ -5,6 +5,7 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
+  Clock,
   Eye,
   Loader2,
   MapPin,
@@ -19,6 +20,7 @@ import {
   X,
 } from 'lucide-react'
 import { cn } from 'cn'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
@@ -27,6 +29,9 @@ import { Trace, TraceIcon, TraceLine, TraceTitle } from '@/components/ui/trace'
 import type { Destination } from '@/data/destinations'
 import { GUEST_LIMITS, VIBE_LABEL, briefWithStay, stayDates, type Brief, type VibeId } from '../../lib/assistant'
 import type { AgentStep, MessageData } from '../../lib/assistantChats'
+import { characteristicLabel } from '../../lib/hotelierFacts'
+import { requestViewOf, type HotelierRequestView } from '../../lib/hotelierRequest'
+import { useLiveRun } from './useLiveRun'
 import { cancellationLabel } from '../../lib/booking'
 import {
   EPISTEMIC_LABEL,
@@ -176,6 +181,7 @@ export function ToolCard({ step, failed }: { step: AgentStep; failed?: boolean }
 
 const RUN_STATUS: Record<ToolResult['status'], string> = {
   running: 'Выполняется',
+  pending: 'Ждёт ответа',
   success: 'Готово',
   error: 'Ошибка',
 }
@@ -186,7 +192,18 @@ const SOURCE_TYPE: Record<ToolEvidence['source_type'], string> = {
   review: 'Отзыв гостя',
   ota_page: 'Страница Островка',
   calculation: 'Расчёт',
+  hotelier: 'Ответ отельера',
 }
+
+/** The mark of synthetic demonstration data. */
+const DemoMark = () => (
+  <Badge
+    className="ml-1.5 h-4 px-1.5 align-middle text-[11px]"
+    title="Демонстрационные данные, не настоящий ответ отеля"
+  >
+    демо
+  </Badge>
+)
 
 /** «26 октября 2026 г.»; nothing for a date that does not read. */
 function dateLabel(iso: string | null): string | null {
@@ -216,7 +233,10 @@ function SourceItem({ source }: { source: ToolEvidence }) {
   ].filter(Boolean)
   return (
     <li className="flex flex-col gap-0.5 rounded-xl bg-card px-3 py-2 text-sm/[1.35]">
-      <span className="font-semibold text-foreground">{source.source_name}</span>
+      <span className="font-semibold text-foreground">
+        {source.source_name}
+        {source.demo && <DemoMark />}
+      </span>
       {source.source_url && isSafeUrl(source.source_url) ? (
         <a
           href={source.source_url}
@@ -251,6 +271,7 @@ function ClaimItem({ claim, names }: { claim: ToolClaim; names: ReadonlyMap<stri
     <li className="text-sm/[1.35]">
       <span className="text-foreground">
         {claim.label}: <span className="font-semibold">{claim.value}</span>
+        {claim.demo && <DemoMark />}
       </span>
       <span className={`block ${greyMutedText}`}>{origin.join(' · ')}</span>
     </li>
@@ -379,10 +400,14 @@ function RunDetails({ result }: { result: ToolResult }) {
  * The block of a tool's run: what it does, its status and short result, and «Источники и данные» that opens in place.
  * Each block keeps its own state; nothing of the model's reasoning, no JSON and no names of functions are shown.
  */
-export function ToolRunCard({ step, run }: { step: AgentStep; run: ToolRun }) {
+export function ToolRunCard({ step, run: saved }: { step: AgentStep; run: ToolRun }) {
   const [open, setOpen] = useState(false)
+  // A run of «Запрос отельеру» is read again while it waits: the hotelier's answer finishes it later.
+  const run = useLiveRun(saved)
   const { result } = run
   const status = result.status
+  const request = requestViewOf(result)
+  if (request) return <HotelierRequestCard step={step} run={run} request={request} />
   return (
     <div
       className={cn(cardClass, 'flex w-full flex-col sm:w-[min(100%,36rem)]')}
@@ -395,6 +420,8 @@ export function ToolRunCard({ step, run }: { step: AgentStep; run: ToolRun }) {
         >
           {status === 'running' ? (
             <Loader2 className="motion-safe:animate-spin" aria-hidden />
+          ) : status === 'pending' ? (
+            <Clock aria-hidden />
           ) : status === 'error' ? (
             <X strokeWidth={2.5} aria-hidden />
           ) : (
@@ -899,4 +926,106 @@ function ParamEditor({ param, ...props }: ParamsProps & { param: SessionParam; o
         />
       )
   }
+}
+
+/** «Источники и данные» of a run that opens in place: the AI assistant's answer in the chat with the hotel shows it too. */
+export function RunSources({ result, label }: { result: ToolResult; label: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger
+        className="mt-1 flex w-full items-center justify-between gap-2 rounded-md py-1 text-sm font-semibold text-primary focus-visible:outline-3 focus-visible:outline-ring"
+        aria-label={label}
+      >
+        Источники
+        <ChevronDown className={cn('size-4 flex-none transition-transform', open && 'rotate-180')} aria-hidden />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <RunDetails result={result} />
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
+const REQUEST_STATUS: Record<HotelierRequestView['status'], string> = {
+  pending: 'Ждёт ответа отельера',
+  answered: 'Отельер ответил',
+}
+
+/**
+ * The block «Запрос отельеру»: the hotel, the question and the characteristics asked; once the hotelier answered, the
+ * same block shows the answer and the characteristics taken from it with their source. It comes of the run in
+ * `tool_runs`, never of the model's words.
+ */
+function HotelierRequestCard({ step, run, request }: { step: AgentStep; run: ToolRun; request: HotelierRequestView }) {
+  const [open, setOpen] = useState(false)
+  const { result } = run
+  const answered = request.status === 'answered'
+  return (
+    <section
+      aria-label={step.title}
+      className={cn(cardClass, 'flex w-full flex-col gap-2 sm:w-[min(100%,36rem)]')}
+      data-run={run.id}
+      data-run-status={result.status}
+      data-request={request.requestId}
+    >
+      <div className="flex items-start gap-3">
+        <span className={cn(circleClass, 'grid flex-none place-items-center')}>
+          {answered ? <Check strokeWidth={2.5} aria-hidden /> : <Clock aria-hidden />}
+        </span>
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-[15px]/[1.3] font-semibold text-foreground">{step.title}</span>
+          {request.hotelName && <span className={`text-sm/[1.35] ${greyMutedText}`}>{request.hotelName}</span>}
+          <span className="text-sm/[1.35] font-semibold text-foreground" role="status">
+            {REQUEST_STATUS[request.status]}
+          </span>
+        </span>
+      </div>
+      <p className="text-sm/[1.4] text-foreground">
+        <span className={greyMutedText}>Вопрос: </span>
+        {request.question}
+      </p>
+      {request.keys.length > 0 && (
+        <ul className="flex flex-wrap gap-1" aria-label="Запрашиваемые характеристики">
+          {request.keys.map((key) => (
+            <li key={key}>
+              <Badge className="bg-card font-normal">{characteristicLabel(key)}</Badge>
+            </li>
+          ))}
+        </ul>
+      )}
+      {request.answer && (
+        <blockquote className="rounded-xl bg-card px-3 py-2 text-sm/[1.4] whitespace-pre-line break-words">
+          <span className="block text-xs font-semibold text-muted-foreground">Ответ отельера</span>
+          {request.answer}
+        </blockquote>
+      )}
+      {request.knowledge === 'queued' && (
+        <p className={`text-sm/[1.35] ${greyMutedText}`}>Сохраняю характеристики из ответа…</p>
+      )}
+      {answered && result.claims.length > 0 && (
+        <ul className="flex flex-col gap-1.5" aria-label="Извлечённые характеристики">
+          {result.claims.map((claim) => (
+            <ClaimItem
+              key={claim.id}
+              claim={claim}
+              names={new Map(result.evidence.map((e) => [e.id, e.source_name]))}
+            />
+          ))}
+        </ul>
+      )}
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <CollapsibleTrigger
+          className="flex w-full items-center justify-between gap-2 rounded-md py-1 text-sm font-semibold text-primary focus-visible:outline-3 focus-visible:outline-ring"
+          aria-label={`Источники и данные: ${step.title}`}
+        >
+          Источники и данные
+          <ChevronDown className={cn('size-4 flex-none transition-transform', open && 'rotate-180')} aria-hidden />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <RunDetails result={result} />
+        </CollapsibleContent>
+      </Collapsible>
+    </section>
+  )
 }

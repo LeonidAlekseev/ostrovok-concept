@@ -47,6 +47,7 @@ const message = (id: string, sender: HotelierMessage['sender'], text: string): H
   text,
   requestId: null,
   shareable: false,
+  knowledgeRevokedAt: null,
   readAt: null,
   createdAt: `2026-10-28T10:0${id.length}:00Z`,
 })

@@ -50,6 +50,9 @@ import { loadHotelDetails } from '@/lib/db/hotelDetails'
 import { loadHotelNoise } from '@/lib/db/noise'
 import { recordRun, runOwner } from '@/lib/db/toolRuns'
 import { NOISE_TOOL, NOISE_TOOL_PARAMS, NOISE_TOOL_TITLE, runNoiseTool } from '@/lib/ai/noiseTool'
+import { ASK_HOTELIER_TITLE, ASK_HOTELIER_TOOL, runAskHotelier } from '@/lib/ai/hotelierTool'
+import { loadHotelierClaims } from '@/lib/db/claims'
+import { asksHotelier, characteristicLabel, questionKeys, type HotelierKey } from '@/lib/hotelierFacts'
 import { isHotelGeoQuestion, isHotelViewQuestion, isNoiseQuestion } from '@/lib/noise'
 import type { ToolRun } from '@/lib/toolResult'
 import { todayIso, type IsoDate } from '@/lib/dates'
@@ -225,10 +228,11 @@ async function hotelTurn(
 ): Promise<Response> {
   const next: Brief = { ...brief, hotelId: hotel.id, destinationId: hotel.destinationId }
   const text = messages[messages.length - 1].text
-  const [models, details, noise, noiseRun] = await Promise.all([
+  const [models, details, noise, hotelier, noiseRun] = await Promise.all([
     getTextModels(),
     loadHotelDetails(hotel.id),
     loadHotelNoise(hotel),
+    loadHotelierClaims(hotel.id).then((claims) => claims ?? []),
     isNoiseQuestion(text)
       ? runOwner(chatId, messageId).then((owner) =>
           recordRun(owner, NOISE_TOOL, `${hotel.name} (${hotel.id})`, () => runNoiseTool(hotel.id)),
@@ -276,6 +280,7 @@ async function hotelTurn(
           details,
           noise,
           noiseTool,
+          hotelier,
           signal: timeout,
         }),
       {
@@ -285,27 +290,71 @@ async function hotelTurn(
       },
     )
     if (result.ok) {
-      const { answer, unverified } = result.value
+      const { answer, unverified, askHotelier } = result.value
+      // The model asks the hotelier; the rules do when the traveller asks it in words and the model did not.
+      const ask = askHotelier ?? ruleAsk(text)
+      const asked = ask && (await askStep(hotel, ask, chatId, messageId))
       return Response.json({
         brief: next,
-        reply: answer,
+        reply: asked && !askHotelier ? `${answer}\n\n${ASKED_REPLY}` : answer,
         ...(unverified && { unverified }),
         source: 'model',
-        ...steps,
+        ...withSteps(steps, asked),
       } satisfies AssistantResponse)
     }
     down = result.failed.length > 0
     console.warn('assistant: no model answered a hotel question, using the rules')
   }
   const { answer } = ruleAnswer(text, hotel, brief.dates, details, noise, noiseTool)
+  const ask = ruleAsk(text)
+  const asked = ask && (await askStep(hotel, ask, chatId, messageId))
   return Response.json({
     brief: next,
-    reply: answer,
+    reply: asked ? `${answer}\n\n${ASKED_REPLY}` : answer,
     source: 'rules',
     ...(down && { modelsDown: true }),
-    ...steps,
+    ...withSteps(steps, asked),
   } satisfies AssistantResponse)
 }
+
+/** What Эвал adds when it asked the hotelier by the rules: the model says it in its own answer. */
+const ASKED_REPLY = 'Спросил отельера: ответ придёт в блок «Запрос отельеру».'
+
+/** The rules' call of «Запрос отельеру»: the traveller asks in words to ask the hotel («уточните у отеля»). */
+const ruleAsk = (text: string): { question: string; keys: HotelierKey[] } | undefined =>
+  asksHotelier(text) ? { question: text.trim().slice(0, 300), keys: questionKeys(text) } : undefined
+
+/**
+ * Runs «Запрос отельеру» for the signed-in traveller's chat: its run waits in `tool_runs` (`pending`), linked to the
+ * request, and nothing is held open; a guest's run is an error asking to sign in.
+ */
+async function askStep(
+  hotel: Hotel,
+  { question, keys }: { question: string; keys: HotelierKey[] },
+  chatId?: string,
+  messageId?: string,
+): Promise<TurnStep> {
+  const owner = await runOwner(chatId, messageId)
+  const run = await recordRun(owner, ASK_HOTELIER_TOOL, `${hotel.name} (${hotel.id})`, (runId) =>
+    runAskHotelier(
+      owner?.client ?? null,
+      { hotelId: hotel.id, question, characteristicKeys: keys },
+      { hotelName: hotel.name, chatId: owner?.chatId ?? null, runId },
+    ),
+  )
+  return {
+    agent: 'hotelier',
+    title: ASK_HOTELIER_TITLE,
+    params: keys.length > 0 ? keys.map(characteristicLabel).join(', ') : hotel.name,
+    status: run.result.status === 'error' ? 'failed' : 'done',
+    result: run.result.summary.slice(0, 300),
+    run,
+  }
+}
+
+/** The steps of the answer with the step of «Запрос отельеру» after them. */
+const withSteps = (steps: { steps?: TurnStep[] }, asked: TurnStep | undefined) =>
+  asked ? { steps: [...(steps.steps ?? []), asked] } : steps
 
 /** The step of «Анализ шума» with its run: the block of the feed. */
 const noiseStep = (run: ToolRun): TurnStep => ({

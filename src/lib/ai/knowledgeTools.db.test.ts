@@ -25,7 +25,7 @@ describe.runIf(process.env.LIVE_DB === '1' && isSupabaseConfigured)('the tools o
       runFeatures: runFeaturesTool,
       runNear: runNearTool,
       runReviews: runReviewsTool,
-      record: async (_owner, _tool, _input, execute) => ({ id: crypto.randomUUID(), result: await execute() }),
+      record: async (_owner, _tool, _input, execute) => ({ id: crypto.randomUUID(), result: await execute(null) }),
     }
     const outcome = await runKnowledge({ calls, planner: 'rules' }, candidates, {
       owner: null,

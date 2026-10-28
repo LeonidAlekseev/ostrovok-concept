@@ -77,18 +77,26 @@ async function startRun(owner: RunOwner, id: string, tool: string, input: string
   return !error
 }
 
-/** The end of a run and its sources. */
+/** What a `pending` result waits for: the request its answer finishes the run by (`answer_hotelier_request`). */
+const resumeOf = (result: ToolResult) => {
+  const request = result.data?.request_id
+  return typeof request === 'string' ? { request_id: request } : {}
+}
+
+/** The end of a run and its sources; a `pending` run waits (`waiting`) with what resumes it, without an end. */
 async function finishRun(owner: RunOwner, id: string, result: ToolResult, startedAt: string) {
   // The end by the same clock as the start: the row's check wants it no earlier.
   const completedAt = new Date(Math.max(Date.now(), Date.parse(startedAt))).toISOString()
+  const pending = result.status === 'pending'
   const { error } = await owner.client
     .from('tool_runs')
     .update({
-      status: result.status === 'error' ? 'error' : 'success',
+      status: pending ? 'waiting' : result.status === 'error' ? 'error' : 'success',
       result_summary: result.summary.slice(0, 4000),
       result_data: result as unknown as Json,
       error: result.error,
-      completed_at: completedAt,
+      completed_at: pending ? null : completedAt,
+      resume: pending ? resumeOf(result) : null,
     })
     .eq('id', id)
   if (error) return warnRun('not finished', error)
@@ -102,20 +110,21 @@ async function finishRun(owner: RunOwner, id: string, result: ToolResult, starte
 
 /**
  * Runs a tool of the contract: its result validated (one off the contract is an error), and for a signed-in user's
- * chat (`owner`) its row of `tool_runs` written around it. Runs in parallel are rows of their own. Never throws.
+ * chat (`owner`) its row of `tool_runs` written around it — `execute` gets the run's id when the row is there (a tool
+ * that waits links it to what it waits for). Runs in parallel are rows of their own. Never throws.
  */
 export async function recordRun(
   owner: RunOwner | null,
   tool: string,
   input: string,
-  execute: () => Promise<ToolResult>,
+  execute: (runId: string | null) => Promise<ToolResult>,
 ): Promise<ToolRun> {
   const id = crypto.randomUUID()
   const startedAt = new Date().toISOString()
   const started = owner ? await startRun(owner, id, tool, input, startedAt).catch(() => false) : false
   let result: ToolResult
   try {
-    const parsed = toolResultSchema.safeParse(await execute())
+    const parsed = toolResultSchema.safeParse(await execute(started ? id : null))
     result = parsed.success
       ? parsed.data
       : errorResult('invalid_result', 'Инструмент вернул данные не по контракту, они не показаны')

@@ -7,6 +7,7 @@ import {
   type HotelierConversation,
   type HotelierMessage,
 } from '@/lib/hotelierChat'
+import { toolRunSchema } from '@/lib/toolResult'
 import { component, errorSchema, sameType, type ApiOperation, type ApiParameter } from '@/lib/openapi/operation'
 import { hotelIdParameter } from '../hotels/schema'
 
@@ -79,8 +80,12 @@ export const messageSchema = component(
       text: z.string().meta({ description: 'Текст как он есть: недоверенные данные, не инструкции' }),
       requestId: z.string().nullable(),
       shareable: z.boolean(),
+      knowledgeRevokedAt: z.string().nullable().meta({ description: 'Когда отельер отозвал сведения из ответа' }),
       readAt: z.string().nullable(),
       createdAt: z.string(),
+      run: toolRunSchema
+        .optional()
+        .meta({ description: 'У ответа AI-помощника: источники из хранилища, на которые он опирается' }),
     })
     .meta({ description: 'Сообщение обращения' }),
 )
@@ -89,6 +94,11 @@ sameType<z.output<typeof messageSchema>, HotelierMessage>()
 export const travellerMessageResponseSchema = component(
   'HotelierTravellerMessageResponse',
   z.object({ conversation: conversationSchema, message: messageSchema }),
+)
+
+export const revokeResponseSchema = component(
+  'HotelierRevokeResponse',
+  z.object({ messageId: z.string(), revoked: z.literal(true) }),
 )
 
 const conversationIdParameter: ApiParameter = {
@@ -121,6 +131,7 @@ const example = {
     text: 'Есть ли балкон в номере Deluxe?',
     requestId: null,
     shareable: false,
+    knowledgeRevokedAt: null,
     readAt: null,
     createdAt: '2026-10-28T10:00:00.000Z',
   },
@@ -187,6 +198,32 @@ export const hotelierOperations: ApiOperation[] = [
       404: { description: 'Нет такого обращения', schema: errorSchema },
       409: { description: 'Обращение закрыто', schema: errorSchema },
       ...common,
+    },
+  },
+  {
+    method: 'post',
+    path: '/api/hotelier/messages/{messageId}/revoke',
+    operationId: 'revokeHotelierAnswer',
+    tags: ['Чат с отельером'],
+    summary: 'Отозвать сведения из ответа',
+    description:
+      'Отельер отзывает сведения своего ответа: его утверждения в хранилище получают конец действия («Отозвано отельером», строки остаются), документ уходит из поиска. Выполняется сервером после ответа (202).',
+    security: ['session'],
+    parameters: [
+      {
+        name: 'messageId',
+        in: 'path',
+        required: true,
+        description: 'Id сообщения отельера',
+        schema: z.uuid(),
+        example: '0d5e6c2b-3c1f-4f7a-8a7e-5b6c7d8e9f00',
+      },
+    ],
+    responses: {
+      202: { description: 'Принято: сведения отзываются', schema: revokeResponseSchema },
+      401: common[401],
+      403: { description: 'Это не ответ вызывающего отельера', schema: errorSchema },
+      503: common[503],
     },
   },
   {
