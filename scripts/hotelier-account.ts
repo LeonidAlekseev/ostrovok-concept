@@ -1,5 +1,5 @@
 // Prepares the demo hotelier: the account «Демо отельер» and its profile of a hotelier of every hotel.
-//   npm run db:hotelier   (the keys come from .env.local, see README «Ключи API»)
+//   npm run db:hotelier   (the keys come from .env, see README «Ключи API»)
 // Idempotent: an existing account keeps its password and gets the same profile. Needs NEXT_PUBLIC_SUPABASE_URL,
 // SUPABASE_SERVICE_ROLE_KEY, DEMO_HOTELIER_EMAIL and DEMO_HOTELIER_PASSWORD; prints what it did, never the keys.
 import { required, serviceClient, userIdByEmail } from './lib/node.ts'

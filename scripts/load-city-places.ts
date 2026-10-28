@@ -8,7 +8,7 @@
 // 5. scripts/load-osm-places.ts writes the places and the rectangle (`preload`) and counts them by category;
 // 6. the temporary files go, whatever happened.
 // Idempotent: a second run updates the same rows and records the rectangle once. --dry-run downloads and counts but
-// writes nothing. Needs NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (from .env.local) unless --dry-run;
+// writes nothing. Needs NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (from .env) unless --dry-run;
 // prints counts, never the keys. Example, Valencia (README, «Загрузка мест другого города»):
 //   npm run db:city-places -- --city València --pbf-url https://download.geofabrik.de/europe/spain/valencia-latest.osm.pbf \
 //     --bbox 39.27,-0.53,39.58,-0.27

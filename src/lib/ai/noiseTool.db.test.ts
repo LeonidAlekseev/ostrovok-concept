@@ -7,7 +7,7 @@ vi.mock('next/cache', () => ({ unstable_cache: (read: unknown) => read }))
 
 /**
  * «Анализ шума» on the real database (read with the anon key, as the site): run on demand with
- * `LIVE_DB=1 node --env-file=.env.local node_modules/vitest/vitest.mjs run src/lib/ai/noiseTool.db.test.ts`.
+ * `LIVE_DB=1 node --env-file=.env node_modules/vitest/vitest.mjs run src/lib/ai/noiseTool.db.test.ts`.
  */
 describe.runIf(process.env.LIVE_DB === '1' && isSupabaseConfigured)('runNoiseTool on the database', () => {
   it('reads the estimate at the facade of ota-9741622, its calculation, the datasets and the OSM places', async () => {

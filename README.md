@@ -6,8 +6,24 @@
 
 ## Запуск
 
+Провайдер LLM — **NVIDIA API** (build.nvidia.com, один ключ `NVIDIA_API_KEY`). Модели по задачам:
+
+| Задача                                | Модель                                                                                                    |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Текст (помощник, понимание пожелания) | `nvidia/nemotron-3.5-lightning-30b-a3b` → `nvidia/nemotron-3.5-bolt-e4b` → `minimaxai/minimax-m3.1-flash` |
+| Фото в чате                           | `nvidia/nemotron-3.5-super-vl-120b-a12b` → `minimaxai/minimax-m3.1-flash`                                 |
+| Эмбеддинги                            | `nvidia/nemotron-3.5-embed-1b`                                                                            |
+| Реранк                                | `nvidia/nemotron-3.5-rerank-8b`                                                                           |
+| Эмбеддинги фото                       | `nvidia/llama-nemotron-embed-vl-1b-v2`                                                                    |
+
+Подробнее — раздел «Модели». Без `NVIDIA_API_KEY` помощник отвечает по правилам.
+
+Шаги запуска (нужны Node.js ≥ 22 и ключ приложения `AGE_SECRET_KEY`, см. «Ключи API»):
+
 ```bash
 npm install
+export AGE_SECRET_KEY="$(cat age-app.key)"   # файл ключа приложения, в git его нет
+npm run secrets:reveal                      # создаёт .env из secrets.app.env.age
 npm run dev        # http://localhost:3000
 npm run build      # production-сборка (страница пререндерится статически)
 npm run start      # запуск собранной версии
@@ -17,21 +33,47 @@ npm test
 npm run format:check
 ```
 
+Или без Node.js на машине — в Docker, см. «Docker».
+
 Для `npm run dev` и `npm run build` нужны `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-(сборка читает каталог из базы и без них останавливается). Остальные имена — в `.env.example`; значения достаёт
-`npm run secrets:reveal` (создаёт `.env.local`, см. «Ключи API»). Для ИИ-ответов нужен `NVIDIA_API_KEY`, без него
-помощник отвечает по правилам. Тесты и lint ключей не требуют.
+(сборка читает каталог из базы и без них останавливается). Остальные имена — в `.env.example`, у каждой подписано,
+откуда брать значение. Тесты и lint ключей не требуют.
 
 CI (GitHub Actions, `.github/workflows/ci.yml`) на каждый PR и push в `dev` и `main` запускает
 `npm ci`, `npm run lint`, `npm run typecheck`, `npm test` и `npm run format:check` в job `checks`
 (проверка `CI / checks`). Сборку в CI не запускают: её выполняет Vercel.
 
+## Docker
+
+Образ собирает `Dockerfile` (Next.js `output: 'standalone'`, три стадии, Node 24), запускает `docker-compose.yml`.
+
+**Docker Desktop (Windows, macOS):**
+
+1. Установить [Docker Desktop](https://www.docker.com/products/docker-desktop/) и запустить его (на Windows включить
+   WSL 2 в мастере установки). Проверить: `docker --version`.
+2. Склонировать репозиторий и перейти в его папку.
+3. Передать ключи одним из двух способов:
+   - **файл `.env`** в корне репозитория (UTF-8 без BOM, формат `KEY=value`; образец — `.env.example`). Compose
+     подставит его в сборку и в контейнер (`env_file`);
+   - **один ключ `AGE_SECRET_KEY`** — ключ приложения (файл от владельца проекта). Значения расшифруются из
+     `secrets.app.env.age`. macOS, Terminal: `export AGE_SECRET_KEY="$(cat age-app.key)"`. Windows, PowerShell:
+     `$env:AGE_SECRET_KEY = (Get-Content age-app.key -Raw)`.
+4. Выполнить `docker compose up --build` и открыть http://localhost:3000. Остановить — `Ctrl+C`, затем
+   `docker compose down`.
+
+Секреты в образ не попадают: `.dockerignore` не пускает `.env*` и `*.key` в контекст сборки, `COPY .env` нет,
+`AGE_SECRET_KEY` для сборки передаётся секретом сборки (`--mount=type=secret`), а в работающий контейнер — переменной
+окружения. В образе лежит только зашифрованный `secrets.app.env.age`. Образ строит каталог из Supabase, поэтому сборке
+нужны сеть и ключи (`NEXT_PUBLIC_SUPABASE_*` из `.env` или из `AGE_SECRET_KEY`).
+
 ## Деплой на Vercel
 
-Vercel определяет проект как Next.js без дополнительной настройки:
+Vercel определяет проект как Next.js без дополнительной настройки (нативная сборка, не Docker):
 импортируйте репозиторий (Framework Preset — Next.js, команды по умолчанию)
-или выполните `npx vercel --prod` из корня. Нужен Node.js ≥ 20.9.
-В настройках проекта Vercel нужна одна переменная — `GIT_SECRET_PRIVATE_KEY` (см. «Ключи API»).
+или выполните `npx vercel --prod` из корня. Нужен Node.js ≥ 22.
+В настройках проекта Vercel (Settings → Environment Variables) нужна одна переменная — `AGE_SECRET_KEY`: в Value —
+содержимое файла ключа приложения (или только строка `AGE-SECRET-KEY-1…`), для Production, Preview и Development.
+Старую `GIT_SECRET_PRIVATE_KEY` удалить. Затем — Redeploy.
 
 Вне production (`npm run dev` и preview-деплои Vercel, по `VERCEL_ENV`) в левом нижнем углу
 показываются технические параметры глобуса: fps, время кадра, разрешение рендера,
@@ -39,27 +81,32 @@ Vercel определяет проект как Next.js без дополнит�
 
 ## Ключи API
 
-Ключи API (Supabase, NVIDIA) хранятся в репозитории зашифрованными через
-[git-secret](https://github.com/sobolevn/git-secret): в git лежит только `.env.local.secret`, открытые `.env*`
-(кроме `.env.example` с именами переменных) и закрытые ключи в `.gitignore`. Файл зашифрован для ключа GPG проекта
-`secrets@opognali.local` (без пароля) и ключей людей, добавленных через `git secret tell`.
+В репозитории лежат только зашифрованные [age](https://github.com/FiloSottile/age) файлы (бинарный формат); открытый
+`.env` в `.gitignore`, `git ls-files .env` пуст. `.env.example` — те же имена, значения пустые, у каждой подписано,
+откуда взять ключ.
 
-- **Раскрыть** — `npm run secrets:reveal` создаёт `.env.local`: с переменной `GIT_SECRET_PRIVATE_KEY` (закрытый ключ
-  в armored-виде, `\n` можно экранировать) расшифровывает пакетом `openpgp`, без неё — через `git secret reveal -f`
-  (нужны git-secret и закрытый ключ в `gpg`). Без ключа и git-secret ничего не делает.
-- **Добавить или сменить ключ** — правка `.env.local`, затем `npm run secrets:hide` (`git secret hide`) и коммит
-  `.env.local.secret`. Новое имя переменной — ещё и в `.env.example`.
-- **Добавить человека** — импорт его открытого ключа (`gpg --import`), `git secret tell <email>`, затем
-  `npm run secrets:hide` и коммит `.gitsecret/` и `.env.local.secret`. Убрать — `git secret removeperson <email>`,
-  `npm run secrets:hide` и смена самих ключей API: старые копии файла остаются в истории git.
-- **Сборка** — `prebuild` (`node scripts/secrets.mjs build`) при наличии `GIT_SECRET_PRIVATE_KEY` пишет
-  `.env.production.local`, из которого `next build` встраивает `NEXT_PUBLIC_*`; `.env.local` при этом не трогается.
-  Без ключа (CI) шаг пропускается, сборка и тесты проходят.
+- `secrets.env.age` — `.env` для организаторов, получатель — только их ключ
+  (`age -r age1932fu7f70rwyfhaxflyfszz4gf6avxwc95wc0yjwm6zns9tspycqpgdnc0 -o secrets.env.age .env`).
+- `secrets.app.env.age` — тот же `.env` для приложения, получатель — только ключ приложения
+  `age1r0g77nfftvy2pc7taq5rzu8achvylulttze8vjxru4z406ezwees7m5q4u`. Закрытая часть (`AGE-SECRET-KEY-1…`) хранится вне git
+  и лежит в `AGE_SECRET_KEY` на Vercel и в Docker. Организаторы этот файл не читают, а приложение — файл организаторов.
+- **Раскрыть** — `npm run secrets:reveal` (нужен `AGE_SECRET_KEY`: одна строка `AGE-SECRET-KEY-1…` или весь файл
+  `age-keygen`) пишет `.env` из `secrets.app.env.age`.
+- **Обновить секреты** — править `.env` (UTF-8 без BOM, `KEY=value` без кавычек и пробелов), затем
+  `npm run secrets:encrypt` пересоздаёт оба файла (пакет `age-encryption`, бинарник `age` не нужен; формат проверяется
+  до записи) и коммит `secrets.env.age`, `secrets.app.env.age`. Новое имя переменной — ещё и в `.env.example`.
+  Проверка: `age -d -i age-app.key secrets.app.env.age | diff - .env`; `age-inspect secrets.env.age` — один получатель
+  X25519.
+- **Сменить ключ приложения** — `age-keygen -o age-app.key`, открытый ключ — в `APP_RECIPIENT`
+  (`src/lib/secretsFile.mjs`) и сюда, `npm run secrets:encrypt`, новый закрытый ключ — в `AGE_SECRET_KEY` на Vercel и
+  у тех, кто запускает Docker. Старые копии файла остаются в истории git: ключи API поменять.
+- **Сборка** — `prebuild` (`node scripts/secrets.mjs build`) при наличии `AGE_SECRET_KEY` пишет
+  `.env.production.local`, из которого `next build` встраивает `NEXT_PUBLIC_*`; `.env` при этом не трогается.
+  Без ключа (CI) шаг пропускается, сборка и тесты проходят; на Vercel без ключа сборка останавливается с причиной.
 - **Сервер** — `getSecret(name)` из `src/lib/secrets.ts` (`server-only`) берёт `process.env[name]`, иначе один раз на
-  холодный старт расшифровывает `.env.local.secret` (файл попадает в функции Vercel через `outputFileTracingIncludes`
-  в `next.config.ts`). Нет ключа — `undefined`, код работает в режиме без ключей. Клиент серверные ключи не получает.
-- **Сменить ключ проекта** — новый ключ GPG, `git secret removeperson secrets@opognali.local`, `git secret tell` нового,
-  `npm run secrets:hide`, новый закрытый ключ — в `GIT_SECRET_PRIVATE_KEY` на Vercel.
+  холодный старт расшифровывает `secrets.app.env.age` (файл попадает в функции Vercel и в образ Docker через
+  `outputFileTracingIncludes` в `next.config.ts`). Нет ключа — `undefined`, код работает в режиме без ключей. Клиент
+  серверные ключи не получает.
 
 ## Supabase
 
@@ -88,11 +135,11 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 <SUPABASE_SERVICE_ROLE_KEY>`), иначе сайт обновится сам в течение часа. Сборка читает базу: без ключей она
 останавливается с «нет NEXT_PUBLIC_SUPABASE_URL…: npm run secrets:reveal».
 
-- `npm run db:types` — `scripts/db-types.mjs`: `supabase gen types typescript` по базе (`SUPABASE_DB_URL` из `.env.local`, схема
+- `npm run db:types` — `scripts/db-types.mjs`: `supabase gen types typescript` по базе (`SUPABASE_DB_URL` из `.env`, схема
   только читается) в `src/lib/db/database.types.ts`, затем Prettier. Клиенты Supabase типизированы `Database`. **Перегенерируйте
   после каждой миграции** (`db:push`) и коммитьте файл вместе с ней. Следом скрипт обновляет раздел Supabase документации API
   (`npm run docs:supabase`, см. «Документация API»).
-- `npm run db:push` — применяет миграции (`supabase db push --db-url "$SUPABASE_DB_URL"`, строка из `.env.local`).
+- `npm run db:push` — применяет миграции (`supabase db push --db-url "$SUPABASE_DB_URL"`, строка из `.env`).
   Прямой адрес `db.<ref>.supabase.co` доступен только по IPv6; без IPv6 подставьте строку пулера
   (Dashboard → Connect → Transaction pooler, порт 6543) в `SUPABASE_DB_URL` окружения.
 - `npm run db:seed` — `scripts/seed.ts` (Node исполняет TypeScript сам): строит каталог генератором
@@ -175,7 +222,7 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 
 **Скрипты `scripts/`.** Исходные файлы данных вне репозитория, поэтому скрипты загрузки — единственный способ
 восстановить базу; не удаляйте их. TypeScript-скрипты исполняет Node и начинают с `scripts/lib/node.ts`: он
-разрешает импорты модулей приложения без расширения, даёт `required()` (переменная `.env.local` или ошибка с её
+разрешает импорты модулей приложения без расширения, даёт `required()` (переменная `.env` или ошибка с её
 именем) и `serviceClient()` (клиент с сервисным ключом).
 
 | Скрипт                                                                                | Назначение                                                                                         |
@@ -195,7 +242,7 @@ layout (`CatalogProvider`, `useDestinations`), главная — новые о�
 | `semantic-eval.ts`                                                                    | качество поиска по смыслу на живой базе                                                            |
 | `clean-shared-photos.ts` (`db:clean:shared-photos`)                                   | фото снимков без снимка                                                                            |
 | `db-push.mjs`, `db-types.mjs` (`db:push`, `db:types`)                                 | миграции и типы `Database`                                                                         |
-| `secrets.mjs` (`secrets:*`)                                                           | ключи `.env.local.secret`                                                                          |
+| `secrets.mjs` (`secrets:*`)                                                           | ключи: `.env` ↔ `secrets.*.age`                                                                    |
 | `screenshots.mjs`                                                                     | визуальная проверка страниц                                                                        |
 | `openapi-supabase.ts` (`docs:supabase`)                                               | раздел Supabase документации API из `database.types.ts`                                            |
 | `openapi-examples.ts` (`docs:examples`)                                               | реальные примеры ответов документации API с запущенного сайта                                      |
@@ -280,7 +327,7 @@ npm run db:city-places -- --city València \
 (`searchStep`, `src/lib/ai/turn.ts`) повторяется один раз при `timeout`, `model` или `database`, если до срока ответа
 (15 с) хватает времени; если и повтор не удался, ответ помечается `modelsDown`. Векторы недавних запросов кешируются в памяти процесса.
 Таблица `embeddings` закрыта: читают её только функции `security definer`, пишет сервисный ключ.
-Качество — `node --env-file=.env.local scripts/semantic-eval.ts` (15 запросов, попадания в top-5 до и после
+Качество — `node --env-file=.env scripts/semantic-eval.ts` (15 запросов, попадания в top-5 до и после
 реранжирования; вне CI).
 
 ### Модели

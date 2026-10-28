@@ -1,24 +1,39 @@
 # secrets Specification
 
 ## Purpose
-Ключи API хранятся в репозитории зашифрованными git-secret (`.env.local.secret`); сборка и сервер получают их, имея в окружении только `GIT_SECRET_PRIVATE_KEY`.
+Ключи API хранятся в репозитории зашифрованными age (`secrets.env.age` для организаторов, `secrets.app.env.age` для приложения); сборка и сервер получают их, имея в окружении только `AGE_SECRET_KEY`.
 
 ## Requirements
 
 ### Requirement: Зашифрованные ключи в репозитории
-Ключи API SHALL храниться в репозитории только зашифрованными git-secret (`.env.local.secret`); открытые `.env`-файлы и закрытые ключи SHALL не попадать в git.
+Ключи API SHALL храниться в репозитории только зашифрованными age в бинарном формате: `secrets.env.age` (получатель — ключ организаторов) и `secrets.app.env.age` (получатель — ключ приложения). Открытый `.env` и закрытые ключи SHALL не попадать в git; `.env` SHALL быть в `.gitignore`.
 
 #### Scenario: Статус
 - **WHEN** разработчик раскрыл ключи и запустил `git status`
-- **THEN** `.env.local` и закрытый ключ не видны как новые файлы
+- **THEN** `.env` и закрытый ключ не видны как новые файлы
 
-### Requirement: Один ключ в Vercel
-Сборка и сервер SHALL получать все ключи API из `.env.local.secret`, имея в окружении только `GIT_SECRET_PRIVATE_KEY`. Без этого ключа сборка и тесты SHALL проходить, а функции с ключами — работать в режиме без ключей.
+#### Scenario: Файлы организаторов
+- **WHEN** проверяют `secrets.env.age` через `age-inspect`
+- **THEN** заголовок содержит ровно одну запись X25519, файл не читается как текст
 
-#### Scenario: Сборка с ключом
-- **WHEN** в окружении есть только `GIT_SECRET_PRIVATE_KEY` и запускается сборка
-- **THEN** `NEXT_PUBLIC_*` из зашифрованного файла встроены, серверный код получает `OPENROUTER_API_KEY`
+#### Scenario: Git
+- **WHEN** выполняют `git ls-files .env`
+- **THEN** вывод пуст
+
+### Requirement: Обновление зашифрованных файлов одной командой
+`npm run secrets:encrypt` SHALL создавать оба файла заново из `.env`. Команда SHALL останавливаться, если `.env` содержит BOM, CRLF, кавычки, пробелы или строки не вида `KEY=value`.
+
+#### Scenario: Совпадение
+- **WHEN** `age -d -i <ключ приложения> secrets.app.env.age`
+- **THEN** результат совпадает с `.env`
+
+### Requirement: Один ключ AGE_SECRET_KEY
+Сборка и сервер SHALL получать ключи API из `process.env`, а недостающие — из `secrets.app.env.age` с `AGE_SECRET_KEY`, без бинарника `age`. Без `AGE_SECRET_KEY` сборка и тесты SHALL проходить, а функции с ключами — работать в режиме без ключей.
+
+#### Scenario: Сборка и сервер с ключом
+- **WHEN** в окружении есть только `AGE_SECRET_KEY`
+- **THEN** `NEXT_PUBLIC_*` встроены в сборку, серверный код получает `NVIDIA_API_KEY`
 
 #### Scenario: Без ключа
-- **WHEN** `GIT_SECRET_PRIVATE_KEY` нет
+- **WHEN** `AGE_SECRET_KEY` нет
 - **THEN** сборка и тесты проходят
