@@ -2,6 +2,7 @@ import 'server-only'
 import { generateText, tool, type LanguageModel } from 'ai'
 import { z } from 'zod'
 import type { AssistantRequest, TurnStep } from '../assistant'
+import type { ChatWidget } from '../chatWidget'
 import type { NearbyPlace } from '../hotelDetails'
 import { CATEGORY, PLACE_CATEGORIES, type PlaceCategory } from '../geo/categories'
 import {
@@ -51,6 +52,8 @@ export interface GeoOutcome {
   /** Эвал's answer: what the steps found, the places and the distances of the data only. */
   summary: string
   map?: ChatMap
+  /** The view steps' map of the lines of sight (src/lib/ai/viewTurn.ts). */
+  widget?: ChatWidget
   /** Who chose the calls. */
   planner: 'model' | 'rules'
   /** The models were asked and none chose the calls: the rules did. */

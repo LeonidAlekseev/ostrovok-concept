@@ -9,6 +9,7 @@ import {
 } from './assistant'
 import { clearDialog, isBrief, isPlan, isQuestion, loadDialog } from './assistantDialog'
 import { parseChatMap, type ChatMap } from './geo/chatMap'
+import { parseChatWidget, type ChatWidget } from './chatWidget'
 import { parseParams, type SessionParam } from './sessionMemory'
 import { requestStage, requestViewOf } from './hotelierRequest'
 import { parseToolRun, type ToolRun } from './toolResult'
@@ -67,6 +68,8 @@ export interface MessageData {
   unverified?: string
   /** A chat about a hotel: the places near it and the routes to them the geo steps found. */
   map?: ChatMap
+  /** A chat about a hotel: the noise map or the map of the view the answer is about. */
+  widget?: ChatWidget
   /** «Сохранил в память сессии»: what a change of the chat's brief saved (an agent's message). */
   memory?: SessionParam[]
   /**
@@ -238,6 +241,7 @@ export function parseData(value: unknown): MessageData | null {
     ...(value.more === true && { more: true as const }),
     ...(isString(value.unverified) && value.unverified && { unverified: value.unverified }),
     ...(parseChatMap(value.map) && { map: parseChatMap(value.map) }),
+    ...(parseChatWidget(value.widget) && { widget: parseChatWidget(value.widget) }),
     ...(parseParams(value.memory) && { memory: parseParams(value.memory) }),
     ...(isBrief(value.notFound) && { notFound: value.notFound }),
     ...(value.rerun === true && { rerun: true as const }),

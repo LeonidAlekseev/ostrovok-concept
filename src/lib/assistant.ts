@@ -11,6 +11,7 @@ import {
 import { addDays, formatShortRange, fromIso, nightsBetween, toIso, type IsoDate } from './dates'
 import { countRu, formatMeters, formatPrice } from './format'
 import { parseChatMap, type ChatMap } from './geo/chatMap'
+import { parseChatWidget, type ChatWidget } from './chatWidget'
 import { stayTotal } from './offer'
 import { MAX_NIGHTS, type Guests, type SearchQuery } from './search'
 import { parseToolRun, type ToolRun } from './toolResult'
@@ -830,6 +831,8 @@ export interface AssistantResponse {
   modelsDown?: true
   /** A chat about a hotel: the map of the places near it the geo steps found. */
   map?: ChatMap
+  /** A chat about a hotel: the noise map or the map of the view the question is about (src/lib/chatWidget.ts). */
+  widget?: ChatWidget
   /**
    * The answer of the tools of the store (src/lib/ai/knowledgeTurn.ts): the chosen hotels with the characteristics,
    * the places near and the reviews they were chosen by, from the runs' data only. Shown before the plan.
@@ -952,6 +955,7 @@ export async function askAssistant(
         ...(parsePhoto(data.photo) && { photo: parsePhoto(data.photo) }),
         ...(data.modelsDown === true && { modelsDown: true as const }),
         ...(parseChatMap(data.map) && { map: parseChatMap(data.map) }),
+        ...(parseChatWidget(data.widget) && { widget: parseChatWidget(data.widget) }),
         ...(typeof data.findings === 'string' && data.findings && { findings: data.findings.slice(0, MAX_FINDINGS) }),
         ...(parseDateChange(data.change) && { change: parseDateChange(data.change) }),
       }
