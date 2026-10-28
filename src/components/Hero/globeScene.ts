@@ -1,5 +1,6 @@
 import type { Destination } from '../../data/destinations'
 import type { SpotlightHotel } from '../../lib/catalog'
+import { globeCities, type GlobeCity } from '../../data/globeCities'
 import { projectToGlobe, type GlobePoint, type GlobeView } from '../../lib/globe'
 
 /** A city's new hotel highlighted on the globe. */
@@ -101,4 +102,20 @@ export function pickSpotlightCity(
   })
   const fresh = fits.filter((d) => !recent.includes(d.id))
   return shuffle(fresh.length ? fresh : fits)[0] ?? null
+}
+
+/** The city dot nearest to (x, y) within `radius`, all in CSS pixels from the globe's top left; `size` is the globe's side. */
+export function cityAt(view: GlobeView, x: number, y: number, size: number, radius: number): GlobeCity | null {
+  let best: GlobeCity | null = null
+  let bestDistance = radius
+  for (const city of globeCities) {
+    const p = projectToGlobe(city.lat, city.lon, view)
+    if (p.depth <= 0.05) continue
+    const distance = Math.hypot((p.x * size) / 100 - x, (p.y * size) / 100 - y)
+    if (distance < bestDistance) {
+      best = city
+      bestDistance = distance
+    }
+  }
+  return best
 }

@@ -4,15 +4,17 @@ import { Building2, ChevronRight } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { PhotoPlaceholder } from '@/components/ui/PhotoPlaceholder'
 import type { Destination } from '@/data/destinations'
+import type { GlobeCity } from '@/data/globeCities'
 import type { SpotlightHotel } from '@/lib/catalog'
 import { hotelHref } from '@/lib/search'
-import { GLOBE_CENTER, viewPlacing, type GlobeView } from '../../lib/globe'
+import { GLOBE_CENTER, projectToGlobe, viewPlacing, type GlobeView } from '../../lib/globe'
 import { appEnv, isProduction } from '../../lib/env'
 import { formatPrice } from '../../lib/format'
 import { SLOGAN } from '../../lib/shareMedia'
 import { createFrameMeter, type FrameWindow } from './globePerformance'
 import { createGlobeRenderer, type GlobeRenderer } from './globeRenderer'
 import {
+  cityAt,
   createHotelFeed,
   depthOpacity,
   pickOther,
@@ -21,6 +23,7 @@ import {
   type Scene,
   type Spotlight,
 } from './globeScene'
+import { CityLabel, CityList } from './CityDots'
 import { cardShift, type CardFit } from './cardFit'
 import { StatsPanel, type StatsPanelHandle } from './StatsPanel'
 
@@ -152,6 +155,10 @@ export function Hero({ cities: markers, hotels, featured }: Props) {
   const globeRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const pinRefs = useRef(new Map<string, HTMLButtonElement>())
+  /** The city dot whose name is shown: hovered, tapped or reached with the keyboard. */
+  const [activeCity, setActiveCity] = useState<GlobeCity | null>(null)
+  const activeCityRef = useRef<GlobeCity | null>(null)
+  const cityLabelRef = useRef<HTMLDivElement>(null)
   const glowRef = useRef<HTMLDivElement>(null)
   const cardRef = useRef<HTMLDivElement>(null)
   const statsRef = useRef<StatsPanelHandle>(null)
@@ -164,8 +171,23 @@ export function Hero({ cities: markers, hotels, featured }: Props) {
   /** The hotel each city showed last, so that the next opening of its pin shows another one. */
   const shownRef = useRef(new Map<string, string>())
 
+  const showCity = useCallback((city: GlobeCity | null) => {
+    if (activeCityRef.current === city) return
+    activeCityRef.current = city
+    setActiveCity(city)
+    // The label is placed by the next frame; with the globe standing still no frame may come before it shows.
+    if (city === null) cityLabelRef.current?.setAttribute('data-hidden', '')
+  }, [])
+
   /** Writes the current scene straight to the DOM, bypassing React on every frame. */
-  const paint = useCallback((scene: Scene) => {
+  const paint = useCallback((scene: Scene, view: GlobeView) => {
+    const label = cityLabelRef.current
+    const city = activeCityRef.current
+    if (label && city) {
+      const p = projectToGlobe(city.lat, city.lon, view)
+      setPosition(label, p.x, p.y)
+      label.toggleAttribute('data-hidden', p.depth <= 0.05)
+    }
     for (const [id, el] of pinRefs.current) {
       const p = scene.points.get(id)!
       setPosition(el, p.x, p.y)
@@ -218,7 +240,7 @@ export function Hero({ cities: markers, hotels, featured }: Props) {
     const changed = spotlightRef.current !== spotlight
     spotlightRef.current = spotlight
     if (spotlight.hotel) shownRef.current.set(spotlight.destination.id, spotlight.hotel.id)
-    paint(sceneAt(markers, spotlight, viewRef.current))
+    paint(sceneAt(markers, spotlight, viewRef.current), viewRef.current)
     // The card fades in at the new city instead of jumping there (not on the first render: the server-rendered
     // card is already in place). The animation overrides the per-frame depth opacity only while it runs.
     if (!changed || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
@@ -247,6 +269,7 @@ export function Hero({ cities: markers, hotels, featured }: Props) {
     const recent: string[] = [spotlightRef.current.destination.id]
     let speed = 0
     // Pointer travel since the last frame while the globe is being dragged.
+    let tap: { x: number; y: number } | null = null
     let drag: { pointerId: number; lastX: number; lastY: number; dx: number; dy: number } | null = null
     let elapsed = 0
     let last = performance.now()
@@ -340,7 +363,7 @@ export function Hero({ cities: markers, hotels, featured }: Props) {
           setSpinning(true)
         }
       }
-      paint(scene)
+      paint(scene, view)
       if (elapsed >= period) {
         elapsed = 0
         nextSpotlight(scene.points)
@@ -355,9 +378,33 @@ export function Hero({ cities: markers, hotels, featured }: Props) {
       targetRef.current = null
       canvas.setPointerCapture(e.pointerId)
       canvas.toggleAttribute('data-dragging', true)
+      tap = { x: e.clientX, y: e.clientY }
+    }
+    /** The city dot under the pointer, if any: fingers get a wider reach than a mouse. */
+    const cityUnder = (e: PointerEvent) => {
+      const rect = canvas.getBoundingClientRect()
+      return cityAt(
+        viewRef.current,
+        e.clientX - rect.left,
+        e.clientY - rect.top,
+        rect.width,
+        e.pointerType === 'mouse' ? 9 : 18,
+      )
     }
     const onPointerMove = (e: PointerEvent) => {
-      if (e.pointerId !== drag?.pointerId) return
+      if (e.pointerId !== drag?.pointerId) {
+        if (!drag && e.pointerType === 'mouse') {
+          const city = cityUnder(e)
+          pausedRef.current.hover = city !== null
+          showCity(city)
+          canvas.toggleAttribute('data-city', city !== null)
+        }
+        return
+      }
+      if (tap && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 6) {
+        tap = null
+        showCity(null)
+      }
       drag.dx += e.clientX - drag.lastX
       drag.dy += e.clientY - drag.lastY
       drag.lastX = e.clientX
@@ -367,11 +414,24 @@ export function Hero({ cities: markers, hotels, featured }: Props) {
       if (e.pointerId !== drag?.pointerId) return
       drag = null
       canvas.toggleAttribute('data-dragging', false)
+      // A tap, not a drag: a finger opens the label of the dot it touched, or closes the open one.
+      if (tap && e.type === 'pointerup' && e.pointerType !== 'mouse') {
+        const city = cityUnder(e)
+        showCity(city && city !== activeCityRef.current ? city : null)
+      }
+      tap = null
+    }
+    const onPointerLeave = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse' || drag) return
+      pausedRef.current.hover = false
+      showCity(null)
+      canvas.removeAttribute('data-city')
     }
     canvas.addEventListener('pointerdown', onPointerDown)
     canvas.addEventListener('pointermove', onPointerMove)
     canvas.addEventListener('pointerup', onPointerUp)
     canvas.addEventListener('pointercancel', onPointerUp)
+    canvas.addEventListener('pointerleave', onPointerLeave)
 
     // Animate only while the hero is on screen.
     const observer = new IntersectionObserver(([entry]) => {
@@ -391,9 +451,10 @@ export function Hero({ cities: markers, hotels, featured }: Props) {
       canvas.removeEventListener('pointermove', onPointerMove)
       canvas.removeEventListener('pointerup', onPointerUp)
       canvas.removeEventListener('pointercancel', onPointerUp)
+      canvas.removeEventListener('pointerleave', onPointerLeave)
       renderer?.dispose()
     }
-  }, [markers, feed, paint])
+  }, [markers, feed, paint, showCity])
 
   // A selected pin stops the spin and is brought to the middle of the screen, just above the search form.
   useEffect(() => {
@@ -455,12 +516,21 @@ export function Hero({ cities: markers, hotels, featured }: Props) {
         {/* Only the disc itself can be grabbed; on it, swipes in any direction turn the globe. */}
         <canvas
           ref={canvasRef}
-          className={`absolute inset-0 size-full touch-none transition-opacity duration-600 ease-[ease] [clip-path:circle(50%)] data-dragging:cursor-grabbing ${spinning ? 'cursor-grab opacity-100' : 'opacity-0'}`}
+          className={`absolute inset-0 size-full touch-none transition-opacity duration-600 ease-[ease] [clip-path:circle(50%)] data-dragging:cursor-grabbing data-city:cursor-pointer ${spinning ? 'cursor-grab opacity-100' : 'opacity-0'}`}
           aria-hidden
         />
         <div className={earthShade} aria-hidden />
         <div className={sun} aria-hidden />
         <div ref={glowRef} className={cityGlow} style={positionStyle(initialScene.hub)} aria-hidden />
+
+        <CityLabel city={activeCity} labelRef={cityLabelRef} />
+        <CityList
+          active={activeCity}
+          onActive={showCity}
+          onFocusChange={(focused) => {
+            pausedRef.current.focus = focused
+          }}
+        />
 
         {markers.map((d) => {
           const isHub = d.id === destination.id
