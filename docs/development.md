@@ -55,3 +55,5 @@ node scripts/screenshots.mjs --label after --against before --mask canvas / /sea
 `npx next start` порождает дочерний процесс `next-server`, который держит порт: чтобы остановить
 сервер, завершите PID именно `next-server` (например, `lsof -ti :3341`), а не только родительского
 `npx`.
+
+[← README](../README.md)

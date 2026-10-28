@@ -2,6 +2,14 @@
 
 Стили, глобус, состояние в браузере и изображения. Инструменты Эвала — в [tools.md](tools.md).
 
+## Оглавление
+
+- [Система целиком](#система-целиком)
+- [Стили](#стили)
+- [Производительность глобуса](#производительность-глобуса)
+- [Состояние в браузере](#состояние-в-браузере)
+- [Изображения](#изображения)
+
 ## Система целиком
 
 ```mermaid
@@ -9,7 +17,7 @@ flowchart LR
   B["Браузер<br/>React, MapLibre, Supabase JS"]
   subgraph N["Next.js (Vercel или Docker)"]
     P["Страницы и proxy.ts<br/>(сессия в cookie)"]
-    R["Маршруты src/app/api<br/>assistant, hotels/*, hotelier/*,<br/>openapi, revalidate; /health"]
+    R["Маршруты src/app/api<br/>assistant, hotels/*, hotelier/*,<br/>openapi, revalidate, /health"]
   end
   subgraph S["Supabase"]
     PG[("Postgres<br/>PostGIS · pgvector · RLS")]
@@ -160,3 +168,5 @@ node scripts/build-draw-images.mjs <папка с section-bg.png, canvas-drawing
 ```bash
 uv run --with pillow --with numpy python scripts/build-globe.py <папка-с-geojson>
 ```
+
+[← README](../README.md)

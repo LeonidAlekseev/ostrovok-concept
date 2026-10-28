@@ -24,3 +24,5 @@
 `/legal/terms`, `/legal/privacy`, `/legal/cookies`: тексты-шаблоны лежат в `src/data/legal.ts`,
 разметку даёт общий `src/components/LegalPage` (дата обновления, демо-пометка, оглавление по
 `h2` с якорями). Страница cookie перечисляет cookie сессии Supabase и ключи `ostrovok:v1:*`. Все страницы статические.
+
+[← README](../README.md)
