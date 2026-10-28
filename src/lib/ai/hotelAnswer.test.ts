@@ -108,17 +108,17 @@ describe('ruleAnswer', () => {
   it('answers the parking and the pets from the amenities', () => {
     expect(ruleAnswer('Есть ли парковка?', hotel).answer).toMatch(/^Да: парковка/)
     expect(ruleAnswer('Можно с питомцами?', hotel).answer).toMatch(/^Да, можно с питомцами \(за отдельную плату\)/)
-    expect(ruleAnswer('Есть ли парковка?', bare).answer).toContain('парковка не указана')
-    expect(ruleAnswer('Можно с питомцами?', bare).answer).toContain('о размещении с питомцами ничего не сказано')
+    expect(ruleAnswer('Есть ли парковка?', bare).answer).toContain('Парковка в данных отеля не указана')
+    expect(ruleAnswer('Можно с питомцами?', bare).answer).toContain('Про питомцев в данных отеля ничего не сказано')
   })
 
   it('tells a word from a word that holds its letters (Scenario: Центр)', () => {
     // «центра» and «оценки» hold «цен» but ask for no prices; «стиральная машина» is no parking.
-    expect(ruleAnswer('Далеко ли до центра?', hotel).answer).not.toContain('Номера отеля')
-    expect(ruleAnswer('Какие оценки у отеля?', hotel).answer).not.toContain('Номера отеля')
+    expect(ruleAnswer('Далеко ли до центра?', hotel).answer).not.toContain('Вот какие номера есть в отеле')
+    expect(ruleAnswer('Какие оценки у отеля?', hotel).answer).not.toContain('Вот какие номера есть в отеле')
     expect(ruleAnswer('Есть стиральная машина?', hotel).answer).not.toMatch(/парковка/)
-    expect(ruleAnswer('Какая цена?', hotel).answer).toContain('Номера отеля')
-    expect(ruleAnswer('Сколько стоит номер?', hotel).answer).toContain('Номера отеля')
+    expect(ruleAnswer('Какая цена?', hotel).answer).toContain('Вот какие номера есть в отеле')
+    expect(ruleAnswer('Сколько стоит номер?', hotel).answer).toContain('Вот какие номера есть в отеле')
     expect(ruleAnswer('Можно с собакой?', hotel).answer).toMatch(/^Да, можно с питомцами/)
   })
 
@@ -131,7 +131,7 @@ describe('ruleAnswer', () => {
   it('names Ostrovok’s places nearby with their distances when the hotel’s page has them', () => {
     const { answer, unverified } = ruleAnswer('Что рядом с отелем?', hotel, undefined, details)
     expect(answer).toBe(
-      'Рядом с отелем, по данным Островка:\n• Фира Валенсия (станция) — 140 м\n• Зоопарк Биопарк (зоопарк или аквариум) — 3,2 км',
+      'Вот что есть рядом с отелем, по данным Островка:\n• Фира Валенсия (станция) — 140 м\n• Зоопарк Биопарк (зоопарк или аквариум) — 3,2 км',
     )
     expect(answer).not.toContain(NO_NEARBY_DATA)
     expect(unverified).toBeUndefined()
@@ -153,7 +153,7 @@ describe('ruleAnswer', () => {
   it('answers «шумно ли» with the lines of the page', () => {
     const { answer } = ruleAnswer('Тут шумно ночью?', hotel, undefined, details, noise)
     expect(answer).toBe(
-      `О шуме у отеля, по картам шума EEA и OpenStreetMap:\n${noiseLines(noise)
+      `Вот что известно о шуме у отеля, по картам шума EEA и OpenStreetMap:\n${noiseLines(noise)
         .map((line) => `• ${line}`)
         .join('\n')}`,
     )
@@ -325,7 +325,7 @@ describe('the noise tool in the answer', () => {
 
   it('answers by the rules from the tool’s characteristics, or says it has none', () => {
     expect(ruleAnswer('Шумно ли ночью?', hotel, dates, null, noise, sampleResult).answer).toBe(
-      'О шуме у отеля, по данным хранилища (источники — в блоке «Анализ шума»):\n• Ночью (Lnight): дороги города: 55–59 дБ\n• Днём (07:00–19:00), оценка: дороги города: 55–63 дБ',
+      'Вот что известно о шуме у отеля, по данным хранилища (источники — в блоке «Анализ шума»):\n• Ночью (Lnight): дороги города: 55–59 дБ\n• Днём (07:00–19:00), оценка: дороги города: 55–63 дБ',
     )
     const none = { ...sampleResult, claims: [], evidence: [], calculations: [] }
     expect(ruleAnswer('Шумно ли ночью?', hotel, dates, null, null, none).answer).toBe(

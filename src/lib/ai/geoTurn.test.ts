@@ -227,7 +227,9 @@ describe('the Ostrovok places', () => {
   it('come first; OpenStreetMap does not repeat their places', async () => {
     const outcome = (await geoTurn(hotel, ask('Как далеко аэропорт?'), options({ ostrovok: [airportOstrovok] })))!
     expect(outcome.steps[0]).toMatchObject({ title: 'Смотрю места рядом по данным Островка', result: 'аэропорт — 1' })
-    expect(outcome.summary).toMatch(/^По данным Островка:\n• Аэропорт: ближе всего — «Валенсия» \(аэропорт\), 10,9 км/)
+    expect(outcome.summary).toMatch(
+      /^Вот что нашёл по данным Островка:\n• Аэропорт: ближе всего — «Валенсия» \(аэропорт\), 10,9 км/,
+    )
     expect(outcome.summary).not.toContain('Aeropuerto')
     expect(outcome.map?.points[1]).toMatchObject({ label: 'Валенсия', source: 'ostrovok' })
   })
@@ -276,7 +278,7 @@ describe('a place of Ostrovok and OpenStreetMap', () => {
       options({ deps: deps(store([llotja, towers])), ostrovok: [lonja] }),
     ))!
     expect(outcome.summary).toMatch(
-      /^По данным Островка и OpenStreetMap:\n• Достопримечательность: ближе всего — «Ла-Лонья» \(достопримечательность\), 150 м от отеля; пешком/,
+      /^Вот что нашёл по данным Островка и OpenStreetMap:\n• Достопримечательность: ближе всего — «Ла-Лонья» \(достопримечательность\), 150 м от отеля; пешком/,
     )
     expect(outcome.summary).toContain('Ещё: «Torres de Quart» — 630 м.')
     expect(outcome.summary).not.toContain('Llotja')

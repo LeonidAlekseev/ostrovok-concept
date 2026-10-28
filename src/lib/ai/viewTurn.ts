@@ -156,6 +156,16 @@ function seaLine(view: HotelView, floor: number | null): { text: string; checked
   }
 }
 
+/** The sea's verdict as advice, first in the answer to «какой вид из окна?»; none for a floor asked or an unsure verdict. */
+function seaLead(reach: Checked['reach'] | undefined, floor: number | null): string | undefined {
+  if (!reach || floor) return undefined
+  if (reach.kind === 'all') return 'Море видно из окон с любого этажа.'
+  if (reach.kind === 'from')
+    return `Море видно с ${reach.floor}-го этажа, так что при бронировании просите номер повыше.`
+  if (reach.kind === 'none') return 'Море из окон отеля не видно ни с одного этажа.'
+  return undefined
+}
+
 const dayOf = (date: string) =>
   new Date(`${date}T12:00:00Z`).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
 
@@ -231,8 +241,10 @@ export async function viewTurn(
   const wantsSea = asksSea(text)
   const wantsSunset = asksSunset(text)
   const wantsSunrise = asksSunrise(text)
+  let lead: string | undefined
   if (wantsSea) {
     const sea = seaLine(view, floor)
+    lead = seaLead(sea.checked?.reach, floor)
     lines.push(sea.text)
     if (sea.checked) checked.push(sea.checked)
   }
@@ -355,6 +367,7 @@ export async function viewTurn(
   // «Какой вид из окна?» without a place: the sea, the sunset of the day and the landmarks seen.
   if (!wantsSea && !wantsSunset && !wantsSunrise && !named.length && !kinds.length && !query) {
     const sea = seaLine(view, floor)
+    lead = seaLead(sea.checked?.reach, floor)
     lines.push(sea.text, sunsetLine(view, point, date, floor), sunriseLine(view, point, date, floor))
     if (sea.checked) checked.push(sea.checked)
     const seen = view.landmarks
@@ -370,7 +383,8 @@ export async function viewTurn(
   // The guests' own words about the view, as they wrote them: not checked against the lines.
   const quote = details.viewQuotes[0]
   const summary = [
-    `Из отеля (${windowLabel(view.window)}; проверены этажи с 1-го по ${view.window.floors}-й${floor ? `, отдельно — ${floor}-й` : ''}):`,
+    ...(lead ? [lead] : []),
+    `Вот что видно из окон отеля (${windowLabel(view.window)}; проверены этажи с 1-го по ${view.window.floors}-й${floor ? `, отдельно — ${floor}-й` : ''}):`,
     ...lines,
     ...placeLines,
     ...(quote ? [`Гость о виде: «${quote.text}»`] : []),
