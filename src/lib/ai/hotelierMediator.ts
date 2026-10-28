@@ -11,7 +11,8 @@ import {
 } from '../db/claims'
 import type { Json } from '../db/database.types'
 import { loadHotelDetails } from '../db/hotelDetails'
-import { dedupeKey, serviceClient } from '../db/hotelierKnowledge'
+import { dedupeKey } from '../db/hotelierKnowledge'
+import { serviceClient } from '../db/serviceClient'
 import {
   conflictingIds,
   hotelierClaimLine,
@@ -25,10 +26,8 @@ import { firstAnswer } from './chain'
 import { backgroundLinks } from './hotelierExtract'
 import { hotelFacts, isRussian } from './hotelAnswer'
 import { getTextModels } from './model'
-import { NVIDIA_KEY } from './nvidia'
-import { queryVector } from './semantic'
+import { queryVectorOrNull } from './semantic'
 import { clipText } from '../format'
-import { getSecret } from '../secrets'
 
 /**
  * The hotel's AI assistant in a traveller's chat with the hotel (hotelier-knowledge), after the traveller's message
@@ -209,13 +208,7 @@ export async function mediate(conversationId: string, messageId: string): Promis
     let claims: HotelClaim[] = []
     let chunks: KnowledgeChunk[] = []
     if (!confirmOnly) {
-      const key = await getSecret(NVIDIA_KEY).catch(() => undefined)
-      const vector = key
-        ? await Promise.race([
-            queryVector(key, question.text.slice(0, 500)).catch(() => null),
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000)),
-          ])
-        : null
+      const vector = await queryVectorOrNull(question.text, 6000)
       const [details, hotelier, found] = await Promise.all([
         loadHotelDetails(hotel.id),
         loadHotelierClaims(hotel.id),

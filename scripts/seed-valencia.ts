@@ -12,6 +12,7 @@ const { destinations } = await import('../src/data/destinations.ts')
 const { buildCatalog } = await import('../src/lib/catalogGenerator.ts')
 const { otaHotel, searchStay } = await import('../src/lib/ota/hotel.ts')
 const { otaSearchSchema } = await import('../src/lib/ota/search.ts')
+const { withoutMergedHotels } = await import('../src/lib/ota/merged.ts')
 
 const DESTINATION_ID = 'valencia'
 // Rows of jsonb a request: small enough for the database's short statement timeout.
@@ -38,6 +39,9 @@ const json = JSON.parse(await readFile(positionals[0], 'utf8')) as {
   map_hotels: { master_id: number; [key: string]: unknown }[]
   [key: string]: unknown
 }
+// The duplicates folded into another hotel (src/lib/ota/merged.ts) stay out of the tables.
+json.hotels = withoutMergedHotels(json.hotels, (h) => h.master_id)
+json.map_hotels = withoutMergedHotels(json.map_hotels, (pin) => pin.master_id)
 const search = otaSearchSchema.parse(json)
 const destinationIndex = destinations.findIndex((d) => d.id === DESTINATION_ID)
 const destination = destinations[destinationIndex]

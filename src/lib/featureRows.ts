@@ -28,7 +28,7 @@ export interface FeatureRow {
   floors_lower: number | null
   floors_upper: number | null
   noise_dataset: string | null
-  /** noise-estimate-v1 at the facade (`noiseEstimate`): the street side and the yard side, the places summed in, dB. */
+  /** noise-estimate-v2 at the facade (`noiseEstimate`): the street side and the yard side, the places summed in, dB. */
   noise_method: string | null
   noise_zone: 'building' | 'circle' | null
   street_lday_min: number | null
@@ -86,7 +86,7 @@ const bounds = (range: LevelRange | null | undefined) => [level(range?.min), lev
 /**
  * The hotel's row, or `null` when `hotel_geo` found no building and the facade no noise (outside Valencia): the
  * building at the point, the loudest EEA band of each indicator at the facade to the street over the layers, and the
- * estimate of noise-estimate-v1 at the facade.
+ * estimate of noise-estimate-v2 at the facade.
  */
 export function featureRow(hotelId: string, geo: HotelGeo, facade: FacadeNoise): FeatureRow | null {
   const building = geo.building && text(geo.building.id) ? geo.building : null
@@ -184,9 +184,17 @@ export function diffRows<T extends object>(
   next: readonly T[],
   key: (row: T) => string,
 ): { upsert: T[]; remove: T[] } {
-  // `real` columns come back rounded to float4.
-  const close = (a: unknown, b: unknown) =>
-    a === b || (typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) < 1e-4)
+  // `real` columns come back rounded to float4; `jsonb` ones come back with their keys in another order.
+  const close = (a: unknown, b: unknown): boolean => {
+    if (a === b) return true
+    if (typeof a === 'number' && typeof b === 'number') return Math.abs(a - b) < 1e-4
+    if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false
+    if (Array.isArray(a) || Array.isArray(b))
+      return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => close(v, b[i]))
+    const [x, y] = [a, b] as Record<string, unknown>[]
+    const keys = Object.keys(y)
+    return Object.keys(x).length === keys.length && keys.every((k) => k in x && close(x[k], y[k]))
+  }
   const same = (a: T, b: T) => (Object.keys(b) as (keyof T)[]).every((k) => close(a[k], b[k]))
   const before = new Map(current.map((row) => [key(row), row]))
   const after = new Set(next.map(key))

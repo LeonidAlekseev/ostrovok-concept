@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isGeoQuestion, questionCategories } from './questions'
+import { isGeoQuestion, placeAfterTo, questionCategories } from './questions'
 
 // assistant-geo, Requirement: Гео-шаги в ходе Эвала
 describe('the words of a question about the places near', () => {
@@ -25,5 +25,22 @@ describe('the words of a question about the places near', () => {
     expect(isGeoQuestion('Есть ли парковка?')).toBe(false)
     expect(isGeoQuestion('Какие номера есть?')).toBe(false)
     expect(isGeoQuestion('Можно с питомцами?')).toBe(false)
+  })
+})
+
+// assistant-geo, Requirement: Название места после «до»
+describe('the name after «до»', () => {
+  it.each([
+    ['Сколько идти до Центрального рынка?', 'Центрального рынка'],
+    ['Как добраться до Mercado Central пешком', 'Mercado Central'],
+    ['Далеко ли до Города искусств и наук от отеля?', 'Города искусств и наук'],
+    ['сколько ехать до Ciutat de les Arts i les Ciències на такси', 'Ciutat de les Arts i les Ciències'],
+    ['Сколько идти до аптеки?', undefined],
+    ['Далеко до метро?', undefined],
+    ['Какая поездка до отеля?', undefined],
+    ['Открыт до 10 вечера?', undefined],
+    ['Что рядом?', undefined],
+  ])('%s → %s', (text, name) => {
+    expect(placeAfterTo(text)).toBe(name)
   })
 })

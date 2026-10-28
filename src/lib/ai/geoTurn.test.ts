@@ -387,6 +387,23 @@ describe('the plan', () => {
     })
   })
 
+  // assistant-geo, Requirement: Название места после «до»
+  it('geocodes the name after «до» and does not ask the everyday places instead', () => {
+    expect(rulesPlan('Сколько идти до Центрального рынка?')).toEqual([{ tool: 'geocode', query: 'Центрального рынка' }])
+  })
+
+  it('adds the geocode of the name the model sent to the kinds of places', () => {
+    const plan = tidyPlan(
+      [{ tool: 'nearbyPlaces', categories: ['attraction'], radiusM: 2000 }],
+      'Сколько идти до Центрального рынка?',
+    )
+    expect(plan[0]).toEqual({ tool: 'geocode', query: 'Центрального рынка' })
+    // The model's own geocode is kept, not doubled.
+    expect(tidyPlan([{ tool: 'geocode', query: 'Mercat Central' }], 'Сколько идти до Центрального рынка?')).toEqual([
+      { tool: 'geocode', query: 'Mercat Central' },
+    ])
+  })
+
   it('makes the model’s calls safe', () => {
     expect(
       tidyPlan(

@@ -3,10 +3,10 @@ import { firstAnswer } from '@/lib/ai/chain'
 import { geoTurn } from '@/lib/ai/geoTurn'
 import { viewTurn } from '@/lib/ai/viewTurn'
 import { noiseWidget } from '@/lib/chatWidget'
-import { answerWithModel, ruleAnswer } from '@/lib/ai/hotelAnswer'
+import { answerWithModel, asksHotelFacts, ruleAnswer } from '@/lib/ai/hotelAnswer'
 import { getTextModels, getVisionModels } from '@/lib/ai/model'
 import { APICallError } from 'ai'
-import { allowRequest, allowVisionRequest, clientIp } from '@/lib/ai/rateLimit'
+import { allowHotelRequest, allowRequest, allowVisionRequest, clientIp } from '@/lib/ai/rateLimit'
 import { PHOTO_CITIES } from '@/lib/ai/photoEmbedding'
 import { searchHotelsByPhotos } from '@/lib/ai/photoSearch'
 import { SEMANTIC_TIMEOUT_MS, semanticSearch, type SemanticHit } from '@/lib/ai/semantic'
@@ -52,7 +52,7 @@ import { bookingTurn } from '@/lib/ai/bookingTurn'
 import { loadHotelFeatures } from '@/lib/db/features'
 import { loadHotelDetails } from '@/lib/db/hotelDetails'
 import { loadHotelNoise } from '@/lib/db/noise'
-import { serviceClient } from '@/lib/db/hotelierKnowledge'
+import { serviceClient } from '@/lib/db/serviceClient'
 import { recordRun, runOwner } from '@/lib/db/toolRuns'
 import { NOISE_TOOL, NOISE_TOOL_PARAMS, NOISE_TOOL_TITLE, runNoiseTool } from '@/lib/ai/noiseTool'
 import { ASK_HOTELIER_TITLE, ASK_HOTELIER_TOOL, runAskHotelier } from '@/lib/ai/hotelierTool'
@@ -268,16 +268,21 @@ async function hotelTurn(
           onError: (id, error) => warn(`${id} did not choose the geo calls`, error),
         })
       : null
-  if (geo)
+  if (geo) {
+    // A question of both kinds («бар рядом и можно ли с собакой?»): the places by the geo steps, the rest by the hotel's data.
+    const rest = asksHotelFacts(text)
+      ? ruleAnswer(text, hotel, brief.dates, details, noise, noiseTool, false).answer
+      : undefined
     return Response.json({
       brief: next,
-      reply: geo.summary,
+      reply: rest ? `${geo.summary}\n\n${rest}` : geo.summary,
       source: geo.planner,
       steps: geo.steps,
       ...(geo.map && { map: geo.map }),
       ...(geo.widget && { widget: geo.widget }),
       ...(geo.modelsDown && { modelsDown: true }),
     } satisfies AssistantResponse)
+  }
   let down = false
   if (models) {
     const features = (await loadHotelFeatures().catch(() => null))?.get(hotel.id)
@@ -601,9 +606,11 @@ async function photoTurn(photos: readonly string[], ip: string, context: WishCon
  */
 export async function POST(request: Request) {
   const ip = clientIp(request)
-  if (!(await allowRequest(ip))) return apiError(429, 'Too many requests')
   const parsedBody = assistantRequestSchema.safeParse(await request.json().catch(() => null))
   if (!parsedBody.success) return apiError(400, 'Invalid request')
+  // A chat about a hotel counts its questions apart from the search's requests.
+  const allowed = typeof parsedBody.data.brief.hotelId === 'string' ? allowHotelRequest : allowRequest
+  if (!(await allowed(ip))) return apiError(429, 'Too many requests')
 
   const { messages, photos = [], rerun } = parsedBody.data
   const deadline = Date.now() + (photos.length > 0 ? PHOTO_BUDGET_MS : ANSWER_BUDGET_MS)

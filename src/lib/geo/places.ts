@@ -3,6 +3,7 @@ import { haversineMeters, type LatLon } from './distance'
 import type { CallBudget } from './http'
 import type { GeocodedPlace } from './nominatim'
 import type { OsmPlaceRow, OsmType, OverpassArea } from './overpass'
+import { officialPlaceName } from './ruPlaces'
 import { outside, type GeoFailure, type GeoResult } from './result'
 
 /**
@@ -52,7 +53,7 @@ export interface PlaceStore {
     perCategory: number,
     budget: CallBudget,
   ): Promise<GeoResult<CachedNear>>
-  /** Places whose name is `name` exactly, any case, in any of its languages. */
+  /** Places named `name`: an equal name (any case, accents, language) or, else, the most alike by trigrams. */
   named(name: string, budget: CallBudget): Promise<GeoResult<GeocodedPlace[]>>
   /** Writes the rows; `false` when it could not (no service key, an error). */
   save(rows: readonly OsmPlaceRow[], origin: 'preload' | 'online'): Promise<boolean>
@@ -197,7 +198,7 @@ export const geocodedRow = (place: GeocodedPlace): OsmPlaceRow => ({
   geom: `SRID=4326;POINT(${place.lon} ${place.lat})`,
 })
 
-/** A place in Valencia by its name: the cache by the exact name, else Nominatim, whose finds are written for good. */
+/** A place in Valencia by its name: the cache by the name (alike names too), else Nominatim, whose finds are written for good. */
 export async function geocode(
   query: string,
   {
@@ -206,10 +207,13 @@ export async function geocode(
     budget,
   }: { store: PlaceStore; search: (query: string) => Promise<GeoResult<GeocodedPlace[]>>; budget: CallBudget },
 ): Promise<GeoResult<Geocoded>> {
-  const cached = await store.named(query, budget)
+  // A Russian name goes to the cache as it is (OSM has some), then as the official one the cache and Nominatim know.
+  const asked = officialPlaceName(query) ?? query
+  let cached = await store.named(query, budget)
+  if (asked !== query && cached.ok && !cached.value.length) cached = await store.named(asked, budget)
   if (cached.ok && cached.value.length)
     return { ok: true, value: { source: 'cache', places: cached.value, attribution: ATTRIBUTION } }
-  const found = await search(query)
+  const found = await search(asked)
   if (!found.ok) return found
   await store.save(found.value.map(geocodedRow), 'online')
   return { ok: true, value: { source: 'online', places: found.value, attribution: ATTRIBUTION } }

@@ -51,8 +51,8 @@ export function VibeResult({ vibe, stay, onRestart }: Props) {
               className="flex h-2 overflow-hidden rounded-full bg-muted"
               style={{ '--left': `${left}%` } as CSSProperties}
             >
-              <div className="w-(--left) bg-(image:--decor-vibe-calm)" />
-              <div className="flex-1 bg-(image:--decor-vibe-loud)" />
+              <div className="w-(--left) bg-[image:linear-gradient(135deg,var(--decor-vibe-calm-from),var(--decor-vibe-calm-to))]" />
+              <div className="flex-1 bg-[image:linear-gradient(135deg,var(--decor-vibe-loud-from),var(--decor-vibe-loud-to))]" />
             </div>
           </li>
         ))}

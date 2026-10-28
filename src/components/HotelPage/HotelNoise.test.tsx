@@ -89,7 +89,7 @@ describe('HotelNoise', () => {
       .map((li) => li.textContent)
     expect(items[0]).toMatch(/^Фасад на улицу — для каждого источника карт шума EEA/)
     expect(items.join(' ')).toMatch(/L = Lref − 20·lg\(d\/10\)/)
-    expect(items.join(' ')).toMatch(/Не учитываем экранирование зданиями/)
+    expect(items.join(' ')).toMatch(/Здание полностью экранирует двор от заведений/)
     expect(items.at(-1)).toMatch(
       /^Источники: Карты шума EEA по директиве 2002\/49\/EC, раунд 2022: полосы Lden и Lnight; EUBUCCO v0\.2/,
     )

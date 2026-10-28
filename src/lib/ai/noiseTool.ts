@@ -39,7 +39,7 @@ import { queryVectorOrNull } from './semantic'
 
 /**
  * «Анализ шума», the reference tool of the contract (src/lib/toolResult.ts, docs/tools.md): what the store of claims
- * knows of the noise at a real hotel — the estimate of noise-estimate-v1 at the facade to the street and to the yard
+ * knows of the noise at a real hotel — the estimate of noise-estimate-v2 at the facade to the street and to the yard
  * by period (`noise.estimate.*`: EEA's bands at the facade and the loud places of OpenStreetMap summed), the share of
  * the places, the loud places around with the nearest of each kind — and the guests' reviews that speak of noise or
  * quiet (`searchHotelReviews`: by the words and the meaning, only the chunks that name noise or quiet). Only the store's data with their sources and calculation: no level is lowered for

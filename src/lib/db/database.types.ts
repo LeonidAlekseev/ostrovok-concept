@@ -2043,6 +2043,10 @@ export type Database = {
         Args: { lat: number; lon: number; per_category?: number; radius_m: number; wanted: string[] }
         Returns: Json
       }
+      osm_places_near_facade: {
+        Args: { lat: number; lon: number; per_category?: number; radius_m: number; wanted: string[] }
+        Returns: Json
+      }
       rate_limit_hit: { Args: { hit_key: string; hit_limit: number; window_seconds: number }; Returns: boolean }
     }
     Enums: {

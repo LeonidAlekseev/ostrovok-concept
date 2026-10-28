@@ -19,6 +19,8 @@ import { ok, timedOut, unavailable, type GeoResult } from './result'
  */
 
 export const OVERPASS_URL = 'https://overpass-api.de/api/interpreter'
+/** Asked in this order: the next one only when the one before failed or did not answer (the main one is often 502). */
+export const OVERPASS_URLS: readonly string[] = [OVERPASS_URL, 'https://overpass.kumi.systems/api/interpreter']
 /** Within the turn's 9 s: the query's own `[timeout:]` says the same to the server. */
 export const OVERPASS_TIMEOUT_MS = 4000
 
@@ -95,6 +97,25 @@ function wayShape(points: LatLon[]): { geom: string; centre: LatLon } | undefine
   return { geom: `SRID=4326;LINESTRING(${points.map(pair).join(',')})`, centre: middle }
 }
 
+/**
+ * The border of a relation of a shape category (a park, a beach) as a MULTIPOLYGON, from the `polygons` of
+ * scripts/osm-pbf-to-overpass.py (Overpass gives a relation only a centre): each polygon a list of rings, the outer
+ * one first. A ring of fewer than 4 points is no ring and is left out; `undefined` when no polygon is left.
+ */
+function relationShape(polygons: unknown): string | undefined {
+  const text = (Array.isArray(polygons) ? polygons : []).flatMap((polygon) => {
+    const rings = (Array.isArray(polygon) ? polygon : []).flatMap((ring) => {
+      const points = Array.isArray(ring) ? ring.filter(isPoint) : []
+      return points.length >= 4 ? [`(${points.map(pair).join(',')})`] : []
+    })
+    // The outer ring is the polygon: a polygon without it would take a hole for its border.
+    return rings.length > 0 && Array.isArray(polygon) && (polygon[0] as unknown[])?.length >= 4
+      ? [`(${rings.join(',')})`]
+      : []
+  })
+  return text.length > 0 ? `SRID=4326;MULTIPOLYGON(${text.join(',')})` : undefined
+}
+
 /** One element of an Overpass answer as a row; `undefined` for one of no category or without coordinates. */
 export function elementRow(element: unknown): OsmPlaceRow | undefined {
   if (!element || typeof element !== 'object') return undefined
@@ -120,6 +141,8 @@ export function elementRow(element: unknown): OsmPlaceRow | undefined {
   }
   if (isPoint(e.center)) {
     const centre = { lat: round(e.center.lat), lon: round(e.center.lon) }
+    const border = type === 'relation' && isShape(tags) ? relationShape(e.polygons) : undefined
+    if (border) return { ...base, ...centre, geom: border }
     return { ...base, ...centre, geom: `SRID=4326;POINT(${pair(centre)})` }
   }
   return undefined
@@ -147,29 +170,36 @@ export interface OverpassDeps {
   budget: CallBudget
   gate: RateGate
   fetch?: typeof fetch
-  url?: string
+  urls?: readonly string[]
   timeoutMs?: number
 }
 
-/** Asks Overpass for `categories` in `area` and parses the answer. */
+/**
+ * Asks Overpass for `categories` in `area` and parses the answer. When a server fails or times out, the next of `urls`
+ * is asked with what the budget has left; a 429 is not retried (the gate has closed the service for its wait).
+ */
 export async function overpassPlaces(
   categories: readonly PlaceCategory[],
   area: OverpassArea,
-  { url = OVERPASS_URL, timeoutMs = OVERPASS_TIMEOUT_MS, ...deps }: OverpassDeps,
+  { urls = OVERPASS_URLS, timeoutMs = OVERPASS_TIMEOUT_MS, ...deps }: OverpassDeps,
 ): Promise<GeoResult<OsmPlaceRow[]>> {
-  const left = deps.budget.deadline - Date.now()
-  const ms = Math.min(timeoutMs, left)
-  const query = overpassQuery(categories, area, Math.max(1, Math.floor(ms / 1000)))
-  const answer = await osmJson({
-    service: 'overpass',
-    url,
-    timeoutMs: ms,
-    ...deps,
-    init: {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ data: query }).toString(),
-    },
-  })
-  return answer.ok ? parseOverpass(answer.value) : answer
+  let answer: GeoResult<unknown> | undefined
+  for (const [i, url] of urls.entries()) {
+    const ms = Math.min(timeoutMs, deps.budget.deadline - Date.now())
+    const query = overpassQuery(categories, area, Math.max(1, Math.floor(ms / 1000)))
+    answer = await osmJson({
+      service: 'overpass',
+      gateKey: i === 0 ? 'overpass' : 'overpass-reserve',
+      url,
+      timeoutMs: ms,
+      ...deps,
+      init: {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ data: query }).toString(),
+      },
+    })
+    if (answer.ok || (answer.reason !== 'unavailable' && answer.reason !== 'timeout')) break
+  }
+  return answer?.ok ? parseOverpass(answer.value) : (answer ?? unavailable('overpass'))
 }

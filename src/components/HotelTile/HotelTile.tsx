@@ -4,7 +4,7 @@ import { MapPin } from 'lucide-react'
 import { cn } from 'cn'
 import { Separator } from '@/components/ui/separator'
 import { hasFreeCancellation, TILE_PHOTOS, type TileHotel } from '../../lib/catalog'
-import { formatDecimal, formatPrice } from '../../lib/format'
+import { formatPrice, kmFromCentre } from '../../lib/format'
 import { guruPrice } from '../../lib/offer'
 import { useDestination } from '../Catalog/useDestinations'
 import { GeneratedBadge } from '../GeneratedBadge/GeneratedBadge'
@@ -105,11 +105,11 @@ export function HotelTile({
           {/* From 281px the city follows the distance; the screen reader always gets the whole text. */}
           <span className="min-w-0 truncate">
             <span aria-hidden>
-              {formatDecimal(hotel.distanceKm)} км от центра
+              {kmFromCentre(hotel.distanceKm)}
               <span className="hidden @[281px]:inline"> {destination?.genitive}</span>
             </span>
             <span className="sr-only">
-              {formatDecimal(hotel.distanceKm)} км от центра {destination?.genitive}
+              {kmFromCentre(hotel.distanceKm)} {destination?.genitive}
             </span>
           </span>
         </p>
