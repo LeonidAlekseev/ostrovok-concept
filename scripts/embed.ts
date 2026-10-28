@@ -1,5 +1,5 @@
 // Embeds the catalog for the semantic search: every hotel gets a vector from nvidia/nemotron-3.5-embed-1b in the `embeddings` table.
-//   npm run db:embed   (Node runs the TypeScript itself; the keys come from .env.local, see README «Ключи API»)
+//   npm run db:embed   (Node runs the TypeScript itself; the keys come from .env, see README «Ключи API»)
 // Only new and changed hotels go to the model (`content_hash`, which includes the model, so vectors of another model are redone); vectors of removed hotels are deleted.
 // Batches of BATCH texts, at most 40 requests a minute (the NVIDIA key's limit); a 429 or a 5xx is retried with a
 // pause. Needs NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and NVIDIA_API_KEY; prints counts, never the keys.

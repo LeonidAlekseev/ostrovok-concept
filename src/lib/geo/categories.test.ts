@@ -53,4 +53,16 @@ describe('the categories', () => {
     ])
     expect(shapeFilters(['bar'])).toEqual([])
   })
+
+  it('takes only the coastline of the sea for the sea, not a river, a riverbank or a lake', () => {
+    expect(categorize({ natural: 'coastline' })).toEqual(['sea'])
+    const notSea: Record<string, string>[] = [
+      { natural: 'water', water: 'river' },
+      { waterway: 'riverbank' },
+      { waterway: 'river' },
+      { natural: 'water' },
+      { natural: 'bay' },
+    ]
+    for (const tags of notSea) expect(categorize(tags)).not.toContain('sea')
+  })
 })

@@ -346,6 +346,24 @@ describe('ViewAnswer', () => {
     expect(within(map).getByText('Hospital Clínico: закрыто (линия)')).toBeTruthy()
   })
 
+  it('lists only the place asked, without the sea, the sunset and the sunrise', async () => {
+    const place = {
+      name: 'Museu Fallero',
+      category: 'музей',
+      lat: 39.48,
+      lon: -0.37,
+      distanceM: 1200,
+      tone: 'closed' as const,
+      verdict: 'закрыто',
+      blockers: [],
+    }
+    render(<ViewAnswer widget={widget({ floor: null, focus: [], places: [place] })} />)
+    const summary = await screen.findByRole('list', { name: 'Итог' })
+    expect(within(summary).getByText('Museu Fallero')).toBeTruthy()
+    expect(within(summary).getByText('закрыто')).toBeTruthy()
+    expect(within(summary).queryByText(/^Закат|^Восход|^Море/)).toBeNull()
+  })
+
   it('says there is no map without the page’s data: the answer’s text stays', async () => {
     fetchMock.mockImplementation(async () => Response.json({ view: null, map: null }))
     render(<ViewAnswer widget={widget()} />)

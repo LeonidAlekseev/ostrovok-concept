@@ -3,7 +3,7 @@
 //   npm run db:clean:shared-photos              only shows what would go: the folders and the number of files
 //   npm run db:clean:shared-photos -- --delete  removes them through the Storage API
 // A folder younger than an hour is left: its snapshot may be being shared right now. Needs NEXT_PUBLIC_SUPABASE_URL
-// and SUPABASE_SERVICE_ROLE_KEY (.env.local); prints counts and paths, never the keys.
+// and SUPABASE_SERVICE_ROLE_KEY (.env); prints counts and paths, never the keys.
 import { parseArgs } from 'node:util'
 import {
   SHARED_PHOTO_BUCKET,

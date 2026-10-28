@@ -2,7 +2,7 @@
 // the page's hotel without its contacts and the reviews into `ota_hotel_pages`, the places of interest once each with
 // their point into `ota_pois`, the hotel's distance to each into `ota_hotel_pois`, the rate tags into
 // `ota_rate_spec_tags`. The analytics, the settings, the CSP and the rest of the page are not kept.
-//   npm run db:load:ota-pages -- <dir> [--dry-run]   (Node runs the TypeScript itself; the keys come from .env.local)
+//   npm run db:load:ota-pages -- <dir> [--dry-run]   (Node runs the TypeScript itself; the keys come from .env)
 // The files are untrusted data: only JSON is parsed, a file over 4 MB, a name other than `<master_id>.json`, a page
 // of another hotel or a hotel not in `ota_hotels` stops the load before anything is written. Upserts and deletes the
 // stale places of the loaded hotels, so a second run over the same files writes the same rows. Needs

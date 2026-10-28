@@ -1,0 +1,12 @@
+# Read by `docker compose` next to docker-compose.yml: logs and the encrypted keys file.
+services:
+  app:
+    # Container logs rotate: stdout and stderr of the server, `make logs` follows them.
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    # New secrets.app.env.age (npm run secrets:encrypt) is picked up by a restart, no rebuild.
+    volumes:
+      - ./secrets.app.env.age:/app/secrets.app.env.age:ro

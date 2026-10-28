@@ -1,5 +1,5 @@
 // Loads the catalog generator's destinations and hotels into Supabase and prepares the demo account.
-//   npm run db:seed   (Node runs the TypeScript itself; the keys come from .env.local, see README «Ключи API»)
+//   npm run db:seed   (Node runs the TypeScript itself; the keys come from .env, see README «Ключи API»)
 //   npm run db:seed -- --revalidate https://<site>   then drops the site's cached catalogue (POST /api/revalidate)
 // Upserts by id, so a second run leaves the same rows. Needs NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
 // DEMO_USER_EMAIL and DEMO_USER_PASSWORD; prints counts, never the keys.

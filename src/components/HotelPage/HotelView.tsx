@@ -539,12 +539,31 @@ export function ViewAnswer({ widget }: { widget: ViewWidget }) {
   if (loading) return <p className="h-24 animate-pulse rounded-xl bg-card" aria-label="Загружаю карту вида" />
   if (!ready || !floor)
     return <p className="text-sm text-muted-foreground">Карты вида нет: линии взгляда не загрузились.</p>
-  const asked = new Set<ViewFocus>(focus.length ? focus : VIEW_FOCUSES)
+  // A question about a place shows the place; the sea, the sunset and the sunrise only when asked (or when nothing is).
+  const asked = new Set<ViewFocus>(focus.length ? focus : places.length ? [] : VIEW_FOCUSES)
   const unknown: Reach = { kind: 'unknown' }
   return (
     <div className="flex flex-col gap-3">
       <ViewMapPanel hotel={hotel} scene={scene} compact />
       <ul className="flex flex-col gap-3 rounded-2xl bg-card p-4" aria-label="Итог">
+        {places.map((place) => (
+          <li key={`${place.name}-${place.lat}-${place.lon}`} className="flex gap-3">
+            <Landmark className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <span className="font-semibold">{place.name}</span>
+                <span
+                  className={cn('shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold', TONE_CLASS[place.tone])}
+                >
+                  {place.verdict}
+                </span>
+              </span>
+              <span className="text-sm text-pretty text-muted-foreground">
+                {place.category} · {distanceLabel(place.distanceM)} · {fromFloorTitle(floor)}
+              </span>
+            </span>
+          </li>
+        ))}
         {asked.has('sunset') && sunset && (
           <Row
             icon={Sunset}
