@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from './db/database.types'
-import { followConversation } from './hotelierChatRemote'
+import { followConversation, loadMyChats } from './hotelierChatRemote'
 
 type Handler = (payload: object) => void
 
@@ -51,5 +51,39 @@ describe('followConversation', () => {
     expect(conversation).not.toHaveBeenCalled()
     handlers.hotelier_messages({ new: row, errors: null })
     expect(message).toHaveBeenCalledWith(expect.objectContaining({ id: 'm1', sender: 'hotelier', text: 'Да' }))
+  })
+})
+
+describe('loadMyChats', () => {
+  it('reads the traveller’s own chats by the database’s function, with the hotel’s name', async () => {
+    const select = vi.fn().mockResolvedValue({
+      data: [
+        {
+          id: 'c1',
+          hotel_id: 'ota-1',
+          kind: 'user',
+          status: 'open',
+          last_message_at: '2026-10-28T10:00:00Z',
+          last_message_text: 'Есть ли балкон?',
+          last_sender: 'user',
+          user_unread: 1,
+          hotelier_unread: 0,
+          is_demo: false,
+          created_at: '2026-10-28T09:00:00Z',
+          hotel: { name: 'Hotel Reina' },
+        },
+      ],
+      error: null,
+    })
+    const rpc = vi.fn(() => ({ select }))
+    const chats = await loadMyChats({ rpc } as unknown as SupabaseClient<Database>)
+    expect(rpc).toHaveBeenCalledWith('hotelier_my_chats')
+    expect(select).toHaveBeenCalledWith(expect.stringContaining('hotel:hotels(name:data->>name)'))
+    expect(chats).toMatchObject([{ id: 'c1', hotelId: 'ota-1', hotelName: 'Hotel Reina', userUnread: 1 }])
+  })
+
+  it('throws the database’s error', async () => {
+    const rpc = vi.fn(() => ({ select: vi.fn().mockResolvedValue({ data: null, error: { message: 'boom' } }) }))
+    await expect(loadMyChats({ rpc } as unknown as SupabaseClient<Database>)).rejects.toThrow('boom')
   })
 })
