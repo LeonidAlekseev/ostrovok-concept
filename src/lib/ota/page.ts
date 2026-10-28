@@ -15,7 +15,7 @@ import type {
   ViewQuote,
 } from '../hotelDetails'
 import { REVIEW_SOURCE_OF_CODE, type ReviewSource } from '../hotelDetails'
-import type { OtaPageFields } from './hotel'
+import type { OtaPageFields, PageRoom } from './hotel'
 
 /**
  * The licensed snapshots of the Ostrovok hotel pages (`<master_id>.json`, a list of the page's elements): the
@@ -73,6 +73,13 @@ const pagePropsSchema = z.object({
 
 export type OtaPoi = z.infer<typeof poiSchema>
 export type OtaRateTag = z.infer<typeof rateTagSchema>
+
+/**
+ * The name a place is stored under. Ostrovok names an airport by its city («Валенсия», the English name «Valencia
+ * Airport»): the English name is the airport's own, so it is the name; a place of another type keeps its name.
+ */
+export const poiName = ({ type, name, nameEn }: { type: string; name: string; nameEn: string }): string =>
+  type === 'AIRPORT' && nameEn ? nameEn : name
 
 /** `props.pageProps` of a snapshot: the element `__NEXT_DATA__`, its `content` an object or its JSON. */
 export function nextDataPageProps(snapshot: unknown): unknown {
@@ -704,6 +711,83 @@ export const hasWorkstation = (roomGroups: unknown): boolean =>
       (group as { roomAmenityData: unknown[] }).roomAmenityData.includes('workstation'),
   )
 
+/** Russian labels of the room amenities Ostrovok lists (`roomAmenityData`); a key not here is not shown. */
+const ROOM_AMENITY_LABEL: Record<string, string> = {
+  'private-bathroom': 'Собственная ванная',
+  'shared-bathroom': 'Общая ванная',
+  'external-private-bathroom': 'Отдельная ванная',
+  'air-conditioning': 'Кондиционер',
+  hairdryer: 'Фен',
+  towels: 'Полотенца',
+  tv: 'Телевизор',
+  toiletries: 'Туалетные принадлежности',
+  'wi-fi': 'Wi‑Fi',
+  safe: 'Сейф',
+  telephone: 'Телефон',
+  heating: 'Отопление',
+  shower: 'Душ',
+  desk: 'Письменный стол',
+  wardrobe: 'Шкаф',
+  workstation: 'Рабочее место',
+  iron: 'Утюг',
+  soundproofing: 'Звукоизоляция',
+  'blackout-blinds': 'Затемняющие шторы',
+  'mini-bar': 'Мини-бар',
+  mirror: 'Зеркало',
+  coffee: 'Кофе',
+  fridge: 'Холодильник',
+  tea: 'Чай',
+  'tea-or-coffee': 'Чай или кофе',
+  microwave: 'Микроволновая печь',
+  kitchen: 'Кухня',
+  water: 'Питьевая вода',
+  bathrobe: 'Халат',
+  slippers: 'Тапочки',
+  balcony: 'Балкон',
+  pillows: 'Подушки',
+  dishwasher: 'Посудомоечная машина',
+  'with-view': 'Вид из окна',
+  hypoallergenic: 'Гипоаллергенное бельё',
+  bedsheets: 'Постельное бельё',
+  'washing-machine': 'Стиральная машина',
+  fan: 'Вентилятор',
+  bath: 'Ванна',
+  'dining-area': 'Обеденная зона',
+  patio: 'Патио',
+  'pets-allowed': 'Можно с питомцами',
+  'private-entrance': 'Отдельный вход',
+  duplex: 'Два уровня',
+}
+
+const ROOM_PHOTO_LIMIT = 8
+
+const roomGroupSchema = z.object({
+  rgHash: z.string().min(1),
+  size: z.number().positive().nullable().catch(null),
+  images: z.array(z.looseObject({ tmpl: z.string() })).catch([]),
+  roomAmenityData: z.array(z.string()).catch([]),
+})
+
+/** The page's room groups by `rg_hash`: area, photos and amenities as the page says them; a bad group is skipped. */
+export function pageRooms(roomGroups: unknown): Record<string, PageRoom> {
+  if (!Array.isArray(roomGroups)) return {}
+  const rooms: Record<string, PageRoom> = {}
+  for (const group of roomGroups) {
+    const parsed = roomGroupSchema.safeParse(group)
+    if (!parsed.success) continue
+    const { rgHash, size, images, roomAmenityData } = parsed.data
+    rooms[rgHash] = {
+      area: size === null ? null : Math.round(size),
+      photos: images
+        .map((image) => image.tmpl)
+        .filter((tmpl) => tmpl.includes('{size}'))
+        .slice(0, ROOM_PHOTO_LIMIT),
+      amenities: [...new Set(roomAmenityData.map((key) => ROOM_AMENITY_LABEL[key]).filter(Boolean))],
+    }
+  }
+  return rooms
+}
+
 /** The columns of `ota_hotel_pages` the catalogue row takes (`pageFields`). */
 export const PAGE_FIELDS_COLUMNS =
   'master_id, description:hotel->descriptionStruct, policies:hotel->policies, roomGroups:hotel->roomGroups'
@@ -718,7 +802,13 @@ export const pageFieldsRowSchema = z.object({
 /** What the page gives the hotel's catalogue row: the description, the times and the workspace. */
 export function pageFields(row: z.infer<typeof pageFieldsRowSchema>): OtaPageFields {
   const { checkIn, checkOut } = stayTimes(row)
-  return { description: descriptionText(row), checkIn, checkOut, workspace: hasWorkstation(row.roomGroups) }
+  return {
+    description: descriptionText(row),
+    checkIn,
+    checkOut,
+    workspace: hasWorkstation(row.roomGroups),
+    rooms: pageRooms(row.roomGroups),
+  }
 }
 
 /** The columns of `ota_hotel_pages` for `roomFloorsOf`. */

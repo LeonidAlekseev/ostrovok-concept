@@ -129,6 +129,21 @@ describe('the block «Запрос отельеру»', () => {
     expect(screen.getByRole('status').textContent).toBe('Отельер ответил')
   })
 
+  it('shows the hotelier withdrew the characteristics when the chat’s message brings it, whatever it read before', async () => {
+    // The block read the answer with its characteristics from `tool_runs`; the hotelier withdraws them later.
+    realtime.row = { id: RUN, result_data: answered }
+    const { rerender } = render(<ToolRunCard step={step} run={pending} />)
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Отельер ответил'))
+    const revoked: ToolRun = {
+      id: RUN,
+      result: { ...answered, data: { ...answered.data, knowledge: 'revoked' }, claims: [] },
+    }
+    rerender(<ToolRunCard step={step} run={revoked} />)
+    const card = screen.getByRole('region', { name: 'Запрос отельеру' })
+    expect(within(card).getByText(/Отельер отозвал сведения из этого ответа/)).toBeDefined()
+    expect(within(card).queryByRole('list', { name: 'Извлечённые характеристики' })).toBeNull()
+  })
+
   it('ignores an event the policies refused', async () => {
     render(<ToolRunCard step={step} run={pending} />)
     await waitFor(() => expect(realtime.update).not.toBeNull())

@@ -6,6 +6,7 @@ import {
   chatTitle,
   dialogOf,
   hotelChatOf,
+  isPending,
   lastPhotoMessage,
   loadGuestChats,
   mergeServerMessage,
@@ -267,12 +268,12 @@ describe('the runs of the steps in the saved chats', () => {
 
 // hotelier-knowledge, Requirement: Ответ отельера в чате Эвала
 describe('mergeServerMessage', () => {
-  const run = (status: 'pending' | 'success', answer?: string) => ({
+  const run = (status: 'pending' | 'success', answer?: string, knowledge = 'done') => ({
     id: '00000000-0000-4000-8000-0000000001a1',
     result: {
       status,
       summary: answer ?? 'Ждёт',
-      data: { request_id: 'r1', question: 'Балкон?', ...(answer && { answer, knowledge: 'done' }) },
+      data: { request_id: 'r1', question: 'Балкон?', ...(answer && { answer, knowledge }) },
       evidence: [],
       claims: [],
       calculations: [],
@@ -281,12 +282,12 @@ describe('mergeServerMessage', () => {
       error: null,
     },
   })
-  const step = (status: 'pending' | 'success', answer?: string): ChatMessage => ({
+  const step = (status: 'pending' | 'success', answer?: string, knowledge?: string): ChatMessage => ({
     id: 'step',
     role: 'agent',
     status: 'done',
     text: '',
-    data: { step: { agent: 'hotelier', title: 'Запрос отельеру', run: run(status, answer) } },
+    data: { step: { agent: 'hotelier', title: 'Запрос отельеру', run: run(status, answer, knowledge) } },
     createdAt: '2026-10-28T10:00:00Z',
   })
   const chat = (): Chat => ({ ...newChat('2026-10-28T09:00:00Z'), messages: [step('pending')] })
@@ -313,6 +314,11 @@ describe('mergeServerMessage', () => {
     expect(after.messages[0].data.step?.run?.result.status).toBe('success')
     // An older echo of the browser's own save does not undo the answer.
     expect(mergeServerMessage(after, step('pending'), true)).toBe(after)
+    expect(mergeServerMessage(after, step('success', 'Да'), true)).toBe(after)
+    // The hotelier withdrew the answer's characteristics: the finished block says so, and an older echo keeps it.
+    const revoked = mergeServerMessage(after, step('success', 'Да', 'revoked'), true)
+    expect(revoked.messages[0].data.step?.run?.result.data?.knowledge).toBe('revoked')
+    expect(mergeServerMessage(revoked, step('success', 'Да'), true)).toBe(revoked)
     // A message of the browser's own is not the server's to add.
     const user: ChatMessage = {
       id: 'u',
@@ -323,5 +329,46 @@ describe('mergeServerMessage', () => {
       createdAt: '2026-10-28T12:00:00Z',
     }
     expect(mergeServerMessage(before, user, true)).toBe(before)
+  })
+})
+
+// assistant-search, Requirement: История чатов
+describe('a step left pending by a lost write', () => {
+  const orphan = () => [
+    message('user', 'Привет'),
+    message('agent', '', { status: 'pending', data: { step: { agent: 'trips', title: 'Смотрю бронирования' } } }),
+    message('assistant', 'Готово'),
+  ]
+
+  it('does not make the chat wait (Scenario: Осиротевший шаг)', () => {
+    expect(isPending(chatWith('2026-10-28T10:00:00Z', ...orphan()))).toBe(false)
+  })
+
+  it('still waits for a pending answer', () => {
+    const chat = chatWith(
+      '2026-10-28T10:00:00Z',
+      message('user', 'Привет'),
+      message('assistant', '', { status: 'pending' }),
+    )
+    expect(isPending(chat)).toBe(true)
+  })
+
+  it('reads as a failed step when the chat is loaded', () => {
+    const chat = parseChat(JSON.parse(JSON.stringify(chatWith('2026-10-28T10:00:00Z', ...orphan()))))
+    expect(chat?.messages.map((m) => m.status)).toEqual(['done', 'failed', 'done'])
+  })
+
+  it('stays pending while the answer is pending', () => {
+    const waiting = chatWith(
+      '2026-10-28T10:00:00Z',
+      message('user', 'Привет'),
+      message('agent', '', { status: 'pending', data: { step: { agent: 'trips', title: 'Смотрю' } } }),
+      message('assistant', '', { status: 'pending' }),
+    )
+    expect(parseChat(JSON.parse(JSON.stringify(waiting)))?.messages.map((m) => m.status)).toEqual([
+      'done',
+      'pending',
+      'pending',
+    ])
   })
 })

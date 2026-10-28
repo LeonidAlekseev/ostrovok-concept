@@ -994,6 +994,11 @@ function HotelierRequestCard({ step, run, request }: { step: AgentStep; run: Too
       {request.knowledge === 'queued' && (
         <p className={`text-sm/[1.35] ${greyMutedText}`}>Сохраняю характеристики из ответа…</p>
       )}
+      {request.knowledge === 'revoked' && (
+        <p className={`text-sm/[1.35] ${greyMutedText}`}>
+          Отельер отозвал сведения из этого ответа: Эвал их больше не использует.
+        </p>
+      )}
       {answered && result.claims.length > 0 && (
         <ul className="flex flex-col gap-1.5" aria-label="Извлечённые характеристики">
           {result.claims.map((claim) => (

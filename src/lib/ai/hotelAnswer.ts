@@ -5,7 +5,7 @@ import { HOTEL_UNAVAILABLE, MAX_MESSAGE_LENGTH, type AssistantRequest, type Stay
 import { AMENITIES, MEAL_LABEL, STAY_TYPES, roomFacts, travelDistances, type Hotel, type Room } from '../catalog'
 import { nightsBetween } from '../dates'
 import type { HotelFeatures } from '../features'
-import { formatDecimal, formatPrice } from '../format'
+import { clipText, formatDecimal, formatPrice } from '../format'
 import { distanceLabel, factLines, NEARBY_SHOWN, REVIEW_SOURCE_LABEL, type HotelDetails } from '../hotelDetails'
 import { isNoiseQuestion, noiseLines, type HotelNoise } from '../noise'
 import { averageNight, stayTotal } from '../offer'
@@ -359,7 +359,7 @@ export function isRussian(text: string): boolean {
 }
 
 const clean = (value: string | null | undefined, max: number): string | undefined => {
-  const text = value?.trim().slice(0, max)
+  const text = value && clipText(value.trim(), max)
   return text && isRussian(text) ? text : undefined
 }
 
@@ -408,7 +408,7 @@ export async function answerWithModel(
   // The demo's and the contradictions are said whatever the model wrote.
   const notes = hotelierNotes(answer, options.hotelier ?? [])
   const said = notes.length > 0 ? `${answer}\n\n${notes.join(' ')}` : answer
-  const question = output.ask_hotelier?.question?.trim().slice(0, 300)
+  const question = output.ask_hotelier?.question && clipText(output.ask_hotelier.question.trim(), 300)
   const keys = (output.ask_hotelier?.characteristic_keys ?? []).filter(isHotelierKey).slice(0, 10)
   return {
     answer: said,

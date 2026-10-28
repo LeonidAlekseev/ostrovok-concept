@@ -13,7 +13,7 @@ import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { serviceClient, type Table } from './lib/node.ts'
 
-const { nextDataPageProps, trimPage } = await import('../src/lib/ota/page.ts')
+const { nextDataPageProps, poiName, trimPage } = await import('../src/lib/ota/page.ts')
 type TrimmedPage = import('../src/lib/ota/page.ts').TrimmedPage
 
 const MAX_FILE_BYTES = 4 * 1024 * 1024
@@ -97,19 +97,23 @@ const updatedAt = new Date().toISOString()
 await upsert(
   'ota_pois',
   'region_id',
-  [...pois.values()].map((poi) => ({
-    region_id: poi.regionId,
-    type: poi.type,
-    subtype: poi.subtype,
-    name: poi.name || hotelNames.get(poi.regionId)?.name || '',
-    name_en: poi.nameEn || hotelNames.get(poi.regionId)?.nameEn || '',
-    genitive: poi.inflection?.genitive || null,
-    locative_in: poi.inflection?.locativeIn || null,
-    catalog_slug: poi.catalogSlug || null,
-    // EWKT: PostgREST hands the text to the geometry column's input.
-    geom: `SRID=4326;POINT(${poi.center.lng} ${poi.center.lat})`,
-    updated_at: updatedAt,
-  })),
+  [...pois.values()].map((poi) => {
+    const name = poi.name || hotelNames.get(poi.regionId)?.name || ''
+    const nameEn = poi.nameEn || hotelNames.get(poi.regionId)?.nameEn || ''
+    return {
+      region_id: poi.regionId,
+      type: poi.type,
+      subtype: poi.subtype,
+      name: poiName({ type: poi.type, name, nameEn }),
+      name_en: nameEn,
+      genitive: poi.inflection?.genitive || null,
+      locative_in: poi.inflection?.locativeIn || null,
+      catalog_slug: poi.catalogSlug || null,
+      // EWKT: PostgREST hands the text to the geometry column's input.
+      geom: `SRID=4326;POINT(${poi.center.lng} ${poi.center.lat})`,
+      updated_at: updatedAt,
+    }
+  }),
 )
 await upsert(
   'ota_hotel_pages',

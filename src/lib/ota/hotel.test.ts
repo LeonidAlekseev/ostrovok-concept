@@ -82,12 +82,43 @@ describe('otaHotel', () => {
     expect(hotel.workspace).toBe(false)
   })
 
+  it("shows the room of the hotel's page: its photos, area and amenities, and nothing the page lacks", () => {
+    const page = {
+      description: '',
+      checkIn: null,
+      checkOut: null,
+      workspace: false,
+      rooms: {
+        '3102302': { area: 18, photos: ['https://cdn.ostrovok.ru/t/{size}/r1.jpg'], amenities: ['Сейф'] },
+      },
+    }
+    const [room] = otaHotel(raw(), 'valencia', STAY, undefined, page).rooms
+    expect(room).toMatchObject({ area: 18, amenities: ['Сейф'] })
+    expect(room.photos).toEqual([
+      {
+        id: 'room-1',
+        caption: 'Двухместный номер Cosy, фото 1',
+        tone: 0,
+        url: 'https://cdn.ostrovok.ru/t/{size}/r1.jpg',
+      },
+    ])
+    // The rate's own area wins; a room the page lacks keeps the placeholder and no amenities.
+    expect(otaHotel(raw(), 'valencia', STAY, undefined, { ...page, rooms: {} }).rooms[0]).toMatchObject({
+      area: null,
+      photos: [{ id: 'room-1', tone: 0 }],
+    })
+    expect(otaHotel(raw(), 'valencia', STAY, undefined, { ...page, rooms: {} }).rooms[0]).not.toHaveProperty(
+      'amenities',
+    )
+  })
+
   it("takes the description, the times and the workspace of the hotel's page", () => {
     const hotel = otaHotel(raw(), 'valencia', STAY, undefined, {
       description: 'Отель у парка.\n\nЕсть бассейн.',
       checkIn: '15:00',
       checkOut: '11:00',
       workspace: true,
+      rooms: {},
     })
     expect(hotel).toMatchObject({
       description: 'Отель у парка.\n\nЕсть бассейн.',

@@ -7,8 +7,10 @@ import { errorResult, type ToolResult } from '../toolResult'
 
 /**
  * Эвал's tool «Запрос отельеру» (`ask_hotelier`): a question about the hotel its data cannot answer goes to the
- * hotel's hotelier, as the signed-in traveller (`create_hotelier_request`, no service role), linked to the chat and
- * the run of the tool. The result is `pending` — a normal state, not an error: the run waits in `tool_runs` without a
+ * hotel's hotelier for the signed-in traveller, linked to their chat and to the run of the tool the route has just
+ * started in `tool_runs`. Only the server asks (`create_hotelier_request` is the service role's): a traveller cannot
+ * make a question look like Эвал's, and the database checks the run is a running `ask_hotelier` of that chat. The
+ * result is `pending` — a normal state, not an error: the run waits in `tool_runs` without a
  * request, a stream or a worker held open, and the hotelier's answer finishes it (`answer_hotelier_request`). The
  * traveller's identical open question is the same request; the database keeps the limits.
  */
@@ -45,33 +47,38 @@ const LIMITATIONS = [
 const failureOf = (error: { code?: string; message?: string }) =>
   error.message === 'hotelier_request_limit'
     ? errorResult('rate_limited', 'Слишком много вопросов отельеру: попробуйте позже')
-    : error.message === 'hotelier_sign_in'
-      ? errorResult('sign_in_required', 'Войдите, чтобы Эвал спросил отельера')
-      : error.message === 'hotelier_request_invalid'
-        ? errorResult('invalid_request', 'Этот вопрос нельзя передать отельеру')
-        : errorResult('store_unavailable', 'Не получилось передать вопрос отельеру')
+    : error.message === 'hotelier_request_invalid'
+      ? errorResult('invalid_request', 'Этот вопрос нельзя передать отельеру')
+      : errorResult('store_unavailable', 'Не получилось передать вопрос отельеру')
 
 /**
- * Leaves the question for the hotel's hotelier. `client` is the traveller's session (`null` for a guest: then nothing
- * is asked), `chatId` and `runId` the chat and the row of the run the request is linked to.
+ * Leaves the question for the hotel's hotelier. `traveller` is the signed-in user the route checked, their chat and
+ * the row of the run the request is linked to (`null` for a guest: then nothing is asked); `service` the client with
+ * the service role (`null` without it).
  */
 export async function runAskHotelier(
-  client: SupabaseClient<Database> | null,
+  service: SupabaseClient<Database> | null,
   input: AskHotelierInput,
-  { hotelName, chatId, runId }: { hotelName: string; chatId: string | null; runId: string | null },
+  {
+    hotelName,
+    traveller,
+  }: { hotelName: string; traveller: { userId: string; chatId: string; runId: string | null } | null },
 ): Promise<ToolResult> {
   const parsed = askHotelierInputSchema.safeParse(input)
   if (!parsed.success) return errorResult('invalid_request', 'Этот вопрос нельзя передать отельеру')
-  if (!client || !chatId) return errorResult('sign_in_required', 'Войдите, чтобы Эвал спросил отельера')
+  if (!traveller) return errorResult('sign_in_required', 'Войдите, чтобы Эвал спросил отельера')
+  // Without its run in `tool_runs` the question would be nobody's tool's: it is not asked.
+  if (!service || !traveller.runId) return errorResult('store_unavailable', 'Не получилось передать вопрос отельеру')
   const { hotelId, question, characteristicKeys = [], roomTypeId, contextSummary } = parsed.data
-  const { data, error } = await client.rpc('create_hotelier_request', {
+  const { data, error } = await service.rpc('create_hotelier_request', {
+    traveller: traveller.userId,
     hotel_id: hotelId,
     question,
+    origin_chat_id: traveller.chatId,
+    origin_tool_run_id: traveller.runId,
     characteristic_keys: characteristicKeys,
     ...(roomTypeId && { room_ref: roomTypeId }),
     ...(contextSummary && { context_summary: contextSummary }),
-    origin_chat_id: chatId,
-    ...(runId && { origin_tool_run_id: runId }),
   })
   const made = data?.[0]
   if (error || !made) {

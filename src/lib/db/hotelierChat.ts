@@ -2,6 +2,8 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/db/database.types'
 import {
+  CONVERSATION_COLUMNS,
+  MESSAGE_COLUMNS,
   conversationOf,
   messageOf,
   type ConversationStatus,
@@ -13,7 +15,8 @@ import {
  * The writes of the chats with the hoteliers (supabase/migrations/20261028130000_hotelier_chat.sql), as the user of the
  * request: the client with their session, under RLS — no service role. The database itself checks who writes as whom,
  * keeps a closed chat closed and lets one author write 20 messages a minute; this module only tells its failures
- * apart. A failure is logged by its code, never with the message.
+ * apart. It reads only the columns a user may select (`CONVERSATION_COLUMNS`, `MESSAGE_COLUMNS`): never who the
+ * traveller is. A failure is logged by its code, never with the message.
  */
 
 type Client = SupabaseClient<Database>
@@ -46,15 +49,15 @@ export async function signedInUser(client: Client): Promise<string | null> {
   return data.user?.id ?? null
 }
 
-/** The traveller's open chat with the hotel, started when there is none (a parallel start finds the other one's). */
+/**
+ * The traveller's open chat with the hotel, started when there is none (a parallel start finds the other one's). Their
+ * newest chat with it is the open one, if any: a new chat starts only after the last one closed.
+ */
 async function openChat(client: Client, userId: string, hotelId: string): Promise<ChatResult<HotelierConversation>> {
   const find = () =>
     client
-      .from('hotelier_conversations')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('hotel_id', hotelId)
-      .eq('kind', 'user')
+      .rpc('hotelier_traveller_chat', { hotel_id: hotelId })
+      .select(CONVERSATION_COLUMNS)
       .neq('status', 'closed')
       .maybeSingle()
   const found = await find()
@@ -63,7 +66,7 @@ async function openChat(client: Client, userId: string, hotelId: string): Promis
   const created = await client
     .from('hotelier_conversations')
     .insert({ hotel_id: hotelId, user_id: userId })
-    .select('*')
+    .select(CONVERSATION_COLUMNS)
     .single()
   if (!created.error) return { ok: true, value: conversationOf(created.data) }
   if (created.error.code !== '23505') return fail(failureOf(created.error, 'chat not started'))
@@ -84,7 +87,7 @@ export async function sendTravellerMessage(
   const { data, error } = await client
     .from('hotelier_messages')
     .insert({ conversation_id: chat.value.id, sender: 'user', author_id: userId, text })
-    .select('*')
+    .select(MESSAGE_COLUMNS)
     .single()
   if (error) return fail(failureOf(error, 'message not written'))
   return { ok: true, value: { conversation: chat.value, message: messageOf(data) } }
@@ -121,7 +124,7 @@ export async function sendHotelierMessage(
       shareable,
       request_id: request,
     })
-    .select('*')
+    .select(MESSAGE_COLUMNS)
     .single()
   if (error) return fail(failureOf(error, 'answer not written'))
   return { ok: true, value: messageOf(data) }
@@ -143,18 +146,12 @@ export async function answerRequest(client: Client, requestId: string, messageId
 
 /**
  * The hotelier may withdraw the knowledge of `messageId`: it is their answer (`sender = 'hotelier'`) in a conversation
- * RLS shows them — of their hotel.
+ * of their hotel — the database's to say (`hotelier_own_answer`), as the author is a hidden column.
  */
-export async function ownAnswer(client: Client, userId: string, messageId: string): Promise<boolean> {
-  const { data, error } = await client
-    .from('hotelier_messages')
-    .select('id')
-    .eq('id', messageId)
-    .eq('sender', 'hotelier')
-    .eq('author_id', userId)
-    .maybeSingle()
+export async function ownAnswer(client: Client, messageId: string): Promise<boolean> {
+  const { data, error } = await client.rpc('hotelier_own_answer', { message_id: messageId })
   if (error) failureOf(error, 'answer not read')
-  return Boolean(data)
+  return data === true
 }
 
 /** A new state of the conversation; the database's function decides who may set it. */
@@ -171,7 +168,7 @@ export async function setConversationStatus(
   if (!allowed) return fail('forbidden')
   const { data, error: readError } = await client
     .from('hotelier_conversations')
-    .select('*')
+    .select(CONVERSATION_COLUMNS)
     .eq('id', conversationId)
     .single()
   if (readError) return fail(failureOf(readError, 'chat not read'))

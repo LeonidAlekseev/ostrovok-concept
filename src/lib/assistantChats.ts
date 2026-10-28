@@ -10,6 +10,7 @@ import {
 import { clearDialog, isBrief, isPlan, isQuestion, loadDialog } from './assistantDialog'
 import { parseChatMap, type ChatMap } from './geo/chatMap'
 import { parseParams, type SessionParam } from './sessionMemory'
+import { requestStage, requestViewOf } from './hotelierRequest'
 import { parseToolRun, type ToolRun } from './toolResult'
 import { parseDateChange, type DateChange, type DateChangeState } from './trips'
 
@@ -133,7 +134,11 @@ export function chatTitle(text: string): string {
   return line.length > TITLE_LENGTH ? `${line.slice(0, TITLE_LENGTH - 1).trimEnd()}…` : line
 }
 
-export const isPending = (chat: Chat) => chat.messages.some((m) => m.status === 'pending')
+/**
+ * A message still waits for its answer. A pending step of an agent alone is no wait: it is the turn's sign of work,
+ * and the turn that left it has finished (a step orphaned by a lost write must not block the chat for good).
+ */
+export const isPending = (chat: Chat) => chat.messages.some((m) => m.status === 'pending' && m.role !== 'agent')
 
 /** The hotels the chat's answers have shown. */
 export const shownHotels = (chat: Chat): Set<string> =>
@@ -264,16 +269,17 @@ export function parseMessage(value: unknown): ChatMessage | null {
   }
 }
 
-/** The step's run is still open: «Запрос отельеру» waits for the hotelier or for the characteristics of the answer. */
-const openRun = (message: ChatMessage) => {
-  const result = message.data.step?.run?.result
-  return result?.status === 'pending' || result?.data?.knowledge === 'queued'
+/** How far the step's «Запрос отельеру» has gone (`requestStage`); -1 for a step of another tool or none. */
+const stageOf = (message: ChatMessage) => {
+  const run = message.data.step?.run
+  return run ? requestStage(requestViewOf(run.result)) : -1
 }
 
 /**
  * A message the server wrote into the chat later, by Realtime: the hotelier's answer (`owner`) joins the feed, and the
- * step of «Запрос отельеру» still waiting takes its finished run. Anything else — an echo of the browser's own save,
- * which may be older than what the browser has — leaves the chat as it is (the same object). `active`: the traveller
+ * step of «Запрос отельеру» takes its run once it has gone further — answered, its characteristics in, or withdrawn by
+ * the hotelier. Anything else — an echo of the browser's own save, which may be older than what the browser has —
+ * leaves the chat as it is (the same object). `active`: the traveller
  * is in this chat, so a new answer is not unread.
  */
 export function mergeServerMessage(chat: Chat, message: ChatMessage, active: boolean): Chat {
@@ -283,7 +289,7 @@ export function mergeServerMessage(chat: Chat, message: ChatMessage, active: boo
     const messages = [...chat.messages, message].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     return { ...chat, messages, unread: chat.unread || !active, updatedAt: message.createdAt }
   }
-  if (!openRun(old) || !message.data.step?.run || JSON.stringify(old.data) === JSON.stringify(message.data)) return chat
+  if (stageOf(message) <= stageOf(old)) return chat
   return { ...chat, messages: chat.messages.map((m) => (m.id === message.id ? { ...m, data: message.data } : m)) }
 }
 
@@ -294,6 +300,7 @@ export function parseChat(value: unknown): Chat | null {
   if (!Array.isArray(value.messages)) return null
   const messages = value.messages.map(parseMessage)
   if (messages.some((m) => m === null)) return null
+  const waits = (messages as ChatMessage[]).some((m) => m.status === 'pending' && m.role !== 'agent')
   return {
     id: value.id,
     title: value.title,
@@ -302,7 +309,10 @@ export function parseChat(value: unknown): Chat | null {
     unread: value.unread === true,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
-    messages: messages as ChatMessage[],
+    // The steps no turn waits for any more (the answer is done) are failed ones.
+    messages: (messages as ChatMessage[]).map((m) =>
+      !waits && m.role === 'agent' && m.status === 'pending' ? { ...m, status: 'failed' as const } : m,
+    ),
   }
 }
 

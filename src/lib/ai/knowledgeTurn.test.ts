@@ -102,6 +102,7 @@ function deps(extra: Partial<KnowledgeDeps> = {}) {
   )
   const all: KnowledgeDeps = {
     levels: vi.fn(async () => levels),
+    hotelierNoise: vi.fn(async () => []),
     near: vi.fn(async () => near),
     runFeatures: vi.fn(
       timed((input: FeaturesInput, index: readonly LevelRow[] | null) => featuresResult(input, index, new Map())),

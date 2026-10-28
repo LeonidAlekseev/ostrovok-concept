@@ -2,6 +2,9 @@ import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
 import { channelName, join, rowOf } from './supabase/realtime'
 import type { Database } from './db/database.types'
 import {
+  CONVERSATION_COLUMNS,
+  MESSAGE_COLUMNS,
+  REQUEST_COLUMNS,
   conversationOf,
   messageOf,
   requestOf,
@@ -15,7 +18,8 @@ import {
 
 /**
  * The browser's reads of the chats with the hoteliers, under RLS: the traveller reads their own, the hotelier those of
- * their hotels. Realtime brings the new rows of the same policies. Writes go through the routes (the limits and the
+ * their hotels, both only the columns that do not name the traveller. Realtime brings the new rows of the same policies,
+ * with the same columns. Writes go through the routes (the limits and the
  * checks are the server's); only «read» is a call of the database's function.
  */
 
@@ -26,22 +30,16 @@ export const INBOX_LIMIT = 200
 /** The messages of a conversation at most, the newest. */
 export const MESSAGES_LIMIT = 500
 
-const CONVERSATION_COLUMNS = '*, hotel:hotels(name:data->>name)'
+const INBOX_COLUMNS = `${CONVERSATION_COLUMNS}, hotel:hotels(name:data->>name)` as const
 
 /** The traveller's newest chat with the hotel, closed or not; `null` when there is none. */
 export async function loadHotelChat(client: Client, hotelId: string): Promise<HotelierConversation | null> {
   const { data: auth } = await client.auth.getUser()
-  const userId = auth.user?.id
-  if (!userId) return null
-  // A hotelier sees every chat of the hotel: the traveller's own is asked by their id.
+  if (!auth.user) return null
+  // A hotelier sees every chat of the hotel: the traveller's own is the database's to find (`user_id` is hidden).
   const { data, error } = await client
-    .from('hotelier_conversations')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('hotel_id', hotelId)
-    .eq('kind', 'user')
-    .order('created_at', { ascending: false })
-    .limit(1)
+    .rpc('hotelier_traveller_chat', { hotel_id: hotelId })
+    .select(CONVERSATION_COLUMNS)
     .maybeSingle()
   if (error) throw new Error(error.message)
   return data && conversationOf(data)
@@ -51,7 +49,7 @@ export async function loadHotelChat(client: Client, hotelId: string): Promise<Ho
 export async function loadInbox(client: Client): Promise<HotelierConversation[]> {
   const { data, error } = await client
     .from('hotelier_conversations')
-    .select(CONVERSATION_COLUMNS)
+    .select(INBOX_COLUMNS)
     .order('last_message_at', { ascending: false })
     .limit(INBOX_LIMIT)
   if (error) throw new Error(error.message)
@@ -61,7 +59,7 @@ export async function loadInbox(client: Client): Promise<HotelierConversation[]>
 export async function loadMessages(client: Client, conversationId: string): Promise<HotelierMessage[]> {
   const { data, error } = await client
     .from('hotelier_messages')
-    .select('*')
+    .select(MESSAGE_COLUMNS)
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: false })
     .limit(MESSAGES_LIMIT)
@@ -72,7 +70,7 @@ export async function loadMessages(client: Client, conversationId: string): Prom
 export async function loadRequests(client: Client, conversationId: string): Promise<HotelierRequest[]> {
   const { data, error } = await client
     .from('hotelier_requests')
-    .select('*')
+    .select(REQUEST_COLUMNS)
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true })
   if (error) throw new Error(error.message)

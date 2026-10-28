@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isOpenRequest, requestViewOf } from './hotelierRequest'
+import { isOpenRequest, requestStage, requestViewOf } from './hotelierRequest'
 import type { ToolResult } from './toolResult'
 
 const result = (status: ToolResult['status'], data: Record<string, unknown> | null): ToolResult => ({
@@ -29,6 +29,13 @@ describe('the block «Запрос отельеру»', () => {
     expect(answered).toMatchObject({ status: 'answered', answer: 'Да', knowledge: 'queued' })
     expect(isOpenRequest(answered)).toBe(true)
     expect(isOpenRequest({ ...answered, knowledge: 'done' })).toBe(false)
+    // Withdrawn by the hotelier: the last stage, which no older copy of the block replaces.
+    const revoked = requestViewOf(result('success', { ...asked, answer: 'Да', knowledge: 'revoked' }))!
+    expect(revoked.knowledge).toBe('revoked')
+    expect(isOpenRequest(revoked)).toBe(false)
+    expect([pending, answered, { ...answered, knowledge: 'done' as const }, revoked, null].map(requestStage)).toEqual([
+      0, 1, 2, 3, -1,
+    ])
   })
 
   it('is none for another tool’s result', () => {

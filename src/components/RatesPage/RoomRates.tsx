@@ -38,6 +38,7 @@ export function RoomRates({ hotel, room, stay, guests, onPickDates }: Props) {
             {room.name}
           </h2>
           <p className="text-sm text-muted-foreground">{roomFacts(room)}</p>
+          {room.amenities && <p className="text-sm text-muted-foreground">{room.amenities.join(' · ')}</p>}
           {reason && <p className="text-sm font-semibold text-destructive">Недоступен: {reason}</p>}
         </div>
       </div>

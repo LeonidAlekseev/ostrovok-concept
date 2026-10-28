@@ -16,6 +16,7 @@ import {
   type KnowledgeDeps,
 } from '@/lib/ai/knowledgeTurn'
 import { runFeaturesTool, runNearTool, runReviewsTool, type Candidate } from '@/lib/ai/knowledgeTools'
+import { loadHotelierNoise } from '@/lib/db/claims'
 import { loadLevelIndex, loadNearIndex } from '@/lib/db/knowledge'
 import { MODEL_TIMEOUT_MS, understandWish } from '@/lib/ai/understand'
 import {
@@ -48,10 +49,12 @@ import { bookingTurn } from '@/lib/ai/bookingTurn'
 import { loadHotelFeatures } from '@/lib/db/features'
 import { loadHotelDetails } from '@/lib/db/hotelDetails'
 import { loadHotelNoise } from '@/lib/db/noise'
+import { serviceClient } from '@/lib/db/hotelierKnowledge'
 import { recordRun, runOwner } from '@/lib/db/toolRuns'
 import { NOISE_TOOL, NOISE_TOOL_PARAMS, NOISE_TOOL_TITLE, runNoiseTool } from '@/lib/ai/noiseTool'
 import { ASK_HOTELIER_TITLE, ASK_HOTELIER_TOOL, runAskHotelier } from '@/lib/ai/hotelierTool'
 import { loadHotelierClaims } from '@/lib/db/claims'
+import { clipText } from '@/lib/format'
 import { asksHotelier, characteristicLabel, questionKeys, type HotelierKey } from '@/lib/hotelierFacts'
 import { isHotelGeoQuestion, isHotelViewQuestion, isNoiseQuestion } from '@/lib/noise'
 import type { ToolRun } from '@/lib/toolResult'
@@ -172,6 +175,7 @@ const KNOWLEDGE_TIME_MS = 4000
 /** The store's reads and the runs of the tools, as the route does them. */
 const KNOWLEDGE_DEPS: KnowledgeDeps = {
   levels: loadLevelIndex,
+  hotelierNoise: loadHotelierNoise,
   near: loadNearIndex,
   runFeatures: runFeaturesTool,
   runNear: runNearTool,
@@ -322,11 +326,12 @@ const ASKED_REPLY = 'Спросил отельера: ответ придёт в
 
 /** The rules' call of «Запрос отельеру»: the traveller asks in words to ask the hotel («уточните у отеля»). */
 const ruleAsk = (text: string): { question: string; keys: HotelierKey[] } | undefined =>
-  asksHotelier(text) ? { question: text.trim().slice(0, 300), keys: questionKeys(text) } : undefined
+  asksHotelier(text) ? { question: clipText(text.trim(), 300), keys: questionKeys(text) } : undefined
 
 /**
  * Runs «Запрос отельеру» for the signed-in traveller's chat: its run waits in `tool_runs` (`pending`), linked to the
- * request, and nothing is held open; a guest's run is an error asking to sign in.
+ * request, and nothing is held open; a guest's run is an error asking to sign in. The question is the server's to
+ * leave (the service role), for the user the session proved.
  */
 async function askStep(
   hotel: Hotel,
@@ -335,11 +340,11 @@ async function askStep(
   messageId?: string,
 ): Promise<TurnStep> {
   const owner = await runOwner(chatId, messageId)
-  const run = await recordRun(owner, ASK_HOTELIER_TOOL, `${hotel.name} (${hotel.id})`, (runId) =>
+  const run = await recordRun(owner, ASK_HOTELIER_TOOL, `${hotel.name} (${hotel.id})`, async (runId) =>
     runAskHotelier(
-      owner?.client ?? null,
+      owner && (await serviceClient()),
       { hotelId: hotel.id, question, characteristicKeys: keys },
-      { hotelName: hotel.name, chatId: owner?.chatId ?? null, runId },
+      { hotelName: hotel.name, traveller: owner && { userId: owner.userId, chatId: owner.chatId, runId } },
     ),
   )
   return {
@@ -347,7 +352,7 @@ async function askStep(
     title: ASK_HOTELIER_TITLE,
     params: keys.length > 0 ? keys.map(characteristicLabel).join(', ') : hotel.name,
     status: run.result.status === 'error' ? 'failed' : 'done',
-    result: run.result.summary.slice(0, 300),
+    result: clipText(run.result.summary, 300),
     run,
   }
 }
@@ -362,7 +367,7 @@ const noiseStep = (run: ToolRun): TurnStep => ({
   title: NOISE_TOOL_TITLE,
   params: NOISE_TOOL_PARAMS,
   status: run.result.status === 'error' ? 'failed' : 'done',
-  result: run.result.summary.slice(0, 300),
+  result: clipText(run.result.summary, 300),
   run,
 })
 

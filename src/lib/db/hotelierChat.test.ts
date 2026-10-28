@@ -44,7 +44,19 @@ function fake(answers: Record<string, Answer[]>, rpc: Answer = { data: true, err
   const calls: Call[] = []
   const next = (call: Call): Answer => answers[`${call.table}:${call.op}`]?.shift() ?? { data: null, error: null }
   const client = {
-    rpc: vi.fn(async () => rpc),
+    // A call of a function: awaited as it is, or read on like a table (`rpc:<name>`).
+    rpc: vi.fn((name: string, args: unknown) => {
+      const call: Call = { table: `rpc:${name}`, op: 'select', value: args, filters: [] }
+      calls.push(call)
+      const query = {
+        select: () => query,
+        neq: (k: string, v: unknown) => (call.filters.push(['neq', k, v]), query),
+        maybeSingle: async () => next(call),
+        then: (resolve: (answer: Answer) => unknown, reject: (error: unknown) => unknown) =>
+          Promise.resolve(rpc).then(resolve, reject),
+      }
+      return query
+    }),
     from: (table: string) => {
       const call: Call = { table, op: 'select', filters: [] }
       calls.push(call)
@@ -70,7 +82,7 @@ beforeEach(() => {
 describe('sendTravellerMessage', () => {
   it('writes into the open chat, starting one when there is none', async () => {
     const { client, calls } = fake({
-      'hotelier_conversations:select': [{ data: null, error: null }],
+      'rpc:hotelier_traveller_chat:select': [{ data: null, error: null }],
       'hotelier_conversations:insert': [{ data: row(), error: null }],
       'hotelier_messages:insert': [{ data: messageRow(), error: null }],
     })
@@ -82,18 +94,14 @@ describe('sendTravellerMessage', () => {
       author_id: 'u1',
       text: 'Есть балкон?',
     })
-    // The open chat is the traveller's own, never a closed one.
-    expect(calls[0].filters).toEqual(
-      expect.arrayContaining([
-        ['eq', 'user_id', 'u1'],
-        ['neq', 'status', 'closed'],
-      ]),
-    )
+    // The open chat is the traveller's own (the database's function finds it), never a closed one.
+    expect(calls[0]).toMatchObject({ table: 'rpc:hotelier_traveller_chat', value: { hotel_id: 'ota-1' } })
+    expect(calls[0].filters).toEqual([['neq', 'status', 'closed']])
   })
 
   it('finds the chat a parallel request started', async () => {
     const { client } = fake({
-      'hotelier_conversations:select': [
+      'rpc:hotelier_traveller_chat:select': [
         { data: null, error: null },
         { data: row({ id: 'c2' }), error: null },
       ],
@@ -113,7 +121,7 @@ describe('sendTravellerMessage', () => {
     ['XX000', 'boom «секрет»', 'store'],
   ])('tells the refusal %s %s apart', async (code, message, failure) => {
     const { client } = fake({
-      'hotelier_conversations:select': [{ data: row(), error: null }],
+      'rpc:hotelier_traveller_chat:select': [{ data: row(), error: null }],
       'hotelier_messages:insert': [{ data: null, error: { code, message } }],
     })
     expect(await sendTravellerMessage(client, 'u1', 'ota-1', 'x')).toEqual({ ok: false, failure })

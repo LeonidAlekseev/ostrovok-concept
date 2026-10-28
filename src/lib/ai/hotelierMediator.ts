@@ -27,6 +27,7 @@ import { hotelFacts, isRussian } from './hotelAnswer'
 import { getTextModels } from './model'
 import { NVIDIA_KEY } from './nvidia'
 import { queryVector } from './semantic'
+import { clipText } from '../format'
 import { getSecret } from '../secrets'
 
 /**
@@ -238,7 +239,7 @@ export async function mediate(conversationId: string, messageId: string): Promis
       }
     }
 
-    const answered = decision?.decision === 'answer' ? decision.answer.trim().slice(0, 900) : ''
+    const answered = decision?.decision === 'answer' ? clipText(decision.answer.trim(), 900) : ''
     const answer =
       answered && [answered, ...hotelierNotes(answered, cited(decision?.claim_ids ?? [], 'C', claims))].join(' ')
     const usedClaims = decision ? cited(decision.claim_ids, 'C', claims) : []

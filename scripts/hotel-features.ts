@@ -6,7 +6,8 @@
 // quiet and the Lnight contours: too slow to compute on every request, see 20261027210000_hotel_noise_maps.sql).
 // And the store of claims (src/lib/claimRows.ts, scripts/lib/claims-store.ts): EEA's bands at each hotel and the day
 // estimate from them, the estimate of noise-estimate-v1 at the facade (`noise.estimate.*`), the loud OSM places within 200 m, the pharmacies, shops, hospitals, stops, beaches and parks
-// within 1 km (Ostrovok's places first), the nearest building of EUBUCCO, the guests' reviews and their words about
+// within 1 km (Ostrovok's places first), the nearest building of EUBUCCO, the facts of the hotels' pages (the year built, the
+// rooms), the views the names of the room types tell of, the guests' reviews and their words about
 // noise and quiet, each with its evidence, calculation and the confidence of src/lib/confidence.ts. Copies no raw data: only the derived values and the reference to the source. Run it after every reload of the
 // geodata (scripts/load-valencia-geo.py), or the noise maps stay those of the old contours.
 //   npm run db:features [-- --dry-run]   (Node runs the TypeScript itself; the keys come from .env.local)
@@ -27,12 +28,14 @@ const {
   buildingStore,
   estimateOf,
   estimateStore,
+  factsStore,
   facadeDataset,
   mergeStores,
   nearbyStore,
   noiseStore,
   placesStore,
   reviewStore,
+  roomViewStore,
 } = await import('../src/lib/claimRows.ts')
 type Store = import('../src/lib/claimRows.ts').Store
 type Dataset = import('../src/lib/claimRows.ts').Dataset
@@ -108,7 +111,7 @@ const datasets = await readAll<Dataset>('geo_datasets', 'id, name, version, url,
 // The Ostrovok places of the hotels' pages, with the time of their rows.
 const ostrovokPlaces = await readAll<Omit<OstrovokPlace, 'updated_at'> & { hotel_id: string }>(
   'ota_hotel_places' as Table,
-  'hotel_id, master_id, region_id, type, subtype, name, name_en, distance_m, lat, lon',
+  'hotel_id, master_id, region_id, type, subtype, name, name_en, distance_m, straight_m, lat, lon',
   ['master_id', 'region_id'],
   (q) => q.lte('distance_m', NEARBY_RADIUS_M),
 )
@@ -182,15 +185,16 @@ for (let i = 0; i < hotels.length; i += PARALLEL) {
 }
 
 // The reviews of the hotels' pages.
-const pages = await readAll<{ master_id: number; updated_at: string; list: unknown[] | null }>(
+const pages = await readAll<{ master_id: number; updated_at: string; list: unknown[] | null; facts: unknown }>(
   'ota_hotel_pages',
-  'master_id, updated_at, list:reviews->list',
+  'master_id, updated_at, list:reviews->list, facts:hotel->facts',
   ['master_id'],
 )
 const byId = new Map(hotels.map((h) => [h.id, h]))
 for (const page of pages) {
   const hotel = byId.get(`ota-${page.master_id}`)
-  if (hotel) stores.push(reviewStore(hotel, { ...page, list: page.list ?? [] }))
+  if (!hotel) continue
+  stores.push(reviewStore(hotel, { ...page, list: page.list ?? [] }), factsStore(hotel, page))
 }
 
 // The views of the room types of the hotels in the catalogue.
@@ -200,6 +204,11 @@ const raw = await readAll<{ master_id: number; room_groups: RoomGroup[] | null }
   'master_id, room_groups:static_vm->room_groups',
   ['master_id'],
 )
+const pageTimes = new Map(pages.map((page) => [`ota-${page.master_id}`, page.updated_at]))
+for (const h of raw) {
+  const hotel = byId.get(`ota-${h.master_id}`)
+  if (hotel) stores.push(roomViewStore(hotel, h.room_groups ?? [], pageTimes.get(hotel.id) ?? null))
+}
 const views: ViewRow[] = raw
   .filter((h) => inCatalogue.has(`ota-${h.master_id}`))
   .flatMap((h) => viewRows(h.master_id, h.room_groups ?? []))

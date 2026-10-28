@@ -13,8 +13,11 @@ export interface HotelierRequestView {
   keys: string[]
   answer: string | null
   answeredAt: string | null
-  /** `queued`: the characteristics are being extracted; `done`, `none`: they are in the block or there are none. */
-  knowledge: 'queued' | 'done' | 'none' | null
+  /**
+   * `queued`: the characteristics are being extracted; `done`, `none`: they are in the block or there are none;
+   * `revoked`: the hotelier withdrew them (src/lib/db/hotelierKnowledge.ts).
+   */
+  knowledge: 'queued' | 'done' | 'none' | 'revoked' | null
 }
 
 const text = (value: unknown) => (typeof value === 'string' && value ? value : null)
@@ -29,7 +32,12 @@ export function requestViewOf(result: ToolResult): HotelierRequestView | null {
     ? data.requested_characteristics.filter((k): k is string => typeof k === 'string')
     : []
   const knowledge =
-    data.knowledge === 'queued' || data.knowledge === 'done' || data.knowledge === 'none' ? data.knowledge : null
+    data.knowledge === 'queued' ||
+    data.knowledge === 'done' ||
+    data.knowledge === 'none' ||
+    data.knowledge === 'revoked'
+      ? data.knowledge
+      : null
   return {
     requestId,
     hotelName: text(data.hotel_name),
@@ -44,3 +52,15 @@ export function requestViewOf(result: ToolResult): HotelierRequestView | null {
 
 /** The block still changes: the hotelier has not answered, or the answer's characteristics are on their way. */
 export const isOpenRequest = (view: HotelierRequestView) => view.status === 'pending' || view.knowledge === 'queued'
+
+/**
+ * How far the request has gone: waiting (0), answered with its characteristics on their way (1), answered (2), its
+ * characteristics withdrawn (3). A copy of the block that is further on replaces one that is not, never the other way:
+ * a late echo of an older copy must not bring back what the hotelier withdrew.
+ */
+export function requestStage(view: HotelierRequestView | null): number {
+  if (!view) return -1
+  if (view.knowledge === 'revoked') return 3
+  if (view.status === 'pending') return 0
+  return view.knowledge === 'queued' ? 1 : 2
+}

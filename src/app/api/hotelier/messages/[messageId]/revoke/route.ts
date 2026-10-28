@@ -18,7 +18,7 @@ export async function POST(_request: Request, context: { params: Promise<{ messa
   if (!client) return apiError(503, STORE_ERROR)
   const userId = await signedInUser(client)
   if (!userId) return apiError(401, UNAUTHORIZED_ERROR)
-  if (!(await ownAnswer(client, userId, messageId))) return apiError(403, FORBIDDEN_ERROR)
+  if (!(await ownAnswer(client, messageId))) return apiError(403, FORBIDDEN_ERROR)
   after(() => revokeHotelierAnswer(messageId))
   return Response.json({ messageId, revoked: true }, { status: 202 })
 }

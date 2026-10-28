@@ -37,3 +37,16 @@ export function guestsLabel({ adults, children, rooms }: Guests): string {
   const guests = countRu(adults + children, ['гость', 'гостя', 'гостей'])
   return rooms > 1 ? `${guests}, ${countRu(rooms, ['номер', 'номера', 'номеров'])}` : guests
 }
+
+/**
+ * A text cut to `max` characters at most without breaking a word: at the last space before the limit, with «…».
+ * A plain `slice` leaves a fragment of a word («Superi»), which reads as the model's typo. A text without a space
+ * near the limit is cut where it must be.
+ */
+export function clipText(text: string, max: number): string {
+  if (text.length <= max) return text
+  const head = text.slice(0, max - 1)
+  const space = head.search(/\s\S*$/u)
+  const cut = space >= max * 0.6 ? head.slice(0, space) : head
+  return `${cut.replace(/[\s,;:—–-]+$/u, '')}…`
+}

@@ -7,6 +7,8 @@ import {
   canonical,
   chunksOf,
   estimateStore,
+  factsStore,
+  roomViewStore,
   claimKey,
   mentionExcerpt,
   mergeStores,
@@ -387,6 +389,22 @@ describe('placesStore', () => {
       }),
     ])
     expect(store.evidence[0]).toMatchObject({ type: 'ota_page', url: null, retrieved_at: '2026-10-26T10:00:00.000Z' })
+    // The place's point is stored with the entity, so the graph needs no cache of OSM for it.
+    expect(store.entities.find((e) => e.kind === 'ota_poi')?.metadata).toEqual({ lat: 39.4705, lon: -0.376 })
+  })
+
+  it('keeps our straight line beside the Ostrovok distance of a place, and the points of the OSM places', () => {
+    const store = placesStore(
+      hotel,
+      { places: [at(1, 'pharmacy', 120)], covered: [] },
+      [{ ...station, subtype: 'PARK', type: 'POI', straight_m: 420 }],
+      options,
+    )
+    expect(store.claims.find((c) => c.source_key === 'ota_poi/77')).toMatchObject({
+      value_numeric: 300,
+      method: { straight_m: 420 },
+    })
+    expect(store.entities.find((e) => e.ref === 'node/1')?.metadata).toEqual({ lat: 39.47001, lon: -0.376 })
   })
 
   it('makes nothing without places', () => {
@@ -625,5 +643,52 @@ describe('the confidence of the claims', () => {
     }
     for (const relation of mergeStores(stores).relations)
       expect(relation.confidence).toBe(claims.find((c) => claimKey(c) === relation.claim)!.confidence)
+  })
+})
+
+// hotel-knowledge, Requirement: Факты страницы и виды номеров
+describe('factsStore', () => {
+  it('reports the page facts the hotel gives, and none of the zeros', () => {
+    const store = factsStore(hotel, {
+      master_id: 1,
+      updated_at: '2026-10-26 10:00:00+00',
+      facts: { yearBuilt: 1998, yearRenovated: 0, roomsNumber: 44, floorsNumber: 0 },
+    })
+    expect(store.claims.map((c) => [c.property, c.value_numeric])).toEqual([
+      ['hotel.year_built', 1998],
+      ['hotel.rooms_count', 44],
+    ])
+    expect(store.claims[0]).toMatchObject({
+      epistemic_status: 'reported',
+      confidence: CONFIDENCE.ostrovok_fact,
+      method: { confidence: { policy: CONFIDENCE_POLICY, rule: 'ostrovok_fact' } },
+      evidence: [{ evidence: 'Островок:facts:1', role: 'source' }],
+    })
+    expect(factsStore(hotel, { master_id: 1, updated_at: '', facts: { yearBuilt: 0 } })).toEqual(mergeStores([]))
+  })
+})
+
+describe('roomViewStore', () => {
+  const groups = [
+    { rg_hash: 'a1', room_group_id: 5, name_struct: { main_name: 'Люкс с видом на море' } },
+    { rg_hash: 'b2', room_group_id: 6, name_struct: { main_name: 'Стандартный номер' } },
+  ]
+  it('makes a room entity and a reported view claim for a name that tells of a view, nothing for the rest', () => {
+    const store = roomViewStore(hotel, groups, '2026-10-26 10:00:00+00')
+    expect(store.entities).toEqual([
+      expect.objectContaining({ kind: 'hotel', ref: 'ota-1' }),
+      { kind: 'room', ref: 'ota-1/a1', hotel_id: 'ota-1', name: 'Люкс с видом на море' },
+    ])
+    expect(store.claims).toEqual([
+      expect.objectContaining({
+        entity: 'room:ota-1/a1',
+        property: 'room.view',
+        value_text: 'sea',
+        epistemic_status: 'reported',
+        confidence: CONFIDENCE.room_name_view,
+        evidence: [{ evidence: 'Островок:room:1:a1', role: 'source' }],
+      }),
+    ])
+    expect(roomViewStore(hotel, [groups[1]], null)).toEqual(mergeStores([]))
   })
 })
