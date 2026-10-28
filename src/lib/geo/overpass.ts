@@ -19,6 +19,8 @@ import { ok, timedOut, unavailable, type GeoResult } from './result'
  */
 
 export const OVERPASS_URL = 'https://overpass-api.de/api/interpreter'
+/** Asked in this order: the next one only when the one before failed or did not answer (the main one is often 502). */
+export const OVERPASS_URLS: readonly string[] = [OVERPASS_URL, 'https://overpass.kumi.systems/api/interpreter']
 /** Within the turn's 9 s: the query's own `[timeout:]` says the same to the server. */
 export const OVERPASS_TIMEOUT_MS = 4000
 
@@ -147,29 +149,36 @@ export interface OverpassDeps {
   budget: CallBudget
   gate: RateGate
   fetch?: typeof fetch
-  url?: string
+  urls?: readonly string[]
   timeoutMs?: number
 }
 
-/** Asks Overpass for `categories` in `area` and parses the answer. */
+/**
+ * Asks Overpass for `categories` in `area` and parses the answer. When a server fails or times out, the next of `urls`
+ * is asked with what the budget has left; a 429 is not retried (the gate has closed the service for its wait).
+ */
 export async function overpassPlaces(
   categories: readonly PlaceCategory[],
   area: OverpassArea,
-  { url = OVERPASS_URL, timeoutMs = OVERPASS_TIMEOUT_MS, ...deps }: OverpassDeps,
+  { urls = OVERPASS_URLS, timeoutMs = OVERPASS_TIMEOUT_MS, ...deps }: OverpassDeps,
 ): Promise<GeoResult<OsmPlaceRow[]>> {
-  const left = deps.budget.deadline - Date.now()
-  const ms = Math.min(timeoutMs, left)
-  const query = overpassQuery(categories, area, Math.max(1, Math.floor(ms / 1000)))
-  const answer = await osmJson({
-    service: 'overpass',
-    url,
-    timeoutMs: ms,
-    ...deps,
-    init: {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ data: query }).toString(),
-    },
-  })
-  return answer.ok ? parseOverpass(answer.value) : answer
+  let answer: GeoResult<unknown> | undefined
+  for (const [i, url] of urls.entries()) {
+    const ms = Math.min(timeoutMs, deps.budget.deadline - Date.now())
+    const query = overpassQuery(categories, area, Math.max(1, Math.floor(ms / 1000)))
+    answer = await osmJson({
+      service: 'overpass',
+      gateKey: i === 0 ? 'overpass' : 'overpass-reserve',
+      url,
+      timeoutMs: ms,
+      ...deps,
+      init: {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ data: query }).toString(),
+      },
+    })
+    if (answer.ok || (answer.reason !== 'unavailable' && answer.reason !== 'timeout')) break
+  }
+  return answer?.ok ? parseOverpass(answer.value) : (answer ?? unavailable('overpass'))
 }

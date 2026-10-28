@@ -1,4 +1,4 @@
-import type { OsmService, RateGate } from './limits'
+import type { GateKey, OsmService, RateGate } from './limits'
 import { limited, timedOut, unavailable, type GeoResult } from './result'
 
 /**
@@ -33,6 +33,8 @@ export function retryAfterSeconds(header: string | null, now = Date.now()): numb
 
 export interface OsmRequest {
   service: OsmService
+  /** The turn to count in the gate, when it is not the service's own. */
+  gateKey?: GateKey
   url: string
   /** The service's own time; the budget may cut it shorter. */
   timeoutMs: number
@@ -49,6 +51,7 @@ export interface OsmRequest {
  */
 export async function osmJson({
   service,
+  gateKey = service,
   url,
   timeoutMs,
   budget,
@@ -58,7 +61,7 @@ export async function osmJson({
 }: OsmRequest): Promise<GeoResult<unknown>> {
   const left = () => budget.deadline - Date.now()
   if (left() < MIN_CALL_MS) return timedOut(service)
-  const turn = await gate.acquire(service, left() - MIN_CALL_MS)
+  const turn = await gate.acquire(gateKey, left() - MIN_CALL_MS)
   if (!turn.ok) return limited(service, turn.retryAfterS)
   if (left() < MIN_CALL_MS) return timedOut(service)
   const timeout = AbortSignal.timeout(Math.min(timeoutMs, left()))
@@ -71,7 +74,7 @@ export async function osmJson({
     })
     if (response.status === 429) {
       const seconds = retryAfterSeconds(response.headers.get('retry-after')) ?? DEFAULT_RETRY_AFTER_S
-      gate.close(service, seconds)
+      gate.close(gateKey, seconds)
       return limited(service, seconds)
     }
     if (!response.ok) {

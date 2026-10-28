@@ -18,7 +18,7 @@ import { haversineMeters, type LatLon } from '../geo/distance'
 import { MAX_WALK_M, type DriveRoute, type WalkRoute } from '../geo/osrm'
 import { FAR_CATEGORIES, type Geocoded, type Nearby, type NearbyGroup, type Place } from '../geo/places'
 import { mergePlaces } from '../geo/samePlace'
-import { EVERYDAY, FAR_RADIUS_M, NEAR_RADIUS_M, questionCategories } from '../geo/questions'
+import { EVERYDAY, FAR_RADIUS_M, NEAR_RADIUS_M, placeAfterTo, questionCategories } from '../geo/questions'
 import type { GeoResult } from '../geo/result'
 import {
   GEOCODE_DESCRIPTION,
@@ -202,12 +202,14 @@ function searches(categories: readonly PlaceCategory[]): NearbyCall[] {
 /** The calls by the words of the question; «что рядом» without a kind asks the everyday places. */
 export function rulesPlan(text: string): Call[] {
   const named = questionCategories(text)
-  return searches(named.length ? named : EVERYDAY)
+  const place = placeAfterTo(text)
+  const geocode: Call[] = place ? [{ tool: 'geocode', query: place }] : []
+  return [...geocode, ...searches(named.length ? named : place ? [] : EVERYDAY)]
 }
 
 /**
  * The model's calls made safe. A geocode of a kind of place («центр Валенсии», «аэропорт») is the search of the
- * kind; the kinds the words name and the model forgot are searched too; the sea is asked with its beaches (the
+ * kind; the kinds the words name and the model forgot are searched too, and so is the place named after «до …»; the sea is asked with its beaches (the
  * coastline has the port); the radius is at least the kind's «рядом», 20 km for a far one; a call repeated is
  * dropped; at most `MAX_CALLS`.
  */
@@ -219,7 +221,10 @@ export function tidyPlan(calls: readonly Call[], text: string): Call[] {
   })
   const asked = new Set(kept.flatMap((call) => (call.tool === 'nearbyPlaces' ? call.categories : [])))
   const forgotten = questionCategories(text).filter((c) => !asked.has(c))
-  const all = [...kept, ...searches(forgotten)]
+  const place = placeAfterTo(text)
+  const named: Call[] =
+    place && !kept.some((call) => call.tool === 'geocode') ? [{ tool: 'geocode', query: place }] : []
+  const all = [...named, ...kept, ...searches(forgotten)]
   const seen = new Set<string>()
   const taken = new Set<PlaceCategory>()
   return (all.length ? all : rulesPlan(text))

@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import fixture from './fixtures/overpass-valencia.json'
-import { elementRow, overpassQuery, parseOverpass } from './overpass'
+import { RateGate } from './limits'
+import { elementRow, overpassPlaces, overpassQuery, parseOverpass } from './overpass'
 
 const rows = () => {
   const result = parseOverpass(fixture)
@@ -95,5 +96,46 @@ describe('the Overpass answer', () => {
       reason: 'unavailable',
     })
     expect(parseOverpass('<html>')).toMatchObject({ ok: false, reason: 'unavailable' })
+  })
+})
+
+// assistant-geo, Requirement: Запасной адрес Overpass
+describe('the reserve Overpass server', () => {
+  const area = { around: { lat: 39.47, lon: -0.376, radiusM: 500 } }
+  const ask = (fetch: typeof globalThis.fetch, urls = ['https://main.example/api', 'https://reserve.example/api']) =>
+    overpassPlaces(['bar'], area, { budget: { deadline: Date.now() + 9000 }, gate: new RateGate(), fetch, urls })
+
+  it('is asked when the main one answers 502, and its answer is taken', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const fetch = vi.fn(async (url: string | URL | Request) =>
+      String(url).startsWith('https://main')
+        ? new Response('Bad Gateway', { status: 502 })
+        : Response.json({ elements: [] }),
+    )
+    expect(await ask(fetch)).toEqual({ ok: true, value: [] })
+    expect(fetch.mock.calls.map(([url]) => String(url))).toEqual([
+      'https://main.example/api',
+      'https://reserve.example/api',
+    ])
+  })
+
+  it('is not asked when the main one answered', async () => {
+    const fetch = vi.fn(async () => Response.json({ elements: [] }))
+    await ask(fetch)
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('is not asked after a 429, which closes the service', async () => {
+    const fetch = vi.fn(async () => new Response('', { status: 429, headers: { 'retry-after': '30' } }))
+    const result = await ask(fetch)
+    expect(result).toMatchObject({ ok: false, reason: 'limited' })
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('fails honestly when both fail', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const fetch = vi.fn(async () => new Response('', { status: 502 }))
+    expect(await ask(fetch)).toMatchObject({ ok: false, reason: 'unavailable' })
+    expect(fetch).toHaveBeenCalledTimes(2)
   })
 })

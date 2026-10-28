@@ -5,6 +5,8 @@
  */
 
 export type OsmService = 'nominatim' | 'overpass' | 'osrm'
+/** What the gate counts: Overpass's reserve server has its turn of its own. */
+export type GateKey = OsmService | 'overpass-reserve'
 
 export interface RateRule {
   /** The least time between two requests of this process. */
@@ -18,10 +20,11 @@ export interface RateRule {
  * Nominatim: an absolute maximum of 1 request a second (the OSMF policy). Overpass: 10 a minute (osmmcp keeps 2 for
  * its background work; ours are rare and stop at a 429). OSRM of FOSSGIS: 1 a second.
  */
-export const RATE_RULES: Record<OsmService, RateRule> = {
+export const RATE_RULES: Record<GateKey, RateRule> = {
   nominatim: { gapMs: 1000, limit: 1, windowS: 1 },
   overpass: { gapMs: 6000, limit: 10, windowS: 60 },
   osrm: { gapMs: 1000, limit: 1, windowS: 1 },
+  'overpass-reserve': { gapMs: 6000, limit: 10, windowS: 60 },
 }
 
 /** Counts a request in the shared window: `true` within the limit, `null` when the counter is not there. */
@@ -38,12 +41,12 @@ export type GateResult = { ok: true } | { ok: false; retryAfterS: number }
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 export class RateGate {
-  private next = new Map<OsmService, number>()
-  private closedUntil = new Map<OsmService, number>()
-  private readonly rules: Record<OsmService, RateRule>
+  private next = new Map<GateKey, number>()
+  private closedUntil = new Map<GateKey, number>()
+  private readonly rules: Record<GateKey, RateRule>
   private readonly options: GateOptions
 
-  constructor(rules: Record<OsmService, RateRule> = RATE_RULES, options: GateOptions = {}) {
+  constructor(rules: Record<GateKey, RateRule> = RATE_RULES, options: GateOptions = {}) {
     this.rules = rules
     this.options = options
   }
@@ -57,7 +60,7 @@ export class RateGate {
   }
 
   /** Closes `service` for `seconds` (a 429's `Retry-After`). */
-  close(service: OsmService, seconds: number) {
+  close(service: GateKey, seconds: number) {
     const until = this.now() + seconds * 1000
     this.closedUntil.set(service, Math.max(until, this.closedUntil.get(service) ?? 0))
   }
@@ -66,7 +69,7 @@ export class RateGate {
    * Waits for the turn of a request to `service`, no longer than `maxWaitMs`; a turn further away, a closed service
    * or a full shared window give the wait in seconds instead.
    */
-  async acquire(service: OsmService, maxWaitMs: number): Promise<GateResult> {
+  async acquire(service: GateKey, maxWaitMs: number): Promise<GateResult> {
     const rule = this.rules[service]
     const now = this.now()
     const closed = (this.closedUntil.get(service) ?? 0) - now
