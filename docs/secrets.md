@@ -28,3 +28,5 @@
   холодный старт расшифровывает `secrets.app.env.age` (файл попадает в функции Vercel и в образ Docker через
   `outputFileTracingIncludes` в `next.config.ts`). Нет ключа — `undefined`, код работает в режиме без ключей. Клиент
   серверные ключи не получает.
+
+[← README](../README.md)

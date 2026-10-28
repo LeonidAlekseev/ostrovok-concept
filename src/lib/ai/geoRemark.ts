@@ -1,6 +1,7 @@
 import 'server-only'
 import { generateText, type LanguageModel } from 'ai'
 import { isRussian } from './hotelAnswer'
+import { REPLY_STYLE } from './style'
 
 /**
  * Эвал's remark over the facts of a geo answer (src/lib/ai/geoTurn.ts): the facts — the places, the distances, the
@@ -21,6 +22,7 @@ const instructions = (hotel: string) =>
     'фактов: можно ли дойти пешком или удобнее такси, есть ли из чего выбрать. Грамотно, на «вы», просто и по делу,',
     'без общих слов. Без цифр и чисел, без расстояний, времени и единиц измерения; не называй мест и не повторяй',
     'факты. Только сама фраза, без кавычек и пояснений.',
+    REPLY_STYLE,
   ].join(' ')
 
 /** The model's sentence over `facts`; throws on an empty answer, so the next model of the chain is asked. */

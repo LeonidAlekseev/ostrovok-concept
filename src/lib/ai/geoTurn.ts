@@ -469,7 +469,7 @@ function summary(facts: ReturnType<typeof factsOf>, hasMap: boolean, remark?: st
   const { sources, lines, notes } = facts
   if (lines.length === 0) return notes.join(' ') || 'Не нашёл таких мест в данных.'
   return [
-    `По данным ${sources.join(' и ')}:`,
+    `Вот что нашёл по данным ${sources.join(' и ')}:`,
     ...lines,
     ...notes,
     ...(remark ? [remark] : []),

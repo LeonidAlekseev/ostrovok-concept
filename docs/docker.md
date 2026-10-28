@@ -3,6 +3,14 @@
 Запуск приложения в контейнере (Docker Desktop, Windows и macOS). Compose поднимает только приложение; база — облачный
 Supabase (причины — в [README](../README.md#почему-база-внешняя)).
 
+## Оглавление
+
+- [Файлы](#файлы)
+- [Docker Desktop (Windows, macOS)](#docker-desktop-windows-macos)
+- [Что внутри образа](#что-внутри-образа)
+- [TLS: сертификат НУЦ Минцифры (GigaChat)](#tls-сертификат-нуц-минцифры-gigachat)
+- [Сидирование](#сидирование)
+
 ## Файлы
 
 - `Dockerfile` — стадии `deps` (`npm ci`), `source`, `build` (`next build` с `output: 'standalone'`, включается
@@ -64,3 +72,5 @@ https://gu-st.ru/content/Other/doc/russian_trusted_root_ca.cer, SHA-256
 Отдельная команда: `docker compose run --rm tools npm run db:features -- --dry-run`.
 Загрузки из внешних файлов (`db:seed:valencia`, `db:load:ota-pages`, `load-valencia-geo.py`, `db:city-places`) в
 `make seed` не входят: исходные данные лежат вне репозитория.
+
+[← README](../README.md)
