@@ -942,6 +942,41 @@ export type Database = {
         }
         Relationships: []
       }
+      hotel_photo_embeddings: {
+        Row: {
+          content_hash: string
+          destination_id: string
+          embedding: unknown
+          hotel_id: string
+          photo_key: string
+          updated_at: string
+        }
+        Insert: {
+          content_hash: string
+          destination_id: string
+          embedding: unknown
+          hotel_id: string
+          photo_key: string
+          updated_at?: string
+        }
+        Update: {
+          content_hash?: string
+          destination_id?: string
+          embedding?: unknown
+          hotel_id?: string
+          photo_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'hotel_photo_embeddings_destination_id_fkey'
+            columns: ['destination_id']
+            isOneToOne: false
+            referencedRelation: 'destinations'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       hotel_room_views: {
         Row: {
           hotel_id: string
@@ -1988,6 +2023,14 @@ export type Database = {
           content: string
           destination_id: string
           ref_id: string
+          similarity: number
+        }[]
+      }
+      match_hotel_photos: {
+        Args: { destination_ids?: string[]; match_count?: number; query_embedding: unknown }
+        Returns: {
+          destination_id: string
+          hotel_id: string
           similarity: number
         }[]
       }
