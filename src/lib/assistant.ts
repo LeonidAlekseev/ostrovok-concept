@@ -833,6 +833,8 @@ export interface AssistantResponse {
   /** The model's short remark; absent when the rules read the message. */
   reply?: string
   source: 'model' | 'rules'
+  /** The id of the model that gave the answer (`source` `model`): for the logs and the analysis, not for display. */
+  model?: string
   /** Hotels the semantic search found for the traveller's words once the brief is complete, best first. */
   matches?: HotelSummary[]
   /** The building, noise and room views of the `matches` that have data. */

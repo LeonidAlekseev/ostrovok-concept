@@ -26,8 +26,16 @@ cp .env.example .env     # вписать значения переменных 
 docker compose up --build
 ```
 
-Через 5–10 минут (первая сборка) http://localhost:8080 работает; `make up` делает то же самое. Остановить:
-`Ctrl+C`, затем `docker compose down` (`make down`); логи — `make logs`.
+Через 5–10 минут (первая сборка) http://localhost:8080 работает. Остановить: `Ctrl+C`, затем `docker compose down`.
+
+То же короче — через `make` (на Windows без `make` используйте команды из правой колонки):
+
+| Команда     | Что делает                                            | Без `make`                                                     |
+| ----------- | ----------------------------------------------------- | -------------------------------------------------------------- |
+| `make up`   | собрать образ и запустить приложение на `:8080`       | `docker compose up --build`                                    |
+| `make down` | остановить и удалить контейнеры                       | `docker compose down`                                          |
+| `make logs` | логи приложения в реальном времени                    | `docker compose logs -f app`                                   |
+| `make seed` | загрузить и пересобрать данные в облачной базе `.env` | `docker compose run --rm --build tools sh scripts/seed-all.sh` |
 
 Ключи в `.env` даются двумя способами:
 
@@ -56,6 +64,7 @@ docker compose up --build
 | `SUPABASE_DB_URL`                               | пусто             | строка подключения к базе: нужна `make seed` и миграциям                             |
 | `NVIDIA_API_KEY`                                | пусто             | ключ NVIDIA API; без него Эвал отвечает по правилам, без модели                      |
 | `GIGACHAT_AUTH_KEY`                             | пусто             | Authorization key GigaChat (Сбер), developers.sber.ru → GigaChat API                 |
+| `CRON_SECRET`                                   | пусто             | секрет Vercel Cron для `GET /api/hotelier/knowledge/retry`; задаётся и в Vercel      |
 | `DEMO_USER_EMAIL`, `DEMO_USER_PASSWORD`         | пусто             | демо-путешественник (вход кнопкой, `make seed` создаёт аккаунт)                      |
 | `DEMO_HOTELIER_EMAIL`, `DEMO_HOTELIER_PASSWORD` | пусто             | демо-отельер (то же)                                                                 |
 | `PORT`, `HOSTNAME`                              | `8080`, `0.0.0.0` | порт и адрес сервера в контейнере (заданы в `Dockerfile`)                            |
@@ -101,6 +110,22 @@ GoTrue и Storage для входа и фото. Поэтому данные н�
 Шаги идемпотентны. Отдельная команда: `docker compose run --rm tools npm run db:features -- --dry-run`. Загрузки из
 внешних файлов (`db:seed:valencia`, `db:load:ota-pages`, `load-valencia-geo.py`, `db:city-places`) в `make seed` не
 входят; описание всех скриптов — [docs/data-and-scripts.md](docs/data-and-scripts.md).
+
+## Локальная база Supabase (дополнительно)
+
+Основной запуск (`make up`) работает с облачной Supabase и не меняется. Дополнительно можно поднять у себя и фронтенд,
+и минимальную Supabase (Postgres, Auth, REST, Realtime, Storage, Kong) из `docker-compose.local.yml`:
+
+```bash
+cp .env.local-supabase.example .env.local-supabase   # ключи только для локального запуска
+make up-local     # база и сервисы; фронтенд ждёт данные, затем собирается: http://localhost:8080
+make seed-local   # в другом терминале: миграции, каталог, демо-аккаунты, демо-чаты с отельером, векторы
+make down-local
+```
+
+Ключи моделей (GigaChat, NVIDIA) и демо-аккаунты берутся из `.env`, модели остаются удалёнными. Внешние данные
+(Островок, EUBUCCO, шум EEA, места OSM) в `make seed-local` не входят. Откуда какие данные и как их загрузить —
+[docs/data-sources.md](docs/data-sources.md), подробности запуска — [docs/docker.md](docs/docker.md).
 
 ## Маршруты и доступ
 

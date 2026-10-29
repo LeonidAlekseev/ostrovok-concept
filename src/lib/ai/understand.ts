@@ -157,8 +157,9 @@ export async function understandWish(
   })
   const month = Number(output.when)
   const when = Number.isInteger(month) && month >= 1 && month <= 12 ? month - 1 : output.when
-  // A remark that is not mainly Russian (the model slips into English, Chinese or Korean) is dropped whole.
-  const reply = output.reply?.trim().slice(0, 200)
+  // A remark that is not mainly Russian (the model slips into English, Chinese or Korean) is dropped whole, and so is
+  // a question («Сколько человек?» to «вдвоём»): the questions are the code's, asked from what the brief lacks.
+  const reply = output.reply?.includes('?') ? undefined : output.reply?.trim().slice(0, 200)
   const { budget: said, budgetCurrency, budgetPer, ...rest } = output
   const parsed = normalizeBrief({ ...rest, when }, destinations)
   const input = messages.at(-1)?.text ?? ''

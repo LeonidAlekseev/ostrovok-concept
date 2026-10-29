@@ -66,10 +66,13 @@ function roomPrice(room: Room, dates?: StayDates): string {
   return `${formatPrice(averageNight(total, nights, 1))} за ночь, ${formatPrice(total)} за ${nights} н.`
 }
 
+/** A room's name for the model and the rules: Ostrovok's «(no window)» in Russian, so «без окна» is not read as a view. */
+export const roomLabel = (name: string) => name.replace(/\(?\b(?:no|without) windows?\b\)?/gi, '(без окна)')
+
 function roomLines(hotel: Hotel, dates?: StayDates): string[] {
   return hotel.rooms.slice(0, MAX_ROOMS).map((room) => {
     const price = roomPrice(room, dates)
-    return `${room.name} — ${roomFacts(room)}${price ? `, ${price}` : ''}`
+    return `${roomLabel(room.name)} — ${roomFacts(room)}${price ? `, ${price}` : ''}`
   })
 }
 
@@ -302,7 +305,7 @@ export function hotelFacts(
         const rate = room.rates[0]
         const price = dates ? roomPrice(room, dates) : rate ? `от ${formatPrice(rate.pricePerNight)} за ночь` : ''
         const meal = rate && rate.meal !== 'none' ? `, ${MEAL_LABEL[rate.meal].toLocaleLowerCase('ru')}` : ''
-        return `- ${room.name}: ${roomFacts(room)}${meal}${price ? `; ${price}` : ''}`
+        return `- ${roomLabel(room.name)}: ${roomFacts(room)}${meal}${price ? `; ${price}` : ''}`
       })
       .join('\n')}`,
     !details?.nearby.length && 'Данных о местах рядом (кафе, достопримечательности, пляж) в базе нет.',
@@ -379,6 +382,29 @@ export function isRussian(text: string): boolean {
   return letters.length > 0 && cyrillic.length / letters.length >= MIN_CYRILLIC_SHARE
 }
 
+/** Latin words of four letters and more: shorter ones are «Wi‑Fi», «TV», «SPA». */
+const LATIN_WORD = /(?<![\p{L}\p{N}])\p{Script=Latin}{4,}(?![\p{L}\p{N}])/gu
+/** Terms a Russian answer keeps in Latin letters though the data may spell them otherwise. */
+const LATIN_TERMS = new Set(['wifi', 'wi-fi', 'booking', 'airbnb', 'google', 'maps', 'openstreetmap', 'eubucco'])
+/** Advice the model brings from itself: it is said only when the data have the thing. */
+const OWN_ADVICE = /беруш|затычк\p{L}* для ушей/iu
+
+/**
+ * What an answer from the data has that the data do not: a word in Latin letters (the model slipping into English or
+ * German: «lift», «Erdgeschoss») or advice the data say nothing of («беруши»). The names of the hotel and of its places
+ * are in the data, so they pass. Empty: the answer holds.
+ */
+export function outsideData(answer: string, data: string): string[] {
+  const known = data.toLocaleLowerCase('ru')
+  const words = (answer.match(LATIN_WORD) ?? [])
+    .map((word) => word.toLocaleLowerCase('ru'))
+    .filter((word) => !LATIN_TERMS.has(word) && !known.includes(word))
+  const advice = (answer.match(new RegExp(OWN_ADVICE, 'giu')) ?? []).filter(
+    (stem) => !known.includes(stem.toLocaleLowerCase('ru')),
+  )
+  return [...new Set([...words, ...advice])]
+}
+
 const clean = (value: string | null | undefined, max: number): string | undefined => {
   const text = value && clipText(value.trim(), max)
   return text && isRussian(text) ? text : undefined
@@ -425,6 +451,22 @@ export async function answerWithModel(
   })
   const answer = clean(output.answer, MAX_ANSWER_LENGTH)
   if (!answer) throw new Error('The model gave no answer')
+  // The answer is of the data (the rest goes to `unverified`): a word or advice from nowhere fails this model, and the
+  // chain asks the next one.
+  const data = [
+    hotelFacts(
+      hotel,
+      options.dates,
+      options.features,
+      options.details,
+      options.noise,
+      options.noiseTool,
+      options.hotelier,
+    ),
+    ...messages.map((m) => m.text),
+  ].join('\n')
+  const outside = outsideData(answer, data)
+  if (outside.length > 0) throw new Error(`The answer has what the data do not: ${outside.join(', ')}`)
   const unverified = clean(output.unverified, MAX_ANSWER_LENGTH)
   // The demo's and the contradictions are said whatever the model wrote.
   const notes = hotelierNotes(answer, options.hotelier ?? [])

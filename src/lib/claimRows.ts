@@ -1103,6 +1103,8 @@ export interface ReviewPage {
   master_id: number
   updated_at: string
   list: readonly unknown[]
+  /** The address of the page on Ostrovok, where the snapshot had it (`ota_hotel_pages.url`). */
+  url?: string | null
 }
 
 /**
@@ -1131,7 +1133,7 @@ export function reviewStore(hotel: ClaimHotel, page: ReviewPage): Store {
       title: `Отзыв гостя${date ? ` от ${date.slice(0, 10)}` : ''}`,
       provider: OSTROVOK,
       external_id: String(id),
-      url: null,
+      url: page.url ?? null,
       retrieved_at: time(page.updated_at),
       excerpt: whole.length > 500 ? `${whole.slice(0, 500).trim()}…` : whole,
       metadata: {
@@ -1206,6 +1208,8 @@ export interface FactsPage {
   master_id: number
   updated_at: string
   facts: unknown
+  /** The address of the page on Ostrovok, where the snapshot had it (`ota_hotel_pages.url`). */
+  url?: string | null
 }
 
 /** The facts of the page that become claims: the property, its unit and the key in `facts`. Zero is «unknown». */
@@ -1231,7 +1235,7 @@ export function factsStore(hotel: ClaimHotel, page: FactsPage): Store {
     title: `Страница отеля на Островке: «${hotel.name ?? hotel.id}»`,
     provider: OSTROVOK,
     external_id: `facts:${page.master_id}`,
-    url: null,
+    url: page.url ?? null,
     retrieved_at: time(page.updated_at),
     excerpt: null,
     metadata: { master_id: page.master_id },

@@ -7,6 +7,8 @@ import { NOISE_ESTIMATE_METHOD, loudestSource, type HotelNoise, type LevelRange,
  * the room group's `rg_hash`.
  */
 
+type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+
 export interface FeatureRow {
   hotel_id: string
   building_id: string | null
@@ -31,6 +33,8 @@ export interface FeatureRow {
   /** noise-estimate-v2 at the facade (`noiseEstimate`): the street side and the yard side, the places summed in, dB. */
   noise_method: string | null
   noise_zone: 'building' | 'circle' | null
+  /** The answer of `hotel_noise_facade` as it is (`facadeOf` reads it): the page and Эвал read the layers from here. */
+  noise_facade: Json | null
   street_lday_min: number | null
   street_lday_max: number | null
   street_lnight_min: number | null
@@ -46,6 +50,8 @@ export interface FacadeNoise {
   sources: HotelNoise['sources']
   dataset: string | null
   estimate: NoiseEstimate | null
+  /** The answer of `hotel_noise_facade` the sources come from, kept in the row. */
+  answer?: unknown
 }
 
 export interface ViewRow {
@@ -129,6 +135,7 @@ export function featureRow(hotelId: string, geo: HotelGeo, facade: FacadeNoise):
     noise_dataset: noiseDataset,
     noise_method: estimate ? NOISE_ESTIMATE_METHOD : null,
     noise_zone: estimate?.zone?.kind ?? null,
+    noise_facade: facade.answer && typeof facade.answer === 'object' ? (facade.answer as Json) : null,
     street_lday_min,
     street_lday_max,
     street_lnight_min,

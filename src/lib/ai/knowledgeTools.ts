@@ -90,7 +90,7 @@ export const NEAR_DEFAULT_RADIUS_M = 500
 /** «Тихо ночью» of the rules: the night at the facade to the street ends below 50 dB. */
 export const QUIET_NIGHT_DB = 50
 
-export const REVIEW_TOPICS = ['noise', 'cleanliness', 'staff', 'breakfast', 'comfort', 'location'] as const
+export const REVIEW_TOPICS = ['noise', 'cleanliness', 'staff', 'breakfast', 'food', 'comfort', 'location'] as const
 export type ReviewTopic = (typeof REVIEW_TOPICS)[number]
 
 export const REVIEW_TOPIC_LABEL: Record<ReviewTopic, string> = {
@@ -98,6 +98,7 @@ export const REVIEW_TOPIC_LABEL: Record<ReviewTopic, string> = {
   cleanliness: 'чистота',
   staff: 'персонал',
   breakfast: 'завтрак',
+  food: 'кухня и еда',
   comfort: 'кровать и сон',
   location: 'расположение',
 }
@@ -112,6 +113,7 @@ export const REVIEW_QUERY: Record<ReviewTopic, string> = {
   cleanliness: ['чисто', 'чистота', 'чистый', 'грязно', 'грязь', 'уборка', 'убирали'].join(' or '),
   staff: ['персонал', 'сотрудники', 'администратор', 'ресепшн', 'ресепшен', 'вежливый', 'приветливый'].join(' or '),
   breakfast: ['завтрак', 'завтраки', 'завтраком'].join(' or '),
+  food: ['кухня', 'кухней', 'еда', 'ужин', 'ресторан', 'вкусно', 'вкусный', 'кормят', 'блюда'].join(' or '),
   comfort: ['кровать', 'матрас', 'подушки', 'выспаться', 'спать', 'сон'].join(' or '),
   location: ['расположение', 'район', 'центр', 'метро', 'рядом', 'близко', 'пешком'].join(' or '),
 }
@@ -122,6 +124,7 @@ const TOPIC_MENTION: Record<ReviewTopic, RegExp> = {
   cleanliness: /(?<!\p{L})(?:чист|грязн|грязь|убор|убира)\p{L}*/iu,
   staff: /(?<!\p{L})(?:персонал|сотрудник|администратор|ресепш|вежлив|приветлив)\p{L}*/iu,
   breakfast: /(?<!\p{L})завтрак\p{L}*/iu,
+  food: /(?<!\p{L})(?:кухн|еда|еды|еду|едой|ужин|ресторан|вкусн|кормят|кормили|блюд)\p{L}*/iu,
   comfort: /(?<!\p{L})(?:кроват|матрас|подушк|выспа|спать|сон)\p{L}*/iu,
   location: /(?<!\p{L})(?:располож|район|центр|метро|рядом|близко|пешком)\p{L}*/iu,
 }
@@ -606,6 +609,37 @@ export function nearResult(
   })
 }
 
+/** The sentence names the food with a plain complaint: for «хороший завтрак» it is no source (nothing else is judged). */
+const FOOD_COMPLAINT =
+  /(?<!\p{L})(?:невкусн|ужасн|отвратительн|гнил|плох|скуд|однообразн|не\s+менял|нет\s+(?:горяч|никаких)|не\s+понрав|разочар)\p{L}*/iu
+
+/** The sentence praises the food in a plain word. */
+const FOOD_PRAISE =
+  /(?<!\p{L})(?:вкусн|вкуснейш|отличн|прекрасн|великолепн|замечательн|шикарн|супер|похвал|разнообразн|богат|свеж|рекоменд)\p{L}*/iu
+
+const isFood = (topic: ReviewTopic) => topic === 'breakfast' || topic === 'food'
+
+/**
+ * The chunks that go on the topic, the praised first: those of the food without a complaint in the sentence that names
+ * it, the sentence with a word of praise before the rest (the order of the search stays within each).
+ */
+const praisedFirst = <C extends { text: string }>(topic: ReviewTopic, chunks: readonly C[]): C[] => {
+  if (!isFood(topic)) return [...chunks]
+  const sentences = chunks
+    .map((c) => ({ c, s: topicExcerpt(c.text, topic) }))
+    .filter(({ s }) => !FOOD_COMPLAINT.test(s))
+  const praised = ({ s }: { s: string }) => FOOD_PRAISE.test(s)
+  return [...sentences.filter(praised), ...sentences.filter((x) => !praised(x))].map(({ c }) => c)
+}
+
+/** The hotel's weight by its fragments: a praised one counts ten times a plain mention. */
+const praisedScore = (topic: ReviewTopic, chunks: readonly { text: string }[]) =>
+  chunks.reduce((sum, c) => sum + (isFood(topic) && FOOD_PRAISE.test(topicExcerpt(c.text, topic)) ? 10 : 1), 0)
+
+/** What the meaning part of the search embeds: the topic and, when the guest said it, their words. */
+const reviewMeaning = (topic: ReviewTopic, wish?: string) =>
+  wish?.trim() ? `${REVIEW_TOPIC_LABEL[topic]}: ${wish.trim().slice(0, 300)}` : REVIEW_TOPIC_LABEL[topic]
+
 /** The sentence of the chunk on the topic, cut around its word; the chunk's start without one. */
 export function topicExcerpt(text: string, topic: ReviewTopic): string {
   const pattern = TOPIC_MENTION[topic]
@@ -616,6 +650,8 @@ export function topicExcerpt(text: string, topic: ReviewTopic): string {
 
 export interface ReviewsInput {
   topic: ReviewTopic
+  /** The guest's own words: the meaning part of the search embeds them with the topic («вкусные завтраки»). */
+  wish?: string
   candidates: readonly Candidate[]
   chosen: readonly string[]
 }
@@ -704,6 +740,9 @@ export function reviewsResult({ topic, candidates, chosen }: ReviewsInput, revie
       'Отзывы — слова отдельных гостей, а не измерение',
       'Показаны фрагменты, где тема названа словами: отзыв о ней совсем другими словами не попадёт',
       'Без модели векторов поиск идёт только по словам',
+      ...(topic === 'breakfast' || topic === 'food'
+        ? ['Фрагменты с явной жалобой («невкусно», «ужасно», «однообразно») не показаны; оценка вкуса — слова гостей']
+        : []),
     ],
   })
 }
@@ -753,12 +792,15 @@ export async function runNearTool(input: NearInput, index: readonly NearRow[] | 
 /** Runs «Отзывы» for the chosen hotels; never throws. */
 export async function runReviewsTool(input: ReviewsInput): Promise<ToolResult> {
   try {
-    const vector = input.chosen.some(isRealHotelId) ? await queryVectorOrNull(REVIEW_TOPIC_LABEL[input.topic]) : null
+    const vector = input.chosen.some(isRealHotelId)
+      ? await queryVectorOrNull(reviewMeaning(input.topic, input.wish))
+      : null
     const read = await Promise.all(
       input.chosen.map(async (id) => {
         // A hotel not of the base of Островок has no reviews in the store.
         if (!isRealHotelId(id)) return [id, { chunks: [], sources: [] } as HotelReviews] as const
-        const chunks = await searchHotelReviews(id, REVIEW_QUERY[input.topic], TOPIC_MENTION[input.topic], vector)
+        const found = await searchHotelReviews(id, REVIEW_QUERY[input.topic], TOPIC_MENTION[input.topic], vector)
+        const chunks = found && praisedFirst(input.topic, found)
         const sources = chunks
           ? await loadEvidence(
               id,
@@ -773,4 +815,37 @@ export async function runReviewsTool(input: ReviewsInput): Promise<ToolResult> {
     failed(REVIEWS_TOOL, error)
     return errorResult('tool_failed', 'Поиск по отзывам не удался')
   }
+}
+
+/** Hotels read at once when the reviews choose: the store answers each from its own indexes. */
+const REVIEW_READS = 16
+
+/**
+ * The verdict of each hotel by its reviews on the topic: `match` when a review names it without a complaint, the
+ * hotel with more praised fragments first, `miss` without one, `nodata` for a hotel not of the base of Островок or one whose reviews could not be read. `null`
+ * when none could be read at all.
+ */
+export async function reviewVerdicts(
+  topic: ReviewTopic,
+  hotelIds: readonly string[],
+  wish?: string,
+): Promise<Map<string, HotelVerdict> | null> {
+  const real = hotelIds.filter(isRealHotelId)
+  const vector = real.length > 0 ? await queryVectorOrNull(reviewMeaning(topic, wish)) : null
+  const counts = new Map<string, number | null>()
+  for (let from = 0; from < real.length; from += REVIEW_READS)
+    await Promise.all(
+      real.slice(from, from + REVIEW_READS).map(async (id) => {
+        const chunks = await searchHotelReviews(id, REVIEW_QUERY[topic], TOPIC_MENTION[topic], vector)
+        counts.set(id, chunks && praisedScore(topic, praisedFirst(topic, chunks)))
+      }),
+    )
+  if (real.length > 0 && [...counts.values()].every((n) => n === null)) return null
+  return new Map<string, HotelVerdict>(
+    hotelIds.map((id) => {
+      const n = counts.get(id)
+      if (n === undefined || n === null) return [id, { verdict: 'nodata' as const, score: Infinity }]
+      return [id, n > 0 ? { verdict: 'match' as const, score: -n } : { verdict: 'miss' as const, score: 0 }]
+    }),
+  )
 }

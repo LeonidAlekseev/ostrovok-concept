@@ -87,9 +87,9 @@ export function floorOf(text: string): number | null {
 
 // The words of a question about the view, not a place's name: the window and the floor first, then the single words.
 const VIEW_PHRASES =
-  /(?<!\p{L})(?:(?:из|с|со|на) (?:окн|номер|отел|балкон|террас|крыш)\p{L}*|(?:с|со|на) \d+\S* этаж\p{L}*|(?:вид|видом) на)(?!\p{L})/giu
+  /(?<!\p{L})(?:(?:из|с|со|на) (?:окн|номер|отел|балкон|террас|крыш)\p{L}*|(?:с|со|на) \d+\S* этаж\p{L}*|(?:высок|верхн|нижн|низк)\p{L}* этаж\p{L}*|(?:вид|видом) на)(?!\p{L})/giu
 const VIEW_WORDS =
-  /(?<!\p{L})(?:видн\p{L}*|виден|увиж\p{L}*|увидеть|просматрива\p{L}*|ли|вид|какой|какая|что|будет|можно|мне|нам|а|там|отсюда)(?!\p{L})/giu
+  /(?<!\p{L})(?:видн\p{L}*|виден|увиж\p{L}*|увидеть|просматрива\p{L}*|ли|вид|какой|какая|что|будет|можно|мне|нам|а|там|отсюда|стоит|стоило|просить|попросить|просите|этаж\p{L}*)(?!\p{L})/giu
 
 /** The name of the place the question asks about, without the words of the question; `null` when nothing is left. */
 export function placeQuery(text: string): string | null {

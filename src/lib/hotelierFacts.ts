@@ -65,14 +65,21 @@ export const questionKeys = (text: string): HotelierKey[] =>
 
 /**
  * What only the hotel can confirm: free rooms, prices and discounts, a guaranteed view or room, the individual terms
- * of a stay. The assistant never confirms them itself; it asks the hotelier.
+ * of a stay, the transfer from the airport (the page's «shuttle» says nothing of where, when and for how much) and a balcony
+ * with a view of the sea. The assistant never confirms them itself; it asks the hotelier.
  */
 const CONFIRM_ONLY = new RegExp(
-  `${WORD}(?:свободн\\S*\\s+номер|наличи\\S*\\s+(?:мест|номер)|есть\\s+ли\\s+места|цен[аыу]|стоимост|скидк|сколько\\s+стоит|гарантир|точно\\s+будет|индивидуальн|предоплат|бесплатн\\S*\\s+отмен)`,
+  `${WORD}(?:свободн\\S*\\s+номер|наличи\\S*\\s+(?:мест|номер)|есть\\s+ли\\s+места|цен[аыу]|стоимост|скидк|сколько\\s+стоит|гарантир|точно\\s+будет|индивидуальн|предоплат|бесплатн\\S*\\s+отмен|трансфер|шаттл|shuttle|встреч\\S*\\s+(?:в\\s+)?(?:аэропорт|вокзал))`,
   'iu',
 )
 
-export const needsHotelier = (text: string) => CONFIRM_ONLY.test(text)
+/** A balcony with a view of the sea asked together: one room's property that the page's amenities do not confirm. */
+const BALCONY_WITH_SEA = new RegExp(
+  `${WORD}балкон\\S*[^.?!]*вид\\S*\\s+на\\s+(?:мор|океан)|${WORD}вид\\S*\\s+на\\s+(?:мор|океан)[^.?!]*балкон`,
+  'iu',
+)
+
+export const needsHotelier = (text: string) => CONFIRM_ONLY.test(text) || BALCONY_WITH_SEA.test(text)
 
 /** The traveller asks to ask the hotel itself: «спросите у отеля», «уточните у отельера». */
 const ASK_HOTEL = new RegExp(
