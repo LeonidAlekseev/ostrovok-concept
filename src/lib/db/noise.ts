@@ -67,12 +67,21 @@ export function placesOf(answer: unknown): Pick<HotelNoise, 'places' | 'placesCo
   return { places, placesCovered: parsed.data.covered.filter((c): c is NoisyCategory => NOISY.has(c)) }
 }
 
+/**
+ * The first call of a point reads cold geometries (seconds) and can meet the anon role's `statement_timeout`
+ * (`57014`); the second reads them warm (tens of ms), so a cancelled call is asked once more.
+ */
+async function facadeRpc(db: AnonClient, lat: number, lon: number) {
+  const first = await db.rpc('hotel_noise_facade', { lat, lon })
+  return first.error?.code === '57014' ? db.rpc('hotel_noise_facade', { lat, lon }) : first
+}
+
 const readNoise = catalogCached(
   ['hotel-noise', 'facade'],
   async (_hotelId: string, lat: number, lon: number): Promise<HotelNoise> => {
     const db = anonClient()
     const [facade, near] = await Promise.all([
-      db.rpc('hotel_noise_facade', { lat, lon }),
+      facadeRpc(db, lat, lon),
       db.rpc('osm_places_near_facade', {
         lat,
         lon,

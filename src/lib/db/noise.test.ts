@@ -3,7 +3,7 @@ import { loadNoiseMap, noiseMapOf, placesOf } from './noise'
 
 /** The answers of the database's functions by name, and the names asked. */
 const db = vi.hoisted(() => ({
-  answers: {} as Record<string, { data: unknown; error: { message: string } | null }>,
+  answers: {} as Record<string, { data: unknown; error: { message: string; code?: string } | null }>,
   asked: [] as string[],
 }))
 vi.mock('@/lib/supabase/config', () => ({
@@ -189,5 +189,21 @@ describe('loadNoiseMap', () => {
   it('reads no map for a synthetic hotel without asking', async () => {
     expect(await loadNoiseMap({ ...hotel, id: 'prague-old-town-lantern' })).toBeNull()
     expect(db.asked).toEqual([])
+  })
+})
+
+describe('loadHotelNoise', () => {
+  it('asks the facade once more when the first call is cancelled by the statement timeout', async () => {
+    const answers = [
+      { data: null, error: { message: 'canceling statement due to statement timeout', code: '57014' } },
+      { data: { zone: { kind: 'circle', radius_m: 25 }, bands: [] }, error: null },
+    ]
+    const rpc = vi.fn(async (_name: string) => answers.shift())
+    vi.doMock('@supabase/supabase-js', () => ({ createClient: () => ({ rpc }) }))
+    vi.resetModules()
+    const { loadHotelNoise: load } = await import('./noise')
+    await load({ id: 'ota-1', lat: 39.4, lon: -0.3 })
+    expect(rpc.mock.calls.filter(([name]) => name === 'hotel_noise_facade')).toHaveLength(2)
+    vi.doUnmock('@supabase/supabase-js')
   })
 })
