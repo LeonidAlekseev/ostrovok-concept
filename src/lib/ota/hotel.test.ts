@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { destinations } from '../../data/destinations'
+import { createBooking, EMPTY_CARD } from '../booking'
 import { cheapestRate, hasStars, isRated } from '../catalog'
+import { parseOffer, toOfferParams } from '../offer'
+import { toStoredBooking } from '../storage'
 import { otaHotel, searchStay, type OtaStay } from './hotel'
 import { ostrovokImage } from './image'
 import { otaHotelSchema, otaSearchSchema, type OtaHotel, type OtaRate } from './search'
@@ -234,5 +238,35 @@ describe('otaSearchSchema', () => {
     const hotel = raw({ images: [{ tmpl: 'https://cdn.ostrovok.ru/t/640x400/x.jpeg' }] })
     expect(otaHotelSchema.safeParse(hotel).success).toBe(false)
     expect(otaSearchSchema.safeParse({ hotels: [raw()], map_hotels: [] }).success).toBe(true)
+  })
+})
+
+describe('booking of a real hotel', () => {
+  it.each([
+    ['free cancellation, pay now', rate(11779, { free: '2026-11-01T00:00:00Z' })],
+    ['non-refundable', rate(11779)],
+  ])('stores the booking of every rate of an ota hotel: %s', (_name, otaRate) => {
+    const hotel = otaHotel(raw({}, [otaRate]), 'valencia', STAY)
+    const stay = { checkIn: '2026-11-05', checkOut: '2026-11-08', guests: { adults: 2, children: 0, rooms: 1 } }
+    for (const room of hotel.rooms)
+      for (const r of room.rates) {
+        const parsed = parseOffer(
+          toOfferParams({ hotelId: hotel.id, roomId: room.id, rateId: r.id, ...stay }),
+          '2026-10-29',
+          [hotel],
+          destinations,
+        )
+        if (!parsed.ok) throw new Error(parsed.error)
+        const values = {
+          roomGuests: [{ firstName: 'Анна', lastName: 'Петрова' }],
+          email: 'a@b.ru',
+          phone: '+7 900 111-22-33',
+          requests: '',
+          card: { ...EMPTY_CARD, number: '4242 4242 4242 4242' },
+          agreed: true,
+        }
+        const booking = createBooking(parsed.offer, values, 'OS-ABC123', new Date(), '2026-10-29')
+        expect(toStoredBooking(booking)).toEqual(booking)
+      }
   })
 })

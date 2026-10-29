@@ -12,11 +12,11 @@ import { HotelPage } from './HotelPage'
 import { HotelRating } from './HotelRating'
 import { WhyGuests } from './WhyGuests'
 
-const nav = vi.hoisted(() => ({ query: '', replace: vi.fn() }))
+const nav = vi.hoisted(() => ({ query: '', replace: vi.fn(), push: vi.fn() }))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(nav.query),
   usePathname: () => '/hotels/x',
-  useRouter: () => ({ replace: nav.replace }),
+  useRouter: () => ({ replace: nav.replace, push: nav.push }),
 }))
 
 const hotel = getHotel('prague-old-town-lantern')!
@@ -284,7 +284,27 @@ describe('BookingCard', () => {
   })
 
   // Scenario: Выбрать номер
-  it('"Забронировать" scrolls to the rooms and moves focus there', async () => {
+  it('"Забронировать" with dates opens the checkout of the cheapest rate', async () => {
+    const user = userEvent.setup()
+    const stay = { checkIn: '2026-10-22' as const, checkOut: '2026-10-25' as const, guests }
+    renderStay(stay)
+    nav.push.mockClear()
+
+    await user.click(within(card()).getByRole('button', { name: 'Забронировать' }))
+
+    const { room, rate } = cheapestRate(hotel)
+    const url = new URL(nav.push.mock.calls[0][0], 'http://x')
+    expect(url.pathname).toBe('/booking')
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({
+      hotel: hotel.id,
+      room: room.id,
+      rate: rate.id,
+      checkin: '2026-10-22',
+      checkout: '2026-10-25',
+    })
+  })
+
+  it('"Забронировать" without dates scrolls to the rooms and moves focus there', async () => {
     const user = userEvent.setup()
     render(<HotelPage hotel={hotel} />)
     const rooms = screen.getByRole('region', { name: 'Номера' })
