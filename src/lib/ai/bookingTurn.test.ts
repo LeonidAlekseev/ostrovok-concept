@@ -8,6 +8,7 @@ import type { TripBooking } from '../trips'
 import type { AssistantRequest } from '../assistant'
 import { runBookingsTool, runDateChangeTool } from './bookingTools'
 import {
+  answerAboutBookings,
   bookingTurn,
   isDateChangeRequest,
   mergePlans,
@@ -239,6 +240,26 @@ describe('bookingTurn', () => {
     )
     expect(answer.change).toMatchObject({ checkIn: '2026-11-17', checkOut: '2026-11-19' })
     expect(answer.source).toBe('model')
+  })
+
+  it('fails an answer about the bookings with a conclusion the data do not have', async () => {
+    const run = { result: runBookingsTool([november], new Map([[hotel.id, hotel]]), TODAY) }
+    const saying = (answer: string) =>
+      new MockLanguageModelV4({
+        doGenerate: async () => ({
+          content: [{ type: 'text', text: JSON.stringify({ answer }) }],
+          finishReason: { unified: 'stop', raw: undefined },
+          usage: {
+            inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined },
+            outputTokens: { total: 1, text: 1, reasoning: undefined },
+          },
+          warnings: [],
+        }),
+      }) as LanguageModel
+    const ask = (answer: string) =>
+      answerAboutBookings(saying(answer), [user('Что с бронью?')], run.result, AbortSignal.timeout(5000))
+    await expect(ask('Бронь подтверждена. Обычно в отелях тихо, возьмите беруши.')).rejects.toThrow('беруш')
+    await expect(ask('Бронь подтверждена.')).resolves.toBe('Бронь подтверждена.')
   })
 
   it('writes the run of a signed-in user with the number and the dates only', async () => {
