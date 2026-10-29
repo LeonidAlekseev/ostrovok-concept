@@ -1,7 +1,11 @@
 # Docker
 
-Запуск приложения в контейнере (Docker Desktop, Windows и macOS). Compose поднимает только приложение; база — облачный
-Supabase (причины — в [README](../README.md#почему-база-внешняя)).
+Запуск приложения в контейнере (Docker Desktop, Windows и macOS). Два варианта:
+
+- **основной** (`docker-compose.yml`, `make up`): только приложение, база — облачный Supabase (причины — в
+  [README](../README.md#почему-база-внешняя)); так требуют организаторы;
+- **дополнительный** (`docker-compose.local.yml`, `make up-local`): приложение и своя минимальная Supabase, см.
+  [«Локальная Supabase»](#локальная-supabase-дополнительно).
 
 ## Оглавление
 
@@ -10,6 +14,7 @@ Supabase (причины — в [README](../README.md#почему-база-вн
 - [Что внутри образа](#что-внутри-образа)
 - [TLS: сертификат НУЦ Минцифры (GigaChat)](#tls-сертификат-нуц-минцифры-gigachat)
 - [Сидирование](#сидирование)
+- [Локальная Supabase (дополнительно)](#локальная-supabase-дополнительно)
 
 ## Файлы
 
@@ -21,7 +26,9 @@ Supabase (причины — в [README](../README.md#почему-база-вн
   и сервис `tools` (профиль `tools`, `up` его не запускает).
 - `docker-compose.override.yml` — ротация логов и монтирование `secrets.app.env.age` (обновить секреты можно
   перезапуском, без пересборки).
-- `Makefile` — `make up`, `make down`, `make logs`, `make seed`.
+- `docker-compose.local.yml`, `docker/local-supabase/`, `.env.local-supabase.example` — дополнительный вариант с локальной
+  Supabase.
+- `Makefile` — `make up`, `make down`, `make logs`, `make seed`; `make up-local`, `make down-local`, `make seed-local`.
 - `.dockerignore` — `.env*`, `*.key`, `.git`, `node_modules` не попадают в контекст сборки.
 
 ## Docker Desktop (Windows, macOS)
@@ -72,5 +79,33 @@ https://gu-st.ru/content/Other/doc/russian_trusted_root_ca.cer, SHA-256
 Отдельная команда: `docker compose run --rm tools npm run db:features -- --dry-run`.
 Загрузки из внешних файлов (`db:seed:valencia`, `db:load:ota-pages`, `load-valencia-geo.py`, `db:city-places`) в
 `make seed` не входят: исходные данные лежат вне репозитория.
+
+## Локальная Supabase (дополнительно)
+
+`docker-compose.local.yml` — фронтенд и минимальная Supabase из официального self-host, без Studio. Образы закреплены,
+`platform: linux/amd64`: `supabase/postgres:15.8.1.085`, `supabase/gotrue:v2.177.0` (Auth), `postgrest/postgrest:v13.0.4`
+(REST), `supabase/realtime:v2.34.47`, `supabase/storage-api:v1.25.7`, `kong:2.8.1` (шлюз, `docker/local-supabase/kong.yml`).
+
+1. `cp .env.local-supabase.example .env.local-supabase`. В файле пароль Postgres, JWT secret и два ключа (`ANON_KEY`,
+   `SERVICE_ROLE_KEY`): стандартные демо-ключи self-host, подписанные этим секретом, **только для локального запуска**
+   (порты открыты на `127.0.0.1`). Секреты в git не попадают (`.env.*` в `.gitignore`, в репозитории только образец).
+   Свои ключи — любые JWT HS256 с ролями `anon` и `service_role`, подписанные `JWT_SECRET`.
+2. `.env` (как для основного варианта) нужен для ключей моделей `NVIDIA_API_KEY`, `GIGACHAT_AUTH_KEY` и демо-аккаунтов
+   `DEMO_USER_*`, `DEMO_HOTELIER_*`. Адрес и ключи Supabase из `.env` локальный вариант перекрывает.
+3. `make up-local` (`docker compose --env-file .env.local-supabase -f docker-compose.local.yml up --build`) поднимает базу
+   и сервисы. Приложение собирается из того же `Dockerfile` (стадия `tools`) уже на старте: каталог пререндерится из
+   базы, поэтому `docker/local-supabase/app.sh` ждёт данные и только потом выполняет `npm run build` и `next start`.
+4. `make seed-local` в другом терминале: сервис `tools` выполняет `scripts/seed-all.sh` против локальной базы — миграции
+   (`db:push`), каталог и демо-путешественник, демо-отельер, демо-чаты с отельером, пересборка настоящих отелей,
+   свойства, векторы. После этого приложение собирается и открывается на http://localhost:8080.
+5. `make down-local` останавливает всё; данные лежат в томах `db-data` и `storage-data` (`docker volume ls`), удалить их
+   — `docker compose --env-file .env.local-supabase -f docker-compose.local.yml down -v`.
+
+Браузер и контейнеры ходят в Supabase по одному адресу `http://supabase.localhost:8000` (Kong): `*.localhost` — петля в
+браузере, а внутри сети это псевдоним Kong, так что cookie сессии Auth совпадают на сервере и в браузере. Postgres
+доступен снаружи на `127.0.0.1:54322`. Embedding-модели и GigaChat по-прежнему удалённые, поэтому `db:embed*` ходят в
+NVIDIA API (до 40 запросов в минуту). Данные внешних источников (Островок, EUBUCCO, шум EEA, места OSM) в
+`seed-all.sh` не входят: как их загрузить, написано в [«Источниках данных»](data-sources.md). Без настоящих отелей
+(`ota-*`) демо-чаты с отельером пропускаются.
 
 [← README](../README.md)
