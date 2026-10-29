@@ -1,6 +1,7 @@
 import {
   MAX_PHOTOS,
   PHOTO_TEXT,
+  stepTitle,
   type AssistantRequest,
   type Brief,
   type Plan,
@@ -202,7 +203,7 @@ function stepOf(value: AgentStep): AgentStep {
   const run = parseToolRun(value.run)
   return {
     agent: value.agent,
-    title: value.title,
+    title: stepTitle(value.agent, value.title),
     ...(value.params !== undefined && { params: value.params }),
     ...(value.result !== undefined && { result: value.result }),
     ...(run && { run }),

@@ -1338,7 +1338,8 @@ describe('POST /api/assistant: the choice by the tools of the store', () => {
       ['Подбираю отели по вашему описанию', 'Лиссабон'],
       ['Отели по характеристикам', 'ночью тише 50 дБ'],
       ['Места рядом', 'аптека в 500 м'],
-      ['Отзывы', 'тема: шум и тишина'],
+      ['Точный поиск по словам', 'Углубленный поиск · тема: шум и тишина'],
+      ['Поиск по смыслу', 'Углубленный поиск · тема: шум и тишина'],
     ])
     for (const step of body.steps.slice(1)) expect(toolResultSchema.safeParse(step.run.result).success).toBe(true)
     expect(body.matches.map((h: { id: string }) => h.id)).toEqual([a.id])
@@ -1347,17 +1348,39 @@ describe('POST /api/assistant: the choice by the tools of the store', () => {
   })
 
   // Scenario: Просьба об отзывах без города и дат
-  it('searches the reviews in Valencia for a wish of the food, before the dates and the party are asked', async () => {
+  it('searches the documents in Valencia for a question of the food, before the dates and the party are asked', async () => {
     setModel(undefined)
-    for (const text of ['Где хороший завтрак', 'Отель с отличной кухней']) {
+    for (const text of ['Где хороший завтрак', 'Где вкусная кухня?']) {
       const body = await (await ask(text, {})).json()
       expect(body.brief.destinationId).toBe('valencia')
-      expect(body.steps.map((s: { title: string }) => s.title)).toContain('Отзывы')
+      expect(body.steps.map((s: { title: string }) => s.title)).toEqual(
+        expect.arrayContaining(['Точный поиск по словам', 'Поиск по смыслу']),
+      )
     }
     // Another topic of the store still waits for the city.
     const body = await (await ask('Где чисто?', {})).json()
     expect(body.brief.destinationId).toBeUndefined()
     expect(body.steps).toBeUndefined()
+  })
+
+  // Scenario: Поиск отеля с темой сначала уточняет даты и состав
+  it('asks the dates and the party first for a search of a hotel, then searches the documents of the hotels', async () => {
+    setModel(undefined)
+    for (const text of [
+      'Найди отели, где хороший и качественный завтрак.',
+      'Найди отель, чтобы были очень вкусные и качественные завтраки',
+      'Тихий отель с вкусным завтраком',
+    ]) {
+      const first = await (await ask(text, {})).json()
+      expect(first.brief.destinationId).toBe('valencia')
+      expect(first.steps).toBeUndefined()
+      const second = await (await ask(text, complete)).json()
+      const titles = second.steps.map((s: { title: string }) => s.title)
+      expect(titles).toEqual(expect.arrayContaining(['Точный поиск по словам', 'Поиск по смыслу']))
+      expect(titles).not.toContain('Отзывы')
+      for (const step of second.steps)
+        expect(step.run?.result.error?.message ?? '').not.toMatch(/не подобран|ни один отель/)
+    }
   })
 
   // Scenario: Модель выбирает вызовы инструментов
@@ -1412,9 +1435,10 @@ describe('POST /api/assistant: the choice by the tools of the store', () => {
     expect(rows.filter((r) => r.status === 'running').map((r) => r.tool_name)).toEqual([
       'hotels_by_features',
       'nearby_places',
-      'hotel_reviews',
+      'deep_search_exact',
+      'deep_search_meaning',
     ])
-    expect(rows.filter((r) => r.status === 'success' || r.status === 'error')).toHaveLength(3)
+    expect(rows.filter((r) => r.status === 'success' || r.status === 'error')).toHaveLength(4)
   })
 
   // Scenario: Хранилище не прочиталось

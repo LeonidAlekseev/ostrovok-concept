@@ -2026,6 +2026,104 @@
         }
       }
     },
+    "/rpc/hotels_chunks_search": {
+      "post": {
+        "operationId": "rpc_hotels_chunks_search",
+        "tags": ["Функции"],
+        "summary": "hotels_chunks_search",
+        "description": "Функция `hotels_chunks_search` базы через PostgREST.",
+        "x-used-in": ["src/lib/db/claims.ts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "hotel_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "per_hotel": {
+                    "type": "number"
+                  },
+                  "query": {
+                    "type": "string"
+                  },
+                  "query_embedding": {}
+                },
+                "required": ["hotel_ids", "query"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Результат функции",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "chunk_id": {
+                        "type": "string"
+                      },
+                      "document_id": {
+                        "type": "string"
+                      },
+                      "evidence_id": {
+                        "type": "string"
+                      },
+                      "fts_place": {
+                        "type": "number"
+                      },
+                      "hotel_id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "metadata": {
+                        "description": "JSON"
+                      },
+                      "ord": {
+                        "type": "number"
+                      },
+                      "similarity": {
+                        "type": "number"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "vector_place": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "chunk_id",
+                      "document_id",
+                      "evidence_id",
+                      "fts_place",
+                      "hotel_id",
+                      "kind",
+                      "metadata",
+                      "ord",
+                      "similarity",
+                      "text",
+                      "vector_place"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/rpc/hotels_outside_noise": {
       "post": {
         "operationId": "rpc_hotels_outside_noise",

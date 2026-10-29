@@ -259,6 +259,14 @@ describe('the runs of the steps in the saved chats', () => {
     expect(loadGuestChats()[0].messages[0].data.step?.run?.result.groups).toEqual(groupedResult.groups)
   })
 
+  // Scenario: Сохранённый чат показывает новое название
+  it('shows the tool saved as «Отзывы» under its new name «Углубленный поиск»', () => {
+    const old = { agent: 'search', title: 'Отзывы', params: 'тема: завтрак', result: 'Завтрак: 12 фрагментов отзывов' }
+    expect(parseChat(chatWith({ step: old }))!.messages[0].data.step).toEqual({ ...old, title: 'Углубленный поиск' })
+    // Only the search's old title is renamed; a step of another agent keeps its own.
+    expect(parseChat(chatWith({ step: { ...old, agent: 'geo' } }))!.messages[0].data.step?.title).toBe('Отзывы')
+  })
+
   it('shows an older step without a run as before, and drops a run off the contract only', () => {
     expect(parseChat(chatWith({ step }))!.messages[0].data.step).toEqual(step)
     const broken = { id: RUN_ID, result: { ...sampleResult, claims: 'много' } }

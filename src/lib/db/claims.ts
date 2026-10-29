@@ -412,6 +412,96 @@ export async function searchHotelReviews(
   return chunks && chunks.filter((c) => c.kind === 'review' && mention.test(c.text))
 }
 
+/** A chunk found among many hotels' documents: the hotel it is of and, when found by meaning, how close it is. */
+export interface HotelsChunk extends KnowledgeChunk {
+  hotelId: string
+  /** 1 − the cosine distance to the query's vector; `null` for a chunk the meaning part did not find. */
+  similarity: number | null
+}
+
+const hotelsRow = knowledgeRow.omit({ rank: true }).extend({
+  hotel_id: z.string(),
+  similarity: z.number().nullable(),
+})
+
+/** The hotels one read asks at most, as `hotels_chunks_search` allows. */
+export const HOTELS_SEARCH_LIMIT = 500
+
+/** Hotels read at once by the one-by-one search. */
+const ONE_BY_ONE = 16
+
+/** `searchHotelsKnowledge` by `hotel_chunks_hybrid`, a read a hotel (a database without `hotels_chunks_search`). */
+async function searchHotelsOneByOne(
+  ids: readonly string[],
+  query: string,
+  embedding: readonly number[] | null,
+  perHotel: number,
+): Promise<Map<string, HotelsChunk[]> | null> {
+  const found = new Map<string, HotelsChunk[]>()
+  let read = 0
+  for (let from = 0; from < ids.length; from += ONE_BY_ONE)
+    await Promise.all(
+      ids.slice(from, from + ONE_BY_ONE).map(async (id) => {
+        const chunks = await searchHotelKnowledge(id, query, perHotel, embedding)
+        if (!chunks) return
+        read++
+        if (chunks.length > 0)
+          found.set(
+            id,
+            chunks.map((c) => ({ ...c, hotelId: id, similarity: null })),
+          )
+      }),
+    )
+  return read > 0 ? found : null
+}
+
+/**
+ * The best chunks of each real hotel's documents — reviews, descriptions and the hotels' knowledge from their
+ * hoteliers — by `hotels_chunks_search`, in one read: by the words of `query` and, with `embedding`, by meaning,
+ * at most `perHotel` by each. The hotels with no match are not in the map. `null` when they cannot be read.
+ */
+export async function searchHotelsKnowledge(
+  hotelIds: readonly string[],
+  query: string,
+  embedding: readonly number[] | null,
+  perHotel = 6,
+): Promise<Map<string, HotelsChunk[]> | null> {
+  const ids = hotelIds.filter(isRealHotelId).slice(0, HOTELS_SEARCH_LIMIT)
+  const found = new Map<string, HotelsChunk[]>()
+  if (ids.length === 0) return found
+  try {
+    const { data, error } = await anonClient().rpc('hotels_chunks_search', {
+      hotel_ids: ids,
+      query: query.trim().slice(0, QUERY_CHARS),
+      ...(embedding && { query_embedding: toVector(embedding) }),
+      per_hotel: perHotel,
+    })
+    // The function is not in the database yet (the migration comes after the code): one read a hotel, as before.
+    if (error?.code === 'PGRST202') return await searchHotelsOneByOne(ids, query, embedding, perHotel)
+    if (error) throw error
+    for (const value of data ?? []) {
+      const parsed = hotelsRow.safeParse(value)
+      if (!parsed.success) continue
+      const { chunk_id, document_id, evidence_id, fts_place, vector_place, hotel_id, ...rest } = parsed.data
+      const chunk: HotelsChunk = {
+        chunkId: chunk_id,
+        documentId: document_id,
+        evidenceId: evidence_id,
+        ftsPlace: fts_place,
+        vectorPlace: vector_place,
+        hotelId: hotel_id,
+        rank: 0,
+        ...rest,
+      }
+      found.set(hotel_id, [...(found.get(hotel_id) ?? []), chunk])
+    }
+    return found
+  } catch (error) {
+    console.warn(`hotels knowledge: not read (${String((error as { code?: unknown })?.code ?? 'error').slice(0, 40)})`)
+    return null
+  }
+}
+
 /** At most this many sources are read at once. */
 export const EVIDENCE_LIMIT = 100
 
