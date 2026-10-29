@@ -44,6 +44,7 @@ export function BookingForm({ offer }: { offer: Offer }) {
   const [typed, setTyped] = useState<Partial<BookingFormValues>>({})
   const [errors, setErrors] = useState<FormErrors>({})
   const [processing, setProcessing] = useState(false)
+  const [saveError, setSaveError] = useState<string>()
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
   useEffect(() => () => clearTimeout(timer.current), [])
 
@@ -70,11 +71,18 @@ export function BookingForm({ offer }: { offer: Offer }) {
       focusField(first)
       return
     }
+    setSaveError(undefined)
     setProcessing(true)
     timer.current = setTimeout(() => {
       let id = newBookingId()
       while (bookings.some((b) => b.id === id)) id = newBookingId()
-      saveBooking(createBooking(offer, values, id, new Date(), todayIso()))
+      try {
+        saveBooking(createBooking(offer, values, id, new Date(), todayIso()))
+      } catch {
+        setProcessing(false)
+        setSaveError('Не удалось сохранить бронь. Проверьте данные и попробуйте ещё раз.')
+        return
+      }
       router.replace(`/trips?new=${id}`)
     }, PROCESSING_MS)
   }
@@ -134,6 +142,11 @@ export function BookingForm({ offer }: { offer: Offer }) {
         </div>
         {errors.agreed && <FieldError id="agreed-error">{errors.agreed}</FieldError>}
       </Field>
+      {saveError && (
+        <p className="text-sm text-destructive" role="alert">
+          {saveError}
+        </p>
+      )}
       <Button type="submit" size="lg" disabled={processing} className="w-full sm:w-fit">
         {processing ? 'Обрабатываем…' : 'Забронировать'}
       </Button>
