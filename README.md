@@ -110,6 +110,22 @@ GoTrue и Storage для входа и фото. Поэтому данные н�
 внешних файлов (`db:seed:valencia`, `db:load:ota-pages`, `load-valencia-geo.py`, `db:city-places`) в `make seed` не
 входят; описание всех скриптов — [docs/data-and-scripts.md](docs/data-and-scripts.md).
 
+## Локальная база Supabase (дополнительно)
+
+Основной запуск (`make up`) работает с облачной Supabase и не меняется. Дополнительно можно поднять у себя и фронтенд,
+и минимальную Supabase (Postgres, Auth, REST, Realtime, Storage, Kong) из `docker-compose.local.yml`:
+
+```bash
+cp .env.local-supabase.example .env.local-supabase   # ключи только для локального запуска
+make up-local     # база и сервисы; фронтенд ждёт данные, затем собирается: http://localhost:8080
+make seed-local   # в другом терминале: миграции, каталог, демо-аккаунты, демо-чаты с отельером, векторы
+make down-local
+```
+
+Ключи моделей (GigaChat, NVIDIA) и демо-аккаунты берутся из `.env`, модели остаются удалёнными. Внешние данные
+(Островок, EUBUCCO, шум EEA, места OSM) в `make seed-local` не входят. Откуда какие данные и как их загрузить —
+[docs/data-sources.md](docs/data-sources.md), подробности запуска — [docs/docker.md](docs/docker.md).
+
 ## Маршруты и доступ
 
 | Маршрут                   | Что                                                 |
