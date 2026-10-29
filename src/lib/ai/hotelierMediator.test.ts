@@ -171,6 +171,18 @@ describe('the hotel’s AI assistant', () => {
     ])
   })
 
+  it('passes the question on when the answer has a conclusion the data do not', async () => {
+    const model = decides({
+      decision: 'answer',
+      answer: 'По словам отельера, балкон есть. Чем выше этаж, тем тише.',
+      claim_ids: ['C1'],
+      chunk_ids: [],
+      hotel_data: false,
+    })
+    deps.models = [{ id: 'bolt', model, timeoutMs: 1000 }]
+    expect(await ask('Есть ли балкон в номерах Deluxe?')).toBe('escalated')
+  })
+
   it('passes to the hotelier what only the hotel confirms, without asking a model', async () => {
     const model = decides({ decision: 'answer', answer: 'Да', claim_ids: [], chunk_ids: [], hotel_data: true })
     deps.models = [{ id: 'bolt', model, timeoutMs: 1000 }]
