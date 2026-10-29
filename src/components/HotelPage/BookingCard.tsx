@@ -1,12 +1,14 @@
 'use client'
 
 import type { ComponentProps, ReactElement } from 'react'
+import { useRouter } from 'next/navigation'
 import { CalendarDays, ChevronDown, ChevronRight, User } from 'lucide-react'
 import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
-import { freeCancellationDeadline, type Hotel } from '@/lib/catalog'
+import { cheapestRate, freeCancellationDeadline, type Hotel } from '@/lib/catalog'
 import { formatShortDay, todayIso } from '@/lib/dates'
 import { formatPrice, guestsLabel } from '@/lib/format'
+import { toOfferParams } from '@/lib/offer'
 import { DateField } from '../SearchForm/DateField'
 import { GuestsField } from '../SearchForm/GuestsField'
 import { goToSection } from './goToSection'
@@ -53,11 +55,12 @@ function DayField({ trigger }: { trigger: ReactElement }) {
 
 /**
  * The booking card: the GURU price of the stay with the regular one struck out, "за M ночей для N гостей",
- * check-in, check-out and the guests, each opening its picker, and "Забронировать", which leads to the rooms
- * (`onBook` runs first). Under it the last day of free cancellation of the cheapest refundable rate, only when
+ * check-in, check-out and the guests, each opening its picker, and "Забронировать" (`onBook` runs first): with the
+ * dates chosen it opens the checkout of the cheapest rate, whose price the card shows, without them it leads to the rooms. Under it the last day of free cancellation of the cheapest refundable rate, only when
  * the dates are chosen and such a rate has it ahead; the time of day is not in the data.
  */
 export function BookingCard({ hotel, onBook, className }: { hotel: Hotel; onBook?: () => void; className?: string }) {
+  const router = useRouter()
   const { stay, error, guests, setStay } = useHotelStay()
   const { price, guru, caption } = useStayPrice(hotel)
   const deadline = stay && freeCancellationDeadline(hotel, stay.checkIn, todayIso())
@@ -117,7 +120,9 @@ export function BookingCard({ hotel, onBook, className }: { hotel: Hotel; onBook
         className="h-12 w-full text-base shadow-none"
         onClick={() => {
           onBook?.()
-          goToSection('rooms')
+          if (!stay) return goToSection('rooms')
+          const { room, rate } = cheapestRate(hotel)
+          router.push(`/booking?${toOfferParams({ hotelId: hotel.id, roomId: room.id, rateId: rate.id, ...stay })}`)
         }}
       >
         <span className="min-w-0 truncate">Забронировать</span>

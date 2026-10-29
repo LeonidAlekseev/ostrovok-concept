@@ -206,6 +206,34 @@ describe('BookingPage submit', () => {
     expect(raw).not.toContain('12/30')
   })
 
+  it('tells the user when the booking cannot be saved and stays on the page', async () => {
+    nav.query = offerQuery(nowRate.id)
+    render(<BookingPage />)
+    await waitForCatalog()
+    const user = userEvent.setup()
+    const fill = async (label: string, value: string) => {
+      await user.click(screen.getByLabelText(label))
+      await user.paste(value)
+    }
+    await fill('Имя', 'Анна')
+    await fill('Фамилия', 'Петрова')
+    await fill('Email', 'anna@example.com')
+    await fill('Телефон', '+7 900 123-45-67')
+    await fill('Номер карты', '4242424242424242')
+    await fill('Срок действия', '1230')
+    await fill('CVC', '987')
+    await fill('Имя держателя', 'ANNA PETROVA')
+    await user.click(screen.getByRole('checkbox'))
+    const update = vi.spyOn(bookingsStore, 'update').mockImplementation(() => {
+      throw new Error('quota')
+    })
+    await user.click(screen.getByRole('button', { name: 'Забронировать' }))
+
+    expect((await screen.findByRole('alert', {}, { timeout: 3000 })).textContent).toContain('Не удалось сохранить')
+    expect(nav.replace).not.toHaveBeenCalled()
+    update.mockRestore()
+  })
+
   // booking-checkout, Scenario: Бронь видна в «Моих поездках»
   it('shows the new booking in «Мои поездки» after the redirect', async () => {
     nav.query = offerQuery(hotelRate.id)
