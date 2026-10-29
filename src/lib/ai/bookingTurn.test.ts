@@ -2,7 +2,7 @@ import type { LanguageModel } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { describe, expect, it, vi } from 'vitest'
 import { getHotel } from '../catalogGenerator'
-import { stayTotal } from '../offer'
+import { guruPrice, stayTotal } from '../offer'
 import { toolResultSchema, type ToolResult } from '../toolResult'
 import type { TripBooking } from '../trips'
 import type { AssistantRequest } from '../assistant'
@@ -177,7 +177,9 @@ describe('the tools', () => {
   it('«Пересчёт при смене дат» counts as the checkout, or says why not', () => {
     const result = runDateChangeTool(november, hotel, '2026-11-13', '2026-11-15', TODAY)
     valid(result)
-    expect(result.data?.change).toMatchObject({ total: stayTotal(rate.pricePerNight, '2026-11-13', '2026-11-15', 1) })
+    expect(result.data?.change).toMatchObject({
+      total: guruPrice(stayTotal(rate.pricePerNight, '2026-11-13', '2026-11-15', 1)),
+    })
     expect(result.calculations.map((c) => c.name)).toContain('Цена проживания, как при бронировании')
     const past = runDateChangeTool(november, hotel, '2026-10-01', '2026-10-03', TODAY)
     valid(past)
@@ -192,7 +194,7 @@ describe('bookingTurn', () => {
       bookingId: 'OS-NOV001',
       checkIn: '2026-11-13',
       checkOut: '2026-11-15',
-      total: stayTotal(rate.pricePerNight, '2026-11-13', '2026-11-15', 1),
+      total: guruPrice(stayTotal(rate.pricePerNight, '2026-11-13', '2026-11-15', 1)),
       from: { checkIn: '2026-11-10', checkOut: '2026-11-12', total: november.total },
     })
     expect(answer.reply).toMatch(/Подтвердить/)
