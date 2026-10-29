@@ -350,7 +350,8 @@ function instructions(
   return [
     `Ты Эвал, помощник сервиса «О!бъективно» на странице отеля «${hotel.name}». Отвечай по-русски.`,
     REPLY_STYLE,
-    'Поле answer — ТОЛЬКО то, что есть в данных отеля ниже. Ничего не выдумывай: если в данных ответа нет, так и скажи.',
+    'Точность. Каждое утверждение в answer опирается на данные ниже. Общие выводы и советы («чем выше, тем тише», «возьмите беруши», «есть лифт», «обычно в отелях…») запрещены, если их нет в данных. Совет допустим, только если прямо следует из цифр или фактов данных.',
+    'Если данных нет, скажи, чего мы не знаем, и предложи спросить отельера.',
     'Поле unverified — то, чего в данных нет, но ты знаешь из общих знаний (например, что обычно есть рядом с этим районом); это не проверено. Если нечего добавить — null.',
     'Названия мест рядом, расстояния и время пешком, которых нет в данных, можно писать только в unverified.',
     'Этажность здания — только строка «Этажей в здании (EUBUCCO)»; «номера занимают N этажей» — это не этажность здания.',
@@ -386,23 +387,37 @@ export function isRussian(text: string): boolean {
 const LATIN_WORD = /(?<![\p{L}\p{N}])\p{Script=Latin}{4,}(?![\p{L}\p{N}])/gu
 /** Terms a Russian answer keeps in Latin letters though the data may spell them otherwise. */
 const LATIN_TERMS = new Set(['wifi', 'wi-fi', 'booking', 'airbnb', 'google', 'maps', 'openstreetmap', 'eubucco'])
-/** Advice the model brings from itself: it is said only when the data have the thing. */
-const OWN_ADVICE = /беруш|затычк\p{L}* для ушей/iu
+/**
+ * Conclusions the model brings from itself. Each is said only when the data have its ground: `from` finds the
+ * conclusion in the answer, `ground` the fact in the data that allows it.
+ */
+const OWN_CONCLUSIONS: readonly { from: RegExp; ground: RegExp }[] = [
+  { from: /беруш|затычк\p{L}* для ушей/iu, ground: /беруш|затычк\p{L}* для ушей/iu },
+  { from: /лифт/iu, ground: /лифт/iu },
+  { from: /вентилятор/iu, ground: /вентилятор/iu },
+  // «Чем выше, тем тише»: only an estimate of the noise by floors in the data allows it.
+  {
+    from: /(?:чем|чём) выше[^.!?\n]{0,30}тем[^.!?\n]{0,15}(?:тише|спокойнее)|(?:выше|верхн\p{L}*|высок\p{L}*) этаж\p{L}*[^.!?\n]{0,40}(?:тише|спокойнее|меньше шум)|(?:тише|спокойнее)[^.!?\n]{0,40}(?:выше|на верхн\p{L}*|на высок\p{L}*) этаж/iu,
+    ground: /этаж\p{L}*[^.\n]{0,60}(?:шум|дб|тих|тише)|(?:шум|дб|тих|тише)[^.\n]{0,60}этаж/iu,
+  },
+  // Hearsay about hotels in general: the data are about this one.
+  { from: /обычно в отел\p{L}*|в большинстве (?:отел|хостел)\p{L}*|как правило|как известно/iu, ground: /^(?!)/u },
+]
 
 /**
  * What an answer from the data has that the data do not: a word in Latin letters (the model slipping into English or
- * German: «lift», «Erdgeschoss») or advice the data say nothing of («беруши»). The names of the hotel and of its places
- * are in the data, so they pass. Empty: the answer holds.
+ * German: «lift», «Erdgeschoss») or a conclusion the data say nothing of («беруши», «лифт», «чем выше, тем тише»,
+ * «как правило»). The names of the hotel and of its places are in the data, so they pass. Empty: the answer holds.
  */
 export function outsideData(answer: string, data: string): string[] {
   const known = data.toLocaleLowerCase('ru')
   const words = (answer.match(LATIN_WORD) ?? [])
     .map((word) => word.toLocaleLowerCase('ru'))
     .filter((word) => !LATIN_TERMS.has(word) && !known.includes(word))
-  const advice = (answer.match(new RegExp(OWN_ADVICE, 'giu')) ?? []).filter(
-    (stem) => !known.includes(stem.toLocaleLowerCase('ru')),
+  const conclusions = OWN_CONCLUSIONS.flatMap(({ from, ground }) =>
+    ground.test(known) ? [] : (answer.match(new RegExp(from, 'giu')) ?? []).map((m) => m.toLocaleLowerCase('ru')),
   )
-  return [...new Set([...words, ...advice])]
+  return [...new Set([...words, ...conclusions])]
 }
 
 const clean = (value: string | null | undefined, max: number): string | undefined => {

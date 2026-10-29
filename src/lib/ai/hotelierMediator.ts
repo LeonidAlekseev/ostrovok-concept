@@ -27,7 +27,7 @@ import { needsHotelier, questionKeys } from '../hotelierFacts'
 import type { ToolEvidence, ToolResult } from '../toolResult'
 import { firstAnswer } from './chain'
 import { backgroundLinks } from './hotelierExtract'
-import { hotelFacts, isRussian } from './hotelAnswer'
+import { hotelFacts, isRussian, outsideData } from './hotelAnswer'
 import { placesAnswer } from './mediatorPlaces'
 import { getTextModels } from './model'
 import { queryVectorOrNull } from './semantic'
@@ -70,6 +70,8 @@ function prompt(facts: string, claims: readonly HotelClaim[], chunks: readonly K
   const conflicts = conflictingIds(claims)
   return [
     'Ты AI-помощник отеля в чате гостя с отелем. Ты не отельер и не говоришь от его имени.',
+    'Точность. Каждое утверждение в ответе опирается на данные ниже. Общие выводы и советы («чем выше, тем тише», «возьмите беруши», «есть лифт», «обычно в отелях…») запрещены, если их нет в данных. Совет допустим, только если прямо следует из цифр или фактов данных.',
+    'Если данных нет, скажи, чего мы не знаем, и предложи спросить отельера (escalate).',
     'Ответь сам (decision: answer) ТОЛЬКО если ответ прямо есть в данных ниже и они не противоречат друг другу. Иначе — escalate: вопрос уйдёт отельеру.',
     'Всегда escalate: наличие свободных номеров, цены и скидки, гарантированный вид или номер, индивидуальные условия, просьба подтвердить у отеля.',
     'Сведения отельера — «по словам отельера»; помеченное [демо] — демонстрационные данные, скажи об этом.',
@@ -268,10 +270,24 @@ export async function mediate(conversationId: string, messageId: string): Promis
         return 'answered'
       }
       if (models && !contradicts(claims)) {
-        const system = prompt(hotelFacts(hotel, undefined, features, details, noise), claims, chunks)
+        const facts = hotelFacts(hotel, undefined, features, details, noise)
+        const system = prompt(facts, claims, chunks)
+        // What the answer may rest on: not the prompt, whose rules name the forbidden conclusions themselves.
+        const data = [
+          facts,
+          ...claims.map((c) => hotelierClaimLine(c, false)),
+          ...chunks.map((c) => c.text),
+          ...dialog.map((m) => m.text),
+        ].join('\n')
         const result = await firstAnswer(
           backgroundLinks(models),
-          (model, signal) => decide(model, system, dialog, signal),
+          async (model, signal) => {
+            const made = await decide(model, system, dialog, signal)
+            // The answer is of the data: a word or a conclusion from nowhere fails this model, the next one is asked.
+            const outside = made.decision === 'answer' ? outsideData(made.answer, data) : []
+            if (outside.length > 0) throw new Error(`The answer has what the data do not: ${outside.join(', ')}`)
+            return made
+          },
           {
             deadline,
             onError: (id, error) =>
