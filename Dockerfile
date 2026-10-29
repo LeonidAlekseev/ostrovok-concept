@@ -13,8 +13,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY . .
 
 # `docker compose run tools …` (make seed): dev dependencies and scripts/, keys from the environment at run time.
+# uv and the system Python run scripts/*.py (make seed-local-geo: DuckDB, psycopg, pyosmium come as wheels at run time);
+# they are only in this stage, the runner image does not have them.
 FROM source AS tools
-ENV NODE_ENV=development NODE_EXTRA_CA_CERTS=/app/certs/russian_trusted_root_ca.pem
+ENV NODE_ENV=development NODE_EXTRA_CA_CERTS=/app/certs/russian_trusted_root_ca.pem UV_PYTHON_PREFERENCE=only-system
+RUN apk add --no-cache uv python3
 CMD ["sh"]
 
 FROM source AS build
