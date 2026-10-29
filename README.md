@@ -12,8 +12,8 @@
 
 Вы задаёте критерии. Эвал находит совпадения. Вы выбираете с уверенностью.
 
-- Видео (Google Drive): https://drive.google.com/drive/folders/1OqgiaKfaIsCUoaC14TO32cFgW4dHG0A5?usp=sharing
-- Сервис (Vercel Production): https://lilteam-ostrovok.vercel.app
+- Демонстрация (Google Drive): https://drive.google.com/drive/folders/1OqgiaKfaIsCUoaC14TO32cFgW4dHG0A5?usp=sharing
+- Вебсайт (Vercel Production): https://lilteam-ostrovok.vercel.app
 
 ## Быстрый старт
 
