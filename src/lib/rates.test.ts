@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Rate, Room } from './catalog'
+import { guruPrice, stayTotal } from './offer'
 import { cancellationDeadline, ratePrice, unavailableReason } from './rates'
 
 const free3: Rate = {
@@ -38,15 +39,19 @@ describe('unavailableReason', () => {
 
 describe('ratePrice', () => {
   it('is per night without dates', () => {
-    expect(ratePrice(free3, null)).toEqual({ perNight: 5000, total: null })
+    expect(ratePrice(free3, null)).toEqual({ perNight: 4500, total: null })
   })
   it('multiplies nights and rooms', () => {
     const stay = { checkIn: '2026-11-01', checkOut: '2026-11-04', guests: { adults: 2, children: 0, rooms: 2 } }
-    expect(ratePrice(free3, stay).total).toBe(30000)
+    expect(ratePrice(free3, stay).total).toBe(27000)
+  })
+  it('totals what the checkout costs: the GURU price of the stay', () => {
+    const stay = { checkIn: '2026-11-06', checkOut: '2026-11-08', guests: { adults: 2, children: 0, rooms: 1 } }
+    expect(ratePrice(free3, stay).total).toBe(guruPrice(stayTotal(5000, '2026-11-06', '2026-11-08', 1)))
   })
   // rate-selection, Requirement: Цена за ночь тарифа
   it('is the average night of the stay with dates', () => {
     const stay = { checkIn: '2026-10-22', checkOut: '2026-10-24', guests: { adults: 2, children: 0, rooms: 2 } }
-    expect(ratePrice({ ...free3, pricePerNight: 7000 }, stay)).toEqual({ perNight: 7550, total: 30200 })
+    expect(ratePrice({ ...free3, pricePerNight: 7000 }, stay)).toEqual({ perNight: 6795, total: 27180 })
   })
 })
