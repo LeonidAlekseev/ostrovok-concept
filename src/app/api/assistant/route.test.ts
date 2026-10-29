@@ -132,6 +132,8 @@ describe('POST /api/assistant', () => {
       brief: { vibe: 'sea', budget: 50000 },
       reply: 'Отличная идея!',
       source: 'model',
+      // The id of the model that answered, for the logs and the analysis.
+      model: 'model-1',
     })
 
     // The model gets the catalog, today's date and the conversation; the answer is a JSON object.
@@ -186,7 +188,7 @@ describe('POST /api/assistant', () => {
   it('keeps the theme of a free phrase and asks when (Scenario: Свободная фраза)', async () => {
     answeredBy({ vibe: 'sea', reply: '탐험 Анталья — отличный выбор!' })
     const response = await (await ask('хочу туда, где тепло и можно поплавать с маской, недорого')).json()
-    expect(response).toEqual({ brief: { vibe: 'sea' }, source: 'model' })
+    expect(response).toEqual({ brief: { vibe: 'sea' }, source: 'model', model: 'model-1' })
     expect(nextQuestion(response.brief, '2026-10-21')?.id).toBe('when')
   })
 
@@ -1013,6 +1015,7 @@ describe('POST /api/assistant with photos', () => {
       expect(body).toEqual({
         brief: {},
         source: 'model',
+        model: 'model-1',
         photo: { action: 'unusable', seen: 'Только цветные полосы.' },
       })
     }
@@ -1341,6 +1344,20 @@ describe('POST /api/assistant: the choice by the tools of the store', () => {
     expect(body.matches.map((h: { id: string }) => h.id)).toEqual([a.id])
     expect(body.findings).toMatch(/^Подобрал по данным \(ночью тише 50 дБ, аптека в 500 м\):\n1\. /)
     expect(body.source).toBe('rules')
+  })
+
+  // Scenario: Просьба об отзывах без города и дат
+  it('searches the reviews in Valencia for a wish of the food, before the dates and the party are asked', async () => {
+    setModel(undefined)
+    for (const text of ['Где хороший завтрак', 'Отель с отличной кухней']) {
+      const body = await (await ask(text, {})).json()
+      expect(body.brief.destinationId).toBe('valencia')
+      expect(body.steps.map((s: { title: string }) => s.title)).toContain('Отзывы')
+    }
+    // Another topic of the store still waits for the city.
+    const body = await (await ask('Где чисто?', {})).json()
+    expect(body.brief.destinationId).toBeUndefined()
+    expect(body.steps).toBeUndefined()
   })
 
   // Scenario: Модель выбирает вызовы инструментов

@@ -21,6 +21,10 @@ describe('parseBudget', () => {
 
   it('does not take the dates, the nights or the guests for a budget', () => {
     expect(parseBudget('20-23 ноября, вдвоём, на 5 ночей')).toBeUndefined()
+    // Spaces join only the groups of three digits: the date and the year are separate numbers.
+    expect(parseBudget('заезд 15 2026')).toBeUndefined()
+    expect(parseBudget('с 10 11 2026 на 3 ночи')).toBeUndefined()
+    expect(parseBudget('в 2026 году, вдвоём')).toBeUndefined()
   })
 })
 

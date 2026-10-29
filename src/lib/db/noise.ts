@@ -19,7 +19,7 @@ import { anonClient, catalogCached, readOrNull, warnShort, type AnonClient, type
 
 /**
  * «Шум и окружение» of a real hotel for its page and for Эвал (`HotelNoise`): the EEA bands at its facade by layer
- * (`hotel_noise_facade`) and the loud places of the OSM cache around it (`osm_places_near_facade`), and the noise around it for the
+ * (`hotel_features.noise_facade`, the answer of `hotel_noise_facade` kept ahead; asked live for a hotel without it) and the loud places of the OSM cache around it (`osm_places_near_facade`), and the noise around it for the
  * map: the day estimate of the pieces of `hotel_noise_day`, the Lnight contours of `hotel_geo_features` and the quiet of
  * `hotel_noise_quiet`, computed ahead into `hotel_noise_maps` (`hotel_noise_map`) and computed now only for a point
  * without one. Read with the anon key and cached with the catalogue; a synthetic hotel, a database without the
@@ -68,20 +68,33 @@ export function placesOf(answer: unknown): Pick<HotelNoise, 'places' | 'placesCo
 }
 
 /**
- * The first call of a point reads cold geometries (seconds) and can meet the anon role's `statement_timeout`
+ * The answer of `hotel_noise_facade` kept in the hotel's `hotel_features` row by `npm run db:features`: a read of one
+ * row. `null` for a hotel without it (a new one, a database before the column), which is then asked live.
+ */
+async function storedFacade(db: AnonClient, hotelId: string): Promise<unknown> {
+  const { data, error } = await db.from('hotel_features').select('noise_facade').eq('hotel_id', hotelId).maybeSingle()
+  if (error) warnShort('noise: no stored facade, asking live', error)
+  return error ? null : (data?.noise_facade ?? null)
+}
+
+/**
+ * The first live call of a point reads cold geometries (seconds) and can meet the anon role's `statement_timeout`
  * (`57014`); the second reads them warm (tens of ms), so a cancelled call is asked once more.
  */
-async function facadeRpc(db: AnonClient, lat: number, lon: number) {
-  const first = await db.rpc('hotel_noise_facade', { lat, lon })
-  return first.error?.code === '57014' ? db.rpc('hotel_noise_facade', { lat, lon }) : first
+async function liveFacade(db: AnonClient, lat: number, lon: number) {
+  const ask = () => db.rpc('hotel_noise_facade', { lat, lon })
+  const first = await ask()
+  const { data, error } = first.error?.code === '57014' ? await ask() : first
+  if (error) throw error
+  return data
 }
 
 const readNoise = catalogCached(
-  ['hotel-noise', 'facade'],
-  async (_hotelId: string, lat: number, lon: number): Promise<HotelNoise> => {
+  ['hotel-noise', 'facade-stored'],
+  async (hotelId: string, lat: number, lon: number): Promise<HotelNoise> => {
     const db = anonClient()
-    const [facade, near] = await Promise.all([
-      facadeRpc(db, lat, lon),
+    const [stored, near] = await Promise.all([
+      storedFacade(db, hotelId),
       db.rpc('osm_places_near_facade', {
         lat,
         lon,
@@ -90,9 +103,8 @@ const readNoise = catalogCached(
         per_category: NOISY_PER_CATEGORY,
       }),
     ])
-    if (facade.error) throw facade.error
     // Without the places the bands still stand: the page says it has no data of OSM.
-    return { ...facadeOf(facade.data), ...placesOf(near.error ? null : near.data) }
+    return { ...facadeOf(stored ?? (await liveFacade(db, lat, lon))), ...placesOf(near.error ? null : near.data) }
   },
 )
 

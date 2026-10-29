@@ -167,7 +167,12 @@ for (let i = 0; i < hotels.length; i += PARALLEL) {
       const buildingDataset = typeof data.building?.dataset === 'string' ? data.building.dataset : null
       // The places of everyday need after the loud ones: a tram stop of both keeps the edge of `placesStore`.
       return {
-        row: featureRow(hotel.id, data, { sources: bands.sources, dataset: facadeDataset(facade.data), estimate }),
+        row: featureRow(hotel.id, data, {
+          sources: bands.sources,
+          dataset: facadeDataset(facade.data),
+          estimate,
+          answer: facade.data,
+        }),
         stores: [
           noiseStore(hotel, Array.isArray(data.noise) ? data.noise : [], datasets),
           estimateStore(hotel, facade.data, places.data, datasets, buildingDataset),
@@ -185,11 +190,13 @@ for (let i = 0; i < hotels.length; i += PARALLEL) {
 }
 
 // The reviews of the hotels' pages.
-const pages = await readAll<{ master_id: number; updated_at: string; list: unknown[] | null; facts: unknown }>(
-  'ota_hotel_pages',
-  'master_id, updated_at, list:reviews->list, facts:hotel->facts',
-  ['master_id'],
-)
+const pages = await readAll<{
+  master_id: number
+  updated_at: string
+  list: unknown[] | null
+  facts: unknown
+  url: string | null
+}>('ota_hotel_pages', 'master_id, updated_at, url, list:reviews->list, facts:hotel->facts', ['master_id'])
 const byId = new Map(hotels.map((h) => [h.id, h]))
 for (const page of pages) {
   const hotel = byId.get(`ota-${page.master_id}`)
@@ -226,7 +233,7 @@ async function stored<T>(table: Table | 'hotel_room_views_named', columns: strin
 const FEATURE_COLUMNS =
   'hotel_id, building_id, height_m, floors, lden_min, lden_max, lden_source, lnight_min, lnight_max, lnight_source, ' +
   'building_dataset, geometry_source, height_source, height_lower_m, height_upper_m, floors_source, floors_lower, ' +
-  'floors_upper, noise_dataset, noise_method, noise_zone, street_lday_min, street_lday_max, street_lnight_min, ' +
+  'floors_upper, noise_dataset, noise_method, noise_zone, noise_facade, street_lday_min, street_lday_max, street_lnight_min, ' +
   'street_lnight_max, yard_lday_min, yard_lday_max, yard_lnight_min, yard_lnight_max'
 await write<FeatureRow>(
   'hotel_features',

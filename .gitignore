@@ -37,6 +37,7 @@ openspec/**/screenshots/
 .env
 .env.*
 !.env.example
+!.env.local-supabase.example
 *.key
 
 # Supabase CLI cache

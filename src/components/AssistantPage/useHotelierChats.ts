@@ -4,12 +4,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { useSession } from '@/hooks/useStore'
 import type { HotelierConversation } from '@/lib/hotelierChat'
 import { deleteChatShares } from '@/lib/assistantShare'
-import { hideMyChat, loadMyChats } from '@/lib/hotelierChatRemote'
+import { followInbox, hideMyChat, loadMyChats } from '@/lib/hotelierChatRemote'
 import { getBrowserClient } from '@/lib/supabase/client'
 
 /**
  * The signed-in traveller's chats with the hotels' hoteliers, for «Мои чаты» beside Эвал's: read once, and again
- * whenever `openId` changes (a chat opened or left has read its answers or got a message). A guest has none.
+ * whenever `openId` changes (a chat opened or left has read its answers or got a message) and whenever one of the
+ * traveller's conversations changes (an answer of the hotelier, a new chat). A guest has none.
  */
 export function useHotelierChats(openId: string | null): {
   chats: HotelierConversation[]
@@ -31,12 +32,18 @@ export function useHotelierChats(openId: string | null): {
       setReady(true)
       return
     }
-    loadMyChats(client)
-      .then((list) => current && setChats(list))
-      .catch(() => current && setChats([]))
-      .finally(() => current && setReady(true))
+    const read = () =>
+      loadMyChats(client)
+        .then((list) => current && setChats(list))
+        .catch(() => current && setChats([]))
+        .finally(() => current && setReady(true))
+    read()
+    // The database sends the traveller their own conversations only (RLS); the list is read again, for it is the
+    // database's to say which of them are «Мои чаты» (not the hotelier's requests, not the hidden ones).
+    const stop = followInbox(client, () => void read())
     return () => {
       current = false
+      stop()
     }
   }, [signedIn, session?.email, openId])
 

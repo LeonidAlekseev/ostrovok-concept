@@ -13,7 +13,7 @@ import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { serviceClient, type Table } from './lib/node.ts'
 
-const { nextDataPageProps, poiName, trimPage } = await import('../src/lib/ota/page.ts')
+const { nextDataPageProps, nextDataPageUrl, poiName, trimPage } = await import('../src/lib/ota/page.ts')
 const { MERGED_OTA_HOTELS } = await import('../src/lib/ota/merged.ts')
 type TrimmedPage = import('../src/lib/ota/page.ts').TrimmedPage
 
@@ -34,6 +34,8 @@ const supabase = serviceClient()
 
 const names = (await readdir(dir)).filter((name) => name.endsWith('.json')).sort()
 const pages: TrimmedPage[] = []
+// The address of each page, where its snapshot says it (`nextDataPageUrl`): never built from a template.
+const urls = new Map<number, string>()
 for (const name of names) {
   const match = /^(\d{1,15})\.json$/.exec(name)
   if (!match) throw new Error(`${name}: not <master_id>.json`)
@@ -41,8 +43,11 @@ for (const name of names) {
   const path = join(dir, name)
   const info = await stat(path)
   if (!info.isFile() || info.size > MAX_FILE_BYTES) throw new Error(`${name}: not a file of at most 4 MB`)
-  const page = trimPage(nextDataPageProps(JSON.parse(await readFile(path, 'utf8'))))
+  const snapshot = JSON.parse(await readFile(path, 'utf8'))
+  const page = trimPage(nextDataPageProps(snapshot))
   if (page.masterId !== Number(match[1])) throw new Error(`${name}: the page is of hotel ${page.masterId}`)
+  const url = nextDataPageUrl(snapshot, page.masterId)
+  if (url) urls.set(page.masterId, url)
   pages.push(page)
 }
 
@@ -79,7 +84,7 @@ const reviews = pages.reduce((sum, page) => sum + ((page.reviews.list as unknown
 
 console.log(`files: ${names.length}, pages: ${pages.length} of ${otaIds.size} ota_hotels`)
 console.log(`places: ${pois.size}, hotel–place links: ${hotelPois.length}, reviews (list): ${reviews}`)
-console.log(`rate tags: ${tags.size}`)
+console.log(`rate tags: ${tags.size}, page addresses: ${urls.size} of ${pages.length}`)
 if (dryRun) {
   console.log('dry run: nothing written')
   process.exit(0)
@@ -120,7 +125,13 @@ await upsert(
 await upsert(
   'ota_hotel_pages',
   'master_id',
-  pages.map((page) => ({ master_id: page.masterId, hotel: page.hotel, reviews: page.reviews, updated_at: updatedAt })),
+  pages.map((page) => ({
+    master_id: page.masterId,
+    hotel: page.hotel,
+    reviews: page.reviews,
+    url: urls.get(page.masterId) ?? null,
+    updated_at: updatedAt,
+  })),
   BATCH,
 )
 await upsert(

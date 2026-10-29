@@ -811,6 +811,7 @@ export type Database = {
           lnight_source: string | null
           noise_dataset: string | null
           noise_method: string | null
+          noise_facade: Json | null
           noise_zone: string | null
           street_lday_max: number | null
           street_lday_min: number | null
@@ -844,6 +845,7 @@ export type Database = {
           lnight_source?: string | null
           noise_dataset?: string | null
           noise_method?: string | null
+          noise_facade?: Json | null
           noise_zone?: string | null
           street_lday_max?: number | null
           street_lday_min?: number | null
@@ -876,6 +878,7 @@ export type Database = {
           lnight_source?: string | null
           noise_dataset?: string | null
           noise_method?: string | null
+          noise_facade?: Json | null
           noise_zone?: string | null
           street_lday_max?: number | null
           street_lday_min?: number | null
@@ -1467,6 +1470,7 @@ export type Database = {
           master_id: number
           reviews: NonNullable<Json>
           updated_at: string
+          url: string | null
         }
         ComputedFields: never
         Insert: {
@@ -1474,12 +1478,14 @@ export type Database = {
           master_id: number
           reviews?: NonNullable<Json>
           updated_at?: string
+          url?: string | null
         }
         Update: {
           hotel?: NonNullable<Json>
           master_id?: number
           reviews?: NonNullable<Json>
           updated_at?: string
+          url?: string | null
         }
         Relationships: [
           {

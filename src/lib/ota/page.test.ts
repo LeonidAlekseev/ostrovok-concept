@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { factLines } from '../hotelDetails'
 import {
   nextDataPageProps,
+  nextDataPageUrl,
   otaHotelDetails,
   pageFields,
   pageRooms,
@@ -251,6 +252,27 @@ describe('nextDataPageProps', () => {
     expect(() => nextDataPageProps({})).toThrow(/not a list/)
     expect(() => nextDataPageProps([{ id: 'x' }])).toThrow(/__NEXT_DATA__/)
     expect(() => nextDataPageProps(snapshot({ props: {} }))).toThrow(/pageProps/)
+  })
+})
+
+describe('nextDataPageUrl', () => {
+  const route = (page: unknown, query: unknown) => snapshot({ page, query, props: { pageProps: {} } })
+  const page = '/hotel/[country]/[city]/[mid]/[slug]'
+  const query = { country: 'spain', city: 'valencia', mid: 'mid7481548', slug: 'tryp_valencia_oceanic_hotel_3' }
+
+  it('fills the route of the snapshot with its query, and names the hotel', () => {
+    expect(nextDataPageUrl(route(page, query), 7481548)).toBe(
+      'https://ostrovok.ru/hotel/spain/valencia/mid7481548/tryp_valencia_oceanic_hotel_3/',
+    )
+    expect(nextDataPageUrl(snapshot(JSON.stringify({ page, query })), 7481548)).toContain('mid7481548')
+  })
+
+  it('gives nothing it would have to guess: no route, a parameter missing, another hotel', () => {
+    expect(nextDataPageUrl(snapshot({ props: {} }), 7481548)).toBeNull()
+    expect(nextDataPageUrl(route('/search', query), 7481548)).toBeNull()
+    expect(nextDataPageUrl(route(page, { ...query, slug: undefined }), 7481548)).toBeNull()
+    expect(nextDataPageUrl(route(page, query), 13115571)).toBeNull()
+    expect(nextDataPageUrl({}, 7481548)).toBeNull()
   })
 })
 

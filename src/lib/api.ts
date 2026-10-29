@@ -23,9 +23,15 @@ export const apiError = (status: number, message: string) => Response.json({ err
 export const loadVisibleHotel = async (hotelId: string): Promise<Hotel | undefined> =>
   isVisibleHotel({ id: hotelId }) ? loadHotel(hotelId) : undefined
 
-/** The request carries the service role key as a bearer: only the operator's scripts and schedulers have it. */
-export async function hasServiceRoleKey(request: Request): Promise<boolean> {
-  const expected = await getSecret('SUPABASE_SERVICE_ROLE_KEY')
+/** The request carries the secret `name` as a bearer, compared in constant time. */
+async function hasBearer(request: Request, name: string): Promise<boolean> {
+  const expected = await getSecret(name)
   const given = request.headers.get('authorization')?.replace(/^Bearer /, '') ?? ''
   return !!expected && given.length === expected.length && timingSafeEqual(Buffer.from(given), Buffer.from(expected))
 }
+
+/** The request carries the service role key as a bearer: only the operator's scripts and schedulers have it. */
+export const hasServiceRoleKey = (request: Request) => hasBearer(request, 'SUPABASE_SERVICE_ROLE_KEY')
+
+/** The request carries `CRON_SECRET` as a bearer: Vercel Cron sends it with every scheduled call. */
+export const hasCronSecret = (request: Request) => hasBearer(request, 'CRON_SECRET')

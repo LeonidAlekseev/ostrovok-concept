@@ -16,9 +16,11 @@ import {
   knowledgeTurn,
   planKnowledge,
   rulesKnowledge,
+  type KnowledgeCall,
   type KnowledgeDeps,
 } from '@/lib/ai/knowledgeTurn'
-import { runFeaturesTool, runNearTool, runReviewsTool, type Candidate } from '@/lib/ai/knowledgeTools'
+import { reviewVerdicts, runFeaturesTool, runNearTool, runReviewsTool, type Candidate } from '@/lib/ai/knowledgeTools'
+import { PERSONA_CITY } from '@/lib/personas'
 import { loadHotelierNoise } from '@/lib/db/claims'
 import { loadLevelIndex, loadNearIndex } from '@/lib/db/knowledge'
 import { MODEL_TIMEOUT_MS, understandWish } from '@/lib/ai/understand'
@@ -104,12 +106,13 @@ async function planTurn(
   context: Omit<TurnContext, 'summaries' | 'features'>,
   { messages, chatId, messageId }: Pick<WishContext, 'messages' | 'chatId' | 'messageId'>,
 ): Promise<Partial<AssistantResponse>> {
-  if (nextQuestion(context.brief, context.today)) return {}
+  const rules = rulesKnowledge(context.wish, context.brief)
+  // A wish of the guests' words («хороший завтрак») is answered before the dates and the party are asked.
+  if (!asksReviews(rules) && nextQuestion(context.brief, context.today)) return {}
   let summaries: Promise<HotelSummary[]> | undefined
   const loadSummaries = () => (summaries ??= loadHotelSummaries().catch(() => []))
   // The wish asks of the noise, a place near or the reviews: the model chooses the tools of the store while the
   // search runs, and the search leaves them their time.
-  const rules = rulesKnowledge(context.wish, context.brief)
   const knowledge = rules.length > 0
   const models = knowledge ? await getTextModels() : undefined
   const plan = knowledge
@@ -175,6 +178,9 @@ async function planTurn(
 /** The answer's time the tools of the store keep for themselves after the earlier steps. */
 const KNOWLEDGE_TIME_MS = 4000
 
+/** The wish asks of the guests' reviews. */
+const asksReviews = (calls: readonly KnowledgeCall[]) => calls.some((c) => c.tool === 'reviews')
+
 /** The store's reads and the runs of the tools, as the route does them. */
 const KNOWLEDGE_DEPS: KnowledgeDeps = {
   levels: loadLevelIndex,
@@ -183,6 +189,7 @@ const KNOWLEDGE_DEPS: KnowledgeDeps = {
   runFeatures: runFeaturesTool,
   runNear: runNearTool,
   runReviews: runReviewsTool,
+  reviewVerdicts,
   record: recordRun,
 }
 
@@ -314,6 +321,7 @@ async function hotelTurn(
         reply: asked && !askHotelier ? `${answer}\n\n${ASKED_REPLY}` : answer,
         ...(unverified && { unverified }),
         source: 'model',
+        model: result.id,
         ...withSteps(steps, asked),
         ...widget,
       } satisfies AssistantResponse)
@@ -411,6 +419,9 @@ async function wishTurn(context: WishContext) {
     .map((m) => m.text)
     .join('. ')
   const found = (next: Brief) => planTurn({ brief: next, wish, today, destinations, deadline, signal }, context)
+  // The reviews of the store are of Valencia: a wish of them without a city is about it.
+  const withCity = (next: Brief): Brief =>
+    !next.destinationId && asksReviews(rulesKnowledge(wish, next)) ? { ...next, destinationId: PERSONA_CITY } : next
 
   const models = await getTextModels()
   let down = false
@@ -422,13 +433,19 @@ async function wishTurn(context: WishContext) {
     )
     if (result.ok) {
       const { parsed, reply } = result.value
-      const next = foldBrief(brief, parsed, input, asked)
-      return { brief: next, reply, source: 'model', ...(await found(next)) } satisfies AssistantResponse
+      const next = withCity(foldBrief(brief, parsed, input, asked))
+      return {
+        brief: next,
+        reply,
+        source: 'model',
+        model: result.id,
+        ...(await found(next)),
+      } satisfies AssistantResponse
     }
     down = result.failed.length > 0
     console.warn('assistant: no model answered, using the rules')
   }
-  const next = mergeBrief(brief, input, asked, destinations)
+  const next = withCity(mergeBrief(brief, input, asked, destinations))
   return {
     brief: next,
     source: 'rules',
@@ -464,7 +481,9 @@ async function look(
   ip: string,
   deadline: number,
   signal: AbortSignal,
-): Promise<{ sight: PhotoSight; steps: TurnStep[] } | { failed: 'limited' | 'down'; steps: TurnStep[] } | null> {
+): Promise<
+  { sight: PhotoSight; model: string; steps: TurnStep[] } | { failed: 'limited' | 'down'; steps: TurnStep[] } | null
+> {
   const until = deadline - VISION_RESERVE_MS
   if (until - Date.now() < MIN_VISION_MS) return null
   if (!(await allowVisionRequest(ip))) return { failed: 'limited', steps: [] }
@@ -484,7 +503,7 @@ async function look(
             ? { agent: 'vision', title: VISION_SWITCH_STEP, status: 'done', result: 'посмотрел' }
             : { agent: 'vision', title: VISION_SWITCH_STEP, status: 'failed', result: 'ни одна модель не ответила' },
         ]
-  if (result.ok) return { sight: result.value, steps }
+  if (result.ok) return { sight: result.value, model: result.id, steps }
   if (result.limited) return { failed: 'limited', steps: [] }
   return { failed: 'down', steps }
 }
@@ -590,10 +609,10 @@ async function photoTurn(photos: readonly string[], ip: string, context: WishCon
     if (!ownWords(input)) return withSteps({ brief, source: 'rules', photo: { action: 'unseen' } })
     return withSteps({ ...(await wishTurn(context)), photo: { action: 'skipped' } })
   }
-  const { sight } = seen
+  const { sight, model } = seen
   // Nothing on the photo to choose a hotel by: no search and no wish of it, Эвал asks for words.
   if (sight.unusable)
-    return withSteps({ brief, source: 'model', photo: { action: 'unusable', seen: sight.description } })
+    return withSteps({ brief, source: 'model', model, photo: { action: 'unusable', seen: sight.description } })
   if (intent === 'similar') return withSteps(await similarTurn(photos, sight, context))
   const text = refinedText(input, sight).slice(0, MAX_MESSAGE_LENGTH)
   const answer = await wishTurn({ ...context, messages: [...messages.slice(0, -1), { role: 'user', text }] })

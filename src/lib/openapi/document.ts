@@ -10,6 +10,7 @@ import { hotelierOperations } from '@/app/api/hotelier/schema'
 import { hotelierHotelsOperations } from '@/app/api/hotelier/hotels/schema'
 import { knowledgeRetryOperations } from '@/app/api/hotelier/knowledge/retry/schema'
 import { hotelierFactsOperations } from '@/app/api/hotels/[hotelId]/hotelier/facts/schema'
+import { healthOperations } from '@/app/health/schema'
 import { hotelsOperations } from '@/app/api/hotels/schema'
 import { openApiOperations } from '@/app/api/openapi.json/schema'
 import { supabaseOpenApiOperations } from '@/app/api/openapi/supabase.json/schema'
@@ -38,6 +39,7 @@ export const API_OPERATIONS: readonly ApiOperation[] = [
   ...hotelierOperations,
   ...revalidateOperations,
   ...openApiOperations,
+  ...healthOperations,
   ...supabaseOpenApiOperations,
 ]
 
@@ -135,7 +137,7 @@ export function apiDocument() {
       title: 'О!бъективно API',
       version: '1',
       description:
-        'Маршруты сайта `src/app/api`. Схемы — из zod рядом с маршрутами, примеры — реальные ответы по отелям Валенсии (длинные массивы сокращены). «Try it» отправляет запрос в текущее окружение; ответ гео-маршрута показывается на карте.',
+        'Маршруты сайта `src/app/api` и `/health`. Схемы — из zod рядом с маршрутами, примеры — реальные ответы по отелям Валенсии (длинные массивы сокращены). «Try it» отправляет запрос в текущее окружение; ответ гео-маршрута показывается на карте.',
     },
     servers: [{ url: '/', description: 'Текущее окружение' }],
     tags: TAGS,
@@ -153,6 +155,11 @@ export function apiDocument() {
           type: 'http',
           scheme: 'bearer',
           description: 'Ключ service role Supabase. Есть только у скриптов; значение не публикуется.',
+        },
+        cronSecret: {
+          type: 'http',
+          scheme: 'bearer',
+          description: '`CRON_SECRET` проекта на Vercel: Vercel Cron присылает его сам; значение не публикуется.',
         },
       },
     },

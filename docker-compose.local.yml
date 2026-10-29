@@ -1,0 +1,229 @@
+# Additional variant: the frontend and a minimal local Supabase (the official self-host without Studio) in Docker.
+#   cp .env.local-supabase.example .env.local-supabase
+#   make up-local     # starts everything; the frontend waits for the data, then builds and serves http://localhost:8080
+#   make seed-local   # in another terminal: migrations, catalogue, demo accounts
+# The main variant stays docker-compose.yml (make up, the cloud Supabase). Model keys (GigaChat, NVIDIA) and the demo
+# accounts come from .env as there; the Supabase URL and keys, from .env.local-supabase. See docs/docker.md.
+name: ostrovok-local
+
+# One address for the browser and the containers: `supabase.localhost` is loopback in the browser (port 8000 of Kong
+# is published) and a network alias of Kong inside. The auth cookie is named after the first label of the host, so the
+# server and the browser must see the same one.
+x-supabase-env: &supabase-env
+  NEXT_PUBLIC_SUPABASE_URL: http://supabase.localhost:8000
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${ANON_KEY:?make .env.local-supabase from .env.local-supabase.example}
+  SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY:?make .env.local-supabase from .env.local-supabase.example}
+
+x-frontend: &frontend
+  build:
+    context: .
+    target: tools
+  image: ostrovok-local-frontend
+  platform: linux/amd64
+  env_file: .env
+
+services:
+  db:
+    image: supabase/postgres:15.8.1.085
+    platform: linux/amd64
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c log_min_messages=fatal
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      PGPORT: '5432'
+      POSTGRES_PORT: '5432'
+      PGPASSWORD: ${POSTGRES_PASSWORD:?make .env.local-supabase from .env.local-supabase.example}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: postgres
+      POSTGRES_DB: postgres
+      JWT_SECRET: ${JWT_SECRET:?make .env.local-supabase from .env.local-supabase.example}
+      JWT_EXP: '3600'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./docker/local-supabase/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:ro
+      - ./docker/local-supabase/realtime.sql:/docker-entrypoint-initdb.d/migrations/99-realtime.sql:ro
+    ports:
+      - '127.0.0.1:54322:5432'
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', 'postgres', '-h', 'localhost']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  auth:
+    image: supabase/gotrue:v2.177.0
+    platform: linux/amd64
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: '9999'
+      API_EXTERNAL_URL: http://supabase.localhost:8000
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      GOTRUE_SITE_URL: http://localhost:8080
+      GOTRUE_URI_ALLOW_LIST: http://localhost:8080/**
+      GOTRUE_DISABLE_SIGNUP: 'false'
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: '3600'
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: 'true'
+      # No mail server here: accounts are confirmed on sign-up.
+      GOTRUE_MAILER_AUTOCONFIRM: 'true'
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:9999/health']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  rest:
+    image: postgrest/postgrest:v13.0.4
+    platform: linux/amd64
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: 'false'
+      PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET}
+      PGRST_APP_SETTINGS_JWT_EXP: '3600'
+    command: ['postgrest']
+    restart: unless-stopped
+
+  realtime:
+    image: supabase/realtime:v2.34.47
+    platform: linux/amd64
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: '4000'
+      DB_HOST: db
+      DB_PORT: '5432'
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: postgres
+      DB_AFTER_CONNECT_QUERY: SET search_path TO _realtime
+      DB_ENC_KEY: supabaserealtime
+      API_JWT_SECRET: ${JWT_SECRET}
+      SECRET_KEY_BASE: UpNVntn3cDxHJpq99YMc1T1AQgQpc8kfYTuRgBiYa15BLrx8etQoXz3gZv1/u2oq
+      ERL_AFLAGS: -proto_dist inet_tcp
+      DNS_NODES: "''"
+      RLIMIT_NOFILE: '10000'
+      APP_NAME: realtime
+      SEED_SELF_HOST: 'true'
+      RUN_JANITOR: 'true'
+    networks:
+      default:
+        # Realtime takes the tenant from the first label of the host name.
+        aliases:
+          - realtime-dev.supabase-realtime
+    restart: unless-stopped
+
+  storage:
+    image: supabase/storage-api:v1.25.7
+    platform: linux/amd64
+    depends_on:
+      db:
+        condition: service_healthy
+      rest:
+        condition: service_started
+    environment:
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      POSTGREST_URL: http://rest:3000
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      FILE_SIZE_LIMIT: '52428800'
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: stub
+      GLOBAL_S3_BUCKET: stub
+      ENABLE_IMAGE_TRANSFORMATION: 'false'
+    volumes:
+      - storage-data:/var/lib/storage
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:5000/status']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  kong:
+    image: kong:2.8.1
+    platform: linux/amd64
+    depends_on:
+      - auth
+      - rest
+      - realtime
+      - storage
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        sed -e "s|__ANON_KEY__|$$ANON_KEY|" -e "s|__SERVICE_ROLE_KEY__|$$SERVICE_KEY|" /home/kong/temp.yml > /tmp/kong.yml
+        && /docker-entrypoint.sh kong docker-start
+    environment:
+      KONG_DATABASE: 'off'
+      KONG_DECLARATIVE_CONFIG: /tmp/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY}
+    volumes:
+      - ./docker/local-supabase/kong.yml:/home/kong/temp.yml:ro
+    ports:
+      - '127.0.0.1:8000:8000'
+    networks:
+      default:
+        aliases:
+          - supabase.localhost
+    restart: unless-stopped
+
+  # The frontend (stage `tools` of the Dockerfile: sources and all dependencies). It builds at start, once the
+  # database has data (the catalogue pages are prerendered from it), see docker/local-supabase/app.sh.
+  app:
+    <<: *frontend
+    depends_on:
+      - kong
+    environment:
+      <<: *supabase-env
+      NODE_ENV: production
+    command: ['sh', 'docker/local-supabase/app.sh']
+    ports:
+      - '8080:8080'
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8080/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 900s
+
+  # make seed-local: scripts of package.json against the local database; not started by `up`.
+  tools:
+    <<: *frontend
+    profiles: ['tools']
+    depends_on:
+      kong:
+        condition: service_started
+      auth:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+    environment:
+      <<: *supabase-env
+      SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+
+volumes:
+  db-data:
+  storage-data:
