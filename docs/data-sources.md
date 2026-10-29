@@ -9,6 +9,8 @@
 - [Как собрать базу](#как-собрать-базу)
 - [Таблицы и первоисточники](#таблицы-и-первоисточники)
 - [Что в `make seed` и `make seed-local`, а что нет](#что-в-make-seed-и-make-seed-local-а-что-нет)
+- [Дамп живой базы](#дамп-живой-базы)
+  - [`make seed-local-geo`](#make-seed-local-geo-геоданные-валенсии-в-локальную-базу)
 
 ## Как собрать базу
 
@@ -24,7 +26,7 @@
 6. `npm run db:seed:hotelier-demo` — демо-переписки с отельером (нужны настоящие отели из шага 3).
 
 Для облачной базы шаги 1, 2, 5 и 6 выполняет `make seed`, для локальной — `make seed-local` (оба запускают
-`scripts/seed-all.sh`).
+`scripts/seed-all.sh`). Шаг 4 для локальной базы выполняет `make seed-local-geo` (`scripts/seed-local-geo.sh`), см. ниже.
 
 ## Таблицы и первоисточники
 
@@ -58,4 +60,34 @@
 пропускаются (`no hotel ota-…, skipped`), пока нет настоящих отелей. Внешние шаги выполняются в том же контейнере:
 `docker compose --env-file .env.local-supabase -f docker-compose.local.yml run --rm -v <папка с файлами>:/data:ro tools npm run db:seed:valencia -- /data/search.json`.
 
+### `make seed-local-geo`: геоданные Валенсии в локальную базу
+
+Запускать после `make seed-local` (миграции применены). Команда `scripts/seed-local-geo.sh` в контейнере `tools` берёт
+данные прямо из первоисточников, по порядку:
+
+| Шаг | Что делает                                                                                                                                                          |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `uv run scripts/load-valencia-geo.py buildings` — здания EUBUCCO с S3 (`s3.eubucco.com`, анонимно, без локального файла; DuckDB читает только строки города)        |
+| 2   | `… noise $NOISE_GPKG` — шум EEA, только если задан `NOISE_GPKG` (ручной шаг, см. ниже), иначе пропуск с подсказкой                                                  |
+| 3   | `… coverage` — границы муниципалитета и провинции через Nominatim                                                                                                   |
+| 4   | `npm run db:city-places -- --city València --pbf-url https://download.geofabrik.de/europe/spain/valencia-latest.osm.pbf --bbox 39.27,-0.53,39.58,-0.27` — места OSM |
+| 5   | `npm run db:features` — здание, шум, окружение, вид из номера                                                                                                       |
+| 6   | `npm run db:embed:chunks` — векторы новых фрагментов, если в `.env` есть `NVIDIA_API_KEY`                                                                           |
+
+Шум EEA (`ES.gpkg`, ~1,6 ГБ) скачивается руками со [страницы EEA](https://sdi.eea.europa.eu/datastore/public?path=/eea_v_3035_1_k_noise-contours-end2022_p_2026_v01_r00)
+(файл `ES.gpkg`); путь передаётся переменной: `NOISE_GPKG=/путь/к/ES.gpkg make seed-local-geo`. Makefile монтирует файл в
+контейнер только для чтения. Без переменной шаг пропускается, а `db:features` считает шум по тому, что есть в базе.
+Загрузка мест — скачивание 141 МБ выгрузки Geofabrik «Valencia» (регион внутри Spain, отдельно от всей Spain в 1,5 ГБ),
+обрезка по прямоугольнику города и запись; временные файлы удаляются. Проверка адресов: HEAD-запросы к Geofabrik, EUBUCCO
+и EEA вернули 200 (2026-10-29). Признаки считаются для настоящих отелей Островка (шаг 3 «Как собрать базу»), поэтому без них `db:features` ничего не добавит. Команда идемпотентна.
+
 [← README](../README.md)
+
+## Дамп живой базы
+
+Готовую копию данных (все таблицы из списка выше, уже с производными данными и векторами) можно не собирать, а
+восстановить: `make restore-local` кладёт её в локальную Supabase вместо `make seed-local`. В дамп входят вся схема
+`public` (структура и данные, в том числе `ota_hotels` и `ota_hotel_pages`: эти данные предоставили организаторы),
+данные `auth.users` и `auth.identities` (демо-аккаунты) и `supabase_migrations.schema_migrations`. Сессии, токены,
+коды и файлы Storage не входят. Снимает дамп `scripts/db-dump.sh` (`make dump-db`, только чтение), публикуется он
+в приватных релизах с тегом `data-2026-10-29`; подробности — [docs/docker.md](docker.md#дамп-живой-базы-make-restore-local).

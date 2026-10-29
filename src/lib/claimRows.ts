@@ -118,7 +118,7 @@ export interface ChunkRow {
 export interface DocumentRow {
   /** `evidenceKey` of the document's source: one document per evidence. */
   evidence: string
-  kind: 'review'
+  kind: 'review' | 'description'
   hotel_id: string
   entity: string
   language: string | null
@@ -1186,6 +1186,69 @@ export function reviewStore(hotel: ClaimHotel, page: ReviewPage): Store {
       })
   }
   if (store.evidence.length > 0) store.entities.push(hotelEntity(hotel))
+  return store
+}
+
+/** A page's snapshot of the hotel's description (`ota_hotel_pages.hotel->descriptionStruct`): its parts, its time. */
+export interface DescriptionPage {
+  master_id: number
+  updated_at: string
+  /** `[{ title, paragraphs[] }]` as the page has it. */
+  description: unknown
+  url?: string | null
+}
+
+/** Ostrovok marks a few words of the description with tags: the text only. */
+const plain = (value: string) =>
+  value
+    .replace(/<[^>]*>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+/**
+ * The hotel's description of its Ostrovok page: one document of its parts (title and paragraphs) as they are, chunked
+ * for the search, its evidence (the page, the snapshot's time). No claim: the description is the hotel's own words.
+ */
+export function descriptionStore(hotel: ClaimHotel, page: DescriptionPage): Store {
+  const hotelKey = entityKey(hotelEntity(hotel))
+  const store: Store = { entities: [], evidence: [], calculations: [], claims: [], relations: [], documents: [] }
+  const parts = (Array.isArray(page.description) ? page.description : []).flatMap((value) => {
+    if (!value || typeof value !== 'object') return []
+    const { title, paragraphs } = value as { title?: unknown; paragraphs?: unknown }
+    const body = (Array.isArray(paragraphs) ? paragraphs : [])
+      .flatMap((p) => (typeof p === 'string' && plain(p) ? [plain(p)] : []))
+      .join('\n')
+    return body ? [{ part: typeof title === 'string' ? plain(title) : '', body }] : []
+  })
+  if (parts.length === 0) return store
+  const whole = parts.map((p) => p.body).join('\n\n')
+  const source: EvidenceRow = {
+    type: 'ota_page',
+    title: 'Описание отеля на странице Островка',
+    provider: OSTROVOK,
+    external_id: `description:${page.master_id}`,
+    url: page.url ?? null,
+    retrieved_at: time(page.updated_at),
+    excerpt: whole.length > 500 ? `${whole.slice(0, 500).trim()}…` : whole,
+    metadata: { master_id: page.master_id },
+    dataset_id: null,
+  }
+  const key = evidenceKey(source)
+  store.evidence.push(source)
+  let ord = 0
+  store.documents.push({
+    evidence: key,
+    kind: 'description',
+    hotel_id: hotel.id,
+    entity: hotelKey,
+    language: /\p{Script=Cyrillic}/u.test(whole) ? 'ru' : null,
+    text: whole,
+    metadata: { master_id: page.master_id, parts: parts.map((p) => p.part) },
+    chunks: parts.flatMap(({ part, body }) =>
+      chunksOf(body).map((chunk) => ({ ord: ord++, text: chunk, metadata: { part } })),
+    ),
+  })
+  store.entities.push(hotelEntity(hotel))
   return store
 }
 

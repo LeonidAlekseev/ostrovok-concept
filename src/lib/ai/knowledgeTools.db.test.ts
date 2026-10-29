@@ -5,7 +5,7 @@ import { loadHotelSummaries } from '@/lib/db/catalog'
 import { isSupabaseConfigured } from '@/lib/supabase/config'
 import { toolResultSchema } from '@/lib/toolResult'
 import { runKnowledge, rulesKnowledge, type KnowledgeDeps } from './knowledgeTurn'
-import { reviewVerdicts, runFeaturesTool, runNearTool, runReviewsTool } from './knowledgeTools'
+import { deepVerdicts, runDeepTool, runFeaturesTool, runNearTool } from './knowledgeTools'
 
 vi.mock('next/cache', () => ({ unstable_cache: (read: unknown) => read }))
 
@@ -26,8 +26,8 @@ describe.runIf(process.env.LIVE_DB === '1' && isSupabaseConfigured)('the tools o
       near: loadNearIndex,
       runFeatures: runFeaturesTool,
       runNear: runNearTool,
-      runReviews: runReviewsTool,
-      reviewVerdicts,
+      runDeep: runDeepTool,
+      deepVerdicts,
       record: async (_owner, _tool, _input, execute) => ({ id: crypto.randomUUID(), result: await execute(null) }),
     }
     const outcome = await runKnowledge({ calls, planner: 'rules' }, candidates, {
@@ -39,8 +39,8 @@ describe.runIf(process.env.LIVE_DB === '1' && isSupabaseConfigured)('the tools o
     // The night at the facade to the street (noise-estimate-v2): fewer hotels are quiet than by the point's bands.
     expect(outcome.chosen.length).toBeGreaterThan(0)
     expect(outcome.chosen.length).toBeLessThanOrEqual(6)
-    const [features, pharmacy, reviews] = outcome.runs.map((r) => r.run.result)
-    for (const result of [features, pharmacy, reviews]) {
+    const [features, pharmacy, exact, meaning] = outcome.runs.map((r) => r.run.result)
+    for (const result of [features, pharmacy, exact, meaning]) {
       expect(toolResultSchema.safeParse(result).success).toBe(true)
       expect(result.status).toBe('success')
     }
@@ -63,6 +63,10 @@ describe.runIf(process.env.LIVE_DB === '1' && isSupabaseConfigured)('the tools o
       const source = pharmacy.evidence.find((e) => e.id === place.evidence_ids[0])!
       expect(['OpenStreetMap', 'Островок']).toContain(source.source_name)
     }
-    for (const claim of reviews.claims) expect(claim).toMatchObject({ status: 'reported', confidence: 0.75 })
+    // The documents' fragments, each labelled with the type of its source.
+    for (const claim of [...exact.claims, ...meaning.claims]) {
+      expect(claim).toMatchObject({ status: 'reported' })
+      expect(claim.label).toMatch(/^(Отзыв|Описание отеля|Ответ отельера)/)
+    }
   }, 30_000)
 })

@@ -1,14 +1,15 @@
 import 'server-only'
+import { DEEP_SEARCH_TITLE } from '../assistant'
 import { NOISE_MENTION, NEARBY_CATEGORIES, mentionExcerpt, sentencesOf } from '../claimRows'
-import { confidenceFor } from '../confidence'
+import { confidenceFor, type ConfidenceKind } from '../confidence'
 import { isRealHotelId } from '../db/anon'
 import {
   loadEvidence,
   loadHotelClaims,
   loadHotelierClaims,
-  searchHotelReviews,
+  searchHotelsKnowledge,
   type ClaimEvidence,
-  type HotelChunk,
+  type HotelsChunk,
   type HotelierNoise,
   type HotelClaim,
 } from '../db/claims'
@@ -41,9 +42,10 @@ import { calculationOf, evidenceOf } from './noiseTool'
  *   facade to the street (noise-estimate-v2: EEA's bands and the loud places nearby), the building's height; a hotel without the claim is «нет данных», never «подходит» or not;
  * - «Места рядом» (the graph of the store) — the nearest place of a category by the edges `near` of each hotel, its
  *   distance a claim with its evidence of OSM or Островок; no edge is «в данных нет», never «рядом нет»;
- * - «Отзывы» (the search of the reviews) — the guests' words on a topic for the chosen hotels, quoted.
+ * - «Углубленный поиск» (the exact search by words and the search by meaning, two steps) — the fragments of the hotels'
+ *   documents on a topic for the chosen hotels, quoted: the guests' reviews, the hotels' descriptions, the hoteliers' answers.
  * The choice (`featureVerdicts`, `nearVerdicts`) reads the indexes of src/lib/db/knowledge.ts for every hotel; the run
- * (`featuresResult`, `nearResult`, `reviewsResult`) shows the chosen ones with their claims whole. Pure but for the
+ * (`featuresResult`, `nearResult`, `deepResult`) shows the chosen ones with their claims whole. Pure but for the
  * reads of `run*`: the tests check them on the store's rows. Nothing is said of a hotel the store has no data of, no
  * level is lowered for windows or walls.
  */
@@ -52,8 +54,12 @@ export const FEATURES_TOOL = 'hotels_by_features'
 export const FEATURES_TOOL_TITLE = 'Отели по характеристикам'
 export const NEARBY_TOOL = 'nearby_places'
 export const NEARBY_TOOL_TITLE = 'Места рядом'
-export const REVIEWS_TOOL = 'hotel_reviews'
-export const REVIEWS_TOOL_TITLE = 'Отзывы'
+/** «Углубленный поиск»: the common name of the two steps below, which the block of the chat shows. */
+export const DEEP_TOOL_TITLE = DEEP_SEARCH_TITLE
+export const EXACT_TOOL = 'deep_search_exact'
+export const EXACT_TOOL_TITLE = 'Точный поиск по словам'
+export const MEANING_TOOL = 'deep_search_meaning'
+export const MEANING_TOOL_TITLE = 'Поиск по смыслу'
 
 /** A hotel the tools choose among: its id and name. */
 export interface Candidate {
@@ -132,8 +138,6 @@ const TOPIC_MENTION: Record<ReviewTopic, RegExp> = {
 /** The hotels a block shows by name, and those named in the line «нет данных». */
 export const SHOWN_HOTELS = 6
 const NAMED_NODATA = 5
-/** Fragments of reviews per hotel. */
-export const REVIEWS_PER_HOTEL = 2
 
 const capital = (text: string) => text.charAt(0).toLocaleUpperCase('ru') + text.slice(1)
 const hotels = (n: number) => countRu(n, ['отель', 'отеля', 'отелей'])
@@ -619,15 +623,25 @@ const FOOD_PRAISE =
 
 const isFood = (topic: ReviewTopic) => topic === 'breakfast' || topic === 'food'
 
+/** The sentence of the chunk on the topic, cut around its word; the chunk's start without one. */
+export function topicExcerpt(text: string, topic: ReviewTopic): string {
+  const pattern = TOPIC_MENTION[topic]
+  const sentence = sentencesOf(text).find((s) => pattern.test(s)) ?? text.trim()
+  if (topic === 'noise') return mentionExcerpt(sentence)
+  return sentence.length > 300 ? `${sentence.slice(0, 299)}…` : sentence
+}
+
+/** The chunks without a complaint about the food (the other topics are not judged). */
+const withoutComplaint = <C extends { text: string }>(topic: ReviewTopic, chunks: readonly C[]): C[] =>
+  isFood(topic) ? chunks.filter((c) => !FOOD_COMPLAINT.test(topicExcerpt(c.text, topic))) : [...chunks]
+
 /**
  * The chunks that go on the topic, the praised first: those of the food without a complaint in the sentence that names
  * it, the sentence with a word of praise before the rest (the order of the search stays within each).
  */
 const praisedFirst = <C extends { text: string }>(topic: ReviewTopic, chunks: readonly C[]): C[] => {
   if (!isFood(topic)) return [...chunks]
-  const sentences = chunks
-    .map((c) => ({ c, s: topicExcerpt(c.text, topic) }))
-    .filter(({ s }) => !FOOD_COMPLAINT.test(s))
+  const sentences = withoutComplaint(topic, chunks).map((c) => ({ c, s: topicExcerpt(c.text, topic) }))
   const praised = ({ s }: { s: string }) => FOOD_PRAISE.test(s)
   return [...sentences.filter(praised), ...sentences.filter((x) => !praised(x))].map(({ c }) => c)
 }
@@ -640,15 +654,74 @@ const praisedScore = (topic: ReviewTopic, chunks: readonly { text: string }[]) =
 const reviewMeaning = (topic: ReviewTopic, wish?: string) =>
   wish?.trim() ? `${REVIEW_TOPIC_LABEL[topic]}: ${wish.trim().slice(0, 300)}` : REVIEW_TOPIC_LABEL[topic]
 
-/** The sentence of the chunk on the topic, cut around its word; the chunk's start without one. */
-export function topicExcerpt(text: string, topic: ReviewTopic): string {
-  const pattern = TOPIC_MENTION[topic]
-  const sentence = sentencesOf(text).find((s) => pattern.test(s)) ?? text.trim()
-  if (topic === 'noise') return mentionExcerpt(sentence)
-  return sentence.length > 300 ? `${sentence.slice(0, 299)}…` : sentence
+/**
+ * The vector of a query, kept for the next calls of the turn (the choice and the step by meaning embed the same
+ * words). A vector that did not come (no key, a slow model) is asked again.
+ */
+const vectors = new Map<string, Promise<number[]>>()
+async function meaningVector(query: string): Promise<number[] | null> {
+  const kept = vectors.get(query)
+  if (kept) return kept
+  const asked = queryVectorOrNull(query)
+  const pending = asked.then((vector) => {
+    if (!vector) {
+      vectors.delete(query)
+      throw new Error('no vector')
+    }
+    return vector
+  })
+  pending.catch(() => {})
+  vectors.set(query, pending)
+  if (vectors.size > 32) vectors.delete(vectors.keys().next().value!)
+  return pending.catch(() => null)
 }
 
-export interface ReviewsInput {
+/** A chunk by meaning is quoted from this closeness (1 − cosine distance) on: below it the match is chance. */
+export const MEANING_MIN_SIMILARITY = 0.45
+
+/** The two steps of «Углубленный поиск»: the words, then the meaning. */
+export type DeepMode = 'exact' | 'meaning'
+
+/** What each source of a chunk is called to the guest: «отзыв», «описание отеля», «ответ отельера». */
+const SOURCE_TYPE: Record<string, { label: string; confidence: ConfidenceKind }> = {
+  review: { label: 'отзыв', confidence: 'review_mention' },
+  ota_page: { label: 'описание отеля', confidence: 'ostrovok_fact' },
+  hotelier: { label: 'ответ отельера', confidence: 'owner_answer' },
+}
+const sourceType = (e: Pick<ClaimEvidence, 'type'>) =>
+  SOURCE_TYPE[e.type] ?? { label: 'документ', confidence: 'inferred' as const }
+/** «Ответ отельера (демо)»: the type of a source, marked when it is synthetic. */
+const sourceLabel = (e: Pick<ClaimEvidence, 'type' | 'demo'>) =>
+  `${capital(sourceType(e).label)}${e.demo ? ' (демо)' : ''}`
+
+/**
+ * The chunks of one hotel that a step shows: by words — those that name the topic in words (a chunk found by words
+ * alone is never quoted as being about it), by meaning — those close enough to the query's vector. The food's
+ * complaints are left out, the praised first; by meaning the closest first.
+ */
+export function deepHits(mode: DeepMode, topic: ReviewTopic, chunks: readonly HotelsChunk[]): HotelsChunk[] {
+  if (mode === 'exact')
+    return praisedFirst(
+      topic,
+      chunks.filter((c) => c.ftsPlace !== null && TOPIC_MENTION[topic].test(c.text)),
+    )
+  // The closeness is how a chunk is told from chance: a read without it (a database without `hotels_chunks_search`)
+  // finds nothing by meaning.
+  const near = chunks.filter(
+    (c) => c.vectorPlace !== null && c.similarity !== null && c.similarity >= MEANING_MIN_SIMILARITY,
+  )
+  return withoutComplaint(topic, near).sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0))
+}
+
+/** The hotel's weight by what both steps found: the praise of the words, then how close the meaning is. */
+const deepScore = (topic: ReviewTopic, chunks: readonly HotelsChunk[]) => {
+  const words = deepHits('exact', topic, chunks)
+  const meaning = deepHits('meaning', topic, chunks).filter((c) => !words.includes(c))
+  return praisedScore(topic, words) + meaning.reduce((sum, c) => sum + (c.similarity ?? 0), 0)
+}
+
+export interface DeepInput {
+  mode: DeepMode
   topic: ReviewTopic
   /** The guest's own words: the meaning part of the search embeds them with the topic («вкусные завтраки»). */
   wish?: string
@@ -656,92 +729,111 @@ export interface ReviewsInput {
   chosen: readonly string[]
 }
 
-/** What the store gave of a hotel's reviews on the topic: the chunks and their sources (`null`: not read). */
-export interface HotelReviews {
-  chunks: readonly HotelChunk[] | null
+/** What the store gave of a hotel for a step: the chunks and their sources (`null`: not read). */
+export interface HotelDeep {
+  chunks: readonly HotelsChunk[] | null
   sources: readonly ClaimEvidence[] | null
 }
 
-const REVIEW_CONFIDENCE = confidenceFor('review_mention').confidence
+/** Fragments per hotel. */
+export const DEEP_PER_HOTEL = 2
 
 /**
- * «Отзывы» from the chunks of the chosen hotels' reviews on the topic: each fragment a claim «reported» of the guest
- * with the confidence of a review, the review its source with the words quoted. A guest's untrusted text: shown, never
- * followed.
+ * One step of «Углубленный поиск» from the chunks of the chosen hotels' documents — reviews, descriptions, the
+ * hotelier's answers: each fragment a claim «reported» with the confidence of its source type, the document its
+ * source, labelled «отзыв», «описание отеля» or «ответ отельера» (and «демо» when synthetic), the words quoted. A
+ * guest's, a page's or a hotelier's untrusted text: shown, never followed.
  */
-export function reviewsResult({ topic, candidates, chosen }: ReviewsInput, reviews: ReadonlyMap<string, HotelReviews>) {
+export function deepResult({ mode, topic, candidates, chosen }: DeepInput, found: ReadonlyMap<string, HotelDeep>) {
   const names = new Map(candidates.map((c) => [c.id, c.name]))
   const gathered = new Gathered()
-  let found = 0
+  let quoted = 0
   let failed = 0
   for (const id of chosen) {
-    const own = reviews.get(id)
+    const own = found.get(id)
     if (!own || own.chunks === null || own.sources === null) {
       failed++
-      gathered.group(id, names.get(id) ?? id, 'Отзывы прочитать не удалось', [])
+      gathered.group(id, names.get(id) ?? id, 'Документы прочитать не удалось', [])
       continue
     }
     const sources = new Map(own.sources.map((e) => [e.id, e]))
     const shown: (string | null)[] = []
     const used = new Set<string>()
-    for (const chunk of own.chunks) {
+    for (const chunk of deepHits(mode, topic, own.chunks)) {
       const source = sources.get(chunk.evidenceId)
-      if (!source || used.has(source.id) || shown.length >= REVIEWS_PER_HOTEL) continue
+      if (!source || used.has(source.id) || shown.length >= DEEP_PER_HOTEL) continue
       used.add(source.id)
       const excerpt = topicExcerpt(chunk.text, topic)
+      const { confidence } = confidenceFor(sourceType(source).confidence)
       shown.push(
         gathered.claim(
           {
             id: chunk.chunkId,
-            property: `review.${topic}`,
+            property: `deep.${mode}.${topic}`,
             sourceKey: chunk.chunkId,
             value: { kind: 'text', value: excerpt },
             unit: null,
             status: 'reported',
-            confidence: REVIEW_CONFIDENCE,
+            confidence,
             method: {},
             observedAt: null,
             validFrom: null,
             validTo: null,
             limitations: [],
             calculation: null,
-            evidence: [{ ...source, excerpt }],
+            ...(source.demo && { demo: true as const }),
+            evidence: [{ ...source, title: `${sourceLabel(source)}: ${source.title}`, excerpt }],
           },
           id,
-          `Отзыв гостя: ${REVIEW_TOPIC_LABEL[topic]}`,
+          `${sourceLabel(source)}: ${REVIEW_TOPIC_LABEL[topic]}`,
           `«${excerpt}»`,
         ),
       )
     }
-    found += shown.filter(Boolean).length
+    quoted += shown.filter(Boolean).length
     gathered.group(
       id,
       names.get(id) ?? id,
-      shown.length > 0 ? null : `Отзывов о теме «${REVIEW_TOPIC_LABEL[topic]}» не нашлось`,
+      shown.length > 0
+        ? null
+        : mode === 'exact'
+          ? `По словам темы «${REVIEW_TOPIC_LABEL[topic]}» ничего не нашлось`
+          : `По смыслу темы «${REVIEW_TOPIC_LABEL[topic]}» ничего близкого не нашлось`,
       shown,
     )
   }
   if (failed === chosen.length && chosen.length > 0)
-    return errorResult('store_unavailable', 'Не получилось прочитать отзывы: хранилище недоступно')
+    return errorResult('store_unavailable', 'Не получилось прочитать документы отелей: хранилище недоступно')
   return gathered.result({
-    summary: `${REVIEW_TOPIC_LABEL[topic]}: ${countRu(found, ['фрагмент', 'фрагмента', 'фрагментов'])} отзывов у ${ofHotels(chosen.length)}`,
-    data: { topic, found },
+    summary: `${REVIEW_TOPIC_LABEL[topic]}: ${countRu(quoted, ['фрагмент', 'фрагмента', 'фрагментов'])} у ${ofHotels(chosen.length)}`,
+    data: { mode, topic, found: quoted },
     method: {
-      name: 'Поиск по словам и по смыслу в отзывах гостей со страниц Островка',
-      version: '2',
-      inputs: [
-        { label: 'Тема', value: REVIEW_TOPIC_LABEL[topic] },
-        { label: 'Слова', value: REVIEW_QUERY[topic].split(' or ').join(', ') },
-        { label: 'Смысл', value: REVIEW_TOPIC_LABEL[topic] },
-      ],
-      assumptions: [`Не больше ${REVIEWS_PER_HOTEL} фрагментов на отель, из разных отзывов`],
+      name:
+        mode === 'exact'
+          ? 'Точный поиск по словам (полнотекстовый, русская морфология) в отзывах, описаниях и ответах отельеров'
+          : 'Поиск по смыслу (векторы модели) в отзывах, описаниях и ответах отельеров',
+      version: '1',
+      inputs:
+        mode === 'exact'
+          ? [
+              { label: 'Тема', value: REVIEW_TOPIC_LABEL[topic] },
+              { label: 'Слова', value: REVIEW_QUERY[topic].split(' or ').join(', ') },
+            ]
+          : [
+              { label: 'Тема', value: REVIEW_TOPIC_LABEL[topic] },
+              { label: 'Смысл', value: reviewMeaning(topic) },
+            ],
+      assumptions: [`Не больше ${DEEP_PER_HOTEL} фрагментов на отель, из разных документов`],
     },
     limitations: [
-      'Отзывы — слова отдельных гостей, а не измерение',
-      'Показаны фрагменты, где тема названа словами: отзыв о ней совсем другими словами не попадёт',
-      'Без модели векторов поиск идёт только по словам',
-      ...(topic === 'breakfast' || topic === 'food'
-        ? ['Фрагменты с явной жалобой («невкусно», «ужасно», «однообразно») не показаны; оценка вкуса — слова гостей']
+      'Отзывы — слова отдельных гостей, описание — слова отеля на странице Островка, ответ отельера — его слова; это не измерение',
+      mode === 'exact'
+        ? 'Показаны фрагменты, где тема названа словами: документ о ней совсем другими словами не попадёт'
+        : `Показаны фрагменты, близкие по смыслу (от ${MEANING_MIN_SIMILARITY} из 1): слово темы в них может не стоять`,
+      'Приватные ответы отельера без его разрешения в поиск не попадают; демо-сведения помечены «демо»',
+      ...(mode === 'meaning' ? ['Без модели векторов поиск по смыслу недоступен'] : []),
+      ...(isFood(topic)
+        ? ['Фрагменты с явной жалобой («невкусно», «ужасно», «однообразно») не показаны; оценка вкуса — слова авторов']
         : []),
     ],
   })
@@ -789,62 +881,65 @@ export async function runNearTool(input: NearInput, index: readonly NearRow[] | 
   }
 }
 
-/** Runs «Отзывы» for the chosen hotels; never throws. */
-export async function runReviewsTool(input: ReviewsInput): Promise<ToolResult> {
+/** The chunks of the hotels' documents for one step: one read for all the hotels; `null` when it could not be read. */
+async function readDeep(
+  mode: DeepMode,
+  topic: ReviewTopic,
+  hotelIds: readonly string[],
+  wish?: string,
+): Promise<Map<string, HotelsChunk[]> | null> {
+  if (mode === 'exact') return searchHotelsKnowledge(hotelIds, REVIEW_QUERY[topic], null)
+  const vector = hotelIds.some(isRealHotelId) ? await meaningVector(reviewMeaning(topic, wish)) : null
+  return vector ? searchHotelsKnowledge(hotelIds, REVIEW_QUERY[topic], vector) : null
+}
+
+/** Runs one step of «Углубленный поиск» for the chosen hotels; never throws. */
+export async function runDeepTool(input: DeepInput): Promise<ToolResult> {
+  const title = input.mode === 'exact' ? EXACT_TOOL : MEANING_TOOL
   try {
-    const vector = input.chosen.some(isRealHotelId)
-      ? await queryVectorOrNull(reviewMeaning(input.topic, input.wish))
-      : null
-    const read = await Promise.all(
+    const real = input.chosen.filter(isRealHotelId)
+    const read = await readDeep(input.mode, input.topic, real, input.wish)
+    if (real.length > 0 && !read)
+      return input.mode === 'meaning'
+        ? errorResult('model_unavailable', 'Поиск по смыслу не сработал: модель векторов не ответила')
+        : errorResult('store_unavailable', 'Не получилось прочитать документы отелей: хранилище недоступно')
+    const found = await Promise.all(
       input.chosen.map(async (id) => {
-        // A hotel not of the base of Островок has no reviews in the store.
-        if (!isRealHotelId(id)) return [id, { chunks: [], sources: [] } as HotelReviews] as const
-        const found = await searchHotelReviews(id, REVIEW_QUERY[input.topic], TOPIC_MENTION[input.topic], vector)
-        const chunks = found && praisedFirst(input.topic, found)
-        const sources = chunks
-          ? await loadEvidence(
-              id,
-              chunks.map((c) => c.evidenceId),
-            )
-          : null
-        return [id, { chunks, sources } as HotelReviews] as const
+        // A hotel not of the base of Островок has no documents in the store.
+        if (!isRealHotelId(id)) return [id, { chunks: [], sources: [] } as HotelDeep] as const
+        const chunks = deepHits(input.mode, input.topic, read?.get(id) ?? [])
+        const sources = await loadEvidence(
+          id,
+          chunks.map((c) => c.evidenceId),
+        )
+        return [id, { chunks: read?.get(id) ?? [], sources } as HotelDeep] as const
       }),
     )
-    return reviewsResult(input, new Map(read))
+    return deepResult(input, new Map(found))
   } catch (error) {
-    failed(REVIEWS_TOOL, error)
-    return errorResult('tool_failed', 'Поиск по отзывам не удался')
+    failed(title, error)
+    return errorResult('tool_failed', 'Углубленный поиск не удался')
   }
 }
 
-/** Hotels read at once when the reviews choose: the store answers each from its own indexes. */
-const REVIEW_READS = 16
-
 /**
- * The verdict of each hotel by its reviews on the topic: `match` when a review names it without a complaint, the
- * hotel with more praised fragments first, `miss` without one, `nodata` for a hotel not of the base of Островок or one whose reviews could not be read. `null`
- * when none could be read at all.
+ * The verdict of each hotel by its documents on the topic, both steps in one read: `match` when a document names the
+ * topic without a complaint or is close to it by meaning, the hotel with more praise and closeness first, `miss`
+ * without one, `nodata` for a hotel not of the base of Островок. `null` when the documents could not be read.
  */
-export async function reviewVerdicts(
+export async function deepVerdicts(
   topic: ReviewTopic,
   hotelIds: readonly string[],
   wish?: string,
 ): Promise<Map<string, HotelVerdict> | null> {
   const real = hotelIds.filter(isRealHotelId)
-  const vector = real.length > 0 ? await queryVectorOrNull(reviewMeaning(topic, wish)) : null
-  const counts = new Map<string, number | null>()
-  for (let from = 0; from < real.length; from += REVIEW_READS)
-    await Promise.all(
-      real.slice(from, from + REVIEW_READS).map(async (id) => {
-        const chunks = await searchHotelReviews(id, REVIEW_QUERY[topic], TOPIC_MENTION[topic], vector)
-        counts.set(id, chunks && praisedScore(topic, praisedFirst(topic, chunks)))
-      }),
-    )
-  if (real.length > 0 && [...counts.values()].every((n) => n === null)) return null
+  const vector = real.length > 0 ? await meaningVector(reviewMeaning(topic, wish)) : null
+  const found = real.length > 0 ? await searchHotelsKnowledge(real, REVIEW_QUERY[topic], vector) : new Map()
+  if (!found) return null
   return new Map<string, HotelVerdict>(
     hotelIds.map((id) => {
-      const n = counts.get(id)
-      if (n === undefined || n === null) return [id, { verdict: 'nodata' as const, score: Infinity }]
+      if (!isRealHotelId(id)) return [id, { verdict: 'nodata' as const, score: Infinity }]
+      const n = deepScore(topic, found.get(id) ?? [])
       return [id, n > 0 ? { verdict: 'match' as const, score: -n } : { verdict: 'miss' as const, score: 0 }]
     }),
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense } from 'react'
+import { Suspense, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { buttonVariants } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { useDestinations } from '@/components/Catalog/useDestinations'
 import { useHotel } from '@/hooks/useHotels'
 import { todayIso } from '@/lib/dates'
 import { parseOffer } from '@/lib/offer'
+import { TripsGate } from '@/components/Trips/TripsGate'
 import { BookingForm } from './BookingForm'
 import { OrderSummary } from './OrderSummary'
 
@@ -52,12 +53,28 @@ function Booking() {
   )
 }
 
+/** The booking lands in «Мои поездки», which need a session: a guest signs in first and comes back to this offer. */
+function BookingGate({ children }: { children: ReactNode }) {
+  const query = useSearchParams().toString()
+  return (
+    <TripsGate
+      next={query ? `/booking?${query}` : '/booking'}
+      title="Войдите, чтобы забронировать"
+      hint="Бронирования хранятся в «Моих поездках», а они доступны после входа. Предложение сохранится."
+    >
+      {children}
+    </TripsGate>
+  )
+}
+
 /** `/booking`: the offer is read from the address on the client, the page itself is prerendered. */
 export function BookingPage() {
   return (
     <main className="mx-auto flex w-full max-w-(--page-max) flex-1 flex-col gap-6 px-(--page-x) py-[clamp(20px,5vw,40px)]">
       <Suspense fallback={<p className="text-muted-foreground">Загружаем предложение…</p>}>
-        <Booking />
+        <BookingGate>
+          <Booking />
+        </BookingGate>
       </Suspense>
     </main>
   )

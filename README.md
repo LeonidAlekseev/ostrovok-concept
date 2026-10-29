@@ -12,8 +12,8 @@
 
 Вы задаёте критерии. Эвал находит совпадения. Вы выбираете с уверенностью.
 
-- Видео (Google Drive): https://drive.google.com/drive/folders/1OqgiaKfaIsCUoaC14TO32cFgW4dHG0A5?usp=sharing
-- Сервис (Vercel Production): https://lilteam-ostrovok.vercel.app
+- Демонстрация (Google Drive): https://drive.google.com/drive/folders/1OqgiaKfaIsCUoaC14TO32cFgW4dHG0A5?usp=sharing
+- Вебсайт (Vercel Production): https://lilteam-ostrovok.vercel.app
 
 ## Быстрый старт
 
@@ -30,12 +30,15 @@ docker compose up --build
 
 То же короче — через `make` (на Windows без `make` используйте команды из правой колонки):
 
-| Команда     | Что делает                                            | Без `make`                                                     |
-| ----------- | ----------------------------------------------------- | -------------------------------------------------------------- |
-| `make up`   | собрать образ и запустить приложение на `:8080`       | `docker compose up --build`                                    |
-| `make down` | остановить и удалить контейнеры                       | `docker compose down`                                          |
-| `make logs` | логи приложения в реальном времени                    | `docker compose logs -f app`                                   |
-| `make seed` | загрузить и пересобрать данные в облачной базе `.env` | `docker compose run --rm --build tools sh scripts/seed-all.sh` |
+| Команда               | Что делает                                                                      | Без `make`                                                             |
+| --------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `make up`             | собрать образ и запустить приложение на `:8080`                                 | `docker compose up --build`                                            |
+| `make down`           | остановить и удалить контейнеры                                                 | `docker compose down`                                                  |
+| `make logs`           | логи приложения в реальном времени                                              | `docker compose logs -f app`                                           |
+| `make seed`           | загрузить и пересобрать данные в облачной базе `.env`                           | `docker compose run --rm --build tools sh scripts/seed-all.sh`         |
+| `make seed-local-geo` | геоданные Валенсии (EUBUCCO, OSM, границы; шум — `NOISE_GPKG`) в локальную базу | `docker compose … run --rm --build tools sh scripts/seed-local-geo.sh` |
+| `make restore-local`  | восстановить в локальную базу готовый дамп живой базы вместо `seed-local`       | `sh scripts/db-restore.sh`                                             |
+| `make dump-db`        | снять дамп живой базы (`SUPABASE_DB_URL`, только чтение) в `dist/db-dump/`      | `sh scripts/db-dump.sh`                                                |
 
 Ключи в `.env` даются двумя способами:
 
@@ -120,11 +123,19 @@ GoTrue и Storage для входа и фото. Поэтому данные н�
 cp .env.local-supabase.example .env.local-supabase   # ключи только для локального запуска
 make up-local     # база и сервисы; фронтенд ждёт данные, затем собирается: http://localhost:8080
 make seed-local   # в другом терминале: миграции, каталог, демо-аккаунты, демо-чаты с отельером, векторы
+make seed-local-geo   # геоданные Валенсии из первоисточников; шум EEA — NOISE_GPKG=/путь/ES.gpkg make seed-local-geo
 make down-local
 ```
 
+Вместо `make seed-local` можно восстановить готовый дамп живой базы: `make restore-local`. В дампе вся схема `public`
+(структура и данные, включая `ota_hotels` и `ota_hotel_pages`), демо-аккаунты (`auth.users`, `auth.identities`) и история
+миграций, поэтому `db:push` ничего не применяет повторно; сессий и файлов Storage нет. Файлы берутся из `dist/db-dump/`
+или из релиза `data-2026-10-29` (репозитории приватные, нужен `gh auth login`; `TAG=… REPO=owner/name make restore-local`),
+сначала проверяется `SHA256SUMS`. Команда **стирает** схему `public` локальной базы. Снять свежий дамп — `make dump-db`.
+Подробности — [docs/docker.md](docs/docker.md#дамп-живой-базы-make-restore-local).
+
 Ключи моделей (GigaChat, NVIDIA) и демо-аккаунты берутся из `.env`, модели остаются удалёнными. Внешние данные
-(Островок, EUBUCCO, шум EEA, места OSM) в `make seed-local` не входят. Откуда какие данные и как их загрузить —
+(Островок, EUBUCCO, шум EEA, места OSM) в `make seed-local` не входят; геоданные грузит `make seed-local-geo`. Откуда какие данные и как их загрузить —
 [docs/data-sources.md](docs/data-sources.md), подробности запуска — [docs/docker.md](docs/docker.md).
 
 ## Маршруты и доступ

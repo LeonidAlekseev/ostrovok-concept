@@ -19,7 +19,7 @@ import {
   type KnowledgeCall,
   type KnowledgeDeps,
 } from '@/lib/ai/knowledgeTurn'
-import { reviewVerdicts, runFeaturesTool, runNearTool, runReviewsTool, type Candidate } from '@/lib/ai/knowledgeTools'
+import { deepVerdicts, runDeepTool, runFeaturesTool, runNearTool, type Candidate } from '@/lib/ai/knowledgeTools'
 import { PERSONA_CITY } from '@/lib/personas'
 import { loadHotelierNoise } from '@/lib/db/claims'
 import { loadLevelIndex, loadNearIndex } from '@/lib/db/knowledge'
@@ -63,7 +63,7 @@ import { clipText } from '@/lib/format'
 import { asksHotelier, characteristicLabel, questionKeys, type HotelierKey } from '@/lib/hotelierFacts'
 import { isHotelGeoQuestion, isHotelViewQuestion, isNoiseQuestion } from '@/lib/noise'
 import type { ToolRun } from '@/lib/toolResult'
-import { todayIso, type IsoDate } from '@/lib/dates'
+import { nightsBetween, todayIso, type IsoDate } from '@/lib/dates'
 import type { Hotel } from '@/lib/catalog'
 import { assistantRequestSchema } from './schema'
 
@@ -107,8 +107,11 @@ async function planTurn(
   { messages, chatId, messageId }: Pick<WishContext, 'messages' | 'chatId' | 'messageId'>,
 ): Promise<Partial<AssistantResponse>> {
   const rules = rulesKnowledge(context.wish, context.brief)
-  // A wish of the guests' words («хороший завтрак») is answered before the dates and the party are asked.
-  if (!asksReviews(rules) && nextQuestion(context.brief, context.today)) return {}
+  // A question about the documents of the hotels («где хороший завтрак») is answered at once, over all the hotels of
+  // the city. A search for a hotel («найди отели, где …») asks the dates and the party first: the documents are then
+  // searched among the hotels that fit them.
+  const answerNow = asksReviews(rules) && !SEEKS_HOTEL.test(context.wish)
+  if (!answerNow && nextQuestion(context.brief, context.today)) return {}
   let summaries: Promise<HotelSummary[]> | undefined
   const loadSummaries = () => (summaries ??= loadHotelSummaries().catch(() => []))
   // The wish asks of the noise, a place near or the reviews: the model chooses the tools of the store while the
@@ -135,7 +138,12 @@ async function planTurn(
   let modelsDown = state.semanticDown === true
   if (plan && owner) {
     const all = await loadSummaries()
-    const candidates = knowledgeCandidates(all, state, planCities(context.brief, context.today, context.destinations))
+    const candidates = knowledgeCandidates(
+      all,
+      state,
+      planCities(context.brief, context.today, context.destinations),
+      nightlyBudget(context.brief),
+    )
     const outcome = await knowledgeTurn(plan, candidates, {
       wish: context.wish,
       owner,
@@ -178,8 +186,17 @@ async function planTurn(
 /** The answer's time the tools of the store keep for themselves after the earlier steps. */
 const KNOWLEDGE_TIME_MS = 4000
 
-/** The wish asks of the guests' reviews. */
-const asksReviews = (calls: readonly KnowledgeCall[]) => calls.some((c) => c.tool === 'reviews')
+/** The wish asks of the documents of the hotels: the reviews, the descriptions, the hoteliers' answers. */
+const asksReviews = (calls: readonly KnowledgeCall[]) => calls.some((c) => c.tool === 'deep')
+
+/** The traveller looks for a hotel («найди отели, где …», «тихий отель с завтраком»), not only asks about a topic. */
+const SEEKS_HOTEL = /(?<!\p{L})(?:отел|гостиниц|хостел|апартамент|жильё|жилье)/iu
+
+/** What a night may cost the traveller, ₽: the night's budget, or the stay's over the nights of the dates. */
+function nightlyBudget({ budget, budgetPerNight, dates }: Brief): number | undefined {
+  if (budgetPerNight) return budgetPerNight
+  return budget && dates ? budget / Math.max(1, nightsBetween(dates.checkIn, dates.checkOut)) : undefined
+}
 
 /** The store's reads and the runs of the tools, as the route does them. */
 const KNOWLEDGE_DEPS: KnowledgeDeps = {
@@ -188,8 +205,8 @@ const KNOWLEDGE_DEPS: KnowledgeDeps = {
   near: loadNearIndex,
   runFeatures: runFeaturesTool,
   runNear: runNearTool,
-  runReviews: runReviewsTool,
-  reviewVerdicts,
+  runDeep: runDeepTool,
+  deepVerdicts,
   record: recordRun,
 }
 
@@ -201,12 +218,15 @@ function knowledgeCandidates(
   all: readonly HotelSummary[],
   state: { ranked?: string[]; semantic?: string[] },
   cities: readonly Destination[],
+  perNight?: number,
 ): Candidate[] {
   const ids = new Set(cities.map((d) => d.id))
   const kept = state.ranked && new Set(state.ranked)
   const semantic = new Map((state.semantic ?? []).map((id, i) => [id, i]))
-  return all
-    .filter((h) => ids.has(h.destinationId) && (!kept || kept.has(h.id)))
+  const inCities = all.filter((h) => ids.has(h.destinationId) && (!kept || kept.has(h.id)))
+  // Within the budget when some hotel is; otherwise the budget does not choose.
+  const affordable = perNight ? inCities.filter((h) => h.priceFrom <= perNight) : []
+  return (affordable.length > 0 ? affordable : inCities)
     .sort((a, b) => (semantic.get(a.id) ?? Infinity) - (semantic.get(b.id) ?? Infinity) || b.rating - a.rating)
     .map((h) => ({ id: h.id, name: h.name }))
 }

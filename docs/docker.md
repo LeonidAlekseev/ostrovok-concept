@@ -15,12 +15,13 @@
 - [TLS: сертификат НУЦ Минцифры (GigaChat)](#tls-сертификат-нуц-минцифры-gigachat)
 - [Сидирование](#сидирование)
 - [Локальная Supabase (дополнительно)](#локальная-supabase-дополнительно)
+  - [Дамп живой базы: `make restore-local`](#дамп-живой-базы-make-restore-local)
 
 ## Файлы
 
 - `Dockerfile` — стадии `deps` (`npm ci`), `source`, `build` (`next build` с `output: 'standalone'`, включается
   `NEXT_OUTPUT=standalone` только в образе), `runner` (только `server.js`, `.next/static`, `public`, `secrets.app.env.age`)
-  и `tools` (зависимости и `scripts/` для `make seed`). Базовый образ закреплён: `node:24.22.1-alpine3.24`.
+  и `tools` (зависимости и `scripts/` для `make seed`; плюс `uv` и `python3` из apk для `scripts/*.py`, в `runner` их нет). Базовый образ закреплён: `node:24.22.1-alpine3.24`.
 - Рантайм — Alpine с busybox (POSIX sh, без bash), процесс от пользователя `app`, порт `8080`, логи в stdout и stderr.
 - `docker-compose.yml` — сервис `app` (`platform: linux/amd64`, `env_file: .env`, `8080:8080`, healthcheck по `/health`)
   и сервис `tools` (профиль `tools`, `up` его не запускает).
@@ -28,7 +29,7 @@
   перезапуском, без пересборки).
 - `docker-compose.local.yml`, `docker/local-supabase/`, `.env.local-supabase.example` — дополнительный вариант с локальной
   Supabase.
-- `Makefile` — `make up`, `make down`, `make logs`, `make seed`; `make up-local`, `make down-local`, `make seed-local`.
+- `Makefile` — `make up`, `make down`, `make logs`, `make seed`; `make up-local`, `make down-local`, `make seed-local`, `make seed-local-geo`, `make restore-local`, `make dump-db`.
 - `.dockerignore` — `.env*`, `*.key`, `.git`, `node_modules` не попадают в контекст сборки.
 
 ## Docker Desktop (Windows, macOS)
@@ -98,14 +99,51 @@ https://gu-st.ru/content/Other/doc/russian_trusted_root_ca.cer, SHA-256
 4. `make seed-local` в другом терминале: сервис `tools` выполняет `scripts/seed-all.sh` против локальной базы — миграции
    (`db:push`), каталог и демо-путешественник, демо-отельер, демо-чаты с отельером, пересборка настоящих отелей,
    свойства, векторы. После этого приложение собирается и открывается на http://localhost:8080.
-5. `make down-local` останавливает всё; данные лежат в томах `db-data` и `storage-data` (`docker volume ls`), удалить их
+5. `make seed-local-geo` (по желанию, после шага 4): здания EUBUCCO, границы, места OSM и пересчёт `db:features` прямо из
+   первоисточников; шум EEA — `NOISE_GPKG=/путь/к/ES.gpkg make seed-local-geo`. Подробности — в
+   [«Источниках данных»](data-sources.md#make-seed-local-geo-геоданные-валенсии-в-локальную-базу).
+6. `make down-local` останавливает всё; данные лежат в томах `db-data` и `storage-data` (`docker volume ls`), удалить их
    — `docker compose --env-file .env.local-supabase -f docker-compose.local.yml down -v`.
 
 Браузер и контейнеры ходят в Supabase по одному адресу `http://supabase.localhost:8000` (Kong): `*.localhost` — петля в
 браузере, а внутри сети это псевдоним Kong, так что cookie сессии Auth совпадают на сервере и в браузере. Postgres
 доступен снаружи на `127.0.0.1:54322`. Embedding-модели и GigaChat по-прежнему удалённые, поэтому `db:embed*` ходят в
 NVIDIA API (до 40 запросов в минуту). Данные внешних источников (Островок, EUBUCCO, шум EEA, места OSM) в
-`seed-all.sh` не входят: как их загрузить, написано в [«Источниках данных»](data-sources.md). Без настоящих отелей
+`seed-all.sh` не входят: геоданные грузит `make seed-local-geo`, остальное описано в [«Источниках данных»](data-sources.md). Без настоящих отелей
 (`ota-*`) демо-чаты с отельером пропускаются.
+
+### Дамп живой базы: `make restore-local`
+
+Вместо `make seed-local` (и без ключей NVIDIA, EUBUCCO, Geofabrik) локальную базу можно заполнить готовым дампом.
+
+**Что в дампе** (`scripts/db-dump.sh`, `make dump-db`; два архива `pg_dump -Fc` в `dist/db-dump/`, плюс `SHA256SUMS` и `MANIFEST`
+с датой, коммитом, числом строк по таблицам и размерами):
+
+- `public.dump` — вся схема `public`, структура и данные, включая `ota_hotels` и `ota_hotel_pages` (их предоставили
+  организаторы). Это полный дамп, а не `--data-only`: ограничения добавляются после данных, поэтому цикл
+  `hotelier_messages` ↔ `hotelier_conversations` восстановлению не мешает;
+- `auth.dump` — только **данные** `auth.users`, `auth.identities` и `supabase_migrations.schema_migrations`. Сессий,
+  refresh-токенов, кодов и других таблиц `auth` нет, файлов Storage тоже (`storage.objects` и политика на него остаются
+  от миграций только в облаке: после восстановления бакет и политику вложений чатов нужно создать самому).
+
+Дамп снимается через `pg_dump` из контейнера `postgres:17-alpine` по `SUPABASE_DB_URL` (transaction pooler Supabase: для
+`pg_dump` с несколькими таблицами он отработал штатно, снимок согласован внутри одного архива, но два архива снимаются
+в разные моменты). Пароль в вывод не попадает. Файлы не коммитятся (`dist/` в `.gitignore`) и публикуются как вложения
+релиза `data-2026-10-29` в приватных репозиториях `ostrovok-hackathon-2026/lil-team` и `LeonidAlekseev/ostrovok-concept`.
+
+**Восстановление** (`scripts/db-restore.sh`, `make restore-local`) после `make up-local`:
+
+1. Файлы берутся из `dist/db-dump/`; если их нет — `gh release download data-2026-10-29 --repo ostrovok-hackathon-2026/lil-team`
+   (нужны `gh` и `gh auth login`; другой релиз или репозиторий — `TAG=… REPO=owner/name make restore-local`).
+2. `sha256sum -c SHA256SUMS`: при несовпадении остановка.
+3. Схема `public` удаляется и пересоздаётся, `auth.users`, `auth.identities` и история миграций очищаются (**необратимо
+   для локальной базы**), затем `pg_restore` из `postgres:17-alpine` (в сети compose, пользователь `postgres`, пароль из
+   `.env.local-supabase`) загружает сначала `auth.dump`, потом `public.dump`; оба в одной транзакции с остановкой на
+   первой ошибке.
+4. История миграций в базе совпадает с `supabase/migrations/`, поэтому `npm run db:push` ничего не применяет.
+
+Пароли демо-аккаунтов — те, что хранятся в дампе (хеши из живой базы), то есть значения `DEMO_USER_*` и
+`DEMO_HOTELIER_*`, с которыми аккаунты создавались; скрипты `db:seed` и `db:hotelier` существующий пароль не меняют.
+`make seed-local-geo` и `db:embed*` после восстановления не нужны: здания, шум, признаки и векторы уже в дампе.
 
 [← README](../README.md)

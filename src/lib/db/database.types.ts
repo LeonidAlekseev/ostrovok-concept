@@ -1984,6 +1984,22 @@ export type Database = {
           sea_m: number
         }[]
       }
+      hotels_chunks_search: {
+        Args: { hotel_ids: string[]; per_hotel?: number; query: string; query_embedding?: unknown }
+        Returns: {
+          chunk_id: string
+          document_id: string
+          evidence_id: string
+          fts_place: number
+          hotel_id: string
+          kind: string
+          metadata: Json
+          ord: number
+          similarity: number
+          text: string
+          vector_place: number
+        }[]
+      }
       hotel_view_eyes: { Args: { lat: number; lon: number; targets: Json }; Returns: Json }
       hotelier_conversation_read: { Args: { conversation_id: string }; Returns: undefined }
       hotelier_conversation_status: { Args: { conversation_id: string; status: string }; Returns: boolean }
