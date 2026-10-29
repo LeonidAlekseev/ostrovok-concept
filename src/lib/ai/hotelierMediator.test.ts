@@ -150,6 +150,27 @@ describe('the hotel’s AI assistant', () => {
     expect(JSON.stringify(model.doGenerateCalls[0].prompt)).toContain('<<<ЧАТ')
   })
 
+  it('shows the hotel’s Ostrovok page as the source of an answer from the page’s data', async () => {
+    const model = decides({
+      decision: 'answer',
+      answer: 'В номерах есть чайник.',
+      claim_ids: [],
+      chunk_ids: [],
+      hotel_data: true,
+    })
+    deps.models = [{ id: 'bolt', model, timeoutMs: 1000 }]
+    expect(await ask('Есть ли в номере чайник?')).toBe('answered')
+    const result = written('hotelier_messages')[0].value as { data: { run: { result: { evidence: unknown[] } } } }
+    expect(result.data.run.result.evidence).toEqual([
+      expect.objectContaining({
+        id: 'mediator-ostrovok-page',
+        source_type: 'ota_page',
+        source_name: 'Островок',
+        title: expect.stringContaining('Страница отеля на Островке'),
+      }),
+    ])
+  })
+
   it('passes to the hotelier what only the hotel confirms, without asking a model', async () => {
     const model = decides({ decision: 'answer', answer: 'Да', claim_ids: [], chunk_ids: [], hotel_data: true })
     deps.models = [{ id: 'bolt', model, timeoutMs: 1000 }]
