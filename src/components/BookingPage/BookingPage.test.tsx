@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getHotel } from '@/lib/catalogGenerator'
@@ -6,6 +6,7 @@ import { addDays, todayIso } from '@/lib/dates'
 import { toOfferParams } from '@/lib/offer'
 import { sessionStore } from '@/lib/session'
 import { bookingsStore } from '@/lib/storage'
+import { TripsPage } from '@/components/Trips/TripsPage'
 import { BookingPage } from './BookingPage'
 import { waitForCatalog } from '@/test/waitForCatalog'
 
@@ -37,10 +38,28 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(2026, 9, 20, 12))
   nav.replace.mockClear()
+  // The booking lands in «Мои поездки», which need a session: the checkout is for the signed in.
+  sessionStore.set({ name: '', email: '' })
 })
 afterEach(() => {
   vi.useRealTimers()
   localStorage.clear()
+  sessionStore.set(null)
+})
+
+// booking-checkout, Requirement: Доступ к оформлению
+describe('BookingPage access', () => {
+  it('asks a guest to sign in and returns to the same offer', async () => {
+    sessionStore.set(null)
+    nav.query = offerQuery(nowRate.id)
+    render(<BookingPage />)
+    await waitForCatalog()
+    expect(screen.getByText('Войдите, чтобы забронировать')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Забронировать' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Войти' }).getAttribute('href')).toBe(
+      `/login?next=${encodeURIComponent(`/booking?${nav.query}`)}`,
+    )
+  })
 })
 
 // booking-checkout, Requirement: Сводка заказа
@@ -185,5 +204,33 @@ describe('BookingPage submit', () => {
     expect(raw).not.toContain('987')
     expect(raw).not.toContain('1230')
     expect(raw).not.toContain('12/30')
+  })
+
+  // booking-checkout, Scenario: Бронь видна в «Моих поездках»
+  it('shows the new booking in «Мои поездки» after the redirect', async () => {
+    nav.query = offerQuery(hotelRate.id)
+    render(<BookingPage />)
+    await waitForCatalog()
+    const user = userEvent.setup()
+    for (const [label, value] of [
+      ['Имя', 'Анна'],
+      ['Фамилия', 'Петрова'],
+      ['Email', 'anna@example.com'],
+      ['Телефон', '+7 900 123-45-67'],
+    ]) {
+      await user.click(screen.getByLabelText(label))
+      await user.paste(value)
+    }
+    await user.click(screen.getByRole('checkbox'))
+    await user.click(screen.getByRole('button', { name: 'Забронировать' }))
+    await waitFor(() => expect(nav.replace).toHaveBeenCalledTimes(1), { timeout: 3000 })
+
+    cleanup()
+    nav.query = new URL(nav.replace.mock.calls[0][0], 'http://x').searchParams.toString()
+    render(<TripsPage />)
+    await waitForCatalog()
+    const [booking] = bookingsStore.get()
+    expect(screen.getByRole('status').textContent).toContain(booking.id)
+    expect(within(screen.getByRole('tabpanel')).getByText(`Бронирование ${booking.id}`)).toBeTruthy()
   })
 })
