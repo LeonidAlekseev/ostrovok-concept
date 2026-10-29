@@ -37,6 +37,8 @@ docker compose up --build
 | `make logs`           | логи приложения в реальном времени                                              | `docker compose logs -f app`                                           |
 | `make seed`           | загрузить и пересобрать данные в облачной базе `.env`                           | `docker compose run --rm --build tools sh scripts/seed-all.sh`         |
 | `make seed-local-geo` | геоданные Валенсии (EUBUCCO, OSM, границы; шум — `NOISE_GPKG`) в локальную базу | `docker compose … run --rm --build tools sh scripts/seed-local-geo.sh` |
+| `make restore-local`  | восстановить в локальную базу готовый дамп живой базы вместо `seed-local`       | `sh scripts/db-restore.sh`                                             |
+| `make dump-db`        | снять дамп живой базы (`SUPABASE_DB_URL`, только чтение) в `dist/db-dump/`      | `sh scripts/db-dump.sh`                                                |
 
 Ключи в `.env` даются двумя способами:
 
@@ -124,6 +126,13 @@ make seed-local   # в другом терминале: миграции, кат
 make seed-local-geo   # геоданные Валенсии из первоисточников; шум EEA — NOISE_GPKG=/путь/ES.gpkg make seed-local-geo
 make down-local
 ```
+
+Вместо `make seed-local` можно восстановить готовый дамп живой базы: `make restore-local`. В дампе вся схема `public`
+(структура и данные, включая `ota_hotels` и `ota_hotel_pages`), демо-аккаунты (`auth.users`, `auth.identities`) и история
+миграций, поэтому `db:push` ничего не применяет повторно; сессий и файлов Storage нет. Файлы берутся из `dist/db-dump/`
+или из релиза `data-2026-10-29` (репозитории приватные, нужен `gh auth login`; `TAG=… REPO=owner/name make restore-local`),
+сначала проверяется `SHA256SUMS`. Команда **стирает** схему `public` локальной базы. Снять свежий дамп — `make dump-db`.
+Подробности — [docs/docker.md](docs/docker.md#дамп-живой-базы-make-restore-local).
 
 Ключи моделей (GigaChat, NVIDIA) и демо-аккаунты берутся из `.env`, модели остаются удалёнными. Внешние данные
 (Островок, EUBUCCO, шум EEA, места OSM) в `make seed-local` не входят; геоданные грузит `make seed-local-geo`. Откуда какие данные и как их загрузить —
