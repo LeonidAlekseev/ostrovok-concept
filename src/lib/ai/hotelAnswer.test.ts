@@ -258,6 +258,26 @@ describe('answerWithModel', () => {
     expect(outsideData('Есть Wi‑Fi и SPA.', 'нет данных')).toEqual([])
   })
 
+  // Эвал, Requirement: Только русские слова и только данные
+  it('rejects the conclusions from nowhere and keeps those the data have', async () => {
+    const invented = [
+      'Чем выше этаж, тем тише.',
+      'На верхних этажах тише, чем внизу.',
+      'В номере есть лифт.',
+      'Возьмите вентилятор.',
+      'Обычно в отелях такого класса тихо.',
+      'Как правило, ночью шумно.',
+    ]
+    for (const text of invented) expect(outsideData(text, 'Шум у фасада 55–60 дБ.')).not.toEqual([])
+    await expect(ask(modelSays({ answer: 'Чем выше, тем тише.', unverified: null }))).rejects.toThrow('тем тише')
+    // the data have the ground
+    expect(outsideData('На 9-м этаже тише, чем на улице.', 'На 9-м этаже шум ниже: 48 дБ.')).toEqual([])
+    expect(outsideData('В доме есть лифт.', 'Удобства: лифт, Wi-Fi.')).toEqual([])
+    // plain sentences about floors and quiet are not conclusions
+    expect(outsideData('Номера на 3-м этаже, у фасада 55 дБ.', 'Номера на 3-м этаже')).toEqual([])
+    expect(outsideData('Тихо во дворе, окна на 5-м этаже.', 'нет данных')).toEqual([])
+  })
+
   it('rejects an answer in English or in another script', async () => {
     expect(isRussian('The hotel has free Wi-Fi and parking.')).toBe(false)
     expect(isRussian('酒店有免费停车位')).toBe(false)
@@ -277,7 +297,7 @@ describe('answerWithModel', () => {
     expect(await ask(model)).toEqual({ answer: 'До центра недалеко.', unverified: 'Рядом, возможно, есть кафе.' })
     const [call] = model.doGenerateCalls
     expect(call.prompt[0].content).toContain(hotel.name)
-    expect(call.prompt[0].content).toContain('ТОЛЬКО то, что есть в данных')
+    expect(call.prompt[0].content).toContain('опирается на данные ниже')
     expect(call.reasoning).toBe('none')
   })
 
