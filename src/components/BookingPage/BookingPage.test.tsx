@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getHotel } from '@/lib/catalogGenerator'
 import { addDays, todayIso } from '@/lib/dates'
-import { toOfferParams } from '@/lib/offer'
+import { guruPrice, toOfferParams } from '@/lib/offer'
 import { sessionStore } from '@/lib/session'
 import { bookingsStore } from '@/lib/storage'
 import { TripsPage } from '@/components/Trips/TripsPage'
@@ -196,7 +196,7 @@ describe('BookingPage submit', () => {
       status: 'confirmed',
       cardLast4: '4242',
       payment: 'now',
-      total: 3 * nowRate.pricePerNight,
+      total: guruPrice(3 * nowRate.pricePerNight),
     })
 
     const raw = localStorage.getItem(bookingsStore.key)!

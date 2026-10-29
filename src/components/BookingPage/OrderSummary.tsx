@@ -38,7 +38,7 @@ export function OrderSummary({ offer }: { offer: Offer }) {
         <dd>{PAYMENT_LABEL[rate.payment]}</dd>
       </dl>
       <p className="flex items-baseline justify-between border-t border-border pt-3">
-        <span className="font-semibold">Итого</span>
+        <span className="font-semibold">Итого по цене GURU</span>
         <b className="text-xl">{formatPrice(offer.total)}</b>
       </p>
     </aside>

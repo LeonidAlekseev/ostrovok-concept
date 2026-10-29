@@ -2,7 +2,7 @@ import { effectiveCancellation } from './booking'
 import { findRate, findRoom, type Cancellation, type Hotel } from './catalog'
 import { nightsBetween, type IsoDate } from './dates'
 import { formatPrice } from './format'
-import { freeCancellationUntil, nightPrice, stayTotal } from './offer'
+import { freeCancellationUntil, guruPrice, nightPrice, stayTotal } from './offer'
 import { MAX_NIGHTS } from './search'
 import type { Booking } from './storage'
 
@@ -96,7 +96,7 @@ export type DateChangeState = 'proposed' | 'applied' | 'outdated'
 export type DateQuote = { ok: true; change: DateChange } | { ok: false; error: string }
 
 /**
- * The booking on new dates at the price of its rate in the catalogue now, as the checkout counts it (`stayTotal`:
+ * The booking on new dates at the price of its rate in the catalogue now, as the checkout counts it (`stayTotal` at the GURU price:
  * Friday and Saturday nights cost more), with the rate's cancellation terms as they are at `today`. Only an upcoming
  * stay that has not begun moves; the dates get the checks of the search.
  */
@@ -125,7 +125,7 @@ export function quoteDateChange(
       from: { checkIn: booking.checkIn, checkOut: booking.checkOut, total: booking.total },
       checkIn,
       checkOut,
-      total: stayTotal(rate.pricePerNight, checkIn, checkOut, booking.guests.rooms),
+      total: guruPrice(stayTotal(rate.pricePerNight, checkIn, checkOut, booking.guests.rooms)),
       cancellation: effectiveCancellation(rate, checkIn, today),
     },
   }

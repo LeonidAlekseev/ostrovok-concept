@@ -138,7 +138,7 @@ describe('changing the dates', () => {
         from: { checkIn: '2026-11-10', checkOut: '2026-11-12', total: 14000 },
         checkIn: '2026-11-13',
         checkOut: '2026-11-15',
-        total: 16200,
+        total: 14580,
         cancellation: { kind: 'free', daysBefore: 3 },
       },
     })
@@ -149,7 +149,7 @@ describe('changing the dates', () => {
       '2026-11-15',
       today,
     )
-    expect(rooms.ok && rooms.change.total).toBe(32400)
+    expect(rooms.ok && rooms.change.total).toBe(29160)
   })
 
   it('makes a rate non-refundable once its free period for the new dates is over', () => {
@@ -180,7 +180,7 @@ describe('changing the dates', () => {
       ...booked,
       checkIn: '2026-11-13',
       checkOut: '2026-11-15',
-      total: 16200,
+      total: 14580,
       cancellation: { kind: 'free', daysBefore: 3 },
     })
     expect(applyDateChange({ ...booked, checkOut: '2026-11-13' }, quote.change, today)).toBeNull()
