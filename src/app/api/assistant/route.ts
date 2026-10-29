@@ -321,6 +321,7 @@ async function hotelTurn(
         reply: asked && !askHotelier ? `${answer}\n\n${ASKED_REPLY}` : answer,
         ...(unverified && { unverified }),
         source: 'model',
+        model: result.id,
         ...withSteps(steps, asked),
         ...widget,
       } satisfies AssistantResponse)
@@ -433,7 +434,13 @@ async function wishTurn(context: WishContext) {
     if (result.ok) {
       const { parsed, reply } = result.value
       const next = withCity(foldBrief(brief, parsed, input, asked))
-      return { brief: next, reply, source: 'model', ...(await found(next)) } satisfies AssistantResponse
+      return {
+        brief: next,
+        reply,
+        source: 'model',
+        model: result.id,
+        ...(await found(next)),
+      } satisfies AssistantResponse
     }
     down = result.failed.length > 0
     console.warn('assistant: no model answered, using the rules')
@@ -474,7 +481,9 @@ async function look(
   ip: string,
   deadline: number,
   signal: AbortSignal,
-): Promise<{ sight: PhotoSight; steps: TurnStep[] } | { failed: 'limited' | 'down'; steps: TurnStep[] } | null> {
+): Promise<
+  { sight: PhotoSight; model: string; steps: TurnStep[] } | { failed: 'limited' | 'down'; steps: TurnStep[] } | null
+> {
   const until = deadline - VISION_RESERVE_MS
   if (until - Date.now() < MIN_VISION_MS) return null
   if (!(await allowVisionRequest(ip))) return { failed: 'limited', steps: [] }
@@ -494,7 +503,7 @@ async function look(
             ? { agent: 'vision', title: VISION_SWITCH_STEP, status: 'done', result: 'посмотрел' }
             : { agent: 'vision', title: VISION_SWITCH_STEP, status: 'failed', result: 'ни одна модель не ответила' },
         ]
-  if (result.ok) return { sight: result.value, steps }
+  if (result.ok) return { sight: result.value, model: result.id, steps }
   if (result.limited) return { failed: 'limited', steps: [] }
   return { failed: 'down', steps }
 }
@@ -600,10 +609,10 @@ async function photoTurn(photos: readonly string[], ip: string, context: WishCon
     if (!ownWords(input)) return withSteps({ brief, source: 'rules', photo: { action: 'unseen' } })
     return withSteps({ ...(await wishTurn(context)), photo: { action: 'skipped' } })
   }
-  const { sight } = seen
+  const { sight, model } = seen
   // Nothing on the photo to choose a hotel by: no search and no wish of it, Эвал asks for words.
   if (sight.unusable)
-    return withSteps({ brief, source: 'model', photo: { action: 'unusable', seen: sight.description } })
+    return withSteps({ brief, source: 'model', model, photo: { action: 'unusable', seen: sight.description } })
   if (intent === 'similar') return withSteps(await similarTurn(photos, sight, context))
   const text = refinedText(input, sight).slice(0, MAX_MESSAGE_LENGTH)
   const answer = await wishTurn({ ...context, messages: [...messages.slice(0, -1), { role: 'user', text }] })

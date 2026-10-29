@@ -67,7 +67,8 @@ describe.each(Object.entries(documents))('the %s document', (_name, document) =>
 })
 
 describe('the routes of src/app/api', () => {
-  const routes = routeFiles()
+  // `/health` lives outside src/app/api and is described in the same document.
+  const routes = [...routeFiles(), { path: '/health', methods: ['get'], file: 'src/app/health/route.ts' }]
   const paths = documents.api.paths as Record<string, Json>
 
   it('are found', () => {

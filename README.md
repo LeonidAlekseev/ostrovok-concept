@@ -64,6 +64,7 @@ docker compose up --build
 | `SUPABASE_DB_URL`                               | пусто             | строка подключения к базе: нужна `make seed` и миграциям                             |
 | `NVIDIA_API_KEY`                                | пусто             | ключ NVIDIA API; без него Эвал отвечает по правилам, без модели                      |
 | `GIGACHAT_AUTH_KEY`                             | пусто             | Authorization key GigaChat (Сбер), developers.sber.ru → GigaChat API                 |
+| `CRON_SECRET`                                   | пусто             | секрет Vercel Cron для `GET /api/hotelier/knowledge/retry`; задаётся и в Vercel      |
 | `DEMO_USER_EMAIL`, `DEMO_USER_PASSWORD`         | пусто             | демо-путешественник (вход кнопкой, `make seed` создаёт аккаунт)                      |
 | `DEMO_HOTELIER_EMAIL`, `DEMO_HOTELIER_PASSWORD` | пусто             | демо-отельер (то же)                                                                 |
 | `PORT`, `HOSTNAME`                              | `8080`, `0.0.0.0` | порт и адрес сервера в контейнере (заданы в `Dockerfile`)                            |

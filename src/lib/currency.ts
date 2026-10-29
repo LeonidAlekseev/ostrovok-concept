@@ -32,9 +32,11 @@ const CURRENCY: [Currency, RegExp][] = [
 ]
 const currencyOf = (sign: string): Currency | undefined => CURRENCY.find(([, re]) => re.test(sign))?.[0]
 
-// «150$», «€200», «50 тыс», «70к», «300 евро», «2 000 000 ₽»: a number, its thousands and its currency.
+// «150$», «€200», «50 тыс», «70к», «300 евро», «2 000 000 ₽»: a number, its thousands and its currency. Spaces join
+// only the groups of three digits: the day, month and year of «10 11 2026» are three numbers, not one. Spaces join
+// only the groups of three digits: the day, month and year of «10 11 2026» are three numbers, not one.
 const AMOUNT =
-  /(?:(€|\$)\s*)?(\d[\d\s ]*\d|\d)\s*(тыс[а-я.]*|к(?![а-яё]))?\s*(€|\$|евро|eur(?![a-z])|долл[а-я.]*|доллар[а-я]*|usd(?![a-z])|баксов|бакс[а-я]*|₽|руб[а-я.]*|р\.)?/g
+  /(?:(€|\$)\s*)?(\d{1,3}(?:[\s ]\d{3})+(?!\d)|\d+)\s*(тыс[а-я.]*|к(?![а-яё]))?\s*(€|\$|евро|eur(?![a-z])|долл[а-я.]*|доллар[а-я]*|usd(?![a-z])|баксов|бакс[а-я]*|₽|руб[а-я.]*|р\.)?/g
 // «за ночь», «в сутки», «в ночь», «150$/ночь».
 const PER_NIGHT = /(?:за|в|на|\/)\s*(?:одну\s+)?(?:ночь|сутки|сут(?![а-яё]))|за\s+ночь/
 

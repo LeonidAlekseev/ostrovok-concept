@@ -167,8 +167,9 @@ export function ChatList({
             </ul>
           </section>
         ))}
+        {/* On a phone the list is long and the chats with hoteliers few: they go first, not behind the scroll. */}
         {hotelierFound.length > 0 && (
-          <section aria-label="С отельерами" className="flex flex-col gap-1">
+          <section aria-label="С отельерами" className="flex flex-col gap-1 max-lg:order-first">
             <h3 className="px-2 text-sm/[normal] font-medium text-muted-foreground">С отельерами</h3>
             <ul className="flex flex-col divide-y divide-border/70">
               {hotelierFound.map((chat) => (

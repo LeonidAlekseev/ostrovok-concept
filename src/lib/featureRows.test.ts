@@ -38,6 +38,11 @@ const facade = { sources, dataset: 'eea-noise-end2022-v01_r00', estimate }
 const round = (value: number) => (Number.isFinite(value) ? Math.round(value * 10) / 10 : null)
 
 describe('featureRow', () => {
+  it('keeps the answer of the facade function in the row', () => {
+    const answer = { zone: { kind: 'circle', radius_m: 25 }, bands: [] }
+    expect(featureRow('ota-1', geo, { ...facade, answer })?.noise_facade).toEqual(answer)
+  })
+
   // geo-data, Requirement: Происхождение значений отеля; hotel-knowledge, Requirement: Оценка шума у фасада
   it('keeps the derived values and the sources, the floors rounded, the loudest band and the estimate at the facade', () => {
     expect(featureRow('ota-1', geo, facade)).toEqual({
@@ -62,6 +67,7 @@ describe('featureRow', () => {
       noise_dataset: 'eea-noise-end2022-v01_r00',
       noise_method: 'noise-estimate-v2',
       noise_zone: 'building',
+      noise_facade: null,
       street_lday_min: round(estimate.street.lday!.min),
       street_lday_max: round(estimate.street.lday!.max),
       street_lnight_min: round(estimate.street.lnight!.min),

@@ -193,17 +193,52 @@ describe('loadNoiseMap', () => {
 })
 
 describe('loadHotelNoise', () => {
-  it('asks the facade once more when the first call is cancelled by the statement timeout', async () => {
-    const answers = [
-      { data: null, error: { message: 'canceling statement due to statement timeout', code: '57014' } },
-      { data: { zone: { kind: 'circle', radius_m: 25 }, bands: [] }, error: null },
-    ]
-    const rpc = vi.fn(async (_name: string) => answers.shift())
-    vi.doMock('@supabase/supabase-js', () => ({ createClient: () => ({ rpc }) }))
+  const stored = {
+    zone: { kind: 'circle', radius_m: 25 },
+    bands: [
+      { side: 'street', source: 'roadsInAgglomeration', indicator: 'Lden', db_min: 65, db_max: 69, dataset: 'eea' },
+      { side: 'yard', source: 'roadsInAgglomeration', indicator: 'Lden', db_min: 55, db_max: 59, dataset: 'eea' },
+    ],
+  }
+
+  /** The client with the stored row (`undefined`: no column or no row) and the answers of the functions in order. */
+  async function load(row: { noise_facade: unknown } | null, rpcAnswers: unknown[]) {
+    const rpc = vi.fn(async (name: string) =>
+      name === 'osm_places_near_facade' ? { data: { covered: [], places: [] }, error: null } : rpcAnswers.shift(),
+    )
+    const maybeSingle = vi.fn(async () => ({ data: row, error: null }))
+    const from = vi.fn(() => ({ select: () => ({ eq: () => ({ maybeSingle }) }) }))
+    vi.doMock('@supabase/supabase-js', () => ({ createClient: () => ({ rpc, from }) }))
     vi.resetModules()
-    const { loadHotelNoise: load } = await import('./noise')
-    await load({ id: 'ota-1', lat: 39.4, lon: -0.3 })
-    expect(rpc.mock.calls.filter(([name]) => name === 'hotel_noise_facade')).toHaveLength(2)
+    const { loadHotelNoise } = await import('./noise')
+    const noise = await loadHotelNoise({ id: 'ota-1', lat: 39.4, lon: -0.3 })
     vi.doUnmock('@supabase/supabase-js')
+    return { noise, facadeCalls: rpc.mock.calls.filter(([name]) => name === 'hotel_noise_facade').length, from }
+  }
+
+  // hotel-page, Requirement: Шум и окружение настоящего отеля
+  it('reads the facade from the hotel_features row without calling the function', async () => {
+    const { noise, facadeCalls, from } = await load({ noise_facade: stored }, [])
+    expect(from).toHaveBeenCalledWith('hotel_features')
+    expect(facadeCalls).toBe(0)
+    expect(noise?.sources).toEqual([{ source: 'roadsInAgglomeration', lden: { min: 65, max: 69 } }])
+    expect(noise?.yard).toEqual([{ source: 'roadsInAgglomeration', lden: { min: 55, max: 59 } }])
+    expect(noise?.zone).toEqual({ kind: 'circle', radiusM: 25 })
+  })
+
+  it('gives the same facade as the live function does', async () => {
+    const live = await load(null, [{ data: stored, error: null }])
+    const kept = await load({ noise_facade: stored }, [])
+    expect(live.facadeCalls).toBe(1)
+    expect(kept.noise).toEqual(live.noise)
+  })
+
+  it('asks the function live for a hotel without a stored facade, once more after the statement timeout', async () => {
+    const { noise, facadeCalls } = await load({ noise_facade: null }, [
+      { data: null, error: { message: 'canceling statement due to statement timeout', code: '57014' } },
+      { data: stored, error: null },
+    ])
+    expect(facadeCalls).toBe(2)
+    expect(noise?.sources).toHaveLength(1)
   })
 })
