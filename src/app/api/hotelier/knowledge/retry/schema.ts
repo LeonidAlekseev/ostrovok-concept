@@ -33,7 +33,7 @@ export const knowledgeRetryOperations: ApiOperation[] = [
     operationId: 'cronRetryHotelierKnowledge',
     tags: ['Служебные'],
     summary: 'Повторить извлечение сведений отельеров (cron)',
-    description: `То же, что POST, для Vercel Cron (\`vercel.json\`, раз в 10 минут: cron вызывает только GET). Нужен секрет \`CRON_SECRET\` в \`Authorization: Bearer\`; Vercel подставляет его сам, значение здесь не публикуется.`,
+    description: `То же, что POST, для Vercel Cron (\`vercel.json\`, раз в сутки в 03:17 UTC — предел тарифа Hobby; cron вызывает только GET). Нужен секрет \`CRON_SECRET\` в \`Authorization: Bearer\`; Vercel подставляет его сам, значение здесь не публикуется.`,
     security: ['cronSecret'],
     responses,
   },

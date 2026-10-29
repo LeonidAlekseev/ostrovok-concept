@@ -1,4 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "crons": [{ "path": "/api/hotelier/knowledge/retry", "schedule": "*/10 * * * *" }]
+  "crons": [{ "path": "/api/hotelier/knowledge/retry", "schedule": "17 3 * * *" }]
 }
