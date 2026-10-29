@@ -1,4 +1,4 @@
--- Semantic search: a vector per catalog object (hotels, routes) from `nvidia/nemotron-3.5-embed-8b`.
+-- Semantic search: a vector per catalog object (hotels, routes) from `nvidia/nemotron-3.5-embed-1b`.
 -- The model gives 4096 numbers; HNSW indexes at most 4000 (`halfvec`), so `npm run db:embed` asks for the
 -- first 2048 (the model is Matryoshka-trained: `dimensions: 2048`) and stores them as `halfvec(2048)`.
 -- Idempotent: safe to re-run on a database that already has these objects.

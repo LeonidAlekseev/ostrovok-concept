@@ -671,6 +671,21 @@ describe('factsStore', () => {
     })
     expect(factsStore(hotel, { master_id: 1, updated_at: '', facts: { yearBuilt: 0 } })).toEqual(mergeStores([]))
   })
+
+  // geo-data, Requirement: Источник — страница Островка со ссылкой
+  it('links the evidence to the page’s address when the snapshot had it, and to nothing when it had not', () => {
+    const facts = { yearBuilt: 1998 }
+    const url = 'https://ostrovok.ru/hotel/spain/valencia/mid1/hotel_x/'
+    expect(factsStore(hotel, { master_id: 1, updated_at: '', facts, url }).evidence[0].url).toBe(url)
+    expect(factsStore(hotel, { master_id: 1, updated_at: '', facts }).evidence[0].url).toBeNull()
+    const reviews = reviewStore(hotel, {
+      master_id: 1,
+      updated_at: '',
+      list: [review(10, { reviewPlus: 'Тихо.' })],
+      url,
+    })
+    expect(reviews.evidence[0].url).toBe(url)
+  })
 })
 
 describe('roomViewStore', () => {

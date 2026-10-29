@@ -95,6 +95,38 @@ export function nextDataPageProps(snapshot: unknown): unknown {
   return props
 }
 
+const NEXT_DATA = (snapshot: unknown) => {
+  const element = Array.isArray(snapshot)
+    ? snapshot.find(
+        (item) => typeof item === 'object' && item !== null && (item as { id?: unknown }).id === '__NEXT_DATA__',
+      )
+    : undefined
+  const content = (element as { content?: unknown } | undefined)?.content
+  const data = typeof content === 'string' ? JSON.parse(content) : content
+  return typeof data === 'object' && data !== null ? (data as { page?: unknown; query?: unknown }) : null
+}
+
+/**
+ * The address of the hotel's page on Ostrovok, from the snapshot's own route: the `page` of `__NEXT_DATA__`
+ * (`/hotel/[country]/[city]/[mid]/[slug]`) with its `query` filled in, as Next.js served the page. Nothing guessed:
+ * `null` when the snapshot has no route, a parameter is missing, or the address does not name the hotel's master id.
+ */
+export function nextDataPageUrl(snapshot: unknown, masterId: number): string | null {
+  const data = NEXT_DATA(snapshot)
+  const route = data?.page
+  const query = (data?.query ?? {}) as Record<string, unknown>
+  if (typeof route !== 'string' || !route.startsWith('/hotel/')) return null
+  let missing = false
+  const path = route.replace(/\[{1,2}(\.\.\.)?(\w+)\]{1,2}/g, (_match, _rest, name: string) => {
+    const value = query[name]
+    const parts = Array.isArray(value) ? value : typeof value === 'string' ? [value] : []
+    if (parts.length === 0 || parts.some((part) => typeof part !== 'string' || part === '')) missing = true
+    return parts.map((part) => encodeURIComponent(String(part))).join('/')
+  })
+  if (missing || path.includes('[') || !new RegExp(`(?<!\\d)${masterId}(?!\\d)`).test(path)) return null
+  return new URL(path.endsWith('/') ? path : `${path}/`, 'https://ostrovok.ru').href
+}
+
 /** The images' `relativePath` is the path of their `tmpl` again. */
 const withoutRelativePath = (images: unknown) =>
   Array.isArray(images)

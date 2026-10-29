@@ -475,7 +475,7 @@
         "tags": ["Таблицы"],
         "summary": "hotel_features",
         "description": "Строки `hotel_features` через PostgREST: `select` — столбцы, фильтры — `столбец=eq.значение`.",
-        "x-used-in": ["src/lib/db/features.ts", "src/lib/db/hotelDetails.ts"],
+        "x-used-in": ["src/lib/db/features.ts", "src/lib/db/hotelDetails.ts", "src/lib/db/noise.ts"],
         "parameters": [
           {
             "name": "select",
@@ -2944,6 +2944,16 @@
           "noise_method": {
             "type": ["string", "null"]
           },
+          "noise_facade": {
+            "anyOf": [
+              {
+                "description": "JSON"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "noise_zone": {
             "type": ["string", "null"]
           },
@@ -2996,6 +3006,7 @@
           "lnight_source",
           "noise_dataset",
           "noise_method",
+          "noise_facade",
           "noise_zone",
           "street_lday_max",
           "street_lday_min",
@@ -3399,9 +3410,12 @@
           },
           "updated_at": {
             "type": "string"
+          },
+          "url": {
+            "type": ["string", "null"]
           }
         },
-        "required": ["hotel", "master_id", "reviews", "updated_at"]
+        "required": ["hotel", "master_id", "reviews", "updated_at", "url"]
       },
       "ota_hotel_places": {
         "type": "object",

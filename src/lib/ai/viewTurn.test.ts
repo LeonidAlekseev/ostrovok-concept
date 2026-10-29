@@ -350,6 +350,9 @@ describe('the words of a view question', () => {
     expect([floorOf('с 5 этажа'), floorOf('на 12-м этаже'), floorOf('из окна')]).toEqual([5, 12, null])
     expect(placeQuery('Видно ли Город искусств и наук из окна?')).toBe('Город искусств и наук')
     expect(placeQuery('Какой вид из окна?')).toBeNull()
+    // A question about the floor is not a place’s name.
+    expect(placeQuery('Стоит ли просить высокий этаж?')).toBeNull()
+    expect(placeQuery('Стоит ли просить верхний этаж, виден ли Город искусств и наук?')).toBe('Город искусств и наук')
   })
 
   // assistant-search, Requirement: Вопросы о виде отдельно от гео- и шумовых

@@ -117,6 +117,8 @@ describe('understandWish: the remark', () => {
   it('drops a remark in English or in another script', async () => {
     expect((await read('Валенсия', { reply: 'Got it, noted!' })).reply).toBeUndefined()
     expect((await read('Валенсия', { reply: 'Записал 好的' })).reply).toBeUndefined()
+    // A question to something the message said («вдвоём») is not a remark: the code asks what the brief lacks.
+    expect((await read('Тихо, вдвоём', { reply: 'Сколько человек поедет?' })).reply).toBeUndefined()
   })
 })
 

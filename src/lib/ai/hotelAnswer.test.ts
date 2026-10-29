@@ -6,7 +6,15 @@ import type { HotelDetails } from '../hotelDetails'
 import { noiseLines, type HotelNoise } from '../noise'
 import { errorResult, type ToolResult } from '../toolResult'
 import { sampleResult } from '@/test/toolResult'
-import { answerWithModel, hotelFacts, isRussian, NO_NEARBY_DATA, ruleAnswer, toolFacts } from './hotelAnswer'
+import {
+  answerWithModel,
+  hotelFacts,
+  isRussian,
+  NO_NEARBY_DATA,
+  outsideData,
+  ruleAnswer,
+  toolFacts,
+} from './hotelAnswer'
 
 const base = getHotel('prague-old-town-lantern')!
 const hotel: Hotel = { ...base, amenities: ['wifi', 'parking', 'pets'] }
@@ -179,6 +187,15 @@ describe('ruleAnswer', () => {
 })
 
 describe('hotelFacts', () => {
+  // ota-13115571: the room of Ostrovok is «Capsule (no window)», and an answer with a view from it contradicts the data.
+  it('says «без окна» for the room whose name says «no window»', () => {
+    const capsule: Hotel = { ...hotel, rooms: [{ ...hotel.rooms[0], name: 'Двухместная Capsule (no window)' }] }
+    const facts = hotelFacts(capsule, dates)
+    expect(facts).toContain('Двухместная Capsule (без окна)')
+    expect(facts).not.toContain('no window')
+    expect(ruleAnswer('Какие есть номера?', capsule, dates).answer).toContain('Capsule (без окна)')
+  })
+
   it('carries the data of the hotel and says there are no places nearby', () => {
     const facts = hotelFacts(hotel, dates)
     expect(facts).toContain(hotel.name)
@@ -217,12 +234,28 @@ describe('hotelFacts', () => {
 // assistant-search, Requirement: Пометка непроверенного
 describe('answerWithModel', () => {
   it('accepts the Latin name of the hotel and «Wi‑Fi» in a Russian answer', async () => {
-    const text = `В отеле ${hotel.name} есть бесплатный Wi‑Fi и парковка на Av Ausias March.`
+    const text = `В отеле ${hotel.name} есть бесплатный Wi‑Fi и парковка.`
     expect(isRussian(text)).toBe(true)
     expect(await ask(modelSays({ answer: text, unverified: 'Рядом, возможно, есть Mercado Central.' }))).toEqual({
       answer: text,
       unverified: 'Рядом, возможно, есть Mercado Central.',
     })
+  })
+
+  // Эвал, Requirement: Только русские слова и только данные
+  it('fails an answer with a word the data do not have or advice from nowhere, but not a name from the data', async () => {
+    await expect(
+      ask(
+        modelSays({
+          answer: 'В отеле есть удобный подъезд, лифт называется lift, а первый этаж — Erdgeschoss.',
+          unverified: null,
+        }),
+      ),
+    ).rejects.toThrow('lift, erdgeschoss')
+    await expect(ask(modelSays({ answer: 'Ночью возьмите беруши.', unverified: null }))).rejects.toThrow('беруш')
+    expect(outsideData(`Отель ${hotel.name} рядом с улицей.`, hotelFacts(hotel, dates))).toEqual([])
+    expect(outsideData('Возьмите беруши.', 'Беруши выдают на ресепшене.')).toEqual([])
+    expect(outsideData('Есть Wi‑Fi и SPA.', 'нет данных')).toEqual([])
   })
 
   it('rejects an answer in English or in another script', async () => {

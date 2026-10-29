@@ -12,6 +12,13 @@ describe('the characteristics a hotelier is asked about', () => {
     expect(needsHotelier('Есть ли свободные номера на эти даты?')).toBe(true)
     expect(needsHotelier('Гарантируете вид на море?')).toBe(true)
     expect(needsHotelier('Есть ли балкон?')).toBe(false)
+    // ota-9096882: «shuttle» among the amenities is not an answer about the transfer from the airport.
+    expect(needsHotelier('Можно заказать трансфер из аэропорта?')).toBe(true)
+    expect(needsHotelier('Вас встречают в аэропорту?')).toBe(true)
+    expect(needsHotelier('Есть ли балкон с видом на море?')).toBe(true)
+    expect(needsHotelier('Из номера с балконом виден вид на море?')).toBe(true)
+    expect(needsHotelier('Далеко ли до аэропорта?')).toBe(false)
+    expect(needsHotelier('Есть ли вид на море? Балкон не нужен.')).toBe(false)
     expect(asksHotelier('Уточните у отеля, пожалуйста')).toBe(true)
     expect(asksHotelier('Спросите отельера про балкон')).toBe(true)
     expect(asksHotelier('Есть ли балкон?')).toBe(false)

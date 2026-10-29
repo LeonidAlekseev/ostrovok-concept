@@ -244,6 +244,13 @@ export const assistantResponseSchema = component(
       brief: briefSchema,
       reply: z.string().optional().meta({ description: 'Реплика модели; нет — ответили правила' }),
       source: z.enum(['model', 'rules']),
+      model: z
+        .string()
+        .optional()
+        .meta({
+          description: 'Id модели, давшей ответ (при `source` `model`); для логов и разбора, не для показа',
+          examples: ['nvidia/nemotron-3.5-lightning-30b-a3b'],
+        }),
       matches: z.array(hotelSummarySchema).optional().meta({ description: 'Отели поиска по смыслу, лучшие первыми' }),
       features: z.record(z.string(), featuresSchema).optional().meta({ description: 'Данные `matches` по id' }),
       missing: z
