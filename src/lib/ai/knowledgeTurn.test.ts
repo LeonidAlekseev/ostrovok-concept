@@ -5,7 +5,14 @@ import type { LevelRow, NearRow } from '../db/knowledge'
 import type { RunOwner } from '../db/toolRuns'
 import { errorResult, toolResultSchema, type ToolResult, type ToolRun } from '../toolResult'
 import type { ModelLink } from './chain'
-import { featuresResult, nearResult, type Candidate, type FeaturesInput, type NearInput } from './knowledgeTools'
+import {
+  featuresResult,
+  nearResult,
+  type Candidate,
+  type FeaturesInput,
+  type HotelVerdict,
+  type NearInput,
+} from './knowledgeTools'
 import {
   factsForModel,
   knowledgeAnswer,
@@ -109,6 +116,7 @@ function deps(extra: Partial<KnowledgeDeps> = {}) {
     ),
     runNear: vi.fn(timed((input: NearInput, index: readonly NearRow[] | null) => nearResult(input, index, []))),
     runReviews: vi.fn(timed(() => errorResult('store_unavailable', 'Не получилось прочитать отзывы'))),
+    reviewVerdicts: vi.fn(async () => null),
     record,
     ...extra,
   }
@@ -133,6 +141,20 @@ describe('the choice of the calls', () => {
       { tool: 'near', category: 'supermarket', radiusM: 300 },
     ])
     expect(rulesKnowledge('Что пишут в отзывах про завтрак?', {})).toEqual([{ tool: 'reviews', topic: 'breakfast' }])
+    // The food asks of the reviews without the word «отзывы»; the other topics wait for it.
+    for (const wish of [
+      'Найди отель, чтобы были очень вкусные и качественные завтраки',
+      'Где хороший завтрак',
+      'Завтрак шведский стол',
+    ])
+      expect(rulesKnowledge(wish, {})).toEqual([{ tool: 'reviews', topic: 'breakfast' }])
+    expect(rulesKnowledge('Отель с отличной кухней', {})).toEqual([{ tool: 'reviews', topic: 'food' }])
+    expect(rulesKnowledge('Тихий отель с вкусным завтраком', {})).toEqual([
+      { tool: 'features', criteria: { nightBelowDb: 50 } },
+      { tool: 'reviews', topic: 'noise' },
+      { tool: 'reviews', topic: 'breakfast' },
+    ])
+    expect(rulesKnowledge('Где чисто?', {})).toEqual([])
     // The sea is the features step's, and a wish without these words runs no tool.
     expect(rulesKnowledge('Отель у моря с бассейном', {})).toEqual([])
     expect(rulesKnowledge('Отель', { quiet: true })[0]).toEqual({ tool: 'features', criteria: { nightBelowDb: 50 } })
@@ -215,6 +237,29 @@ const plan = (calls: KnowledgePlan['calls']): KnowledgePlan => ({ calls, planner
 
 // assistant-search, Requirement: Подбор отелей инструментами хранилища
 describe('the runs of the turn', () => {
+  // Scenario: Отзывы выбирают отели сами
+  it('chooses the hotels by their reviews when the wish asks of nothing else', async () => {
+    const verdicts = new Map<string, HotelVerdict>([
+      ['ota-1', { verdict: 'miss', score: 0 }],
+      ['ota-2', { verdict: 'match', score: -3 }],
+      ['ota-3', { verdict: 'match', score: -1 }],
+    ])
+    const { deps: d, record } = deps({ reviewVerdicts: vi.fn(async () => verdicts) })
+    const outcome = await runKnowledge(plan([{ tool: 'reviews', topic: 'breakfast' }]), candidates, {
+      owner: null,
+      deadline: Date.now() + 5000,
+      deps: d,
+      wish: 'вкусные завтраки',
+    })
+    expect(d.reviewVerdicts).toHaveBeenCalledWith('breakfast', ['ota-1', 'ota-2', 'ota-3'], 'вкусные завтраки')
+    expect(outcome.chosen).toEqual(['ota-2', 'ota-3'])
+    expect(outcome.complete).toBe(true)
+    expect(d.runReviews).toHaveBeenCalledWith(
+      expect.objectContaining({ chosen: ['ota-2', 'ota-3'], wish: 'вкусные завтраки' }),
+    )
+    expect(record).toHaveBeenCalledTimes(1)
+  })
+
   // Scenario: Параллельные вызовы — независимые запуски
   it('runs the calls in parallel, each a run of its own', async () => {
     const { deps: d, active, record } = deps()

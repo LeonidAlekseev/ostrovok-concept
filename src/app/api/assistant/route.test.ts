@@ -1343,6 +1343,20 @@ describe('POST /api/assistant: the choice by the tools of the store', () => {
     expect(body.source).toBe('rules')
   })
 
+  // Scenario: Просьба об отзывах без города и дат
+  it('searches the reviews in Valencia for a wish of the food, before the dates and the party are asked', async () => {
+    setModel(undefined)
+    for (const text of ['Где хороший завтрак', 'Отель с отличной кухней']) {
+      const body = await (await ask(text, {})).json()
+      expect(body.brief.destinationId).toBe('valencia')
+      expect(body.steps.map((s: { title: string }) => s.title)).toContain('Отзывы')
+    }
+    // Another topic of the store still waits for the city.
+    const body = await (await ask('Где чисто?', {})).json()
+    expect(body.brief.destinationId).toBeUndefined()
+    expect(body.steps).toBeUndefined()
+  })
+
   // Scenario: Модель выбирает вызовы инструментов
   it('runs the calls the model chose, with its parameters', async () => {
     const model = new MockLanguageModelV4({

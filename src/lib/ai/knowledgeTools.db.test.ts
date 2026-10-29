@@ -5,7 +5,7 @@ import { loadHotelSummaries } from '@/lib/db/catalog'
 import { isSupabaseConfigured } from '@/lib/supabase/config'
 import { toolResultSchema } from '@/lib/toolResult'
 import { runKnowledge, rulesKnowledge, type KnowledgeDeps } from './knowledgeTurn'
-import { runFeaturesTool, runNearTool, runReviewsTool } from './knowledgeTools'
+import { reviewVerdicts, runFeaturesTool, runNearTool, runReviewsTool } from './knowledgeTools'
 
 vi.mock('next/cache', () => ({ unstable_cache: (read: unknown) => read }))
 
@@ -27,6 +27,7 @@ describe.runIf(process.env.LIVE_DB === '1' && isSupabaseConfigured)('the tools o
       runFeatures: runFeaturesTool,
       runNear: runNearTool,
       runReviews: runReviewsTool,
+      reviewVerdicts,
       record: async (_owner, _tool, _input, execute) => ({ id: crypto.randomUUID(), result: await execute(null) }),
     }
     const outcome = await runKnowledge({ calls, planner: 'rules' }, candidates, {
