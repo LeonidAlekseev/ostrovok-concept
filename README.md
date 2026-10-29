@@ -30,12 +30,13 @@ docker compose up --build
 
 То же короче — через `make` (на Windows без `make` используйте команды из правой колонки):
 
-| Команда     | Что делает                                            | Без `make`                                                     |
-| ----------- | ----------------------------------------------------- | -------------------------------------------------------------- |
-| `make up`   | собрать образ и запустить приложение на `:8080`       | `docker compose up --build`                                    |
-| `make down` | остановить и удалить контейнеры                       | `docker compose down`                                          |
-| `make logs` | логи приложения в реальном времени                    | `docker compose logs -f app`                                   |
-| `make seed` | загрузить и пересобрать данные в облачной базе `.env` | `docker compose run --rm --build tools sh scripts/seed-all.sh` |
+| Команда               | Что делает                                                                      | Без `make`                                                             |
+| --------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `make up`             | собрать образ и запустить приложение на `:8080`                                 | `docker compose up --build`                                            |
+| `make down`           | остановить и удалить контейнеры                                                 | `docker compose down`                                                  |
+| `make logs`           | логи приложения в реальном времени                                              | `docker compose logs -f app`                                           |
+| `make seed`           | загрузить и пересобрать данные в облачной базе `.env`                           | `docker compose run --rm --build tools sh scripts/seed-all.sh`         |
+| `make seed-local-geo` | геоданные Валенсии (EUBUCCO, OSM, границы; шум — `NOISE_GPKG`) в локальную базу | `docker compose … run --rm --build tools sh scripts/seed-local-geo.sh` |
 
 Ключи в `.env` даются двумя способами:
 
@@ -120,11 +121,12 @@ GoTrue и Storage для входа и фото. Поэтому данные н�
 cp .env.local-supabase.example .env.local-supabase   # ключи только для локального запуска
 make up-local     # база и сервисы; фронтенд ждёт данные, затем собирается: http://localhost:8080
 make seed-local   # в другом терминале: миграции, каталог, демо-аккаунты, демо-чаты с отельером, векторы
+make seed-local-geo   # геоданные Валенсии из первоисточников; шум EEA — NOISE_GPKG=/путь/ES.gpkg make seed-local-geo
 make down-local
 ```
 
 Ключи моделей (GigaChat, NVIDIA) и демо-аккаунты берутся из `.env`, модели остаются удалёнными. Внешние данные
-(Островок, EUBUCCO, шум EEA, места OSM) в `make seed-local` не входят. Откуда какие данные и как их загрузить —
+(Островок, EUBUCCO, шум EEA, места OSM) в `make seed-local` не входят; геоданные грузит `make seed-local-geo`. Откуда какие данные и как их загрузить —
 [docs/data-sources.md](docs/data-sources.md), подробности запуска — [docs/docker.md](docs/docker.md).
 
 ## Маршруты и доступ

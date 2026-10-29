@@ -20,7 +20,7 @@
 
 - `Dockerfile` — стадии `deps` (`npm ci`), `source`, `build` (`next build` с `output: 'standalone'`, включается
   `NEXT_OUTPUT=standalone` только в образе), `runner` (только `server.js`, `.next/static`, `public`, `secrets.app.env.age`)
-  и `tools` (зависимости и `scripts/` для `make seed`). Базовый образ закреплён: `node:24.22.1-alpine3.24`.
+  и `tools` (зависимости и `scripts/` для `make seed`; плюс `uv` и `python3` из apk для `scripts/*.py`, в `runner` их нет). Базовый образ закреплён: `node:24.22.1-alpine3.24`.
 - Рантайм — Alpine с busybox (POSIX sh, без bash), процесс от пользователя `app`, порт `8080`, логи в stdout и stderr.
 - `docker-compose.yml` — сервис `app` (`platform: linux/amd64`, `env_file: .env`, `8080:8080`, healthcheck по `/health`)
   и сервис `tools` (профиль `tools`, `up` его не запускает).
@@ -28,7 +28,7 @@
   перезапуском, без пересборки).
 - `docker-compose.local.yml`, `docker/local-supabase/`, `.env.local-supabase.example` — дополнительный вариант с локальной
   Supabase.
-- `Makefile` — `make up`, `make down`, `make logs`, `make seed`; `make up-local`, `make down-local`, `make seed-local`.
+- `Makefile` — `make up`, `make down`, `make logs`, `make seed`; `make up-local`, `make down-local`, `make seed-local`, `make seed-local-geo`.
 - `.dockerignore` — `.env*`, `*.key`, `.git`, `node_modules` не попадают в контекст сборки.
 
 ## Docker Desktop (Windows, macOS)
@@ -98,14 +98,17 @@ https://gu-st.ru/content/Other/doc/russian_trusted_root_ca.cer, SHA-256
 4. `make seed-local` в другом терминале: сервис `tools` выполняет `scripts/seed-all.sh` против локальной базы — миграции
    (`db:push`), каталог и демо-путешественник, демо-отельер, демо-чаты с отельером, пересборка настоящих отелей,
    свойства, векторы. После этого приложение собирается и открывается на http://localhost:8080.
-5. `make down-local` останавливает всё; данные лежат в томах `db-data` и `storage-data` (`docker volume ls`), удалить их
+5. `make seed-local-geo` (по желанию, после шага 4): здания EUBUCCO, границы, места OSM и пересчёт `db:features` прямо из
+   первоисточников; шум EEA — `NOISE_GPKG=/путь/к/ES.gpkg make seed-local-geo`. Подробности — в
+   [«Источниках данных»](data-sources.md#make-seed-local-geo-геоданные-валенсии-в-локальную-базу).
+6. `make down-local` останавливает всё; данные лежат в томах `db-data` и `storage-data` (`docker volume ls`), удалить их
    — `docker compose --env-file .env.local-supabase -f docker-compose.local.yml down -v`.
 
 Браузер и контейнеры ходят в Supabase по одному адресу `http://supabase.localhost:8000` (Kong): `*.localhost` — петля в
 браузере, а внутри сети это псевдоним Kong, так что cookie сессии Auth совпадают на сервере и в браузере. Postgres
 доступен снаружи на `127.0.0.1:54322`. Embedding-модели и GigaChat по-прежнему удалённые, поэтому `db:embed*` ходят в
 NVIDIA API (до 40 запросов в минуту). Данные внешних источников (Островок, EUBUCCO, шум EEA, места OSM) в
-`seed-all.sh` не входят: как их загрузить, написано в [«Источниках данных»](data-sources.md). Без настоящих отелей
+`seed-all.sh` не входят: геоданные грузит `make seed-local-geo`, остальное описано в [«Источниках данных»](data-sources.md). Без настоящих отелей
 (`ota-*`) демо-чаты с отельером пропускаются.
 
 [← README](../README.md)
