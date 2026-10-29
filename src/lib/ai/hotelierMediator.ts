@@ -132,6 +132,22 @@ export const cited = <T>(ids: readonly string[], prefix: 'C' | 'D', rows: readon
 /** Two current answers of the hotelier about one characteristic that say different things. */
 export const contradicts = (claims: readonly HotelClaim[]) => conflictingIds(claims).size > 0
 
+const OSTROVOK_PAGE_ID = 'mediator-ostrovok-page'
+
+/** The hotel's Ostrovok page as a source; the store keeps no address of it, so it has no link. */
+export const ostrovokPageEvidence = (hotelName: string): ToolEvidence => ({
+  id: OSTROVOK_PAGE_ID,
+  source_type: 'ota_page',
+  source_name: 'Островок',
+  source_id: null,
+  source_url: null,
+  title: `Страница отеля на Островке: «${hotelName}»`.slice(0, 300),
+  excerpt: null,
+  retrieved_at: null,
+  entity_id: null,
+  claim_id: null,
+})
+
 /** The answer's block: the hotelier's claims and the documents it used, with their sources from the store. */
 async function sourcesResult(
   hotelId: string,
@@ -139,8 +155,11 @@ async function sourcesResult(
   claims: readonly HotelClaim[],
   chunks: readonly KnowledgeChunk[],
   hotelData: boolean,
+  hotelName: string,
 ): Promise<ToolResult> {
   const evidence = new Map<string, ToolEvidence>()
+  // The page's facts (amenities, rooms) have no claim in the store: the page itself is the source the answer shows.
+  if (hotelData) evidence.set(OSTROVOK_PAGE_ID, ostrovokPageEvidence(hotelName))
   for (const claim of claims) for (const e of hotelierToolEvidence(claim)) evidence.set(e.id, e)
   const read = await loadEvidence(
     hotelId,
@@ -270,7 +289,14 @@ export async function mediate(conversationId: string, messageId: string): Promis
     const usedChunks = decision ? cited(decision.chunk_ids, 'D', chunks) : []
     // An answer with no source it can show is no answer: the hotelier gets the question.
     if (answer && isRussian(answer) && (usedClaims.length || usedChunks.length || decision?.hotel_data)) {
-      const result = await sourcesResult(hotel.id, answer, usedClaims, usedChunks, decision?.hotel_data ?? false)
+      const result = await sourcesResult(
+        hotel.id,
+        answer,
+        usedClaims,
+        usedChunks,
+        decision?.hotel_data ?? false,
+        hotel.name,
+      )
       const { error } = await db.from('hotelier_messages').insert({
         conversation_id: conversationId,
         sender: 'ai_assistant',
