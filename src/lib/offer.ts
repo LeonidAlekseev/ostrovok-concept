@@ -20,7 +20,7 @@ export interface Offer extends OfferSelection {
   rate: Rate
   destination: Destination
   nights: number
-  /** For the whole stay and all rooms, ₽. */
+  /** For the whole stay and all rooms at the GURU price, ₽: what the hotel page shows and the booking costs. */
   total: number
 }
 
@@ -108,7 +108,7 @@ export function parseOffer(
       rate,
       destination,
       nights,
-      total: stayTotal(rate.pricePerNight, stay.checkIn, stay.checkOut, stay.guests.rooms),
+      total: guruPrice(stayTotal(rate.pricePerNight, stay.checkIn, stay.checkOut, stay.guests.rooms)),
     },
   }
 }

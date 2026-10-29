@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { destinations } from '../data/destinations'
 import { cheapestRate } from './catalog'
 import { getHotel } from './catalogGenerator'
+import { parseStayParams } from './search'
 import {
   averageNight,
   freeCancellationUntil,
@@ -114,18 +115,30 @@ describe('parseOffer', () => {
     if (!result.ok) return
     expect(result.offer).toMatchObject({ ...selection, hotel, room, rate, nights: 2 })
     expect(result.offer.destination.id).toBe('prague')
-    expect(result.offer.total).toBe(rate.pricePerNight * 2)
+    expect(result.offer.total).toBe(guruPrice(rate.pricePerNight * 2))
   })
 
   it('prices several rooms', () => {
     const result = parse({ adults: '2', rooms: '2' })
-    expect(result.ok && result.offer.total).toBe(rate.pricePerNight * 2 * 2)
+    expect(result.ok && result.offer.total).toBe(guruPrice(rate.pricePerNight * 2 * 2))
   })
 
   it('prices a Friday check-in at the weekend price', () => {
     const result = parse({ checkin: '2026-11-06', checkout: '2026-11-08' })
-    expect(result.ok && result.offer.total).toBe(2 * nightPrice(rate.pricePerNight, '2026-11-06'))
-    expect(result.ok && result.offer.total).toBeGreaterThan(rate.pricePerNight * 2)
+    expect(result.ok && result.offer.total).toBe(guruPrice(2 * nightPrice(rate.pricePerNight, '2026-11-06')))
+    expect(result.ok && result.offer.total).toBeGreaterThan(guruPrice(rate.pricePerNight * 2))
+  })
+
+  it('costs what the hotel page shows as the GURU price of the cheapest rate', () => {
+    const { room: cheapRoom, rate: cheapRate } = cheapestRate(hotel)
+    const result = parseOffer(
+      toOfferParams({ ...selection, roomId: cheapRoom.id, rateId: cheapRate.id }),
+      TODAY,
+      [hotel],
+      destinations,
+    )
+    const stay = parseStayParams(toOfferParams({ ...selection, roomId: cheapRoom.id, rateId: cheapRate.id }))!
+    expect(result.ok && result.offer.total).toBe(guruPrice(lowestPrice(hotel, stay, stay.guests.rooms, TODAY)))
   })
 
   it('rejects an unknown hotel, room or rate', () => {

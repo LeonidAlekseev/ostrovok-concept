@@ -18,7 +18,7 @@ import { loadLevelIndex, loadNearIndex } from '@/lib/db/knowledge'
 import { errorResult, toolResultSchema } from '@/lib/toolResult'
 import { sampleResult } from '@/test/toolResult'
 import { addDays, todayIso } from '@/lib/dates'
-import { stayTotal } from '@/lib/offer'
+import { guruPrice, stayTotal } from '@/lib/offer'
 import { POST } from './route'
 
 vi.mock('@/lib/ai/model', () => ({ getTextModels: vi.fn(), getVisionModels: vi.fn(), REMARK_MODEL_ID: 'remark' }))
@@ -1495,7 +1495,7 @@ describe('POST /api/assistant: a chat about the bookings', () => {
       from: { checkIn, checkOut, total: trip.total },
       checkIn: newIn,
       checkOut: newOut,
-      total: stayTotal(rate.pricePerNight, newIn, newOut, 1),
+      total: guruPrice(stayTotal(rate.pricePerNight, newIn, newOut, 1)),
       cancellation: expect.any(Object),
     })
     expect(body.steps[0]).toMatchObject({ agent: 'trips', title: 'Пересчёт при смене дат' })

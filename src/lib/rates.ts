@@ -1,6 +1,6 @@
 import type { Rate, Room } from './catalog'
 import { nightsBetween, type IsoDate } from './dates'
-import { averageNight, freeCancellationUntil, stayTotal } from './offer'
+import { averageNight, freeCancellationUntil, guruPrice, stayTotal } from './offer'
 import type { Guests, Stay } from './search'
 
 /** Free cancellation until `until`, or `null`: non-refundable, or the free period is already over. */
@@ -23,6 +23,7 @@ export function unavailableReason(room: Room, guests: Guests): string | null {
     : null
 }
 
+/** Prices at the GURU price, as the hotel page's price card and the checkout have them. */
 export interface RatePrice {
   /** The average night of one room over the stay; the weekday price until the dates are chosen. */
   perNight: number
@@ -31,8 +32,8 @@ export interface RatePrice {
 }
 
 export function ratePrice(rate: Rate, stay: Stay | null): RatePrice {
-  if (!stay) return { perNight: rate.pricePerNight, total: null }
+  if (!stay) return { perNight: guruPrice(rate.pricePerNight), total: null }
   const { checkIn, checkOut, guests } = stay
-  const total = stayTotal(rate.pricePerNight, checkIn, checkOut, guests.rooms)
+  const total = guruPrice(stayTotal(rate.pricePerNight, checkIn, checkOut, guests.rooms))
   return { perNight: averageNight(total, nightsBetween(checkIn, checkOut), guests.rooms), total }
 }
