@@ -31,6 +31,7 @@ import {
   placeLabel,
   runFeaturesTool,
   runNearTool,
+  reviewVerdicts,
   runReviewsTool,
   type Candidate,
   type FeatureCriteria,
@@ -78,12 +79,16 @@ const TOPIC_WORDS: [ReviewTopic, RegExp][] = [
   ['cleanliness', /(?<!\p{L})(?:чист|грязн|убор)/iu],
   ['staff', /(?<!\p{L})(?:персонал|сотрудник|ресепш|администратор)/iu],
   ['breakfast', /(?<!\p{L})завтрак/iu],
+  ['food', /(?<!\p{L})(?:кухн|ресторан|кормят|еда(?!\p{L})|еды(?!\p{L})|ужин)/iu],
   ['comfort', /(?<!\p{L})(?:кроват|матрас|подушк)/iu],
   ['noise', /(?<!\p{L})(?:шум|тих|тиш|громк|слышн)/iu],
   ['location', /(?<!\p{L})(?:расположен|район)/iu],
 ]
 /** «В 300 м», «до 800 метров», «в 1 км» of a place. */
 const RADIUS = /(?:в|до|не дальше|ближе)\s+(\d+(?:[.,]\d+)?)\s*(км|километр\p{L}*|м|метр\p{L}*)(?!\p{L})/iu
+
+/** The food asks of the reviews by itself: «хороший завтрак», «отель с отличной кухней» need no word «отзывы». */
+const FOOD_TOPICS: readonly ReviewTopic[] = ['breakfast', 'food']
 
 /** The sea is the features' step's (`seaMaxM`): «у моря» is not a place near of these tools by the rules. */
 const RULE_CATEGORIES = NEAR_CATEGORIES.filter((c) => c !== 'beach')
@@ -113,9 +118,10 @@ export function rulesKnowledge(wish: string, brief: Pick<Brief, 'quiet'>): Knowl
   for (const category of questionCategories(wish))
     if ((RULE_CATEGORIES as readonly string[]).includes(category))
       calls.push({ tool: 'near', category: category as NearCategory, radiusM })
-  const topics = REVIEW.test(wish) ? TOPIC_WORDS.filter(([, words]) => words.test(wish)).map(([t]) => t) : []
-  for (const topic of topics.length > 0 ? topics : quiet ? (['noise'] as const) : [])
-    calls.push({ tool: 'reviews', topic })
+  const topics = TOPIC_WORDS.filter(
+    ([topic, words]) => (REVIEW.test(wish) || FOOD_TOPICS.includes(topic)) && words.test(wish),
+  ).map(([t]) => t)
+  for (const topic of quiet ? ['noise' as const, ...topics] : topics) calls.push({ tool: 'reviews', topic })
   return normalizeCalls(calls)
 }
 
@@ -164,7 +170,8 @@ const PLAN_TOOLS = {
     inputSchema: nearInput,
   }),
   guestReviews: tool({
-    description: 'Фрагменты отзывов гостей подобранных отелей по теме: шум, чистота, персонал, завтрак, сон, район.',
+    description:
+      'Фрагменты отзывов гостей подобранных отелей по теме: шум, чистота, персонал, завтрак, кухня и еда, сон, район.',
     inputSchema: reviewsInput,
   }),
 }
@@ -175,7 +182,7 @@ const PLAN_INSTRUCTIONS = [
   'с topic noise. Место рядом (аптека, магазин, остановка, метро, парк) — nearbyPlaces с этой категорией, радиус',
   `${NEAR_DEFAULT_RADIUS_M}, если гость не назвал другой (не больше ${NEAR_MAX_RADIUS_M}). Высокое здание —`,
   'heightMinM 20, невысокое — heightMaxM 12; о высоте не просили — не задавай её. Вызывай только то, о чём просит',
-  'гость. Не больше',
+  'гость. Просят хороший завтрак, вкусную кухню — guestReviews с topic breakfast или food. Не больше',
   `${MAX_KNOWLEDGE_CALLS} вызовов.`,
 ].join(' ')
 
@@ -287,6 +294,7 @@ export interface KnowledgeDeps {
   runFeatures: typeof runFeaturesTool
   runNear: typeof runNearTool
   runReviews: typeof runReviewsTool
+  reviewVerdicts: typeof reviewVerdicts
   record: typeof recordRun
 }
 
@@ -354,10 +362,13 @@ export async function runKnowledge(
     owner,
     deadline,
     deps,
+    wish,
   }: {
     owner: RunOwner | null
     deadline: number
     deps: KnowledgeDeps
+    /** The guest's words, for the meaning part of the reviews' search. */
+    wish?: string
   },
 ): Promise<Omit<KnowledgeOutcome, 'text'> & { runs: { call: KnowledgeCall; run: ToolRun }[] }> {
   const { calls } = plan
@@ -376,6 +387,18 @@ export async function runKnowledge(
     }
     return []
   })
+  // The reviews choose too: a hotel whose guests do not name the topic is no answer to «хороший завтрак». Beside the
+  // store's measures (the night's noise) they only show: a hotel the map calls quiet is not out for lack of a review.
+  const reviewing = calls.flatMap((c) =>
+    c.tool === 'reviews' && (choices.length === 0 || FOOD_TOPICS.includes(c.topic)) ? [c.topic] : [],
+  )
+  const reviewed = await Promise.race([
+    Promise.all(reviewing.map((topic) => deps.reviewVerdicts(topic, ids, wish))),
+    new Promise<null[]>((resolve) =>
+      setTimeout(() => resolve([]), Math.max(0, Math.min(KNOWLEDGE_RUN_MS, deadline - Date.now()))),
+    ),
+  ])
+  for (const verdicts of reviewed) if (verdicts) choices.push(verdicts)
   const { ids: chosen, complete } =
     choices.length > 0 ? chooseHotels(candidates, choices) : { ids: [], complete: false }
   const ms = Math.min(KNOWLEDGE_RUN_MS, deadline - Date.now())
@@ -390,7 +413,7 @@ export async function runKnowledge(
                 nearIndex.get(call.category) ?? null,
               )
             : chosen.length > 0
-              ? deps.runReviews({ topic: call.topic, candidates, chosen })
+              ? deps.runReviews({ topic: call.topic, wish, candidates, chosen })
               : Promise.resolve(errorResult('no_hotels', 'Отзывы не искал: ни один отель не подобран'))
       const run = await deps.record(owner, NAME[call.tool], callParams(call), () => inTime(execute, ms))
       return { call, run }
@@ -553,6 +576,7 @@ export async function knowledgeTurn(
     owner: runOwner,
     deadline: deadline - KNOWLEDGE_RESERVE_MS,
     deps,
+    wish,
   })
   const names = new Map(candidates.map((c) => [c.id, c.name]))
   const facts = knowledgeAnswer(outcome.runs, outcome.chosen, outcome.complete, names)

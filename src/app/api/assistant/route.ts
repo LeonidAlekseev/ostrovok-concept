@@ -16,9 +16,11 @@ import {
   knowledgeTurn,
   planKnowledge,
   rulesKnowledge,
+  type KnowledgeCall,
   type KnowledgeDeps,
 } from '@/lib/ai/knowledgeTurn'
-import { runFeaturesTool, runNearTool, runReviewsTool, type Candidate } from '@/lib/ai/knowledgeTools'
+import { reviewVerdicts, runFeaturesTool, runNearTool, runReviewsTool, type Candidate } from '@/lib/ai/knowledgeTools'
+import { PERSONA_CITY } from '@/lib/personas'
 import { loadHotelierNoise } from '@/lib/db/claims'
 import { loadLevelIndex, loadNearIndex } from '@/lib/db/knowledge'
 import { MODEL_TIMEOUT_MS, understandWish } from '@/lib/ai/understand'
@@ -104,12 +106,13 @@ async function planTurn(
   context: Omit<TurnContext, 'summaries' | 'features'>,
   { messages, chatId, messageId }: Pick<WishContext, 'messages' | 'chatId' | 'messageId'>,
 ): Promise<Partial<AssistantResponse>> {
-  if (nextQuestion(context.brief, context.today)) return {}
+  const rules = rulesKnowledge(context.wish, context.brief)
+  // A wish of the guests' words («хороший завтрак») is answered before the dates and the party are asked.
+  if (!asksReviews(rules) && nextQuestion(context.brief, context.today)) return {}
   let summaries: Promise<HotelSummary[]> | undefined
   const loadSummaries = () => (summaries ??= loadHotelSummaries().catch(() => []))
   // The wish asks of the noise, a place near or the reviews: the model chooses the tools of the store while the
   // search runs, and the search leaves them their time.
-  const rules = rulesKnowledge(context.wish, context.brief)
   const knowledge = rules.length > 0
   const models = knowledge ? await getTextModels() : undefined
   const plan = knowledge
@@ -175,6 +178,9 @@ async function planTurn(
 /** The answer's time the tools of the store keep for themselves after the earlier steps. */
 const KNOWLEDGE_TIME_MS = 4000
 
+/** The wish asks of the guests' reviews. */
+const asksReviews = (calls: readonly KnowledgeCall[]) => calls.some((c) => c.tool === 'reviews')
+
 /** The store's reads and the runs of the tools, as the route does them. */
 const KNOWLEDGE_DEPS: KnowledgeDeps = {
   levels: loadLevelIndex,
@@ -183,6 +189,7 @@ const KNOWLEDGE_DEPS: KnowledgeDeps = {
   runFeatures: runFeaturesTool,
   runNear: runNearTool,
   runReviews: runReviewsTool,
+  reviewVerdicts,
   record: recordRun,
 }
 
@@ -411,6 +418,9 @@ async function wishTurn(context: WishContext) {
     .map((m) => m.text)
     .join('. ')
   const found = (next: Brief) => planTurn({ brief: next, wish, today, destinations, deadline, signal }, context)
+  // The reviews of the store are of Valencia: a wish of them without a city is about it.
+  const withCity = (next: Brief): Brief =>
+    !next.destinationId && asksReviews(rulesKnowledge(wish, next)) ? { ...next, destinationId: PERSONA_CITY } : next
 
   const models = await getTextModels()
   let down = false
@@ -422,13 +432,13 @@ async function wishTurn(context: WishContext) {
     )
     if (result.ok) {
       const { parsed, reply } = result.value
-      const next = foldBrief(brief, parsed, input, asked)
+      const next = withCity(foldBrief(brief, parsed, input, asked))
       return { brief: next, reply, source: 'model', ...(await found(next)) } satisfies AssistantResponse
     }
     down = result.failed.length > 0
     console.warn('assistant: no model answered, using the rules')
   }
-  const next = mergeBrief(brief, input, asked, destinations)
+  const next = withCity(mergeBrief(brief, input, asked, destinations))
   return {
     brief: next,
     source: 'rules',
