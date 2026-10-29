@@ -896,12 +896,17 @@ const isStep = (value: unknown): value is TurnStep =>
   ['search', 'features', 'vision', 'geo', 'trips', 'hotelier'].includes((value as TurnStep).agent) &&
   typeof (value as TurnStep).title === 'string' &&
   ['done', 'failed'].includes((value as TurnStep).status)
+/** The common name of the search of the hotels' documents (reviews, descriptions, hoteliers' answers). */
+export const DEEP_SEARCH_TITLE = 'Углубленный поиск'
+/** What a saved step was titled before it was renamed: it is shown under the new name. */
+const RENAMED_STEP: Record<string, string> = { Отзывы: DEEP_SEARCH_TITLE }
+export const stepTitle = (agent: string, title: string) => (agent === 'search' ? (RENAMED_STEP[title] ?? title) : title)
 /** The known fields of a step only; a run off the contract is dropped, the step stays as an older one. */
 const stepOf = ({ agent, title, params, status, result, run }: TurnStep): TurnStep => {
   const parsed = parseToolRun(run)
   return {
     agent,
-    title,
+    title: stepTitle(agent, title),
     ...(typeof params === 'string' && params && { params }),
     status,
     ...(typeof result === 'string' && result && { result }),

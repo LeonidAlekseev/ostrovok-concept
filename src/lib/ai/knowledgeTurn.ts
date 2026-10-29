@@ -20,8 +20,11 @@ import {
   NEAR_DEFAULT_RADIUS_M,
   NEAR_MAX_RADIUS_M,
   QUIET_NIGHT_DB,
-  REVIEWS_TOOL,
-  REVIEWS_TOOL_TITLE,
+  DEEP_TOOL_TITLE,
+  EXACT_TOOL,
+  EXACT_TOOL_TITLE,
+  MEANING_TOOL,
+  MEANING_TOOL_TITLE,
   REVIEW_TOPICS,
   REVIEW_TOPIC_LABEL,
   chooseHotels,
@@ -31,9 +34,10 @@ import {
   placeLabel,
   runFeaturesTool,
   runNearTool,
-  reviewVerdicts,
-  runReviewsTool,
+  deepVerdicts,
+  runDeepTool,
   type Candidate,
+  type DeepMode,
   type FeatureCriteria,
   type HotelVerdict,
   type NearCategory,
@@ -43,19 +47,19 @@ import { REMARK_MODEL_ID } from './model'
 
 /**
  * Эвал's choice of hotels by what the store knows of them (src/lib/ai/knowledgeTools.ts), once the plan is due and the
- * wish asks of the noise, a place near or the reviews. A model of the chain chooses the calls of the tools with their
+ * wish asks of the noise, a place near or the documents of the hotels (reviews, descriptions, answers of the hoteliers). A model of the chain chooses the calls of the tools with their
  * parameters by tool calling (the rules choose the same tools by the words of the wish without one, or when none
  * answered in time); the indexes of the store choose the hotels every call agrees on; then each call runs as a tool of
  * the contract of its own — in parallel, each a row of `tool_runs` for a signed-in user — and shows the chosen hotels
  * with the claims it went by. The answer is written by rules from the runs' claims — no model can add a number or a
  * source — and a model may add one sentence over them, kept only when it passes the checks of src/lib/ai/geoRemark.ts.
- * The reviews are a guest's untrusted words: the model sees none of them.
+ * The documents are untrusted words of guests, pages and hoteliers: the model sees none of them.
  */
 
 export type KnowledgeCall =
   | { tool: 'features'; criteria: FeatureCriteria }
   | { tool: 'near'; category: NearCategory; radiusM: number }
-  | { tool: 'reviews'; topic: ReviewTopic }
+  | { tool: 'deep'; topic: ReviewTopic }
 
 /** The calls of a turn at most: the answer stays short and in time. */
 export const MAX_KNOWLEDGE_CALLS = 5
@@ -121,7 +125,7 @@ export function rulesKnowledge(wish: string, brief: Pick<Brief, 'quiet'>): Knowl
   const topics = TOPIC_WORDS.filter(
     ([topic, words]) => (REVIEW.test(wish) || FOOD_TOPICS.includes(topic)) && words.test(wish),
   ).map(([t]) => t)
-  for (const topic of quiet ? ['noise' as const, ...topics] : topics) calls.push({ tool: 'reviews', topic })
+  for (const topic of quiet ? ['noise' as const, ...topics] : topics) calls.push({ tool: 'deep', topic })
   return normalizeCalls(calls)
 }
 
@@ -139,7 +143,7 @@ export function normalizeCalls(calls: readonly KnowledgeCall[]): KnowledgeCall[]
   return [
     ...(features ? [{ tool: 'features' as const, criteria }] : []),
     ...[...near].map(([category, radiusM]) => ({ tool: 'near' as const, category, radiusM })),
-    ...[...topics].map((topic) => ({ tool: 'reviews' as const, topic })),
+    ...[...topics].map((topic) => ({ tool: 'deep' as const, topic })),
   ].slice(0, MAX_KNOWLEDGE_CALLS)
 }
 
@@ -153,7 +157,7 @@ const nearInput = z.object({
   category: z.enum(NEAR_CATEGORIES as unknown as [NearCategory, ...NearCategory[]]),
   radiusM: z.number().int().min(100).max(NEAR_MAX_RADIUS_M).describe('радиус от отеля, метры; «рядом» — 500'),
 })
-const reviewsInput = z.object({ topic: z.enum(REVIEW_TOPICS) })
+const deepInput = z.object({ topic: z.enum(REVIEW_TOPICS) })
 
 /** The tools as the model sees them to choose the calls: no `execute`, the turn runs each call itself. */
 const PLAN_TOOLS = {
@@ -169,20 +173,21 @@ const PLAN_TOOLS = {
       `пляж, парк) по данным OpenStreetMap и Островка в ${NEAR_MAX_RADIUS_M} м. Один вызов — одна категория.`,
     inputSchema: nearInput,
   }),
-  guestReviews: tool({
+  deepSearch: tool({
     description:
-      'Фрагменты отзывов гостей подобранных отелей по теме: шум, чистота, персонал, завтрак, кухня и еда, сон, район.',
-    inputSchema: reviewsInput,
+      'Углубленный поиск по отзывам, описаниям и ответам отельеров: точный по словам и по смыслу, фрагменты ' +
+      'подобранных отелей по теме — шум, чистота, персонал, завтрак, кухня и еда, сон, район.',
+    inputSchema: deepInput,
   }),
 }
 
 const PLAN_INSTRUCTIONS = [
   'Ты Эвал, помощник по подбору отелей. Выбери вызовы инструментов, чтобы подобрать отели по последнему пожеланию',
-  `гостя. «Тихо», «тихо ночью» — hotelsByFeatures с nightBelowDb ${QUIET_NIGHT_DB} (очень тихо — 45) и guestReviews`,
+  `гостя. «Тихо», «тихо ночью» — hotelsByFeatures с nightBelowDb ${QUIET_NIGHT_DB} (очень тихо — 45) и deepSearch`,
   'с topic noise. Место рядом (аптека, магазин, остановка, метро, парк) — nearbyPlaces с этой категорией, радиус',
   `${NEAR_DEFAULT_RADIUS_M}, если гость не назвал другой (не больше ${NEAR_MAX_RADIUS_M}). Высокое здание —`,
   'heightMinM 20, невысокое — heightMaxM 12; о высоте не просили — не задавай её. Вызывай только то, о чём просит',
-  'гость. Просят хороший завтрак, вкусную кухню — guestReviews с topic breakfast или food. Не больше',
+  'гость. Просят хороший завтрак, вкусную кухню — deepSearch с topic breakfast или food. Не больше',
   `${MAX_KNOWLEDGE_CALLS} вызовов.`,
 ].join(' ')
 
@@ -224,9 +229,9 @@ export async function modelKnowledge(
       const input = nearInput.safeParse(call.input)
       return input.success ? [{ tool: 'near', ...input.data }] : []
     }
-    if (call.toolName === 'guestReviews') {
-      const input = reviewsInput.safeParse(call.input)
-      return input.success ? [{ tool: 'reviews', topic: input.data.topic }] : []
+    if (call.toolName === 'deepSearch') {
+      const input = deepInput.safeParse(call.input)
+      return input.success ? [{ tool: 'deep', topic: input.data.topic }] : []
     }
     return []
   })
@@ -237,7 +242,7 @@ export async function modelKnowledge(
 
 /** What a call is of: the features, a category of places, a topic of reviews. */
 const callKey = (call: KnowledgeCall) =>
-  call.tool === 'features' ? 'features' : call.tool === 'near' ? `near:${call.category}` : `reviews:${call.topic}`
+  call.tool === 'features' ? 'features' : call.tool === 'near' ? `near:${call.category}` : `deep:${call.topic}`
 
 /**
  * The model's calls with those of the rules it left out: a place or a topic the traveller named is always checked; the
@@ -293,8 +298,8 @@ export interface KnowledgeDeps {
   near: (category: NearCategory) => Promise<NearRow[] | null>
   runFeatures: typeof runFeaturesTool
   runNear: typeof runNearTool
-  runReviews: typeof runReviewsTool
-  reviewVerdicts: typeof reviewVerdicts
+  runDeep: typeof runDeepTool
+  deepVerdicts: typeof deepVerdicts
   record: typeof recordRun
 }
 
@@ -323,28 +328,43 @@ async function inTime(execute: () => Promise<ToolResult>, ms: number): Promise<T
   }
 }
 
-const TITLE: Record<KnowledgeCall['tool'], string> = {
-  features: FEATURES_TOOL_TITLE,
-  near: NEARBY_TOOL_TITLE,
-  reviews: REVIEWS_TOOL_TITLE,
+/** The title of a block: the two steps of «Углубленный поиск» are titled each by its own. */
+const titleOf = (call: KnowledgeCall, mode?: DeepMode) =>
+  call.tool === 'features'
+    ? FEATURES_TOOL_TITLE
+    : call.tool === 'near'
+      ? NEARBY_TOOL_TITLE
+      : mode === 'meaning'
+        ? MEANING_TOOL_TITLE
+        : EXACT_TOOL_TITLE
+const nameOf = (call: KnowledgeCall, mode?: DeepMode) =>
+  call.tool === 'features'
+    ? FEATURES_TOOL
+    : call.tool === 'near'
+      ? NEARBY_TOOL
+      : mode === 'meaning'
+        ? MEANING_TOOL
+        : EXACT_TOOL
+const AGENT: Record<KnowledgeCall['tool'], TurnStep['agent']> = { features: 'features', near: 'geo', deep: 'search' }
+/** The steps a call runs as: «Углубленный поиск» is the words, then the meaning. */
+const MODES: readonly DeepMode[] = ['exact', 'meaning']
+/** A run of a call; `mode` for a step of «Углубленный поиск». */
+export interface KnowledgeRun {
+  call: KnowledgeCall
+  run: ToolRun
+  mode?: DeepMode
 }
-const NAME: Record<KnowledgeCall['tool'], string> = {
-  features: FEATURES_TOOL,
-  near: NEARBY_TOOL,
-  reviews: REVIEWS_TOOL,
-}
-const AGENT: Record<KnowledgeCall['tool'], TurnStep['agent']> = { features: 'features', near: 'geo', reviews: 'search' }
 
 /** What a call asks, in Russian: «ночью тише 50 дБ», «аптека в 500 м», «отзывы: шум и тишина». */
 export function callParams(call: KnowledgeCall): string {
   if (call.tool === 'features') return criteriaLabel(call.criteria)
   if (call.tool === 'near') return `${placeLabel(call.category)} в ${formatMeters(call.radiusM)}`
-  return `тема: ${REVIEW_TOPIC_LABEL[call.topic]}`
+  return `${DEEP_TOOL_TITLE} · тема: ${REVIEW_TOPIC_LABEL[call.topic]}`
 }
 
-const stepOf = (call: KnowledgeCall, run: ToolRun): TurnStep => ({
+const stepOf = ({ call, run, mode }: KnowledgeRun): TurnStep => ({
   agent: AGENT[call.tool],
-  title: TITLE[call.tool],
+  title: titleOf(call, mode),
   params: callParams(call),
   status: run.result.status === 'error' ? 'failed' : 'done',
   result: run.result.summary.slice(0, 300),
@@ -370,7 +390,7 @@ export async function runKnowledge(
     /** The guest's words, for the meaning part of the reviews' search. */
     wish?: string
   },
-): Promise<Omit<KnowledgeOutcome, 'text'> & { runs: { call: KnowledgeCall; run: ToolRun }[] }> {
+): Promise<Omit<KnowledgeOutcome, 'text'> & { runs: KnowledgeRun[] }> {
   const { calls } = plan
   const ids = candidates.map((c) => c.id)
   const features = calls.some((c) => c.tool === 'features') ? deps.levels() : Promise.resolve(null)
@@ -387,23 +407,29 @@ export async function runKnowledge(
     }
     return []
   })
-  // The reviews choose too: a hotel whose guests do not name the topic is no answer to «хороший завтрак». Beside the
-  // store's measures (the night's noise) they only show: a hotel the map calls quiet is not out for lack of a review.
+  // The documents choose too: a hotel whose reviews, description and hotelier's answers do not name the topic is no
+  // answer to «хороший завтрак». Beside the store's measures (the night's noise) they only show: a hotel the map calls
+  // quiet is not out for lack of a review.
   const reviewing = calls.flatMap((c) =>
-    c.tool === 'reviews' && (choices.length === 0 || FOOD_TOPICS.includes(c.topic)) ? [c.topic] : [],
+    c.tool === 'deep' && (choices.length === 0 || FOOD_TOPICS.includes(c.topic)) ? [c.topic] : [],
   )
   const reviewed = await Promise.race([
-    Promise.all(reviewing.map((topic) => deps.reviewVerdicts(topic, ids, wish))),
+    Promise.all(reviewing.map((topic) => deps.deepVerdicts(topic, ids, wish))),
     new Promise<null[]>((resolve) =>
       setTimeout(() => resolve([]), Math.max(0, Math.min(KNOWLEDGE_RUN_MS, deadline - Date.now()))),
     ),
   ])
   for (const verdicts of reviewed) if (verdicts) choices.push(verdicts)
+  // The documents that could not be read in time are not «no hotel fits»: the block says which it was.
+  const unread = reviewing.length > 0 && (reviewed.length < reviewing.length || reviewed.some((v) => !v))
   const { ids: chosen, complete } =
     choices.length > 0 ? chooseHotels(candidates, choices) : { ids: [], complete: false }
   const ms = Math.min(KNOWLEDGE_RUN_MS, deadline - Date.now())
+  const toRun = calls.flatMap((call): { call: KnowledgeCall; mode?: DeepMode }[] =>
+    call.tool === 'deep' ? MODES.map((mode) => ({ call, mode })) : [{ call }],
+  )
   const runs = await Promise.all(
-    calls.map(async (call) => {
+    toRun.map(async ({ call, mode }): Promise<KnowledgeRun> => {
       const execute = (): Promise<ToolResult> =>
         call.tool === 'features'
           ? deps.runFeatures({ criteria: call.criteria, candidates, chosen, hotelier }, levels)
@@ -413,15 +439,19 @@ export async function runKnowledge(
                 nearIndex.get(call.category) ?? null,
               )
             : chosen.length > 0
-              ? deps.runReviews({ topic: call.topic, wish, candidates, chosen })
-              : Promise.resolve(errorResult('no_hotels', 'Отзывы не искал: ни один отель не подобран'))
-      const run = await deps.record(owner, NAME[call.tool], callParams(call), () => inTime(execute, ms))
-      return { call, run }
+              ? deps.runDeep({ mode: mode!, topic: call.topic, wish, candidates, chosen })
+              : Promise.resolve(
+                  unread
+                    ? errorResult('timeout', 'Углубленный поиск не успел: документы отелей читались слишком долго')
+                    : errorResult('no_hotels', 'Ни в отзывах, ни в описаниях, ни в ответах отельеров тема не названа'),
+                )
+      const run = await deps.record(owner, nameOf(call, mode), callParams(call), () => inTime(execute, ms))
+      return { call, run, ...(mode && { mode }) }
     }),
   )
   return {
     runs,
-    steps: runs.map(({ call, run }) => stepOf(call, run)),
+    steps: runs.map(stepOf),
     chosen,
     complete,
     planner: plan.planner,
@@ -457,22 +487,22 @@ function claimLine(result: ToolResult, claimId: string): string | null {
  * data and the calls that failed are said. Nothing but the runs' data.
  */
 export function knowledgeAnswer(
-  runs: readonly { call: KnowledgeCall; run: ToolRun }[],
+  runs: readonly KnowledgeRun[],
   chosen: readonly string[],
   complete: boolean,
   names: ReadonlyMap<string, string>,
 ): string {
   const conditions = runs
-    .filter(({ call }) => call.tool !== 'reviews')
+    .filter(({ call }) => call.tool !== 'deep')
     .map(({ call }) => callParams(call))
     .join(', ')
   const failed = runs.filter(({ run }) => run.result.status === 'error')
   const failedLine =
     failed.length > 0
-      ? `Не сработало: ${failed.map(({ call }) => `«${TITLE[call.tool]}» (${callParams(call)})`).join(', ')} — это не проверено.`
+      ? `Не сработало: ${failed.map(({ call, mode }) => `«${titleOf(call, mode)}» (${callParams(call)})`).join(', ')} — это не проверено.`
       : ''
   if (chosen.length === 0) {
-    const choosing = runs.filter(({ call }) => call.tool !== 'reviews')
+    const choosing = runs.filter(({ call }) => call.tool !== 'deep')
     const unread = choosing.length > 0 && choosing.every(({ run }) => run.result.status === 'error')
     return unread
       ? `Данные хранилища не прочитались (${conditions}) — по ним не подбирал.`
@@ -484,29 +514,38 @@ export function knowledgeAnswer(
     ? `Подобрал по данным${conditions ? ` (${conditions})` : ''}:`
     : `Всем условиям сразу (${conditions}) по данным не подошёл ни один отель; ближе всего — эти, но данных у них не хватает:`
   const lines = chosen.map((id, i) => {
-    const facts = runs.flatMap(({ call, run }) => {
-      if (run.result.status === 'error') return []
-      const group = run.result.groups?.find((g) => g.id === id)
-      if (!group) return []
-      const claims = group.claim_ids.flatMap((c) => claimLine(run.result, c) ?? [])
-      if (claims.length > 0) return claims
-      // A group without claims says why: «в данных нет», «отзывов не нашлось».
-      return group.note && call.tool !== 'features'
-        ? [group.note.charAt(0).toLocaleLowerCase('ru') + group.note.slice(1)]
-        : []
+    const seen = new Set<string>()
+    const own = runs.map(({ call, run }) => {
+      const group = run.result.status === 'error' ? undefined : run.result.groups?.find((g) => g.id === id)
+      const claims = (group?.claim_ids ?? [])
+        .filter((c) => !seen.has(c))
+        .flatMap((c) => {
+          seen.add(c)
+          return claimLine(run.result, c) ?? []
+        })
+      return { call, group, claims }
     })
-    return `${i + 1}. ${names.get(id) ?? id}: ${facts.length > 0 ? facts.join('; ') : 'подробностей нет'}.`
+    // Both steps of «Углубленный поиск» may quote one fragment: it is told once; a note «ничего не нашлось» only when
+    // neither step found one.
+    const found = own.some(({ call, claims }) => call.tool === 'deep' && claims.length > 0)
+    const facts = own.flatMap(({ call, group, claims }) => {
+      if (claims.length > 0) return claims
+      // A group without claims says why: «в данных нет», «ничего не нашлось».
+      if (!group?.note || call.tool === 'features' || (call.tool === 'deep' && found)) return []
+      return [group.note.charAt(0).toLocaleLowerCase('ru') + group.note.slice(1)]
+    })
+    return `${i + 1}. ${names.get(id) ?? id}: ${facts.length > 0 ? [...new Set(facts)].join('; ') : 'подробностей нет'}.`
   })
   const nodata = runs.flatMap(({ call, run }) => {
     const n = (run.result.data as { nodata?: unknown } | null)?.nodata
-    return run.result.status === 'success' && typeof n === 'number' && n > 0 && call.tool !== 'reviews'
+    return run.result.status === 'success' && typeof n === 'number' && n > 0 && call.tool !== 'deep'
       ? [`${callParams(call)} — у ${countRu(n, ['отеля', 'отелей', 'отелей'])}`]
       : []
   })
   const tail = [
     nodata.length > 0 && `Нет данных: ${nodata.join('; ')}. Такие отели я не считаю ни подходящими, ни неподходящими.`,
     failedLine,
-    'Отзывы — слова гостей, а уровни шума — карта EEA снаружи здания, не звукоизоляция номера.',
+    'Фрагменты — слова авторов отзывов, описаний и отельеров, а уровни шума — карта EEA снаружи здания, не звукоизоляция номера.',
   ]
   return [head, ...lines, ...tail.filter(Boolean)].join('\n')
 }

@@ -34,6 +34,7 @@ const {
   nearbyStore,
   noiseStore,
   placesStore,
+  descriptionStore,
   reviewStore,
   roomViewStore,
 } = await import('../src/lib/claimRows.ts')
@@ -189,19 +190,28 @@ for (let i = 0; i < hotels.length; i += PARALLEL) {
   }
 }
 
-// The reviews of the hotels' pages.
+// The reviews and the descriptions of the hotels' pages.
 const pages = await readAll<{
   master_id: number
   updated_at: string
   list: unknown[] | null
   facts: unknown
+  description: unknown
   url: string | null
-}>('ota_hotel_pages', 'master_id, updated_at, url, list:reviews->list, facts:hotel->facts', ['master_id'])
+}>(
+  'ota_hotel_pages',
+  'master_id, updated_at, url, list:reviews->list, facts:hotel->facts, description:hotel->descriptionStruct',
+  ['master_id'],
+)
 const byId = new Map(hotels.map((h) => [h.id, h]))
 for (const page of pages) {
   const hotel = byId.get(`ota-${page.master_id}`)
   if (!hotel) continue
-  stores.push(reviewStore(hotel, { ...page, list: page.list ?? [] }), factsStore(hotel, page))
+  stores.push(
+    reviewStore(hotel, { ...page, list: page.list ?? [] }),
+    descriptionStore(hotel, page),
+    factsStore(hotel, page),
+  )
 }
 
 // The views of the room types of the hotels in the catalogue.

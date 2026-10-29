@@ -6,6 +6,7 @@ import {
   NOISE_MENTION,
   canonical,
   chunksOf,
+  descriptionStore,
   estimateStore,
   factsStore,
   roomViewStore,
@@ -257,6 +258,46 @@ describe('reviewStore', () => {
     // «Тихоня» is about quiet as well; «Стихи» is not.
     expect(store.claims.map((c) => c.value_text)).toEqual(['Тихоня-кот.'])
     expect(reviewStore(hotel, page([review(11, { reviewPlus: 'Всё понравилось' })])).claims).toEqual([])
+  })
+})
+
+// assistant-search, Requirement: Углубленный поиск
+describe('descriptionStore', () => {
+  const page = (description: unknown) => ({
+    master_id: 1,
+    updated_at: '2026-10-26 19:43:48.681+00',
+    url: 'https://ostrovok.ru/hotel/spain/valencia/mid1/x/',
+    description,
+  })
+
+  it('keeps the description of the hotel’s page as a document of its parts, without tags', () => {
+    const store = descriptionStore(
+      hotel,
+      page([
+        { title: 'Об отеле', paragraphs: ['Отель рядом с <em>морем</em>.', ' '] },
+        { title: 'Питание', paragraphs: ['Завтрак шведский стол.', 'Ужин по заказу.'] },
+        { title: 'Пусто', paragraphs: [] },
+      ]),
+    )
+    expect(store.evidence).toHaveLength(1)
+    expect(store.evidence[0]).toMatchObject({
+      type: 'ota_page',
+      provider: 'Островок',
+      external_id: 'description:1',
+      retrieved_at: '2026-10-26T19:43:48.681Z',
+    })
+    expect(store.documents).toHaveLength(1)
+    expect(store.documents[0]).toMatchObject({ kind: 'description', hotel_id: hotel.id, language: 'ru' })
+    expect(store.documents[0].chunks.map((c) => [c.ord, c.text, c.metadata])).toEqual([
+      [0, 'Отель рядом с морем.', { part: 'Об отеле' }],
+      [1, 'Завтрак шведский стол. Ужин по заказу.', { part: 'Питание' }],
+    ])
+    expect(store.claims).toEqual([])
+  })
+
+  it('keeps nothing of a page without a description', () => {
+    for (const description of [null, [], [{ title: 'Пусто', paragraphs: [' '] }], 'text'])
+      expect(descriptionStore(hotel, page(description))).toMatchObject({ evidence: [], documents: [], entities: [] })
   })
 })
 

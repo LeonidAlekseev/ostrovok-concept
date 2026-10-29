@@ -257,7 +257,9 @@ export async function writeClaims(supabase: Client, store: Store, dryRun: boolea
   const documents = await run({
     table: 'documents',
     keys: ['evidence_id'],
-    current: await readAll(supabase, 'documents', DOCUMENT_COLUMNS, ['id'], (q) => q.eq('kind', 'review')),
+    current: await readAll(supabase, 'documents', DOCUMENT_COLUMNS, ['id'], (q) =>
+      q.in('kind', ['review', 'description']),
+    ),
     next: store.documents.map((d) => ({
       kind: d.kind,
       hotel_id: d.hotel_id,

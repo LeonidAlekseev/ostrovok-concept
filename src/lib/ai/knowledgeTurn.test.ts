@@ -115,8 +115,8 @@ function deps(extra: Partial<KnowledgeDeps> = {}) {
       timed((input: FeaturesInput, index: readonly LevelRow[] | null) => featuresResult(input, index, new Map())),
     ),
     runNear: vi.fn(timed((input: NearInput, index: readonly NearRow[] | null) => nearResult(input, index, []))),
-    runReviews: vi.fn(timed(() => errorResult('store_unavailable', 'Не получилось прочитать отзывы'))),
-    reviewVerdicts: vi.fn(async () => null),
+    runDeep: vi.fn(timed(() => errorResult('store_unavailable', 'Не получилось прочитать документы'))),
+    deepVerdicts: vi.fn(async () => null),
     record,
     ...extra,
   }
@@ -135,24 +135,27 @@ describe('the choice of the calls', () => {
     expect(rulesKnowledge('Найди отель в Валенсии, чтобы рядом была аптека и было тихо ночью', {})).toEqual([
       { tool: 'features', criteria: { nightBelowDb: 50 } },
       { tool: 'near', category: 'pharmacy', radiusM: 500 },
-      { tool: 'reviews', topic: 'noise' },
+      { tool: 'deep', topic: 'noise' },
     ])
     expect(rulesKnowledge('Отель с супермаркетом в 300 м', {})).toEqual([
       { tool: 'near', category: 'supermarket', radiusM: 300 },
     ])
-    expect(rulesKnowledge('Что пишут в отзывах про завтрак?', {})).toEqual([{ tool: 'reviews', topic: 'breakfast' }])
+    expect(rulesKnowledge('Что пишут в отзывах про завтрак?', {})).toEqual([{ tool: 'deep', topic: 'breakfast' }])
     // The food asks of the reviews without the word «отзывы»; the other topics wait for it.
     for (const wish of [
       'Найди отель, чтобы были очень вкусные и качественные завтраки',
+      'Найди отели, где хороший и качественный завтрак.',
+      'Найди отели, где хороший и качественный завтрак',
+      'найди отели где хороший и качественный завтрак',
       'Где хороший завтрак',
       'Завтрак шведский стол',
     ])
-      expect(rulesKnowledge(wish, {})).toEqual([{ tool: 'reviews', topic: 'breakfast' }])
-    expect(rulesKnowledge('Отель с отличной кухней', {})).toEqual([{ tool: 'reviews', topic: 'food' }])
+      expect(rulesKnowledge(wish, {})).toEqual([{ tool: 'deep', topic: 'breakfast' }])
+    expect(rulesKnowledge('Отель с отличной кухней', {})).toEqual([{ tool: 'deep', topic: 'food' }])
     expect(rulesKnowledge('Тихий отель с вкусным завтраком', {})).toEqual([
       { tool: 'features', criteria: { nightBelowDb: 50 } },
-      { tool: 'reviews', topic: 'noise' },
-      { tool: 'reviews', topic: 'breakfast' },
+      { tool: 'deep', topic: 'noise' },
+      { tool: 'deep', topic: 'breakfast' },
     ])
     expect(rulesKnowledge('Где чисто?', {})).toEqual([])
     // The sea is the features step's, and a wish without these words runs no tool.
@@ -173,13 +176,13 @@ describe('the choice of the calls', () => {
         { tool: 'features', criteria: { nightBelowDb: 50 } },
         { tool: 'near', category: 'pharmacy', radiusM: 400 },
         { tool: 'features', criteria: { heightMinM: 20 } },
-        { tool: 'reviews', topic: 'noise' },
-        { tool: 'reviews', topic: 'noise' },
+        { tool: 'deep', topic: 'noise' },
+        { tool: 'deep', topic: 'noise' },
       ]),
     ).toEqual([
       { tool: 'features', criteria: { nightBelowDb: 50, heightMinM: 20 } },
       { tool: 'near', category: 'pharmacy', radiusM: 400 },
-      { tool: 'reviews', topic: 'noise' },
+      { tool: 'deep', topic: 'noise' },
     ])
     expect(restrictive({ nightBelowDb: 50, heightMinM: 0, heightMaxM: 300 })).toEqual({ nightBelowDb: 50 })
   })
@@ -189,13 +192,13 @@ describe('the choice of the calls', () => {
     const model = calling(
       { toolName: 'hotelsByFeatures', input: { nightBelowDb: 45 } },
       { toolName: 'nearbyPlaces', input: { category: 'pharmacy', radiusM: 300 } },
-      { toolName: 'guestReviews', input: { topic: 'noise' } },
+      { toolName: 'deepSearch', input: { topic: 'noise' } },
       { toolName: 'nearbyPlaces', input: { category: 'casino', radiusM: 300 } },
     )
     expect(await modelKnowledge(model as LanguageModel, ask('Тихо и аптека рядом'), signal())).toEqual([
       { tool: 'features', criteria: { nightBelowDb: 45 } },
       { tool: 'near', category: 'pharmacy', radiusM: 300 },
-      { tool: 'reviews', topic: 'noise' },
+      { tool: 'deep', topic: 'noise' },
     ])
     const prompt = JSON.stringify(model.doGenerateCalls[0].prompt)
     expect(prompt).toContain('Тихо и аптека рядом')
@@ -213,7 +216,7 @@ describe('the choice of the calls', () => {
       calls: [
         { tool: 'features', criteria: { nightBelowDb: 45 } },
         { tool: 'near', category: 'pharmacy', radiusM: 500 },
-        { tool: 'reviews', topic: 'noise' },
+        { tool: 'deep', topic: 'noise' },
       ],
     })
   })
@@ -244,20 +247,26 @@ describe('the runs of the turn', () => {
       ['ota-2', { verdict: 'match', score: -3 }],
       ['ota-3', { verdict: 'match', score: -1 }],
     ])
-    const { deps: d, record } = deps({ reviewVerdicts: vi.fn(async () => verdicts) })
-    const outcome = await runKnowledge(plan([{ tool: 'reviews', topic: 'breakfast' }]), candidates, {
+    const { deps: d, record } = deps({ deepVerdicts: vi.fn(async () => verdicts) })
+    const outcome = await runKnowledge(plan([{ tool: 'deep', topic: 'breakfast' }]), candidates, {
       owner: null,
       deadline: Date.now() + 5000,
       deps: d,
       wish: 'вкусные завтраки',
     })
-    expect(d.reviewVerdicts).toHaveBeenCalledWith('breakfast', ['ota-1', 'ota-2', 'ota-3'], 'вкусные завтраки')
+    expect(d.deepVerdicts).toHaveBeenCalledWith('breakfast', ['ota-1', 'ota-2', 'ota-3'], 'вкусные завтраки')
     expect(outcome.chosen).toEqual(['ota-2', 'ota-3'])
     expect(outcome.complete).toBe(true)
-    expect(d.runReviews).toHaveBeenCalledWith(
-      expect.objectContaining({ chosen: ['ota-2', 'ota-3'], wish: 'вкусные завтраки' }),
+    // «Углубленный поиск» is two steps of their own: the words, then the meaning.
+    expect(d.runDeep).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'exact', chosen: ['ota-2', 'ota-3'], wish: 'вкусные завтраки' }),
     )
-    expect(record).toHaveBeenCalledTimes(1)
+    expect(d.runDeep).toHaveBeenCalledWith(expect.objectContaining({ mode: 'meaning', chosen: ['ota-2', 'ota-3'] }))
+    expect(record.mock.calls.map((c) => c[1])).toEqual(['deep_search_exact', 'deep_search_meaning'])
+    expect(outcome.steps.map((s) => [s.agent, s.title, s.params])).toEqual([
+      ['search', 'Точный поиск по словам', 'Углубленный поиск · тема: завтрак'],
+      ['search', 'Поиск по смыслу', 'Углубленный поиск · тема: завтрак'],
+    ])
   })
 
   // Scenario: Параллельные вызовы — независимые запуски
@@ -317,14 +326,18 @@ describe('the runs of the turn', () => {
     const outcome = await runKnowledge(
       plan([
         { tool: 'features', criteria: { nightBelowDb: 40 } },
-        { tool: 'reviews', topic: 'noise' },
+        { tool: 'deep', topic: 'noise' },
       ]),
       candidates,
       { owner: null, deadline: Date.now() + 5000, deps: d },
     )
     expect(outcome.chosen).toEqual([])
-    expect(d.runReviews).not.toHaveBeenCalled()
-    expect(outcome.steps[1]).toMatchObject({ status: 'failed', result: 'Отзывы не искал: ни один отель не подобран' })
+    expect(d.runDeep).not.toHaveBeenCalled()
+    for (const step of outcome.steps.slice(1))
+      expect(step).toMatchObject({
+        status: 'failed',
+        result: 'Ни в отзывах, ни в описаниях, ни в ответах отельеров тема не названа',
+      })
     expect(knowledgeAnswer(outcome.runs, [], false, new Map())).toMatch(
       /^По данным хранилища ни один отель не подошёл \(ночью тише 40 дБ\)\./,
     )
@@ -402,7 +415,7 @@ describe('the answer of the tools', () => {
       'Подобрал по данным (ночью тише 50 дБ, аптека в 500 м):',
       '1. Hotel Quiet: аптека «Farmacia San Petrillo» — 180 м (OpenStreetMap, уверенность 100 %).',
       'Нет данных: ночью тише 50 дБ — у 1 отеля; аптека в 500 м — у 1 отеля. Такие отели я не считаю ни подходящими, ни неподходящими.',
-      'Отзывы — слова гостей, а уровни шума — карта EEA снаружи здания, не звукоизоляция номера.',
+      'Фрагменты — слова авторов отзывов, описаний и отельеров, а уровни шума — карта EEA снаружи здания, не звукоизоляция номера.',
       'Тихий район с аптекой под рукой — удобно для спокойного отдыха.',
     ])
   })
@@ -422,7 +435,7 @@ describe('the answer of the tools', () => {
       },
     )
     expect(outcome.text).not.toContain('Ruzafa')
-    expect(outcome.text.split('\n').at(-1)).toMatch(/^Отзывы — слова гостей/)
+    expect(outcome.text.split('\n').at(-1)).toMatch(/^Фрагменты — слова авторов/)
   })
 
   it('gives the model no words of the guests', () => {
