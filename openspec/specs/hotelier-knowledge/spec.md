@@ -172,7 +172,7 @@ AI-помощник SHALL передавать вопрос отельеру и 
 - **THEN** ответ кончается целым словом и «…»
 
 ### Requirement: Повтор извлечения по расписанию
-`POST /api/hotelier/knowledge/retry` SHALL разбирать до 5 готовых к повтору ответов без паузы между вызовами и отвечать `{ processed }`. Маршрут SHALL требовать ключ service role в `Authorization: Bearer`, иначе 403. Тот же разбор SHALL делать `GET` того же пути для Vercel Cron (`vercel.json`, раз в сутки в 03:17 UTC — предел тарифа Hobby): он SHALL требовать `CRON_SECRET` в `Authorization: Bearer` (Vercel присылает его сам), иначе 403; ключ service role на `GET` и секрет cron на `POST` SHALL не подходить.
+`POST /api/hotelier/knowledge/retry` SHALL разбирать до 5 готовых к повтору ответов без паузы между вызовами и отвечать `{ processed }`. Маршрут SHALL требовать ключ service role в `Authorization: Bearer`, иначе 403. Тот же разбор SHALL делать `GET` того же пути для Vercel Cron (`vercel.json`, раз в сутки): он SHALL требовать `CRON_SECRET` в `Authorization: Bearer` (Vercel присылает его сам), иначе 403; ключ service role на `GET` и секрет cron на `POST` SHALL не подходить.
 
 #### Scenario: Расписание
 - **WHEN** планировщик вызывает маршрут с ключом
