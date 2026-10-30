@@ -15,6 +15,20 @@
 - Демонстрация (Google Drive): https://drive.google.com/drive/folders/1OqgiaKfaIsCUoaC14TO32cFgW4dHG0A5?usp=sharing
 - Вебсайт (Vercel Production): https://lilteam-ostrovok.vercel.app
 
+## Ветка `standalone`: демо-версия без базы
+
+Эта ветка — демо-версия без базы, её собирает Vercel Production. Все данные вшиты в сборку: снимок живой базы
+в `data/standalone` (каталог, страницы, отзывы, характеристики, фрагменты для поиска и их векторы, места OSM, готовые
+расчёты вида и шума, демо-чаты) и карты шума и вида в `public/standalone/maps`. Снимок снят один раз скриптом
+`scripts/export-standalone.ts` (только чтение) и больше не обновляется.
+
+- Supabase не нужен: переменные `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_*` и `GIGACHAT_AUTH_KEY` не используются.
+- Нужен только `NVIDIA_API_KEY` (или `AGE_SECRET_KEY`): ответы Эвала, вектор запроса, фото. Без ключа — ответы по правилам.
+- Демо-кабинеты путешественника и отельера открываются кнопками входа без паролей. Новые чаты, сообщения отельеру,
+  ответы отельера, брони и ссылки «Поделиться» хранятся в браузере (`localStorage`) и видны только в нём.
+- `docker compose up --build` запускает ту же демо-версию на `:8080`; команды `make seed*`, `restore-local`, `dump-db`
+  ниже относятся к полной версии с Supabase (ветки `dev` и `main`).
+
 ## Быстрый старт
 
 Нужен только Docker (Docker Desktop на Windows и macOS). Установка Node.js не нужна.
@@ -53,7 +67,7 @@ docker compose up --build
 **Ресурсы.** Контейнер приложения (Next.js standalone, Node 24): около 1 CPU и 512 МБ RAM; образ ≈ 460 МБ. Сборка:
 2 CPU и 4 ГБ RAM, 3 ГБ диска, нужна сеть (каталог пререндерится из Supabase). Платформа `linux/amd64`.
 
-**Зависимости.** Docker с Compose v2. Внешние сервисы: облачный Supabase (Postgres, Auth, Storage), GigaChat и NVIDIA API. Версии пакетов — `package-lock.json`.
+**Зависимости.** Docker с Compose v2. Внешние сервисы: облачный Supabase (Postgres, Auth, Storage), GigaChat и NVIDIA API (в ветке `standalone` — только NVIDIA API). Версии пакетов — `package-lock.json`.
 
 **Переменные** (`.env`, подписи и источники — в `.env.example`):
 
