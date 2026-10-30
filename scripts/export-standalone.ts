@@ -297,7 +297,7 @@ function startProxy(port: number, calls: Map<string, unknown>) {
     const upstream = await fetch(`${url}${path}`, {
       method: request.method,
       headers: forward,
-      body: request.method === 'POST' ? payload : undefined,
+      body: request.method === 'POST' ? new Uint8Array(payload) : undefined,
     })
     const text = await upstream.text()
     // `hotels_outside_noise` outlasts the anon role's timeout every time: `exportOutsideNoise` reads it by psql.
