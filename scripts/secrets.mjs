@@ -1,18 +1,10 @@
-// API keys live in .env (not in git) and, encrypted with age, in secrets.env.age and secrets.app.env.age; see README, «Ключи API».
+// API keys live in .env (not in git) and, encrypted with age, in secrets.app.env.age; see README, «Ключи API».
 //   node scripts/secrets.mjs reveal   .env from secrets.app.env.age and AGE_SECRET_KEY
 //   node scripts/secrets.mjs build    .env.production.local from AGE_SECRET_KEY (prebuild, Vercel)
-//   node scripts/secrets.mjs encrypt  secrets.env.age (organizers) and secrets.app.env.age (app) from .env
+//   node scripts/secrets.mjs encrypt  secrets.app.env.age from .env
 // Without the key (CI, builds without secrets) build does nothing and exits 0.
 import { readFile, writeFile } from 'node:fs/promises'
-import {
-  APP_RECIPIENT,
-  ORGANIZERS_FILE,
-  ORGANIZERS_RECIPIENT,
-  SECRET_FILE,
-  checkEnvFormat,
-  decryptEnv,
-  encryptEnv,
-} from '../src/lib/secretsFile.mjs'
+import { APP_RECIPIENT, SECRET_FILE, checkEnvFormat, decryptEnv, encryptEnv } from '../src/lib/secretsFile.mjs'
 
 const root = new URL('../', import.meta.url)
 const secretKey = process.env.AGE_SECRET_KEY
@@ -41,9 +33,8 @@ if (command === 'build') {
 } else if (command === 'encrypt') {
   const text = await readFile(new URL('.env', root), 'utf8')
   const count = checkEnvFormat(text)
-  await writeFile(new URL(ORGANIZERS_FILE, root), await encryptEnv(ORGANIZERS_RECIPIENT, text))
   await writeFile(new URL(SECRET_FILE, root), await encryptEnv(APP_RECIPIENT, text))
-  console.log(`secrets: ${ORGANIZERS_FILE} and ${SECRET_FILE} written, ${count} variables`)
+  console.log(`secrets: ${SECRET_FILE} written, ${count} variables`)
 } else {
   console.error('usage: node scripts/secrets.mjs reveal|build|encrypt')
   process.exit(1)

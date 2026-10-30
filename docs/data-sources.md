@@ -87,7 +87,7 @@
 
 Готовую копию данных (все таблицы из списка выше, уже с производными данными и векторами) можно не собирать, а
 восстановить: `make restore-local` кладёт её в локальную Supabase вместо `make seed-local`. В дамп входят вся схема
-`public` (структура и данные, в том числе `ota_hotels` и `ota_hotel_pages`: эти данные предоставили организаторы),
+`public` (структура и данные, в том числе `ota_hotels` и `ota_hotel_pages`),
 данные `auth.users` и `auth.identities` (демо-аккаунты) и `supabase_migrations.schema_migrations`. Сессии, токены,
 коды и файлы Storage не входят. Снимает дамп `scripts/db-dump.sh` (`make dump-db`, только чтение), публикуется он
 в приватных релизах с тегом `data-2026-10-29`; подробности — [docs/docker.md](docker.md#дамп-живой-базы-make-restore-local).

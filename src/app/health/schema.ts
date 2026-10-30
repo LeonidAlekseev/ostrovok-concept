@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { component, type ApiOperation } from '@/lib/openapi/operation'
 
-/** `GET /health`: liveness for the Docker healthcheck and the organizers' probe; outside `/api`, so no prefix. */
+/** `GET /health`: liveness for the Docker healthcheck; outside `/api`, so no prefix. */
 
 export const healthResponseSchema = component(
   'HealthResponse',
@@ -16,8 +16,7 @@ export const healthOperations: ApiOperation[] = [
     operationId: 'getHealth',
     tags: ['Служебные'],
     summary: 'Проверка, что сервер жив',
-    description:
-      'Без базы и ключей: отвечает, пока работает процесс. Для healthcheck Docker и проверки организаторов. Не кэшируется.',
+    description: 'Без базы и ключей: отвечает, пока работает процесс. Для healthcheck Docker. Не кэшируется.',
     responses: {
       200: {
         description: 'Сервер жив',

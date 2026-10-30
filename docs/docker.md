@@ -3,7 +3,7 @@
 Запуск приложения в контейнере (Docker Desktop, Windows и macOS). Два варианта:
 
 - **основной** (`docker-compose.yml`, `make up`): только приложение, база — облачный Supabase (причины — в
-  [README](../README.md#почему-база-внешняя)); так требуют организаторы;
+  [README](../README.md#почему-база-внешняя));
 - **дополнительный** (`docker-compose.local.yml`, `make up-local`): приложение и своя минимальная Supabase, см.
   [«Локальная Supabase»](#локальная-supabase-дополнительно).
 
@@ -38,8 +38,7 @@
    WSL 2 в мастере установки). Проверить: `docker --version`.
 2. `git clone <репозиторий>` и `cd` в папку.
 3. `cp .env.example .env` (Windows PowerShell: `Copy-Item .env.example .env`) и вписать значения:
-   - либо **все переменные** — значения даёт владелец проекта, они лежат в `secrets.env.age` (для организаторов,
-     `age -d -i <их ключ> secrets.env.age > .env`);
+   - либо **все переменные** — значения даёт владелец проекта;
    - либо **одну `AGE_SECRET_KEY=AGE-SECRET-KEY-1…`** — ключ приложения, остальное расшифруется из `secrets.app.env.age`.
 4. `docker compose up --build` (или `make up`), затем http://localhost:8080.
 5. Остановить: `Ctrl+C`, затем `docker compose down` (`make down`).
@@ -119,8 +118,7 @@ NVIDIA API (до 40 запросов в минуту). Данные внешни
 **Что в дампе** (`scripts/db-dump.sh`, `make dump-db`; два архива `pg_dump -Fc` в `dist/db-dump/`, плюс `SHA256SUMS` и `MANIFEST`
 с датой, коммитом, числом строк по таблицам и размерами):
 
-- `public.dump` — вся схема `public`, структура и данные, включая `ota_hotels` и `ota_hotel_pages` (их предоставили
-  организаторы). Это полный дамп, а не `--data-only`: ограничения добавляются после данных, поэтому цикл
+- `public.dump` — вся схема `public`, структура и данные, включая `ota_hotels` и `ota_hotel_pages`. Это полный дамп, а не `--data-only`: ограничения добавляются после данных, поэтому цикл
   `hotelier_messages` ↔ `hotelier_conversations` восстановлению не мешает;
 - `auth.dump` — только **данные** `auth.users`, `auth.identities` и `supabase_migrations.schema_migrations`. Сессий,
   refresh-токенов, кодов и других таблиц `auth` нет, файлов Storage тоже (`storage.objects` и политика на него остаются
@@ -129,11 +127,11 @@ NVIDIA API (до 40 запросов в минуту). Данные внешни
 Дамп снимается через `pg_dump` из контейнера `postgres:17-alpine` по `SUPABASE_DB_URL` (transaction pooler Supabase: для
 `pg_dump` с несколькими таблицами он отработал штатно, снимок согласован внутри одного архива, но два архива снимаются
 в разные моменты). Пароль в вывод не попадает. Файлы не коммитятся (`dist/` в `.gitignore`) и публикуются как вложения
-релиза `data-2026-10-29` в приватных репозиториях `ostrovok-hackathon-2026/lil-team` и `LeonidAlekseev/ostrovok-concept`.
+релиза `data-2026-10-29` в приватном репозитории `LeonidAlekseev/ostrovok-concept`.
 
 **Восстановление** (`scripts/db-restore.sh`, `make restore-local`) после `make up-local`:
 
-1. Файлы берутся из `dist/db-dump/`; если их нет — `gh release download data-2026-10-29 --repo ostrovok-hackathon-2026/lil-team`
+1. Файлы берутся из `dist/db-dump/`; если их нет — `gh release download data-2026-10-29 --repo LeonidAlekseev/ostrovok-concept`
    (нужны `gh` и `gh auth login`; другой релиз или репозиторий — `TAG=… REPO=owner/name make restore-local`).
 2. `sha256sum -c SHA256SUMS`: при несовпадении остановка.
 3. Схема `public` удаляется и пересоздаётся, `auth.users`, `auth.identities` и история миграций очищаются (**необратимо
