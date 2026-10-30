@@ -1,8 +1,9 @@
 import 'server-only'
+import { gunzipSync } from 'node:zlib'
 
 /**
  * The noise and view maps of the standalone demo, put back together from the static files of
- * scripts/export-standalone.ts (`public/standalone/maps`): a hotel's file lists its features by tile and hash, the
+ * scripts/export-standalone.ts (`public/standalone/maps`, gzipped, the shapes simplified to ~1.5 m): a hotel's file lists its features by tile and hash, the
  * tiles are shared by the hotels around. Read over the site's own address, as the CDN serves them; the tiles are kept
  * by the instance (the maps never change).
  */
@@ -14,9 +15,14 @@ type Feature = Record<string, unknown>
 const TILES_KEPT = 400
 const tiles = new Map<string, Promise<Record<string, Feature> | null>>()
 
+/** A gzipped JSON file of the maps (served as it is: the bytes, not a `Content-Encoding`). */
 const json = async <T>(url: string): Promise<T | null> => {
-  const response = await fetch(url).catch(() => null)
-  return response?.ok ? ((await response.json()) as T) : null
+  const response = await fetch(`${url}.gz`).catch(() => null)
+  if (!response?.ok) return null
+  const bytes = Buffer.from(await response.arrayBuffer())
+  // A server that decoded the gzip itself (a `Content-Encoding` of its own) gives the JSON already.
+  const text = bytes[0] === 0x1f && bytes[1] === 0x8b ? gunzipSync(bytes).toString() : bytes.toString()
+  return JSON.parse(text) as T
 }
 
 function tile(origin: string, id: string) {

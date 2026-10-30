@@ -60,3 +60,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals()
 })
+
+// The standalone demo's browser client (src/lib/standalone/browser.ts) is the full version's «no Supabase» in the
+// component tests: a guest, the chats in the browser's storage. A test that needs a client mocks this module itself.
+vi.mock('@/lib/supabase/client', () => ({ getBrowserClient: () => null }))

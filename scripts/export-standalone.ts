@@ -30,9 +30,10 @@ const { values: options } = parseArgs({
     rpc: { type: 'boolean', default: false },
     maps: { type: 'boolean', default: false },
     browser: { type: 'boolean', default: false },
+    remap: { type: 'boolean', default: false },
   },
 })
-const all = !options.tables && !options.rpc && !options.maps && !options.browser
+const all = !options.tables && !options.rpc && !options.maps && !options.browser && !options.remap
 
 function required(name: string): string {
   const value = process.env[name]
@@ -434,6 +435,82 @@ interface Feature {
   properties: Record<string, unknown>
 }
 
+/** Degrees a point may move when a line is simplified: ~1.5 m, below the 5-decimal rounding's ~1 m twice. */
+const SIMPLIFY_DEG = 1.5e-5
+
+/** Douglas–Peucker of an open line of [lon, lat]. */
+function simplifyLine(points: number[][], tolerance: number): number[][] {
+  if (points.length <= 2) return points
+  const keep = new Uint8Array(points.length)
+  keep[0] = keep[points.length - 1] = 1
+  const stack: [number, number][] = [[0, points.length - 1]]
+  while (stack.length) {
+    const [a, b] = stack.pop()!
+    const [ax, ay] = points[a]
+    const [bx, by] = points[b]
+    const dx = bx - ax
+    const dy = by - ay
+    const len = Math.hypot(dx, dy)
+    let worst = -1
+    let at = -1
+    for (let i = a + 1; i < b; i += 1) {
+      const [px, py] = points[i]
+      const d = len === 0 ? Math.hypot(px - ax, py - ay) : Math.abs(dy * px - dx * py + bx * ay - by * ax) / len
+      if (d > worst) {
+        worst = d
+        at = i
+      }
+    }
+    if (worst > tolerance) {
+      keep[at] = 1
+      stack.push([a, at], [at, b])
+    }
+  }
+  return points.filter((_, i) => keep[i])
+}
+
+/** A ring smaller than this (m²) is a sliver of the clipping and the rounding: nobody sees it on the map. */
+const SLIVER_M2 = 1
+
+/** The area of a ring in m², in the plane around its first point. */
+function ringArea(ring: number[][]): number {
+  const k = Math.cos((ring[0][1] * Math.PI) / 180) * 111_320
+  let sum = 0
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++)
+    sum += (ring[j][0] - ring[i][0]) * k * (ring[j][1] + ring[i][1]) * 111_320
+  return Math.abs(sum / 2)
+}
+
+/** A ring without its repeated points, simplified; `null` when it is a sliver or fewer than 3 points are left. */
+function simplifyRing(ring: number[][]): number[][] | null {
+  const distinct = ring.filter((p, i) => i === 0 || p[0] !== ring[i - 1][0] || p[1] !== ring[i - 1][1])
+  if (distinct.length < 4 || ringArea(distinct) < SLIVER_M2) return null
+  const simple = simplifyLine(distinct, SIMPLIFY_DEG)
+  return simple.length < 4 ? null : simple
+}
+
+/** The polygons of a feature simplified; `null` when nothing of it is left (a sliver of the rounding). */
+function simplifyFeature(feature: Feature): Feature | null {
+  const { type, coordinates } = feature.geometry
+  const polygon = (rings: number[][][]) => {
+    const outer = simplifyRing(rings[0])
+    if (!outer) return null
+    return [outer, ...rings.slice(1).flatMap((r) => simplifyRing(r) ?? [])]
+  }
+  if (type === 'Polygon') {
+    const simple = polygon(coordinates as number[][][])
+    return simple ? { ...feature, geometry: { type, coordinates: simple } } : null
+  }
+  if (type === 'MultiPolygon') {
+    const parts = (coordinates as number[][][][]).flatMap((p) => {
+      const simple = polygon(p)
+      return simple ? [simple] : []
+    })
+    return parts.length ? { ...feature, geometry: { type, coordinates: parts } } : null
+  }
+  return feature
+}
+
 const firstPoint = (coordinates: unknown): [number, number] => {
   let c = coordinates
   while (Array.isArray(c) && Array.isArray(c[0])) c = c[0]
@@ -454,13 +531,15 @@ function writeMaps(hotels: readonly { id: string }[], answers: Map<string, unkno
   const index = (value: unknown): unknown => {
     if (Array.isArray(value) && value.length > 0 && value.every((f) => f && (f as Feature).type === 'Feature' && (f as Feature).geometry)) {
       return {
-        __features: (value as Feature[]).map((feature) => {
+        __features: (value as Feature[]).flatMap((original) => {
+          const feature = simplifyFeature(original)
+          if (!feature) return []
           const [lon, lat] = firstPoint(feature.geometry.coordinates)
           const tile = `${Math.floor(lon / TILE_DEG)}_${Math.floor(lat / TILE_DEG)}`
           const hash = hashOf(feature)
           if (!tiles.has(tile)) tiles.set(tile, new Map())
           tiles.get(tile)!.set(hash, feature)
-          return `${tile}/${hash}`
+          return [`${tile}/${hash}`]
         }),
       }
     }
@@ -480,16 +559,22 @@ function writeMaps(hotels: readonly { id: string }[], answers: Map<string, unkno
     }
     if (Object.keys(maps).length === 0) continue
     mkdirSync(join(PUBLIC_OUT, 'maps/hotels'), { recursive: true })
-    writeFileSync(join(PUBLIC_OUT, 'maps/hotels', `${hotel.id}.json`), JSON.stringify(maps))
+    writeFileSync(join(PUBLIC_OUT, 'maps/hotels', `${hotel.id}.json.gz`), gz(maps))
   }
   mkdirSync(join(PUBLIC_OUT, 'maps/tiles'), { recursive: true })
   let size = 0
+  let packed = 0
   for (const [tile, features] of tiles) {
     const text = JSON.stringify(Object.fromEntries(features))
+    const data = gzipSync(text, { level: 9 })
     size += text.length
-    writeFileSync(join(PUBLIC_OUT, 'maps/tiles', `${tile}.json`), text)
+    packed += data.length
+    writeFileSync(join(PUBLIC_OUT, 'maps/tiles', `${tile}.json.gz`), data)
   }
-  console.log(` maps: ${(raw / 1e6).toFixed(1)} MB as the routes give them, ${(size / 1e6).toFixed(1)} MB of ${tiles.size} tiles`)
+  console.log(
+    ` maps: ${(raw / 1e6).toFixed(1)} MB as the routes give them, ${(size / 1e6).toFixed(1)} MB of ${tiles.size} tiles` +
+      ` simplified, ${(packed / 1e6).toFixed(1)} MB gzipped`,
+  )
 }
 
 /**
@@ -520,6 +605,40 @@ function exportBrowser() {
   write(join(OUT, 'browser.json'), JSON.stringify(browser))
 }
 
+/** The maps as the routes gave them, put back together from the files of `writeMaps` (to write them again). */
+function readMaps(): { hotels: { id: string }[]; answers: Map<string, unknown> } {
+  const { existsSync, readFileSync, readdirSync } = process.getBuiltinModule('node:fs')
+  const { gunzipSync } = process.getBuiltinModule('node:zlib')
+  const readJson = (path: string) =>
+    existsSync(`${path}.gz`) ? JSON.parse(gunzipSync(readFileSync(`${path}.gz`)).toString()) : JSON.parse(readFileSync(path, 'utf8'))
+  const dir = join(PUBLIC_OUT, 'maps')
+  const tileCache = new Map<string, Record<string, Feature>>()
+  const tileOf = (id: string) => {
+    if (!tileCache.has(id)) tileCache.set(id, readJson(join(dir, 'tiles', `${id}.json`)))
+    return tileCache.get(id)!
+  }
+  const rebuild = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(rebuild)
+    if (!value || typeof value !== 'object') return value
+    const refs = (value as { __features?: string[] }).__features
+    if (refs) return refs.map((ref) => tileOf(ref.split('/')[0])[ref.split('/')[1]])
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, rebuild(v)]))
+  }
+  const hotels: { id: string }[] = []
+  const answers = new Map<string, unknown>()
+  for (const file of readdirSync(join(dir, 'hotels')).sort()) {
+    const id = file.replace(/\.json(\.gz)?$/, '')
+    hotels.push({ id })
+    const maps = readJson(join(dir, 'hotels', `${id}.json`)) as Record<string, unknown>
+    for (const [route, answer] of Object.entries(maps)) answers.set(`${id} ${route}`, rebuild(answer))
+  }
+  return { hotels, answers }
+}
+
+if (options.remap) {
+  const { hotels, answers } = readMaps()
+  writeMaps(hotels, answers)
+}
 if (all || options.tables) await exportTables()
 if (all || options.tables || options.browser) exportBrowser()
 if (all || options.rpc || options.maps) await exportRpc(all || options.maps, all || options.rpc)
