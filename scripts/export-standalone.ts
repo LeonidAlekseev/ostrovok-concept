@@ -1,6 +1,7 @@
 // Exports, once, everything the standalone demo (the `standalone` branch) shows into files of the repository, while the
 // live database still exists. ONLY reads: GET of PostgREST and the `stable` functions of the whitelist below.
-//   node --env-file-if-exists=.env scripts/export-standalone.ts [--tables] [--rpc] [--maps]   (all three by default)
+//   STANDALONE_APP_DIR=<a checkout of dev> node --env-file-if-exists=.env scripts/export-standalone.ts \
+//     [--tables] [--browser] [--rpc] [--maps] [--catalog] [--remap]   (the first four by default)
 //
 // * `--tables`: the rows the site reads (`data/standalone/tables/<table>.json.gz`) and their vectors, float32 in a row,
 //   row-aligned (`data/standalone/vectors/<table>.f32`, `__vec` of a row is its index, -1 without a vector). Only the
@@ -12,6 +13,10 @@
 //   `stable` functions: any other request is refused, so nothing is written.
 // * `--maps`: the noise and view maps of every real hotel as the API routes give them, as static files
 //   (`public/standalone/maps/`): the tiles of the buildings and of the noise are shared by the hotels (see `writeMaps`).
+// * `--browser`: what the browser starts from (`data/standalone/browser.json`), of the tables already exported.
+// * `--catalog`: the catalogue's functions without arguments, added to `rpc.json.gz` (part of `--rpc`).
+// * `--remap`: the maps written again from their own files (after a change of the simplification), no crawl.
+// The crawl opens `next dev` of STANDALONE_APP_DIR: the full version with Supabase, never the standalone branch.
 //
 // Needs NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, DEMO_USER_EMAIL and
 // DEMO_HOTELIER_EMAIL; prints counts and sizes, never a key.
@@ -31,9 +36,10 @@ const { values: options } = parseArgs({
     maps: { type: 'boolean', default: false },
     browser: { type: 'boolean', default: false },
     remap: { type: 'boolean', default: false },
+    catalog: { type: 'boolean', default: false },
   },
 })
-const all = !options.tables && !options.rpc && !options.maps && !options.browser && !options.remap
+const all = !options.tables && !options.rpc && !options.maps && !options.browser && !options.remap && !options.catalog
 
 function required(name: string): string {
   const value = process.env[name]
@@ -337,18 +343,44 @@ async function startApp(): Promise<ChildProcess> {
   return app
 }
 
-/** `hotels_outside_noise()` alone, with the service role's longer timeout: under the crawl it outlasts the anon's. */
-async function outsideNoise(): Promise<unknown> {
-  for (let attempt = 1; ; attempt += 1) {
-    const response = await fetch(`${url}/rest/v1/rpc/hotels_outside_noise`, {
-      method: 'POST',
-      headers: { ...headers, 'content-type': 'application/json' },
-      body: '{}',
-    })
-    if (response.ok) return response.json()
-    if (attempt === 3) throw new Error(`hotels_outside_noise: ${response.status}`)
-    await new Promise((r) => setTimeout(r, 5000))
+/**
+ * The functions of the whole catalogue without arguments (`hotels_outside_noise`, `hotel_sea_distances`), read alone
+ * with the service role's longer timeout: under the crawl they outlast the anon's. Their pages are joined.
+ */
+const CATALOG_FUNCTIONS = ['hotels_outside_noise', 'hotel_sea_distances'] as const
+
+async function serviceCall(name: string): Promise<unknown[]> {
+  const rows: unknown[] = []
+  for (let from = 0; ; from += PAGE) {
+    let page: unknown[] | null = null
+    for (let attempt = 1; !page; attempt += 1) {
+      const response = await fetch(`${url}/rest/v1/rpc/${name}?offset=${from}&limit=${PAGE}`, {
+        method: 'POST',
+        headers: { ...headers, 'content-type': 'application/json' },
+        body: '{}',
+      })
+      if (response.ok) page = (await response.json()) as unknown[]
+      else if (attempt === 3) throw new Error(`${name}: ${response.status}`)
+      else await new Promise((r) => setTimeout(r, 5000))
+    }
+    rows.push(...page)
+    if (page.length < PAGE) return rows
   }
+}
+
+/** Adds the catalogue's functions to the recorded calls of data/standalone/rpc.json.gz. */
+async function exportCatalogCalls(calls?: Map<string, unknown>) {
+  const { existsSync, readFileSync } = process.getBuiltinModule('node:fs')
+  const { gunzipSync } = process.getBuiltinModule('node:zlib')
+  const file = join(OUT, 'rpc.json.gz')
+  const kept =
+    calls ?? new Map(existsSync(file) ? Object.entries(JSON.parse(gunzipSync(readFileSync(file)).toString())) : [])
+  for (const name of CATALOG_FUNCTIONS) {
+    const rows = await serviceCall(name)
+    console.log(` ${name}: ${rows.length} rows`)
+    kept.set(callKey(name, {}), rows)
+  }
+  if (!calls) write(file, gz(Object.fromEntries(kept)))
 }
 
 async function realHotels(): Promise<{ id: string; lat: number; lon: number }[]> {
@@ -410,7 +442,7 @@ async function exportRpc(withMaps: boolean, withRpc: boolean) {
     const answers = await crawl(hotels, ['view', ...(withMaps ? MAP_ROUTES : [])], proxy.failed)
     console.log(` ${calls.size} calls recorded, ${proxy.refused()} requests refused`)
     if (withRpc) {
-      calls.set(callKey('hotels_outside_noise', {}), await outsideNoise())
+      await exportCatalogCalls(calls)
       // The map functions are kept as static files by `writeMaps`, not in the bundle.
       const kept = [...calls].filter(([key]) => !/^(hotel_geo_features|hotel_noise_map|hotel_noise_quiet|hotel_noise_day) /.test(key))
       const counts = new Map<string, number>()
@@ -635,6 +667,7 @@ function readMaps(): { hotels: { id: string }[]; answers: Map<string, unknown> }
   return { hotels, answers }
 }
 
+if (options.catalog) await exportCatalogCalls()
 if (options.remap) {
   const { hotels, answers } = readMaps()
   writeMaps(hotels, answers)
