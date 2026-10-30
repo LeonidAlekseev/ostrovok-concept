@@ -11,6 +11,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ hot
   const { hotelId } = await context.params
   const hotel = await loadVisibleHotel(hotelId)
   // The standalone demo's maps are static files of the snapshot (src/lib/standalone/maps.ts).
-  const answer = hotel ? ((await loadStandaloneMap(request.nextUrl.origin, hotel.id, 'noise-map')) as NoiseMapResponse | null) : null
+  const answer = hotel
+    ? ((await loadStandaloneMap(request.nextUrl.origin, hotel.id, 'noise-map')) as NoiseMapResponse | null)
+    : null
   return Response.json(answer ?? ({ map: null } satisfies NoiseMapResponse), { headers: CDN_CACHE_HEADERS })
 }

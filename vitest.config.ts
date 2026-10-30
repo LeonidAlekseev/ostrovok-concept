@@ -1,6 +1,26 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
+/**
+ * The tests of the full version only (branches `dev` and `main`): they check the readers and routes against a mocked
+ * Supabase client, which the standalone demo does not create (its data layer is src/lib/standalone, tested there).
+ */
+const FULL_VERSION_ONLY = [
+  'src/app/api/hotelier/hotels/route.test.ts',
+  'src/app/api/hotelier/routes.test.ts',
+  'src/app/api/hotels/[[]hotelId]/hotelier/facts/route.test.ts',
+  'src/lib/ai/photoSearch.test.ts',
+  'src/lib/ai/rateLimit.test.ts',
+  'src/lib/ai/semantic.test.ts',
+  'src/lib/db/catalog.test.ts',
+  'src/lib/db/claims.test.ts',
+  'src/lib/db/hotelierKnowledgeRetry.test.ts',
+  'src/lib/db/knowledge.index.test.ts',
+  'src/lib/db/knowledge.test.ts',
+  'src/lib/db/noise.test.ts',
+  'src/lib/db/serviceClient.test.ts',
+]
+
 export default defineConfig({
   resolve: {
     alias: {
@@ -19,7 +39,7 @@ export default defineConfig({
     projects: [
       {
         extends: true,
-        test: { name: 'unit', environment: 'node', include: ['src/**/*.test.ts'] },
+        test: { name: 'unit', environment: 'node', include: ['src/**/*.test.ts'], exclude: FULL_VERSION_ONLY },
       },
       {
         extends: true,

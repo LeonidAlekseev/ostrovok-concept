@@ -233,10 +233,22 @@ function untrail(response: Response): Response {
   return new Response(body, { status: response.status, statusText: response.statusText, headers })
 }
 
-/** The rows for a header: without the chunks' vectors, none when too many. */
+/** The tables a GET of the API reads of the browser's rows: the knowledge of the hotelier's answers. */
+const KNOWLEDGE_TABLES = [
+  'entities',
+  'claims',
+  'claim_evidence',
+  'evidence',
+  'relations',
+  'documents',
+  'document_chunks',
+]
+
+/** The rows for a header: the knowledge only, without the chunks' vectors; none when too many. */
 async function headerOverlay(overlay: Overlay): Promise<string | null> {
   const light: Overlay = {}
   for (const [table, rows] of Object.entries(overlay)) {
+    if (!KNOWLEDGE_TABLES.includes(table)) continue
     light[table] = {}
     for (const [key, row] of Object.entries(rows)) {
       if (row && 'embedding' in row) {

@@ -115,6 +115,15 @@ async function requestUser(): Promise<DemoUser | null> {
   }
 }
 
+/**
+ * The request carries rows of the browser: a cached read of the snapshot (`catalogCached`) would not see them, so the
+ * readers read afresh.
+ */
+export function hasBrowserRows(): boolean {
+  const overlay = context.getStore()?.overlay
+  return !!overlay && Object.values(overlay).some((rows) => rows && Object.keys(rows).length > 0)
+}
+
 /** The anon key's client: no user, the policies applied. */
 export const anonStandaloneClient = () =>
   standaloneClient(() => serverDb({ userId: null, service: false }), { user: () => null })

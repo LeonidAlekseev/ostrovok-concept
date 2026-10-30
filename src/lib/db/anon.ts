@@ -2,7 +2,7 @@ import 'server-only'
 import { unstable_cache } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/db/database.types'
-import { anonStandaloneClient } from '@/lib/standalone/server'
+import { anonStandaloneClient, hasBrowserRows } from '@/lib/standalone/server'
 
 /**
  * What the server-side readers of src/lib/db share: the anon client, the test of a real hotel, the cache of the
@@ -47,7 +47,11 @@ export const warnShort = (what: string, error: unknown) =>
 export const catalogCached = <Args extends unknown[], Result>(
   key: readonly string[],
   read: (...args: Args) => Promise<Result>,
-) => unstable_cache(read, [CATALOG_TAG, ...key], { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME })
+) => {
+  const cached = unstable_cache(read, [CATALOG_TAG, ...key], { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME })
+  // A request with the browser's own rows (the hotelier's answers of the standalone demo) reads past the cache.
+  return (...args: Args): Promise<Result> => (hasBrowserRows() ? read(...args) : cached(...args))
+}
 
 /**
  * The data of a real hotel, or `null` for a synthetic one and on a failure, which is logged as «`what`: none for

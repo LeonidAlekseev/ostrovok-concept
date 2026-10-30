@@ -91,26 +91,27 @@ function write(path: string, data: Buffer | string) {
 }
 
 /** The tables, their order and the vector column taken out of the rows. */
-const TABLES: { table: string; order: string; vector?: string; drop?: string[]; filter?: string; geometry?: string }[] = [
-  { table: 'destinations', order: 'id' },
-  { table: 'hotels', order: 'id' },
-  { table: 'ota_hotel_pages', order: 'master_id' },
-  { table: 'ota_hotel_places', order: 'hotel_id' },
-  { table: 'hotel_features', order: 'hotel_id' },
-  { table: 'hotel_room_views_named', order: 'hotel_id,rg_hash' },
-  { table: 'entities', order: 'id' },
-  { table: 'claims', order: 'id' },
-  { table: 'claim_evidence', order: 'claim_id,evidence_id' },
-  { table: 'evidence', order: 'id' },
-  { table: 'calculations', order: 'id' },
-  { table: 'relations', order: 'id' },
-  { table: 'documents', order: 'id' },
-  { table: 'document_chunks', order: 'id', vector: 'embedding', drop: ['fts'] },
-  { table: 'embeddings', order: 'kind,ref_id', vector: 'embedding' },
-  { table: 'hotel_photo_embeddings', order: 'hotel_id,photo_key', vector: 'embedding' },
-  { table: 'osm_places', order: 'osm_type,osm_id', geometry: 'geom' },
-  { table: 'osm_place_areas', order: 'id', geometry: 'area' },
-]
+const TABLES: { table: string; order: string; vector?: string; drop?: string[]; filter?: string; geometry?: string }[] =
+  [
+    { table: 'destinations', order: 'id' },
+    { table: 'hotels', order: 'id' },
+    { table: 'ota_hotel_pages', order: 'master_id' },
+    { table: 'ota_hotel_places', order: 'hotel_id' },
+    { table: 'hotel_features', order: 'hotel_id' },
+    { table: 'hotel_room_views_named', order: 'hotel_id,rg_hash' },
+    { table: 'entities', order: 'id' },
+    { table: 'claims', order: 'id' },
+    { table: 'claim_evidence', order: 'claim_id,evidence_id' },
+    { table: 'evidence', order: 'id' },
+    { table: 'calculations', order: 'id' },
+    { table: 'relations', order: 'id' },
+    { table: 'documents', order: 'id' },
+    { table: 'document_chunks', order: 'id', vector: 'embedding', drop: ['fts'] },
+    { table: 'embeddings', order: 'kind,ref_id', vector: 'embedding' },
+    { table: 'hotel_photo_embeddings', order: 'hotel_id,photo_key', vector: 'embedding' },
+    { table: 'osm_places', order: 'osm_type,osm_id', geometry: 'geom' },
+    { table: 'osm_place_areas', order: 'id', geometry: 'area' },
+  ]
 
 /** The demo accounts' rows: their chats with Эвал and with the hotelier, the profiles. */
 const DEMO_TABLES: { table: string; order: string; by: 'user_id' | 'id' | 'conversation' | 'chat' }[] = [
@@ -199,7 +200,11 @@ async function exportTables() {
         // PostgREST gives a geography as hex EWKB and a geometry as GeoJSON (with its `crs`).
         const value = row[geometry] as string | { type: string; coordinates: unknown } | null
         const shape =
-          typeof value === 'string' ? geoJsonOf(value) : value ? { type: value.type, coordinates: value.coordinates } : null
+          typeof value === 'string'
+            ? geoJsonOf(value)
+            : value
+              ? { type: value.type, coordinates: value.coordinates }
+              : null
         delete row[geometry]
         if (shape && shape.type !== 'Point') row.geometry = shape
       }
@@ -224,7 +229,9 @@ async function exportTables() {
   let conversations: string[] = []
   for (const { table, order, by } of DEMO_TABLES) {
     const filter =
-      by === 'conversation' ? `&conversation_id=in.(${conversations.join(',') || '00000000-0000-0000-0000-000000000000'})` : `&${by}=${inUsers}`
+      by === 'conversation'
+        ? `&conversation_id=in.(${conversations.join(',') || '00000000-0000-0000-0000-000000000000'})`
+        : `&${by}=${inUsers}`
     const rows = await readAll(table, order, filter)
     if (table === 'hotelier_conversations') conversations = rows.map((r) => String(r.id))
     console.log(` ${table}: ${rows.length} demo rows`)
@@ -266,7 +273,10 @@ function startProxy(port: number, calls: Map<string, unknown>) {
   const server = createServer(async (request, response) => {
     const path = request.url ?? '/'
     const fn = /^\/rest\/v1\/rpc\/([a-z_]+)(\?.*)?$/.exec(path)?.[1]
-    const allowed = request.method === 'GET' || request.method === 'HEAD' || (request.method === 'POST' && fn && READ_FUNCTIONS.has(fn))
+    const allowed =
+      request.method === 'GET' ||
+      request.method === 'HEAD' ||
+      (request.method === 'POST' && fn && READ_FUNCTIONS.has(fn))
     if (!allowed || path.startsWith('/auth/') || path.startsWith('/storage/') || path.startsWith('/realtime/')) {
       refused += 1
       response.writeHead(403, { 'content-type': 'application/json' }).end('{"message":"standalone export: read only"}')
@@ -275,7 +285,8 @@ function startProxy(port: number, calls: Map<string, unknown>) {
     const payload = await body(request)
     const forward: Record<string, string> = {}
     for (const [k, v] of Object.entries(request.headers))
-      if (typeof v === 'string' && !['host', 'connection', 'content-length', 'accept-encoding'].includes(k)) forward[k] = v
+      if (typeof v === 'string' && !['host', 'connection', 'content-length', 'accept-encoding'].includes(k))
+        forward[k] = v
     // The functions run with the service role: the anon's 3 s statement timeout cuts the dearest views short. They
     // are `stable` and read the public geodata only, so the answers are the anon's.
     if (fn) {
@@ -444,7 +455,9 @@ async function exportRpc(withMaps: boolean, withRpc: boolean) {
     if (withRpc) {
       await exportCatalogCalls(calls)
       // The map functions are kept as static files by `writeMaps`, not in the bundle.
-      const kept = [...calls].filter(([key]) => !/^(hotel_geo_features|hotel_noise_map|hotel_noise_quiet|hotel_noise_day) /.test(key))
+      const kept = [...calls].filter(
+        ([key]) => !/^(hotel_geo_features|hotel_noise_map|hotel_noise_quiet|hotel_noise_day) /.test(key),
+      )
       const counts = new Map<string, number>()
       for (const [key] of kept) counts.set(key.split(' ')[0], (counts.get(key.split(' ')[0]) ?? 0) + 1)
       console.log(` ${[...counts].map(([k, n]) => `${k} ${n}`).join(', ')}`)
@@ -538,10 +551,15 @@ const firstPoint = (coordinates: unknown): [number, number] => {
 function writeMaps(hotels: readonly { id: string }[], answers: Map<string, unknown>) {
   rmSync(join(PUBLIC_OUT, 'maps'), { recursive: true, force: true })
   const tiles = new Map<string, Map<string, Feature>>()
-  const hashOf = (feature: Feature) => createHash('sha1').update(JSON.stringify(feature)).digest('base64url').slice(0, 12)
+  const hashOf = (feature: Feature) =>
+    createHash('sha1').update(JSON.stringify(feature)).digest('base64url').slice(0, 12)
   /** The map with each array of features replaced by the list of their hashes, tile by tile. */
   const index = (value: unknown): unknown => {
-    if (Array.isArray(value) && value.length > 0 && value.every((f) => f && (f as Feature).type === 'Feature' && (f as Feature).geometry)) {
+    if (
+      Array.isArray(value) &&
+      value.length > 0 &&
+      value.every((f) => f && (f as Feature).type === 'Feature' && (f as Feature).geometry)
+    ) {
       return {
         __features: (value as Feature[]).flatMap((original) => {
           const feature = simplifyFeature(original)
@@ -596,7 +614,10 @@ function exportBrowser() {
   const { gunzipSync } = process.getBuiltinModule('node:zlib')
   const { readFileSync } = process.getBuiltinModule('node:fs')
   const read = (table: string) =>
-    JSON.parse(gunzipSync(readFileSync(join(OUT, 'tables', `${table}.json.gz`))).toString()) as Record<string, unknown>[]
+    JSON.parse(gunzipSync(readFileSync(join(OUT, 'tables', `${table}.json.gz`))).toString()) as Record<
+      string,
+      unknown
+    >[]
   const ids = JSON.parse(readFileSync(join(OUT, 'demo.json'), 'utf8')) as Record<'traveller' | 'hotelier', string>
   const profiles = read('profiles')
   const nameOf = (id: string) => String(profiles.find((p) => p.id === id)?.name ?? '')
@@ -621,7 +642,9 @@ function readMaps(): { hotels: { id: string }[]; answers: Map<string, unknown> }
   const { existsSync, readFileSync, readdirSync } = process.getBuiltinModule('node:fs')
   const { gunzipSync } = process.getBuiltinModule('node:zlib')
   const readJson = (path: string) =>
-    existsSync(`${path}.gz`) ? JSON.parse(gunzipSync(readFileSync(`${path}.gz`)).toString()) : JSON.parse(readFileSync(path, 'utf8'))
+    existsSync(`${path}.gz`)
+      ? JSON.parse(gunzipSync(readFileSync(`${path}.gz`)).toString())
+      : JSON.parse(readFileSync(path, 'utf8'))
   const dir = join(PUBLIC_OUT, 'maps')
   const tileCache = new Map<string, Record<string, Feature>>()
   const tileOf = (id: string) => {
