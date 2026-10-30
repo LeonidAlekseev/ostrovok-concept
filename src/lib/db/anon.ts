@@ -1,8 +1,8 @@
 import 'server-only'
-import { createClient } from '@supabase/supabase-js'
 import { unstable_cache } from 'next/cache'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/db/database.types'
-import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/config'
+import { anonStandaloneClient, hasBrowserRows } from '@/lib/standalone/server'
 
 /**
  * What the server-side readers of src/lib/db share: the anon client, the test of a real hotel, the cache of the
@@ -19,8 +19,7 @@ export const CATALOG_TAG = 'catalog'
 export const CATALOG_LIFETIME = 3600
 
 /** A client with the anon key and no session: the server reads for everybody, never as a user. */
-export const anonClient = () =>
-  createClient<Database>(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } })
+export const anonClient = () => anonStandaloneClient() as unknown as SupabaseClient<Database>
 
 export type AnonClient = ReturnType<typeof anonClient>
 
@@ -28,7 +27,7 @@ export type AnonClient = ReturnType<typeof anonClient>
  * A real hotel of the database (`ota-<master_id>`, see `otaHotelId`) when Supabase is configured. A synthetic hotel
  * of the generator has no geodata, pages or features, so its readers answer `null` without asking.
  */
-export const isRealHotelId = (id: string) => isSupabaseConfigured && /^ota-\d{1,15}$/.test(id)
+export const isRealHotelId = (id: string) => /^ota-\d{1,15}$/.test(id)
 
 /** Where a hotel's geodata are read: its id decides whether there are any (`isRealHotelId`). */
 export interface HotelPoint {
@@ -48,7 +47,11 @@ export const warnShort = (what: string, error: unknown) =>
 export const catalogCached = <Args extends unknown[], Result>(
   key: readonly string[],
   read: (...args: Args) => Promise<Result>,
-) => unstable_cache(read, [CATALOG_TAG, ...key], { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME })
+) => {
+  const cached = unstable_cache(read, [CATALOG_TAG, ...key], { tags: [CATALOG_TAG], revalidate: CATALOG_LIFETIME })
+  // A request with the browser's own rows (the hotelier's answers of the standalone demo) reads past the cache.
+  return (...args: Args): Promise<Result> => (hasBrowserRows() ? read(...args) : cached(...args))
+}
 
 /**
  * The data of a real hotel, or `null` for a synthetic one and on a failure, which is logged as «`what`: none for

@@ -1,9 +1,7 @@
 /**
- * The public Supabase settings, inlined into the client bundle at build time (`NEXT_PUBLIC_*` must be read
- * literally). Without them the site works as before: sign-in reports «Вход временно недоступен».
+ * The standalone demo has no Supabase: the data are the snapshot of data/standalone and the demo accounts sign in
+ * without a password, so everything that needed the settings is on.
  */
-export const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
-export const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
+export const isSupabaseConfigured = true
 
 export const AUTH_UNAVAILABLE = 'Вход временно недоступен'

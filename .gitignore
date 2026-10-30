@@ -44,4 +44,6 @@ openspec/**/screenshots/
 supabase/.temp/
 
 # Исходные геоданные (gpkg, parquet): большие, грузятся в Supabase скриптом scripts/load-valencia-geo.py
-/data/
+/data/*
+# Снимок базы для демо-версии без базы (scripts/export-standalone.ts): часть сборки ветки standalone.
+!/data/standalone/

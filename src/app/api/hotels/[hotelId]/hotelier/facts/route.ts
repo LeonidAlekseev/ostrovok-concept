@@ -1,4 +1,3 @@
-import { after } from 'next/server'
 import { apiError, loadVisibleHotel } from '@/lib/api'
 import { isRealHotelId } from '@/lib/db/anon'
 import { loadHotelierClaims } from '@/lib/db/claims'
@@ -6,6 +5,7 @@ import { retryDueHotelierKnowledge } from '@/lib/db/hotelierKnowledge'
 import { claimRoom, claimValueText, conflictingIds } from '@/lib/hotelierClaims'
 import { characteristicLabel, keyOfProperty } from '@/lib/hotelierFacts'
 import { NOT_FOUND_ERROR, NO_STORE_HEADERS, STORE_ERROR, type HotelierFactsResponse } from './schema'
+import { after, withStandaloneDb } from '@/lib/standalone/server'
 
 /**
  * The hotelier's current characteristics of a real hotel (`loadHotelierClaims`, fresh): what the hotel's page shows in
@@ -13,7 +13,7 @@ import { NOT_FOUND_ERROR, NO_STORE_HEADERS, STORE_ERROR, type HotelierFactsRespo
  * an unknown, hidden or synthetic hotel, 503 when the store fails. After the response the answers whose knowledge
  * failed or was cut off are tried again (`retryDueHotelierKnowledge`): the readers of the knowledge drive its retries.
  */
-export async function GET(_request: Request, context: { params: Promise<{ hotelId: string }> }) {
+async function handleGET(_request: Request, context: { params: Promise<{ hotelId: string }> }) {
   after(() => retryDueHotelierKnowledge())
   const { hotelId } = await context.params
   const hotel = await loadVisibleHotel(hotelId).catch(() => undefined)
@@ -44,3 +44,5 @@ export async function GET(_request: Request, context: { params: Promise<{ hotelI
   })
   return Response.json({ hotelId: hotel.id, facts } satisfies HotelierFactsResponse, { headers: NO_STORE_HEADERS })
 }
+
+export const GET = withStandaloneDb(handleGET)

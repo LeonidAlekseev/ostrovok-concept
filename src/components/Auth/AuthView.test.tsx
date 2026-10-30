@@ -49,51 +49,14 @@ describe('login form', () => {
     expect(supabase.signInWithOtp).not.toHaveBeenCalled()
   })
 
-  it('sends the link back to `next` and asks to check the email', async () => {
-    nav.query = 'next=%2Ftrips'
-    const user = userEvent.setup()
-    render(<AuthPage mode="login" />)
-    await type(user, 'Email', ' anna@example.com ')
-    await user.click(screen.getByRole('button', { name: 'Отправить ссылку' }))
-    expect(await screen.findByText('Проверьте почту')).toBeTruthy()
-    expect(screen.getByRole('status').textContent).toContain('anna@example.com')
-    expect(supabase.signInWithOtp).toHaveBeenCalledWith({
-      email: 'anna@example.com',
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=%2Ftrips`, data: undefined },
-    })
-
-    await user.click(screen.getByRole('button', { name: 'Изменить почту' }))
-    expect(screen.getByLabelText('Email')).toBeTruthy()
-  })
-
-  it('sends an external `next` link to /', async () => {
-    nav.query = `next=${encodeURIComponent('//evil.com')}`
+  // The standalone demo sends no emails: only the demo accounts sign in.
+  it('says the email sign-in is not in the demo and sends nothing', async () => {
     const user = userEvent.setup()
     render(<AuthPage mode="login" />)
     await type(user, 'Email', 'anna@example.com')
     await user.click(screen.getByRole('button', { name: 'Отправить ссылку' }))
-    await screen.findByText('Проверьте почту')
-    expect(supabase.signInWithOtp.mock.calls[0]).toMatchObject([
-      { options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=%2F` } },
-    ])
-  })
-
-  it('reports a failed send at the form', async () => {
-    supabase.signInWithOtp.mockResolvedValueOnce({ error: { status: 429 } })
-    const user = userEvent.setup()
-    render(<AuthPage mode="login" />)
-    await type(user, 'Email', 'anna@example.com')
-    await user.click(screen.getByRole('button', { name: 'Отправить ссылку' }))
-    expect((await screen.findByRole('alert')).textContent).toBe('Слишком много писем подряд: попробуйте через минуту')
-  })
-
-  it('says sign-in is unavailable without the Supabase settings', async () => {
-    supabase.configured = false
-    const user = userEvent.setup()
-    render(<AuthPage mode="login" />)
-    await type(user, 'Email', 'anna@example.com')
-    await user.click(screen.getByRole('button', { name: 'Отправить ссылку' }))
-    expect(screen.getByRole('alert').textContent).toBe('Вход временно недоступен')
+    expect(screen.getByRole('alert').textContent).toBe('Вход по почте недоступен в демо-версии: войдите в демо-аккаунт')
+    expect(supabase.signInWithOtp).not.toHaveBeenCalled()
   })
 
   it('shows an expired link from the email', () => {
@@ -104,7 +67,7 @@ describe('login form', () => {
 })
 
 describe('register form', () => {
-  it('checks the name and the agreement, then sends the link with the name', async () => {
+  it('checks the name and the agreement, then says the email sign-in is not in the demo', async () => {
     const user = userEvent.setup()
     render(<AuthPage mode="register" />)
     await type(user, 'Email', 'anna@example.com')
@@ -116,8 +79,8 @@ describe('register form', () => {
     await type(user, 'Имя', ' Анна Петрова ')
     await user.click(screen.getByRole('checkbox'))
     await user.click(screen.getByRole('button', { name: 'Зарегистрироваться' }))
-    expect(await screen.findByText('Проверьте почту')).toBeTruthy()
-    expect(supabase.signInWithOtp.mock.calls[0]).toMatchObject([{ options: { data: { name: 'Анна Петрова' } } }])
+    expect(screen.getByRole('alert').textContent).toContain('недоступен в демо-версии')
+    expect(supabase.signInWithOtp).not.toHaveBeenCalled()
   })
 })
 

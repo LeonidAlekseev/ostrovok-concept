@@ -1,13 +1,10 @@
 # docker compose up --build  → http://localhost:8080. Keys: .env (cp .env.example .env, fill in the values or
-# only AGE_SECRET_KEY); see README. Only the app runs here: the database is the cloud Supabase.
+# only AGE_SECRET_KEY); see README. The standalone demo: no database, the data are inside the image.
 services:
   app:
     build:
       context: .
       target: runner
-      args:
-        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
       secrets:
         - age_secret_key
     platform: linux/amd64
