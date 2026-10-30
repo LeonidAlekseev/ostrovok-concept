@@ -338,11 +338,15 @@ export class Query<T = any> implements PromiseLike<QueryResult<T>> {
   private headOnly = false
   private signal?: AbortSignal
 
-  constructor(
-    private readonly source: Source,
-    private readonly table: string,
-    private readonly call?: { name: string; args: Row },
-  ) {}
+  private readonly source: Source
+  private readonly table: string
+  private readonly call?: { name: string; args: Row }
+
+  constructor(source: Source, table: string, call?: { name: string; args: Row }) {
+    this.source = source
+    this.table = table
+    this.call = call
+  }
 
   select(columns = '*', options?: { count?: string; head?: boolean }) {
     this.fields = parseSelect(columns)

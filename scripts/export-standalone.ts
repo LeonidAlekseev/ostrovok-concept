@@ -43,6 +43,11 @@ function required(name: string): string {
 const ROOT = new URL('..', import.meta.url).pathname
 const OUT = join(ROOT, 'data/standalone')
 const PUBLIC_OUT = join(ROOT, 'public/standalone')
+/**
+ * The checkout whose `next dev` the crawl opens: the full version with Supabase (a worktree of `dev`), never this one —
+ * on the `standalone` branch the site reads the snapshot itself.
+ */
+const APP = process.env.STANDALONE_APP_DIR ?? ROOT
 const url = required('NEXT_PUBLIC_SUPABASE_URL').replace(/\/$/, '')
 const serviceKey = required('SUPABASE_SERVICE_ROLE_KEY')
 const PAGE = 1000
@@ -314,9 +319,9 @@ const APP_PORT = 3999
 
 /** A local `next dev` with Supabase behind the proxy; the caller kills it. */
 async function startApp(): Promise<ChildProcess> {
-  rmSync(join(ROOT, '.next'), { recursive: true, force: true })
+  rmSync(join(APP, '.next'), { recursive: true, force: true })
   const app = spawn('npx', ['next', 'dev', '-p', String(APP_PORT)], {
-    cwd: ROOT,
+    cwd: APP,
     env: {
       ...process.env,
       NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${PROXY_PORT}`,
@@ -416,7 +421,7 @@ async function exportRpc(withMaps: boolean, withRpc: boolean) {
   } finally {
     if (app.pid) process.kill(-app.pid, 'SIGTERM')
     proxy.server.close()
-    rmSync(join(ROOT, '.next'), { recursive: true, force: true })
+    rmSync(join(APP, '.next'), { recursive: true, force: true })
   }
 }
 

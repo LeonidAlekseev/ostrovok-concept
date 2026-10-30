@@ -159,11 +159,11 @@ export const keyOf = (table: string, row: Row) =>
 
 /** A refusal of a trigger or a policy, as Postgres raises it. */
 export class DbRefusal extends Error {
-  constructor(
-    message: string,
-    readonly code = 'P0001',
-  ) {
+  readonly code: string
+
+  constructor(message: string, code = 'P0001') {
     super(message)
+    this.code = code
   }
 }
 
@@ -188,12 +188,17 @@ export class Db implements Source {
   private indexes = new Map<string, Map<string, Row[]>>()
   private listeners = new Set<(table: string, row: Row | null, old: Row | null) => void>()
 
-  constructor(
-    private readonly base: (table: string) => readonly Row[],
-    readonly overlay: Overlay,
-    readonly functions: Functions,
-    readonly actor: Actor,
-  ) {}
+  private readonly base: (table: string) => readonly Row[]
+  readonly overlay: Overlay
+  readonly functions: Functions
+  readonly actor: Actor
+
+  constructor(base: (table: string) => readonly Row[], overlay: Overlay, functions: Functions, actor: Actor) {
+    this.base = base
+    this.overlay = overlay
+    this.functions = functions
+    this.actor = actor
+  }
 
   /** The same tables as another actor (the service role of the server's own writes). */
   as(actor: Actor): Db {

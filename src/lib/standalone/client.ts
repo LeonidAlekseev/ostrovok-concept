@@ -35,10 +35,13 @@ export class StandaloneChannel {
   private listeners: Listener[] = []
   private stop?: () => void
 
-  constructor(
-    private readonly db: () => Db,
-    readonly topic: string,
-  ) {}
+  private readonly db: () => Db
+  readonly topic: string
+
+  constructor(db: () => Db, topic: string) {
+    this.db = db
+    this.topic = topic
+  }
 
   on(
     _type: 'postgres_changes',

@@ -40,7 +40,12 @@ function vectors(name: string): Vectors | null {
     try {
       const { dim } = JSON.parse(readFileSync(join(DIR, 'vectors', `${name}.json`), 'utf8')) as { dim: number }
       const file = readFileSync(join(DIR, 'vectors', `${name}.f32`))
-      vectorCache.set(name, { dim, data: new Float32Array(file.buffer, file.byteOffset, file.byteLength / 4) })
+      // A view of the file's bytes needs them aligned to 4; a copy when Node's buffer is not.
+      const data =
+        file.byteOffset % 4 === 0
+          ? new Float32Array(file.buffer, file.byteOffset, file.byteLength / 4)
+          : new Float32Array(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength))
+      vectorCache.set(name, { dim, data })
     } catch {
       vectorCache.set(name, null)
     }
@@ -51,11 +56,15 @@ function vectors(name: string): Vectors | null {
 let calls: Map<string, unknown> | undefined
 
 function recorded(key: string): unknown {
-  calls ??= new Map(
-    Object.entries(
-      JSON.parse(gunzipSync(readFileSync(join(DIR, 'rpc.json.gz'))).toString()) as Record<string, unknown>,
-    ),
-  )
+  if (!calls) {
+    try {
+      const text = gunzipSync(readFileSync(join(DIR, 'rpc.json.gz'))).toString()
+      calls = new Map(Object.entries(JSON.parse(text) as Record<string, unknown>))
+    } catch (error) {
+      console.warn(`standalone: no recorded calls (${String(error).slice(0, 200)})`)
+      calls = new Map()
+    }
+  }
   return calls.get(key)
 }
 
@@ -167,7 +176,7 @@ export function withStandaloneDb<R extends Request, C>(
   handler: Handler<R, C>,
 ): (request: R, context: C) => Promise<Response> {
   return async (incoming, routeContext) => {
-    const unwrapped = await unwrap(incoming instanceof NextRequest ? incoming : new NextRequest(incoming))
+    const unwrapped = await unwrap(incoming as unknown as NextRequest)
     const { overlay, carried } = unwrapped
     const request = unwrapped.request as unknown as R
     const ctx: Context = { overlay, user: userOfCookie(cookieOf(incoming)), pending: [] }

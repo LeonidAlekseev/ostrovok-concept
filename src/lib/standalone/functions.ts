@@ -637,6 +637,7 @@ export function standaloneFunctions(source: FunctionsSource): Functions {
         return await handler(db, args, source)
       } catch (error) {
         if (error instanceof DbRefusal) return fail(error.message, error.code)
+        console.warn(`standalone: ${name} failed (${String(error).slice(0, 200)})`)
         return fail(error instanceof Error ? error.message : String(error), 'XX000')
       }
     },
