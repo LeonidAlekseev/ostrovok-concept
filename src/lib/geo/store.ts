@@ -1,9 +1,8 @@
 import 'server-only'
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import type { Database } from '@/lib/db/database.types'
-import { serviceClient } from '@/lib/db/serviceClient'
-import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/config'
+import { anonClient } from '@/lib/db/anon'
 import { PLACE_CATEGORIES } from './categories'
 import type { LatLon } from './distance'
 import type { CallBudget } from './http'
@@ -29,14 +28,11 @@ let clients: Promise<{ read: Client | null; write: Client | null }> | undefined
 
 async function supabase() {
   clients ??= (async () => {
-    if (!isSupabaseConfigured) return { read: null, write: null }
-    const write = await serviceClient()
-    const options = { auth: { persistSession: false, autoRefreshToken: false } }
-    return { read: write ?? createClient<Database>(supabaseUrl, supabaseAnonKey, options), write }
+    // The standalone demo reads the snapshot's places and caches nothing: the places of Overpass are asked again.
+    return { read: anonClient(), write: null as Client | null }
   })()
   const answer = await clients
   // A key that did not come in time leaves no write client for good: the next call asks again.
-  if (!answer.write && isSupabaseConfigured) clients = undefined
   return answer
 }
 

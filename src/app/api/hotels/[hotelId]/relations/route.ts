@@ -9,13 +9,14 @@ import {
   relationsQuerySchema,
   type RelationsResponse,
 } from './schema'
+import { withStandaloneDb } from '@/lib/standalone/server'
 
 /**
  * The edges of a real hotel in the graph of the store — the places near it, its building — the nearest first, with the
  * distance claim and the source of each: 400 for a bad query, 404 for a hotel that is unknown, hidden in this
  * environment or synthetic, 503 when the store cannot be read.
  */
-export async function GET(request: NextRequest, context: { params: Promise<{ hotelId: string }> }) {
+async function handleGET(request: NextRequest, context: { params: Promise<{ hotelId: string }> }) {
   const { hotelId } = await context.params
   const params = request.nextUrl.searchParams
   const query = relationsQuerySchema.safeParse({
@@ -39,3 +40,5 @@ export async function GET(request: NextRequest, context: { params: Promise<{ hot
     { headers: CDN_CACHE_HEADERS },
   )
 }
+
+export const GET = withStandaloneDb(handleGET)

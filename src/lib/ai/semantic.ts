@@ -1,10 +1,9 @@
 import 'server-only'
-import { createClient } from '@supabase/supabase-js'
 import { embed, rerank } from 'ai'
 import { isVisibleHotel } from '@/lib/catalog'
 import { loadHiddenHotelIds } from '@/lib/db/catalog'
 import type { Database } from '@/lib/db/database.types'
-import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/config'
+import { anonClient } from '@/lib/db/anon'
 import { getSecret } from '../secrets'
 import { embeddingModel, toVector } from './embedding'
 import { NVIDIA_KEY } from './nvidia'
@@ -104,8 +103,7 @@ function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 }
 
 /** The catalog's database with the anon key: the functions are `security definer`, the table is closed. */
-export const database = () =>
-  createClient<Database>(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } })
+export const database = () => anonClient()
 
 export const warn = (what: string, error: unknown) =>
   // The kind and the provider's short message; never the query itself.
@@ -137,7 +135,6 @@ export async function semanticSearch(
 ): Promise<SemanticResult> {
   const query = text.trim().slice(0, MAX_SEMANTIC_QUERY)
   if (!query || destinationIds?.length === 0) return EMPTY
-  if (!isSupabaseConfigured) return failed('database')
   const apiKey = await getSecret(NVIDIA_KEY)
   if (!apiKey) return failed('no-key')
   const timeout = AbortSignal.timeout(timeoutMs)

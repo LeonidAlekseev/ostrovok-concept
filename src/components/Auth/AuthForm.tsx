@@ -2,7 +2,6 @@
 
 import { useState, type FormEvent } from 'react'
 import Link from 'next/link'
-import { MailCheck } from 'lucide-react'
 import { TextField } from '@/components/BookingFields/TextField'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -11,8 +10,8 @@ import { Label } from '@/components/ui/label'
 import { EMPTY_REGISTER, validateLogin, validateRegister, type RegisterValues } from '@/lib/auth'
 import type { FormErrors } from '@/lib/booking'
 import { focusField } from '@/lib/focusField'
-import { getBrowserClient } from '@/lib/supabase/client'
-import { AUTH_UNAVAILABLE } from '@/lib/supabase/config'
+
+const EMAIL_UNAVAILABLE = 'Вход по почте недоступен в демо-версии: войдите в демо-аккаунт'
 
 export type AuthMode = 'login' | 'register'
 
@@ -33,13 +32,11 @@ export function FormAlert({ children }: { children: string }) {
 }
 
 /** The sign-in or the registration form; the same in the dialog and on the full page. Both send a one-time link. */
-export function AuthForm({ mode, next, initialError }: Props) {
+export function AuthForm({ mode, initialError }: Props) {
   const register = mode === 'register'
   const [values, setValues] = useState<RegisterValues>(EMPTY_REGISTER)
   const [errors, setErrors] = useState<FormErrors>({})
   const [formError, setFormError] = useState(initialError)
-  const [sentTo, setSentTo] = useState<string | null>(null)
-  const [pending, setPending] = useState(false)
   const change = (patch: Partial<RegisterValues>) => setValues((current) => ({ ...current, ...patch }))
 
   async function submit(event: FormEvent) {
@@ -52,45 +49,8 @@ export function AuthForm({ mode, next, initialError }: Props) {
       focusField(first)
       return
     }
-    const supabase = getBrowserClient()
-    if (!supabase) {
-      setFormError(AUTH_UNAVAILABLE)
-      return
-    }
-    const email = values.email.trim()
-    setPending(true)
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
-        // A sign-in with a new email creates the account too; its name then comes from the email.
-        data: register ? { name: values.name.trim() } : undefined,
-      },
-    })
-    setPending(false)
-    if (!error) setSentTo(email)
-    else
-      setFormError(
-        error.status === 429
-          ? 'Слишком много писем подряд: попробуйте через минуту'
-          : 'Не удалось отправить ссылку, попробуйте ещё раз',
-      )
-  }
-
-  if (sentTo) {
-    return (
-      <div role="status" className="flex flex-col items-start gap-3 rounded-lg bg-muted p-4">
-        <MailCheck className="size-6 text-primary" aria-hidden />
-        <p className="m-0 text-base font-[650]">Проверьте почту</p>
-        <p className="m-0 text-sm text-muted-foreground">
-          Мы отправили ссылку для входа на <span className="font-[550] text-foreground">{sentTo}</span>. Откройте её в
-          этом браузере — ссылка действует один раз.
-        </p>
-        <Button variant="link" onClick={() => setSentTo(null)}>
-          Изменить почту
-        </Button>
-      </div>
-    )
+    // The standalone demo sends no emails: only the demo accounts sign in (the buttons below the form).
+    setFormError(EMAIL_UNAVAILABLE)
   }
 
   return (
@@ -137,7 +97,7 @@ export function AuthForm({ mode, next, initialError }: Props) {
         )}
       </FieldGroup>
       {formError && <FormAlert>{formError}</FormAlert>}
-      <Button type="submit" size="lg" className="w-full" disabled={pending}>
+      <Button type="submit" size="lg" className="w-full">
         {register ? 'Зарегистрироваться' : 'Отправить ссылку'}
       </Button>
       <p className="m-0 text-sm text-muted-foreground">Пароль не нужен: войдите по ссылке из письма.</p>

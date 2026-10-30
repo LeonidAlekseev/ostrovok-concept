@@ -1,4 +1,3 @@
-import { after } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/api'
 import { allowRequest, clientIp } from '@/lib/ai/rateLimit'
@@ -14,6 +13,7 @@ import {
   UNAUTHORIZED_ERROR,
   hotelierMessageSchema,
 } from '../../../schema'
+import { after, withStandaloneDb } from '@/lib/standalone/server'
 
 /**
  * The hotelier's answer in a conversation of their hotel. The database checks the right (`is_hotelier_of`): anyone
@@ -23,7 +23,7 @@ import {
  * failed before are tried again then too. 400 for a bad body, 401 for a
  * guest, 404 for an unknown conversation, 409 for a closed one, 429 over the limits, 503 when the database fails.
  */
-export async function POST(request: Request, context: { params: Promise<{ conversationId: string }> }) {
+async function handlePOST(request: Request, context: { params: Promise<{ conversationId: string }> }) {
   const { conversationId } = await context.params
   if (!z.uuid().safeParse(conversationId).success) return apiError(404, NOT_FOUND_ERROR)
   const body = hotelierMessageSchema.safeParse(await jsonBody(request))
@@ -44,3 +44,5 @@ export async function POST(request: Request, context: { params: Promise<{ conver
   })
   return Response.json(message)
 }
+
+export const POST = withStandaloneDb(handlePOST)

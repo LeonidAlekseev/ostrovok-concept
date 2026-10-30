@@ -1,17 +1,17 @@
-import { after } from 'next/server'
 import { z } from 'zod'
 import { apiError } from '@/lib/api'
 import { ownAnswer, signedInUser } from '@/lib/db/hotelierChat'
 import { revokeHotelierAnswer } from '@/lib/db/hotelierKnowledge'
 import { createClient } from '@/lib/supabase/server'
 import { FORBIDDEN_ERROR, STORE_ERROR, UNAUTHORIZED_ERROR } from '../../../schema'
+import { after, withStandaloneDb } from '@/lib/standalone/server'
 
 /**
  * The hotelier withdraws the knowledge of their answer: its claims end (kept with «Отозвано отельером») and its
  * document leaves the search, by the server after the response. 202 when accepted; 401 for a guest, 403 for a message
  * that is not the caller's answer, 503 without the database.
  */
-export async function POST(_request: Request, context: { params: Promise<{ messageId: string }> }) {
+async function handlePOST(_request: Request, context: { params: Promise<{ messageId: string }> }) {
   const { messageId } = await context.params
   if (!z.uuid().safeParse(messageId).success) return apiError(403, FORBIDDEN_ERROR)
   const client = await createClient()
@@ -22,3 +22,5 @@ export async function POST(_request: Request, context: { params: Promise<{ messa
   after(() => revokeHotelierAnswer(messageId))
   return Response.json({ messageId, revoked: true }, { status: 202 })
 }
+
+export const POST = withStandaloneDb(handlePOST)

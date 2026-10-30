@@ -3,13 +3,14 @@ import { apiError, CDN_CACHE_HEADERS, loadVisibleHotel } from '@/lib/api'
 import { loadHotelClaims } from '@/lib/db/claims'
 import { isRealHotelId } from '@/lib/db/anon'
 import { CLAIMS_QUERY_ERROR, NOT_FOUND_ERROR, STORE_ERROR, claimsQuerySchema, type ClaimsResponse } from './schema'
+import { withStandaloneDb } from '@/lib/standalone/server'
 
 /**
  * The claims of a real hotel by a prefix of the property, each with its value, status, confidence, sources and
  * calculation (the store of claims, `loadHotelClaims`): 400 for a bad query, 404 for a hotel that is unknown, hidden
  * in this environment or synthetic, 503 when the store cannot be read.
  */
-export async function GET(request: NextRequest, context: { params: Promise<{ hotelId: string }> }) {
+async function handleGET(request: NextRequest, context: { params: Promise<{ hotelId: string }> }) {
   const { hotelId } = await context.params
   const params = request.nextUrl.searchParams
   const query = claimsQuerySchema.safeParse({
@@ -33,3 +34,5 @@ export async function GET(request: NextRequest, context: { params: Promise<{ hot
     { headers: CDN_CACHE_HEADERS },
   )
 }
+
+export const GET = withStandaloneDb(handleGET)

@@ -66,6 +66,7 @@ import type { ToolRun } from '@/lib/toolResult'
 import { nightsBetween, todayIso, type IsoDate } from '@/lib/dates'
 import type { Hotel } from '@/lib/catalog'
 import { assistantRequestSchema } from './schema'
+import { withStandaloneDb } from '@/lib/standalone/server'
 
 /** The answer is due in 15 s: the client waits 16. The steps of the turn get what the model left. */
 const ANSWER_BUDGET_MS = 15_000
@@ -643,7 +644,7 @@ async function photoTurn(photos: readonly string[], ip: string, context: WishCon
  * The traveller's newest message: about the bookings (`bookingTurn`), about the chat's hotel (`hotelTurn`), with
  * photos (`photoTurn`) or a wish (`wishTurn`).
  */
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const ip = clientIp(request)
   const parsedBody = assistantRequestSchema.safeParse(await request.json().catch(() => null))
   if (!parsedBody.success) return apiError(400, 'Invalid request')
@@ -694,3 +695,5 @@ export async function POST(request: Request) {
   if (rerun) return Response.json(await rerunTurn(context))
   return Response.json(photos.length > 0 ? await photoTurn(photos, ip, context) : await wishTurn(context))
 }
+
+export const POST = withStandaloneDb(handlePOST)

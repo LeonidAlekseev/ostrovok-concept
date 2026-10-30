@@ -1,4 +1,3 @@
-import { after } from 'next/server'
 import { apiError, loadVisibleHotel } from '@/lib/api'
 import { mediate } from '@/lib/ai/hotelierMediator'
 import { allowRequest, clientIp } from '@/lib/ai/rateLimit'
@@ -13,6 +12,7 @@ import {
   UNAUTHORIZED_ERROR,
   travellerMessageSchema,
 } from '../../../../hotelier/schema'
+import { after, withStandaloneDb } from '@/lib/standalone/server'
 
 /**
  * The signed-in traveller's message to the hotel's hotelier, into their open chat with the hotel (a new one when there
@@ -21,7 +21,7 @@ import {
  * hotelier answers in their panel, and the browser gets both by Realtime. 400 for a bad text, 401 for a guest, 404 for an unknown or hidden hotel, 409 for a closed chat, 429 over
  * the limits, 503 when the database fails.
  */
-export async function POST(request: Request, context: { params: Promise<{ hotelId: string }> }) {
+async function handlePOST(request: Request, context: { params: Promise<{ hotelId: string }> }) {
   const { hotelId } = await context.params
   const body = travellerMessageSchema.safeParse(await jsonBody(request))
   if (!body.success) return apiError(400, BODY_ERROR)
@@ -38,3 +38,5 @@ export async function POST(request: Request, context: { params: Promise<{ hotelI
   after(() => mediate(conversation.id, message.id))
   return Response.json(result.value)
 }
+
+export const POST = withStandaloneDb(handlePOST)

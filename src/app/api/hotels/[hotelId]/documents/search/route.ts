@@ -4,6 +4,7 @@ import { isRealHotelId } from '@/lib/db/anon'
 import { queryVectorOrNull } from '@/lib/ai/semantic'
 import { loadEvidence, searchHotelKnowledge } from '@/lib/db/claims'
 import { NOT_FOUND_ERROR, SEARCH_QUERY_ERROR, STORE_ERROR, searchQuerySchema, type SearchResponse } from './schema'
+import { withStandaloneDb } from '@/lib/standalone/server'
 
 /**
  * The chunks of the documents of a real hotel — the guests' reviews and the hotel's knowledge from its hotelier — for
@@ -11,7 +12,7 @@ import { NOT_FOUND_ERROR, SEARCH_QUERY_ERROR, STORE_ERROR, searchQuerySchema, ty
  * query goes to the search as it is. The texts are untrusted, passed on as data: 400 for a bad query, 404 for a hotel
  * that is unknown, hidden in this environment or synthetic, 503 when the store fails.
  */
-export async function GET(request: NextRequest, context: { params: Promise<{ hotelId: string }> }) {
+async function handleGET(request: NextRequest, context: { params: Promise<{ hotelId: string }> }) {
   const { hotelId } = await context.params
   const params = request.nextUrl.searchParams
   const query = searchQuerySchema.safeParse({
@@ -41,3 +42,5 @@ export async function GET(request: NextRequest, context: { params: Promise<{ hot
     { headers: CDN_CACHE_HEADERS },
   )
 }
+
+export const GET = withStandaloneDb(handleGET)
