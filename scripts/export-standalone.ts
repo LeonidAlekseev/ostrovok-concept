@@ -501,45 +501,25 @@ function simplifyLine(points: number[][], tolerance: number): number[][] {
   return points.filter((_, i) => keep[i])
 }
 
-/** A ring smaller than this (m²) is a sliver of the clipping and the rounding: nobody sees it on the map. */
-const SLIVER_M2 = 1
-
-/** The area of a ring in m², in the plane around its first point. */
-function ringArea(ring: number[][]): number {
-  const k = Math.cos((ring[0][1] * Math.PI) / 180) * 111_320
-  let sum = 0
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++)
-    sum += (ring[j][0] - ring[i][0]) * k * (ring[j][1] + ring[i][1]) * 111_320
-  return Math.abs(sum / 2)
-}
-
-/** A ring without its repeated points, simplified; `null` when it is a sliver or fewer than 3 points are left. */
-function simplifyRing(ring: number[][]): number[][] | null {
+/**
+ * A ring without its repeated points, simplified. A ring the simplification would break (fewer than 4 points left)
+ * keeps its distinct points, and a ring the 5-decimal rounding already flattened stays as it was: no shape of the
+ * route's answer is lost.
+ */
+function simplifyRing(ring: number[][]): number[][] {
   const distinct = ring.filter((p, i) => i === 0 || p[0] !== ring[i - 1][0] || p[1] !== ring[i - 1][1])
-  if (distinct.length < 4 || ringArea(distinct) < SLIVER_M2) return null
+  if (distinct.length < 4) return ring
   const simple = simplifyLine(distinct, SIMPLIFY_DEG)
-  return simple.length < 4 ? null : simple
+  return simple.length < 4 ? distinct : simple
 }
 
-/** The polygons of a feature simplified; `null` when nothing of it is left (a sliver of the rounding). */
-function simplifyFeature(feature: Feature): Feature | null {
+/** The polygons of a feature simplified, every ring kept. */
+function simplifyFeature(feature: Feature): Feature {
   const { type, coordinates } = feature.geometry
-  const polygon = (rings: number[][][]) => {
-    const outer = simplifyRing(rings[0])
-    if (!outer) return null
-    return [outer, ...rings.slice(1).flatMap((r) => simplifyRing(r) ?? [])]
-  }
-  if (type === 'Polygon') {
-    const simple = polygon(coordinates as number[][][])
-    return simple ? { ...feature, geometry: { type, coordinates: simple } } : null
-  }
-  if (type === 'MultiPolygon') {
-    const parts = (coordinates as number[][][][]).flatMap((p) => {
-      const simple = polygon(p)
-      return simple ? [simple] : []
-    })
-    return parts.length ? { ...feature, geometry: { type, coordinates: parts } } : null
-  }
+  const polygon = (rings: number[][][]) => rings.map(simplifyRing)
+  if (type === 'Polygon') return { ...feature, geometry: { type, coordinates: polygon(coordinates as number[][][]) } }
+  if (type === 'MultiPolygon')
+    return { ...feature, geometry: { type, coordinates: (coordinates as number[][][][]).map(polygon) } }
   return feature
 }
 
@@ -565,7 +545,6 @@ function writeMaps(hotels: readonly { id: string }[], answers: Map<string, unkno
       return {
         __features: (value as Feature[]).flatMap((original) => {
           const feature = simplifyFeature(original)
-          if (!feature) return []
           const [lon, lat] = firstPoint(feature.geometry.coordinates)
           const tile = `${Math.floor(lon / TILE_DEG)}_${Math.floor(lat / TILE_DEG)}`
           const hash = hashOf(feature)

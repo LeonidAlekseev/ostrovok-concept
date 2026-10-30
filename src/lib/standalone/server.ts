@@ -174,13 +174,13 @@ type Handler<R, C> = (request: R, context: C) => Promise<Response> | Response
  */
 export function withStandaloneDb<R extends Request, C>(
   handler: Handler<R, C>,
-): (request: R, context: C) => Promise<Response> {
+): (request: R, context?: C) => Promise<Response> {
   return async (incoming, routeContext) => {
     const unwrapped = await unwrap(incoming as unknown as NextRequest)
     const { overlay, carried } = unwrapped
     const request = unwrapped.request as unknown as R
     const ctx: Context = { overlay, user: userOfCookie(cookieOf(incoming)), pending: [] }
-    const response = await context.run(ctx, () => handler(request, routeContext))
+    const response = await context.run(ctx, () => handler(request, routeContext as C))
     const finish = async () => {
       for (let i = 0; i < ctx.pending.length; i += 1) await ctx.pending[i]
       return ctx.db?.changes ?? {}

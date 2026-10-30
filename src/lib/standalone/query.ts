@@ -546,7 +546,12 @@ export class Query<T = any> implements PromiseLike<QueryResult<T>> {
     const { data, error } = await this.source.rpc(name, args)
     if (error) return failed(error, error.code === '42501' ? 403 : 400)
     if (!Array.isArray(data)) return ok(data)
-    const rows = (data as Row[]).filter((row) => row && typeof row === 'object' && this.matches(row, this.filters))
+    // A function of scalars (`setof text`) has no columns to select or filter: its list as it is, paged.
+    if (!data.every((row) => row && typeof row === 'object')) {
+      const page = this.from === undefined ? data : data.slice(this.from, (this.to ?? data.length - 1) + 1)
+      return ok(page)
+    }
+    const rows = (data as Row[]).filter((row) => this.matches(row, this.filters))
     const table = this.source.rpcTable?.(name) ?? name
     return this.shape(table, rows)
   }
