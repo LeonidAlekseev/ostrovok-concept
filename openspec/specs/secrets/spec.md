@@ -1,19 +1,19 @@
 # secrets Specification
 
 ## Purpose
-Ключи API хранятся в репозитории зашифрованными age (`secrets.env.age` для организаторов, `secrets.app.env.age` для приложения); сборка и сервер получают их, имея в окружении только `AGE_SECRET_KEY`.
+Ключи API хранятся в репозитории зашифрованными age (`secrets.app.env.age`); сборка и сервер получают их, имея в окружении только `AGE_SECRET_KEY`.
 
 ## Requirements
 
 ### Requirement: Зашифрованные ключи в репозитории
-Ключи API SHALL храниться в репозитории только зашифрованными age в бинарном формате: `secrets.env.age` (получатель — ключ организаторов) и `secrets.app.env.age` (получатель — ключ приложения). Открытый `.env` и закрытые ключи SHALL не попадать в git; `.env` SHALL быть в `.gitignore`.
+Ключи API SHALL храниться в репозитории только зашифрованными age в бинарном формате: `secrets.app.env.age` (получатель — ключ приложения). Открытый `.env` и закрытые ключи SHALL не попадать в git; `.env` SHALL быть в `.gitignore`.
 
 #### Scenario: Статус
 - **WHEN** разработчик раскрыл ключи и запустил `git status`
 - **THEN** `.env` и закрытый ключ не видны как новые файлы
 
-#### Scenario: Файлы организаторов
-- **WHEN** проверяют `secrets.env.age` через `age-inspect`
+#### Scenario: Формат файла
+- **WHEN** проверяют `secrets.app.env.age` через `age-inspect`
 - **THEN** заголовок содержит ровно одну запись X25519, файл не читается как текст
 
 #### Scenario: Git
@@ -21,7 +21,7 @@
 - **THEN** вывод пуст
 
 ### Requirement: Обновление зашифрованных файлов одной командой
-`npm run secrets:encrypt` SHALL создавать оба файла заново из `.env`. Команда SHALL останавливаться, если `.env` содержит BOM, CRLF, кавычки, пробелы или строки не вида `KEY=value`.
+`npm run secrets:encrypt` SHALL создавать `secrets.app.env.age` заново из `.env`. Команда SHALL останавливаться, если `.env` содержит BOM, CRLF, кавычки, пробелы или строки не вида `KEY=value`.
 
 #### Scenario: Совпадение
 - **WHEN** `age -d -i <ключ приложения> secrets.app.env.age`

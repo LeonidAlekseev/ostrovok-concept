@@ -1,6 +1,6 @@
 import type { HealthResponse } from './schema'
 
-// Liveness for the Docker healthcheck and the organizers' probe: no database, no keys, always `{ "status": "ok" }`.
+// Liveness for the Docker healthcheck: no database, no keys, always `{ "status": "ok" }`.
 export const dynamic = 'force-dynamic'
 
 export function GET() {
