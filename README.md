@@ -13,7 +13,7 @@
 Вы задаёте критерии. Эвал находит совпадения. Вы выбираете с уверенностью.
 
 - Демонстрация (Google Drive): https://drive.google.com/drive/folders/1OqgiaKfaIsCUoaC14TO32cFgW4dHG0A5?usp=sharing
-- Вебсайт (Vercel Production): https://lilteam-ostrovok.vercel.app
+- Вебсайт (Vercel Production): https://ostrovok-concept.vercel.app
 
 ## Ветка `standalone`: демо-версия без базы
 
@@ -23,7 +23,7 @@
 `scripts/export-standalone.ts` (только чтение) и больше не обновляется.
 
 - Supabase не нужен: переменные `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_*` и `GIGACHAT_AUTH_KEY` не используются.
-- Нужен только `NVIDIA_API_KEY` (или `AGE_SECRET_KEY`): ответы Эвала, вектор запроса, фото. Без ключа — ответы по правилам.
+- Нужен только `NVIDIA_API_KEY` (или `AGE_SECRET_KEY`: в `secrets.app.env.age` этой ветки только он): ответы Эвала, вектор запроса, фото. Без ключа — ответы по правилам.
 - Демо-кабинеты путешественника и отельера открываются кнопками входа без паролей. Новые чаты, сообщения отельеру,
   ответы отельера, брони и ссылки «Поделиться» хранятся в браузере (`localStorage`) и видны только в нём.
 - `docker compose up --build` запускает ту же демо-версию на `:8080`; команды `make seed*`, `restore-local`, `dump-db`
