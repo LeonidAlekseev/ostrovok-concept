@@ -13,15 +13,15 @@
 Вы задаёте критерии. Эвал находит совпадения. Вы выбираете с уверенностью.
 
 - Демонстрация (Google Drive): https://drive.google.com/drive/folders/1OqgiaKfaIsCUoaC14TO32cFgW4dHG0A5?usp=sharing
-- Вебсайт (Vercel Production): https://lilteam-ostrovok.vercel.app
+- Вебсайт (Vercel Production): https://ostrovok-concept.vercel.app
 
 ## Быстрый старт
 
 Нужен только Docker (Docker Desktop на Windows и macOS). Установка Node.js не нужна.
 
 ```bash
-git clone https://github.com/ostrovok-hackathon-2026/lil-team.git
-cd lil-team
+git clone https://github.com/LeonidAlekseev/ostrovok-concept.git
+cd ostrovok-concept
 cp .env.example .env     # вписать значения переменных или только AGE_SECRET_KEY (см. ниже)
 docker compose up --build
 ```
@@ -44,8 +44,7 @@ docker compose up --build
 
 1. Одна строка `AGE_SECRET_KEY=AGE-SECRET-KEY-1…` — закрытый ключ приложения. Остальные переменные приложение и сборка
    расшифруют сами из `secrets.app.env.age`.
-2. Все переменные из `.env.example` со значениями. Организаторы берут их из `secrets.env.age`
-   (`age -d -i <свой ключ> -o .env secrets.env.age`).
+2. Все переменные из `.env.example` со значениями (их даёт владелец проекта).
 
 Пошагово для Docker Desktop (Windows, macOS) — [docs/docker.md](docs/docker.md).
 
@@ -72,16 +71,8 @@ docker compose up --build
 | `DEMO_HOTELIER_EMAIL`, `DEMO_HOTELIER_PASSWORD` | пусто             | демо-отельер (то же)                                                                 |
 | `PORT`, `HOSTNAME`                              | `8080`, `0.0.0.0` | порт и адрес сервера в контейнере (заданы в `Dockerfile`)                            |
 
-**Ключи для организаторов — `secrets.env.age` в корне репозитория.** Это зашифрованный `.env` со всеми переменными
-таблицы выше. Он зашифрован только публичным ключом организаторов
-`age1932fu7f70rwyfhaxflyfszz4gf6avxwc95wc0yjwm6zns9tspycqpgdnc0`, прочитать его можно только их закрытым ключом:
-
-```bash
-age -d -i <закрытый ключ организаторов> -o .env secrets.env.age
-docker compose up --build
-```
-
-Второй файл, `secrets.app.env.age`, зашифрован ключом приложения (`AGE_SECRET_KEY`) для Vercel и Docker. Открытый
+**Ключи в репозитории — `secrets.app.env.age`.** Это зашифрованный `.env` со всеми переменными таблицы выше, его
+открывает ключ приложения (`AGE_SECRET_KEY`) на Vercel и в Docker. Открытый
 `.env` в git не попадает: он в `.gitignore`, а `git ls-files .env` ничего не выводит. Подробности —
 [docs/secrets.md](docs/secrets.md).
 

@@ -1,5 +1,5 @@
 ## 1. Секреты age
-- [x] 1.1 `.env` из `.env.local.secret`, `secrets.env.age` (ключ организаторов), `secrets.app.env.age` (наш ключ).
+- [x] 1.1 `.env` из `.env.local.secret`, `secrets.app.env.age` (наш ключ).
 - [x] 1.2 `secrets:encrypt`, `secrets:reveal`, prebuild; `src/lib/secrets.ts`, `secretsFile.mjs`, тесты.
 - [x] 1.3 Удалить git-secret, `openpgp`; `.gitignore`, `.env.example`.
 ## 2. Docker

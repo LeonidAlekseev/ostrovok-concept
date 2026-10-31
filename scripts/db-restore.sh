@@ -11,7 +11,7 @@ set -eu
 cd "$(dirname "$0")/.."
 DIR=dist/db-dump
 TAG=${TAG:-data-2026-10-29}
-REPO=${REPO:-ostrovok-hackathon-2026/lil-team}
+REPO=${REPO:-LeonidAlekseev/ostrovok-concept}
 IMAGE=postgres:17-alpine
 NETWORK=ostrovok-local_default
 
