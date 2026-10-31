@@ -20,13 +20,12 @@
 ## Файлы
 
 - `Dockerfile` — стадии `deps` (`npm ci`), `source`, `build` (`next build` с `output: 'standalone'`, включается
-  `NEXT_OUTPUT=standalone` только в образе), `runner` (только `server.js`, `.next/static`, `public`, `secrets.app.env.age`)
+  `NEXT_OUTPUT=standalone` только в образе), `runner` (только `server.js`, `.next/static`, `public`, `data/standalone`)
   и `tools` (зависимости и `scripts/` для `make seed`; плюс `uv` и `python3` из apk для `scripts/*.py`, в `runner` их нет). Базовый образ закреплён: `node:24.22.1-alpine3.24`.
 - Рантайм — Alpine с busybox (POSIX sh, без bash), процесс от пользователя `app`, порт `8080`, логи в stdout и stderr.
-- `docker-compose.yml` — сервис `app` (`platform: linux/amd64`, `env_file: .env`, `8080:8080`, healthcheck по `/health`)
+- `docker-compose.yml` — сервис `app` (`platform: linux/amd64`, `8080:8080`, healthcheck по `/health`, без `.env`)
   и сервис `tools` (профиль `tools`, `up` его не запускает).
-- `docker-compose.override.yml` — ротация логов и монтирование `secrets.app.env.age` (обновить секреты можно
-  перезапуском, без пересборки).
+- `docker-compose.override.yml` — ротация логов.
 - `docker-compose.local.yml`, `docker/local-supabase/`, `.env.local-supabase.example` — дополнительный вариант с локальной
   Supabase.
 - `Makefile` — `make up`, `make down`, `make logs`, `make seed`; `make up-local`, `make down-local`, `make seed-local`, `make seed-local-geo`, `make restore-local`, `make dump-db`.
@@ -37,9 +36,7 @@
 1. Установить [Docker Desktop](https://www.docker.com/products/docker-desktop/) и запустить его (на Windows включить
    WSL 2 в мастере установки). Проверить: `docker --version`.
 2. `git clone <репозиторий>` и `cd` в папку.
-3. `cp .env.example .env` (Windows PowerShell: `Copy-Item .env.example .env`) и вписать значения:
-   - либо **все переменные** — значения даёт владелец проекта;
-   - либо **одну `AGE_SECRET_KEY=AGE-SECRET-KEY-1…`** — ключ приложения, остальное расшифруется из `secrets.app.env.age`.
+3. Ветка `standalone` — демо-версия без базы и без ключей: `.env` не нужен.
 4. `docker compose up --build` (или `make up`), затем http://localhost:8080.
 5. Остановить: `Ctrl+C`, затем `docker compose down` (`make down`).
 
@@ -47,11 +44,8 @@
 
 ## Что внутри образа
 
-Секретов нет: `COPY .env` отсутствует, значения не пишутся в слои. Сборке нужны `NEXT_PUBLIC_SUPABASE_URL` и
-`NEXT_PUBLIC_SUPABASE_ANON_KEY` (каталог пререндерится из Supabase): их compose передаёт аргументами сборки из `.env`, а
-если их нет — расшифровывает из `secrets.app.env.age` ключом `AGE_SECRET_KEY`, который передаётся секретом сборки
-(`--mount=type=secret`) и в образе не остаётся. Во время работы серверные ключи берутся из окружения контейнера
-(`env_file`) или расшифровываются из `secrets.app.env.age` (см. [«Ключи API»](secrets.md)).
+Секретов нет: демо-версия (`standalone`) собирается из снимка `data/standalone` и не читает ни ключей, ни `.env`;
+`COPY .env` отсутствует.
 
 ## TLS: сертификат НУЦ Минцифры (GigaChat)
 

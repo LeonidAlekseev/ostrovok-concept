@@ -872,6 +872,9 @@ export interface AssistantResponse {
 export const NOT_FOUND = 'Пока не нашёл точных совпадений. Давайте расширим поиск — можно изменить параметры.'
 
 /** What Эвал says about a hotel when it cannot answer at all (no network, the route is down). */
+/** Эвал's only answer in the standalone demo (src/app/api/assistant/route.ts): no model is asked. */
+export const VACATION_REPLY = 'Извините, я в отпуске!)'
+
 export const HOTEL_UNAVAILABLE = 'Сейчас не могу ответить. Попробуйте позже.'
 
 export const MAX_MESSAGE_LENGTH = 500
