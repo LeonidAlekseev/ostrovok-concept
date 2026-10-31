@@ -4,6 +4,7 @@ import { useSession } from '@/hooks/useStore'
 import {
   askAssistant,
   HOTEL_UNAVAILABLE,
+  VACATION_REPLY,
   briefWithStay,
   makePlan,
   mergeBrief,
@@ -119,6 +120,8 @@ export function compose(
   before?: Brief,
 ): { brief: Brief; question: Question | null; text: string; data: ChatMessage['data'] } {
   const { brief, reply: remark, matches, features, missing = [], photo } = response
+  // The standalone demo: Эвал is on vacation, the answer is the whole message — no question, no plan.
+  if (remark === VACATION_REPLY) return { brief, question: null, text: remark, data: {} }
   const today = todayIso()
   // A chat about the bookings: the answer and the change of the dates it proposes, to be confirmed.
   if (brief.trips) {

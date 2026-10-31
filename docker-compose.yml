@@ -1,14 +1,11 @@
-# docker compose up --build  → http://localhost:8080. Keys: .env (cp .env.example .env, fill in the values or
-# only AGE_SECRET_KEY); see README. The standalone demo: no database, the data are inside the image.
+# docker compose up --build  → http://localhost:8080. The standalone demo: no database, no keys, the data are inside
+# the image; see README.
 services:
   app:
     build:
       context: .
       target: runner
-      secrets:
-        - age_secret_key
     platform: linux/amd64
-    env_file: .env
     ports:
       - '8080:8080'
     healthcheck:
@@ -27,7 +24,3 @@ services:
       target: tools
     platform: linux/amd64
     env_file: .env
-
-secrets:
-  age_secret_key:
-    environment: AGE_SECRET_KEY

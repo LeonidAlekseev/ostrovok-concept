@@ -22,8 +22,11 @@
 расчёты вида и шума, демо-чаты) и карты шума и вида в `public/standalone/maps`. Снимок снят один раз скриптом
 `scripts/export-standalone.ts` (только чтение) и больше не обновляется.
 
-- Supabase не нужен: переменные `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_*` и `GIGACHAT_AUTH_KEY` не используются.
-- Нужен только `NVIDIA_API_KEY` (или `AGE_SECRET_KEY`: в `secrets.app.env.age` этой ветки только он): ответы Эвала, вектор запроса, фото. Без ключа — ответы по правилам.
+- Ключи и переменные окружения не нужны: ни Supabase, ни GigaChat, ни NVIDIA API демо-версия не вызывает,
+  зашифрованного `secrets.app.env.age` в этой ветке нет.
+- Эвал на любое сообщение отвечает «Извините, я в отпуске!)». Поиск на сайте — по словам, без векторов запроса.
+- Внешние ресурсы остались только в браузере: фото отелей с CDN Островка и подложка карты OpenFreeMap; на сервере —
+  гео-инструменты OpenStreetMap (Overpass, Nominatim, OSRM) для мест вне снимка.
 - Демо-кабинеты путешественника и отельера открываются кнопками входа без паролей. Новые чаты, сообщения отельеру,
   ответы отельера, брони и ссылки «Поделиться» хранятся в браузере (`localStorage`) и видны только в нём.
 - `docker compose up --build` запускает ту же демо-версию на `:8080`; команды `make seed*`, `restore-local`, `dump-db`
@@ -36,8 +39,7 @@
 ```bash
 git clone https://github.com/LeonidAlekseev/ostrovok-concept.git
 cd ostrovok-concept
-cp .env.example .env     # вписать значения переменных или только AGE_SECRET_KEY (см. ниже)
-docker compose up --build
+docker compose up --build   # демо-версия: .env и ключи не нужны
 ```
 
 Через 5–10 минут (первая сборка) http://localhost:8080 работает. Остановить: `Ctrl+C`, затем `docker compose down`.
@@ -54,7 +56,7 @@ docker compose up --build
 | `make restore-local`  | восстановить в локальную базу готовый дамп живой базы вместо `seed-local`       | `sh scripts/db-restore.sh`                                             |
 | `make dump-db`        | снять дамп живой базы (`SUPABASE_DB_URL`, только чтение) в `dist/db-dump/`      | `sh scripts/db-dump.sh`                                                |
 
-Ключи в `.env` даются двумя способами:
+Полной версии (ветки `dev` и `main`, команды `make seed*`) ключи в `.env` даются двумя способами:
 
 1. Одна строка `AGE_SECRET_KEY=AGE-SECRET-KEY-1…` — закрытый ключ приложения. Остальные переменные приложение и сборка
    расшифруют сами из `secrets.app.env.age`.
@@ -85,7 +87,7 @@ docker compose up --build
 | `DEMO_HOTELIER_EMAIL`, `DEMO_HOTELIER_PASSWORD` | пусто             | демо-отельер (то же)                                                                 |
 | `PORT`, `HOSTNAME`                              | `8080`, `0.0.0.0` | порт и адрес сервера в контейнере (заданы в `Dockerfile`)                            |
 
-**Ключи в репозитории — `secrets.app.env.age`.** Это зашифрованный `.env` со всеми переменными таблицы выше, его
+**Ключи полной версии — `secrets.app.env.age` в ветках `dev` и `main`; в `standalone` его нет.** Это зашифрованный `.env` со всеми переменными таблицы выше, его
 открывает ключ приложения (`AGE_SECRET_KEY`) на Vercel и в Docker. Открытый
 `.env` в git не попадает: он в `.gitignore`, а `git ls-files .env` ничего не выводит. Подробности —
 [docs/secrets.md](docs/secrets.md).

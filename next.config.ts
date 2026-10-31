@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
   env: { APP_ENV: process.env.VERCEL_ENV ?? process.env.APP_ENV ?? '' },
   // src/lib/secrets.ts decrypts the API keys at runtime; the file is read by path, so tracing needs a hint.
   // src/lib/standalone/server.ts reads the snapshot of the database the same way (data/standalone).
-  outputFileTracingIncludes: { '/*': ['./secrets.app.env.age', './data/standalone/**/*'] },
+  outputFileTracingIncludes: { '/*': ['./data/standalone/**/*'] },
   turbopack: {
     rules: {
       // Keeps Turbopack from copying every maplibre-gl/dist .mjs into the build; see the loader.

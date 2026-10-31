@@ -1,8 +1,6 @@
 # syntax=docker/dockerfile:1
 # The standalone demo (branch `standalone`): the site without a database, its data the snapshot of data/standalone.
-# Local run: `docker compose up --build`, see README. No secret goes into a layer: the build gets AGE_SECRET_KEY as a
-# build secret; the running container gets NVIDIA_API_KEY from the environment (env_file .env) or decrypts
-# secrets.app.env.age with AGE_SECRET_KEY.
+# Local run: `docker compose up --build`, see README. The demo needs no keys: it calls no external API of its own.
 # The base image is pinned (Node 24 as in CI, Alpine 3.24); the runtime has only POSIX sh and busybox.
 FROM node:24.22.1-alpine3.24 AS deps
 WORKDIR /app
@@ -23,10 +21,7 @@ CMD ["sh"]
 
 FROM source AS build
 ENV NEXT_OUTPUT=standalone
-# `npm run build` runs scripts/secrets.mjs first: with AGE_SECRET_KEY it writes .env.production.local, removed right after.
-RUN --mount=type=secret,id=age_secret_key,required=false \
-    if [ -s /run/secrets/age_secret_key ]; then AGE_SECRET_KEY="$(cat /run/secrets/age_secret_key)"; export AGE_SECRET_KEY; fi; \
-    npm run build && rm -f .env.production.local
+RUN npm run build
 
 FROM node:24.22.1-alpine3.24 AS runner
 WORKDIR /app

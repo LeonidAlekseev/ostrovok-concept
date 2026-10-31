@@ -32,8 +32,6 @@ jobs:
 
   docker:
     runs-on: ubuntu-latest
-    env:
-      AGE_SECRET_KEY: ${{ secrets.AGE_SECRET_KEY }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -48,7 +46,6 @@ jobs:
       - name: docker build (tools, no keys needed)
         run: docker build --target tools -t ostrovok-tools .
 
-      # The runtime image prerenders the catalogue from Supabase, so it needs the project key (repository secret).
+      # The standalone demo builds from the snapshot of data/standalone: no keys.
       - name: docker build (app)
-        if: env.AGE_SECRET_KEY != ''
-        run: docker build --target runner --secret id=age_secret_key,env=AGE_SECRET_KEY -t ostrovok-app .
+        run: docker build --target runner -t ostrovok-app .
