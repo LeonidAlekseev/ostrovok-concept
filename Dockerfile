@@ -16,6 +16,9 @@ COPY . .
 # they are only in this stage, the runner image does not have them.
 FROM source AS tools
 ENV NODE_ENV=development UV_PYTHON_PREFERENCE=only-system
+# The base image pins Alpine 3.24: its repository keeps only the current build of a package, so a pinned apk version
+# would break the build at its next update.
+# hadolint ignore=DL3018
 RUN apk add --no-cache uv python3
 CMD ["sh"]
 
